@@ -512,6 +512,7 @@ domain model://perspectives.domains#CouchdbManagement
               -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
               create_ context ModelManifest named manifestname bound to origin
               bind currentactor to Author in origin >> binding >> context
+              -- dit werkt.
               DomeinFileName = manifestname + ".json" for origin >> binding
 
   case ModelManifest 
@@ -521,6 +522,7 @@ domain model://perspectives.domains#CouchdbManagement
       aspect sys:ModelManifest$External
       -- Description
       -- IsLibrary
+      -- DomeinFileName
       -- Notice that we have to register the LocalModelName on the filled context role in the collection,
       -- so we can create ModelManifest with a user-defined name. 
       -- The Model URI (the 'logical name' of the model), e.g. model://perspectives.domains#System.
@@ -551,7 +553,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (Description, IsLibrary, VersionToInstall) verbs (SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
-        props (Versions$Version, VersionedModelManifest$External$Description) verbs (SetPropertyValue)
+        props (Versions$Version, Description) verbs (SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
         props (FirstName, LastName) verbs (Consult)
@@ -568,12 +570,12 @@ domain model://perspectives.domains#CouchdbManagement
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
-        props (ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
+        props (Description, IsLibrary, VersionToInstall, DomeinFileName) verbs (Consult)
       -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepuliceerd worden?
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
-        props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName) verbs (Consult)
+        props (Versions$Version, Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName) verbs (Consult)
         action StartUsing
           -- This method also adds an instance of ModelsInUse and adds the VersionedModelURI to property ModelToRemove.
           -- It also sets InstalledPatch and InstalledBuild.
@@ -599,7 +601,7 @@ domain model://perspectives.domains#CouchdbManagement
       screen "Model Manifest"
         row 
           form "This Manifest" External
-            props (ModelManifest$External$Description, VersionToInstall) verbs (Consult)
+            props (Description, VersionToInstall) verbs (Consult)
         row
           table "Model versions" Versions
 
@@ -607,7 +609,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- BUT HOW?
     user ActiveUser filledBy Repository$Accounts
       perspective on Versions
-        props (Versions$Version, VersionedModelManifest$External$Description) verbs (Consult)
+        props (Versions$Version, Description) verbs (Consult)
 
     context Versions (relational) filledBy VersionedModelManifest
       aspect sys:ModelManifest$Versions
@@ -625,6 +627,7 @@ domain model://perspectives.domains#CouchdbManagement
               bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
               -- NOTE that we conceivably might add a version with a lower number than the highest.
               VersionToInstall = v for context >> extern
+              -- dit werkt
               Patch = 0
               Build = 0
 
@@ -698,7 +701,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
-        props (External$DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
+        props (DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
@@ -711,7 +714,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (External$Version, Description, IsRecommended, Patch, Build) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (Version, Description, IsRecommended, Patch, Build) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
       perspective on Manifest
         props (ModelURI) verbs (Consult) 
       screen "Model version"
@@ -727,7 +730,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Author
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
-        props (External$Version) verbs (Consult)
+        props (Version) verbs (Consult)
 
       screen "Manifest"
         row

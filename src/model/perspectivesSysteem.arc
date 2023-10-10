@@ -420,6 +420,7 @@ domain model://perspectives.domains#System
         pattern = "^[0-9]+\\.[0-9]+$" "The form MAJOR.MINOR where both are integer numbers."
       -- E.g. "System@1.0.0"
       property VersionedLocalModelName = (context >> extern >> binder Manifests >> LocalModelName >>= first) + "@" + Versions$Version
+      -- dit kan weer weg!
       property DomeinFileName (String)
 
   case VersionedModelManifest
