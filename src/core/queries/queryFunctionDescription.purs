@@ -169,13 +169,14 @@ handleSequenceFunctions :: Partial => QueryFunctionDescription -> Array QueryFun
 handleSequenceFunctions (BQD dom (BinaryCombinator ComposeF) f1 f2 ran fun man) cumulator = 
   handleSequenceFunctions f2 (snoc cumulator f1)
 -- Bottom case.
-handleSequenceFunctions qfd@(BQD dom (BinaryCombinator ComposeSequenceF) f1 f2 ran fun man) cumulator = case uncons cumulator of
+handleSequenceFunctions qfd@(BQD dom (BinaryCombinator ComposeSequenceF) f1 sequenceFunction ran fun man) cumulator = case uncons cumulator of
   Nothing -> qfd
   Just {head, tail} -> let
-    left = foldl makeComposition head tail
+    -- foldl will create a left-associative composition of all terms.
+    left = foldl makeComposition head (snoc tail f1)
     in
-    (BQD dom (BinaryCombinator ComposeSequenceF) left f2 ran True man)
--- No ComposeSequenceF found.
+    (BQD dom (BinaryCombinator ComposeSequenceF) left sequenceFunction ran True man)
+-- Other bottom case. No ComposeSequenceF found. Foldr will reconstruct the original right-associative composition.
 handleSequenceFunctions last cumulator = foldr makeComposition last cumulator
 -----------------------------------------------------------------------------------------
 ---- BOOLEAN FUNCTIONS
