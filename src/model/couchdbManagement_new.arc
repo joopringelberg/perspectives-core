@@ -148,8 +148,8 @@ domain model://perspectives.domains#CouchdbManagement
     --storage public
     external
       -- The location of the CouchdbServer_. 
-      property ServerUrl = binder CouchdbServers >> Url
-      property CouchdbPort = binder CouchdbServers >> CouchdbServers$CouchdbPort
+      property ServerUrl (functional) = binder CouchdbServers >> Url
+      property CouchdbPort (functional) = binder CouchdbServers >> CouchdbServers$CouchdbPort
       property Name (String)
 
       -- This covers the case we get a CouchdbServer that we did not create ourselves.
@@ -304,40 +304,27 @@ domain model://perspectives.domains#CouchdbManagement
               baseurl <- context >> extern >> ServerUrl
               couchdburl <- "http://localhost:" + context >> extern >> CouchdbPort + "/"
               readmodels <- "models_" + NameSpace_
-              -- writemodels <- "models_" + NameSpace_ + "_write"
               readinstances <- "cw_" + NameSpace_
-              -- writeinstances <- "cw_" + NameSpace_ + "_write"
             in 
               -- models
               callEffect cdb:CreateCouchdbDatabase( baseurl, readmodels )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
-              -- callEffect cdb:CreateCouchdbDatabase( baseurl, writemodels )
-              -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writemodels, readmodels )
               -- instances
               callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
-              -- callEffect cdb:CreateCouchdbDatabase( baseurl, writeinstances )
-              -- callEffect cdb:ReplicateContinuously( baseurl, couchdburl, writeinstances, readinstances )
         on exit
           do for Admin
             letA
               baseurl <- context >> extern >> ServerUrl
               readmodels <- "models_" + NameSpace_
-              -- writemodels <- "models_" + NameSpace_ + "_write"
               readinstances <- "cw_" + NameSpace_
-              -- writeinstances <- "cw_" + NameSpace_ + "_write"
             in 
               -- models
-              -- callEffect cdb:EndReplication( baseurl, writemodels, readmodels )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
-              -- callEffect cdb:DeleteCouchdbDatabase( baseurl, writemodels )
               -- instances
-              -- callEffect cdb:EndReplication( baseurl, writeinstances, readinstances )
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
-              -- callEffect cdb:DeleteCouchdbDatabase( baseurl, writeinstances )
-              -- remove role binding >> context >> Repository$Admin
 
       -- THIS STATE WILL NOT BE REVISITED WHEN ALL MANIFESTS ARE REMOVED,
       -- because the role instance state is re-evaluated BEFORE the instance is actually thrown away.
@@ -375,18 +362,16 @@ domain model://perspectives.domains#CouchdbManagement
       -- Only public repositories will be visible to Accounts of CouchdbServers.
       property IsPublic (mandatory, Boolean)
       -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
-      property NameSpace = binder Repositories >> Repositories$NameSpace
+      property NameSpace (functional) = binder Repositories >> Repositories$NameSpace
       property ReadModels = "models_" + NameSpace_
-      -- property WriteModels = "models_" + NameSpace_ + "_write"
       property ReadInstances = "cw_" + NameSpace_
-      -- property WriteInstances = "cw_" + NameSpace_ + "_write"
       -- The location of the CouchdbServer_. 
-      property ServerUrl = binder Repositories >> context >> extern >> ServerUrl
+      property ServerUrl (functional) = binder Repositories >> context >> extern >> ServerUrl
       property RepositoryUrl = "https://" + NameSpace + "/"
       property AdminLastName = context >> Admin >> LastName
 
     -- We need the ServerAdmin in this context in order to configure the local Admin and to give Authors write access.
-    user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin
+    user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin >>= first
       perspective on Admin
         only (Create, Fill, RemoveFiller, Remove)
         props (SpecificUserName, Password) verbs (SetPropertyValue)
@@ -455,9 +440,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
         only (Create, Fill, Delete, Remove)
-        props (Description, Manifests$LocalModelName) verbs (Consult)
+        props (Description, LocalModelName) verbs (Consult)
         in object state NoLocalModelName
-          props (Manifests$LocalModelName) verbs (SetPropertyValue)
+          props (LocalModelName) verbs (SetPropertyValue)
       
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
@@ -500,7 +485,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- The instances of Repository are published in the cw_servers_and_repositories database.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
       perspective on Manifests
-        props (Manifests$LocalModelName) verbs (Consult)
+        props (LocalModelName) verbs (Consult)
       perspective on extern
         props (NameSpace_, NameSpace) verbs (Consult)
 
@@ -514,32 +499,34 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- This role is in the public Visitor perspective. These are all models that
     -- are stored in this Repository.
-    context Manifests filledBy ModelManifest
+    context Manifests (relational) filledBy ModelManifest
       aspect sys:ManifestCollection$Manifests
-      -- Manifests$LocalModelName
-      state NoLocalModelName = not exists Manifests$LocalModelName
-      state ReadyToMake = (exists Manifests$LocalModelName) and not exists binding
+      -- LocalModelName
+      state NoLocalModelName = not exists LocalModelName
+      state ReadyToMake = (exists LocalModelName) and not exists binding
         on entry
           do for Admin
-            -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
-            create_ context ModelManifest named (context >> extern >> NameSpace_ + "-" + Manifests$LocalModelName) bound to origin
-            bind currentactor to Author in origin >> binding >> context
+            letA 
+              manifestname <- (context >> extern >> NameSpace_ + "-" + LocalModelName)
+            in
+              -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
+              create_ context ModelManifest named manifestname bound to origin
+              bind currentactor to Author in origin >> binding >> context
+              DomeinFileName = manifestname + ".json" for origin >> binding
 
   case ModelManifest 
     aspect sys:ModelManifest
 
     external
       aspect sys:ModelManifest$External
-      -- ModelManifest$External$Description (mandatory, String)
-      -- IsLibrary (mandatory, Boolean)
+      -- Description
+      -- IsLibrary
       -- Notice that we have to register the LocalModelName on the filled context role in the collection,
       -- so we can create ModelManifest with a user-defined name. 
-      -- Here we repeat that name so we can conveniently use it within ModelManifest.
-      property LocalModelName = binder Manifests >> Manifests$LocalModelName >>= first 
       -- The Model URI (the 'logical name' of the model), e.g. model://perspectives.domains#System.
-      property ModelURI = "model://" + context >> Repository >> Repository$External$NameSpace + "#" + LocalModelName
+      property ModelURI (functional) = "model://" + context >> Repository >> Repository$External$NameSpace + "#" + binder Manifests >> LocalModelName >>= first
       -- The location of the CouchdbServer_. 
-      property ServerUrl = binder Manifests >> context >> extern >> ServerUrl
+      property ServerUrl (functional) = binder Manifests >> context >> extern >> ServerUrl
       -- The location where we publish ModelManifest and its versions.
       property PublicUrl = ServerUrl + context >> Repository >> ReadInstances + "/"
       -- The highest version number
@@ -561,7 +548,6 @@ domain model://perspectives.domains#CouchdbManagement
 
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
-        props (LocalModelName) verbs (Consult)
         props (Description, IsLibrary, VersionToInstall) verbs (SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
@@ -582,19 +568,23 @@ domain model://perspectives.domains#CouchdbManagement
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
-        props (LocalModelName, ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
+        props (ModelManifest$External$Description, IsLibrary, VersionToInstall) verbs (Consult)
       -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepuliceerd worden?
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
-        props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI) verbs (Consult)
+        props (Versions$Version, VersionedModelManifest$External$Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName) verbs (Consult)
         action StartUsing
           -- This method also adds an instance of ModelsInUse and adds the VersionedModelURI to property ModelToRemove.
+          -- It also sets InstalledPatch and InstalledBuild.
           callEffect cdb:AddModelToLocalStore( VersionedModelURI )
+          
         action UpdateModel
           letA
+            -- DomeinFileName without version of the origin.
+            dfilename <- context >> extern >> DomeinFileName
             -- Notice that because Versions is a published role, there are no backlinks to roles it fills.
-            basicmodel <- (filter sys:MySystem >> ModelsInUse with filledBy (origin >> binding)) >>= first
+            basicmodel <- (filter sys:MySystem >> ModelsInUse with VersionedModelManifest$External$DomeinFileName == dfilename) >>= first
           in 
             callEffect cdb:UpdateModel( VersionedModelURI, false )
             ModelToRemove = VersionedModelURI for basicmodel
@@ -621,21 +611,22 @@ domain model://perspectives.domains#CouchdbManagement
 
     context Versions (relational) filledBy VersionedModelManifest
       aspect sys:ModelManifest$Versions
-      -- Versions$Version (mandatory, String)
-      -- Versions$LocalModelName = context >> extern >> binder Manifests >> LocalModelName + "@" + Version
-      -- Versions$DomeinFileName (mandatory, String)
+      -- Version
+      -- VersionedLocalModelName
       state ReadyToMake = (exists Versions$Version) and not exists binding
         on entry
           do for Author
             letA
               v <- (context >> extern >> RecommendedVersion) orElse (context >> extern >> HighestVersion)
+              versionname <- context >> extern >> binder Manifests >> context >> extern >> NameSpace_ >>= first + "-" + VersionedLocalModelName
             in
               -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
-              create_ context VersionedModelManifest named (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName) bound to origin
-              DomeinFileName = (context >> Repository >> NameSpace_ + "-" + Versions$LocalModelName + ".json") for origin
+              create_ context VersionedModelManifest named versionname bound to origin
               bind currentactor to VersionedModelManifest$Author in origin >> binding >> context
               -- NOTE that we conceivably might add a version with a lower number than the highest.
               VersionToInstall = v for context >> extern
+              Patch = 0
+              Build = 0
 
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
@@ -646,8 +637,9 @@ domain model://perspectives.domains#CouchdbManagement
           callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, extern >> ArcSource )
           SourcesChanged = false for extern
           LastChangeDT = (callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime) for extern
+          Build = extern >> Build + 1 for extern
         notify Author
-          "Version {extern >> External$Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace}."
+          "Version {extern >> External$Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace >>= first}."
 
     external
       aspect sys:VersionedModelManifest$External
@@ -655,7 +647,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- VersionedModelManifest$External$DomeinFileName
       -- VersionedModelManifest$External$Version
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
-      property ModelURI = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
+      property ModelURI (functional) = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
       property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + External$Version
       property ArcFile (File)
         pattern = "text/arc" "Only .arc files (Perspectives Language source files) are allowed, so use `text//arc."
@@ -665,7 +657,7 @@ domain model://perspectives.domains#CouchdbManagement
       property ArcOK = ArcFeedback matches regexp "^OK"
       property SourcesChanged (Boolean)
       -- property DomeinFile (File)
-      property PublicUrl = binder Versions >> context >> extern >> PublicUrl
+      property PublicUrl (functional) = binder Versions >> context >> extern >> PublicUrl
       -- Only one VersionedModelManifest can be the recommended version at a time.
       property IsRecommended (Boolean)
       -- The (Javascript) DateTime value of the last upload.
@@ -689,7 +681,12 @@ domain model://perspectives.domains#CouchdbManagement
           -- Delete the DomeinFile.
           callEffect p:RemoveFromRepository( VersionedModelManifest$External$ModelURI )
 
-      state ReadyToCompile = ((exists ArcSource) and exists External$Version)
+      state ReadyToCompile = (exists External$Version) and (exists ArcSource)
+      
+      state CompileAutomatically = (exists ArcSource) and callExternal sensor:ReadSensor("clock", "now") returns DateTime > LastChangeDT
+        on entry
+          do for Author
+            delete property ArcFeedback
 
       state ProcessArc = (exists ArcSource) and not exists ArcFeedback
         on entry
@@ -701,8 +698,8 @@ domain model://perspectives.domains#CouchdbManagement
 
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
-        props (DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended) verbs (SetPropertyValue)
+        props (External$DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
 
         in object state ReadyToCompile
           action RestoreState
@@ -714,8 +711,7 @@ domain model://perspectives.domains#CouchdbManagement
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        -- is ModelURI nog steeds een probleem?
-        props (External$Version, Description, IsRecommended) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
+        props (External$Version, Description, IsRecommended, Patch, Build) verbs (Consult) -- ModelURI geeft een probleem. Probeer VersionedModelManifest$External$ModelURI.
       perspective on Manifest
         props (ModelURI) verbs (Consult) 
       screen "Model version"

@@ -103,12 +103,19 @@ domain model://perspectives.domains#System
       -- We can actually only show properties that are in that perspective.
       perspective on ModelsInUse
         only (Remove)
-        props (VersionedModelManifest$External$LocalModelName, Description, Version) verbs (Consult)
+        props (ModelName, Description, Version, Patch, Build) verbs (Consult)
+        props (InstalledPatch, InstalledBuild, UpdateOnBuild) verbs (SetPropertyValue)
       perspective on ModelsToUpdate
-        props (VersionedModelManifest$External$LocalModelName, Description, Version) verbs (Consult)
-        action Update
-          -- Update the version number in order to update.
-          callEffect cdb:UpdateModel( callExternal util:Replace( "@.*$", "@" + Version, ModelToRemove ) returns String, false )
+        props (ModelName, Description, Version) verbs (Consult)
+        in object state InstallUpdate
+          action InstallPatch
+            callEffect cdb:UpdateModel( ModelToRemove, false )
+            InstalledPatch = Patch
+            InstalledBuild = Build
+        in object state InstallBuild
+          action UpdateBuild
+            callEffect cdb:UpdateModel( ModelToRemove, false )
+            InstalledBuild = Build
       perspective on BaseRepository
         props (Domain) verbs (Consult)
       perspective on Repositories
@@ -174,17 +181,24 @@ domain model://perspectives.domains#System
 
     context ModelsInUse (relational) filledBy sys:VersionedModelManifest
       property ModelToRemove (String)
+      property InstalledPatch (Number)
+      property InstalledBuild (Number)
+      property UpdateOnBuild (Boolean)
+      state InstallBuild = UpdateOnBuild and InstalledBuild < Build
+      state InstallUpdate = InstalledPatch < Patch
       on exit
         -- notify User
         --   "Model {ModelToRemove} has been removed completely."
         do for User
           callDestructiveEffect cdb:RemoveModelFromLocalStore ( ModelToRemove )
     
-    context ModelsToUpdate = filter ModelsInUse with 
-      -- Compare the Patch part of the Semantic Versioning string (the least or rightmost part).
-      callExternal util:SelectR( "\\.(\\d+)$", ModelToRemove ) returns Number
-      -- Dit is gebaseerd op het verkeerde idee dat ik in een VersionedModel het patch deel zou aanpassen.
-        < callExternal util:SelectR( "\\.(\\d+)$", Version ) returns Number
+    context ModelsToUpdate = filter ModelsInUse with isInState InstallUpdate or isInState InstallBuild
+
+    -- context ModelsToUpdate = filter ModelsInUse with 
+    --   -- Compare the Patch part of the Semantic Versioning string (the least or rightmost part).
+    --   callExternal util:SelectR( "\\.(\\d+)$", ModelToRemove ) returns Number
+    --   -- Dit is gebaseerd op het verkeerde idee dat ik in een VersionedModel het patch deel zou aanpassen.
+    --     < callExternal util:SelectR( "\\.(\\d+)$", Version ) returns Number
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.
     context IndexedContexts (mandatory) filledBy sys:RootContext
@@ -394,26 +408,30 @@ domain model://perspectives.domains#System
       aspect sys:RootContext$External
       property Description (mandatory, String)
       property IsLibrary (mandatory, Boolean)
-
+      -- The value of this property will be set automatically by the Couchdb:VersionedModelManifest$Author.
+      -- It must be a local DomeinFileId, e.g. perspectives_domains-System.json (WITHOUT the version!)
+      property DomeinFileName (mandatory, String)
+      
     context Versions (relational) filledBy VersionedModelManifest
       -- This value must be entered by the user. 
       -- We need it on this role so we can create an instance of VersionedModelManifest based on
       -- the Version value.
       property Version (mandatory, String)
+        pattern = "^[0-9]+\\.[0-9]+$" "The form MAJOR.MINOR where both are integer numbers."
       -- E.g. "System@1.0.0"
-      property LocalModelName = (context >> extern >> binder Manifests >> Manifests$LocalModelName >>= first) + "@" + Versions$Version
-      -- The value of this property will be set automatically by the Couchdb:VersionedModelManifest$Author.
-      -- It must be a DomeinFileId, e.g. perspectives_domains-System@1.0.0.json
-      property DomeinFileName (mandatory, String)
+      property VersionedLocalModelName = (context >> extern >> binder Manifests >> LocalModelName >>= first) + "@" + Versions$Version
+      property DomeinFileName (String)
 
   case VersionedModelManifest
     external
+      property ModelName (functional) = binder Versions >> context >> extern >> binder Manifests >> LocalModelName
       property Description (mandatory, String)
       -- Notice that we have to register the DomeinFileName on the context role in the collection (ModelManifest$Versions),
       -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
-      property DomeinFileName (functional) = binder Versions >> Versions$DomeinFileName
-      property Version (functional) = binder Versions >> Versions$Version
-      property LocalModelName (functional) = binder Versions >> Versions$LocalModelName
+      property DomeinFileName (functional) = binder Versions >> context >> extern >> ModelManifest$External$DomeinFileName
+      property Version (functional)        = binder Versions >> Versions$Version
+      property Patch (Number)
+      property Build (Number)
     user Visitor = sys:Me
       perspective on extern
         props (Description, DomeinFileName) verbs (Consult)
