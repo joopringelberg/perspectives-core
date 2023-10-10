@@ -125,6 +125,6 @@ propertyTypeIsCalculated = getProperty >=> (case _ of
 -----------------------------------------------------------
 -- FUNCTIONS ON STRING
 -----------------------------------------------------------
-getProperType :: String -> MonadPerspectives PropertyType
-getProperType s = ((getEnumeratedProperty $ EnumeratedPropertyType s) >>= pure <<< ENP <<< identifier)
+getPropertyType :: String -> MonadPerspectives PropertyType
+getPropertyType s = ((getEnumeratedProperty $ EnumeratedPropertyType s) >>= pure <<< ENP <<< identifier)
   <|> ((getCalculatedProperty $ CalculatedPropertyType s) >>= pure <<< CP <<< identifier)

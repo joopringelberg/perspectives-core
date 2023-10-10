@@ -65,7 +65,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
-import Perspectives.Representation.Class.Property (getProperType)
+import Perspectives.Representation.Class.Property (getPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -774,7 +774,7 @@ getHiddenFunction = unsafeCoerce $ compileFunction
 -- | that COULD have the property.
 getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getDynamicPropertyGetter p adt = do
-  (pt :: PropertyType) <- getProperType p
+  (pt :: PropertyType) <- getPropertyType p
   case pt of 
     CP _ -> do 
       allProps <- allLocallyRepresentedProperties adt

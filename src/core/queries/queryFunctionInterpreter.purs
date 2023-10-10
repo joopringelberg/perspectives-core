@@ -71,7 +71,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
-import Perspectives.Representation.Class.Property (getProperType)
+import Perspectives.Representation.Class.Property (getPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
@@ -556,7 +556,7 @@ toString {head} = case head of
 getDynamicPropertyGetter :: String -> RoleInstance ~~> DependencyPath
 getDynamicPropertyGetter p rid = do
   (rt :: EnumeratedRoleType) <- roleType rid
-  (pt :: PropertyType) <- lift2MPQ $ getProperType p
+  (pt :: PropertyType) <- lift2MPQ $ getPropertyType p
   case pt of 
     CP _ -> do 
       allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST rt)
