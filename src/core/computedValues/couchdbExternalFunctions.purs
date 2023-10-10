@@ -48,7 +48,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Generic (Foreign, encodeJSON)
-import Foreign.Object (Object, empty, insert, lookup, singleton)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
@@ -60,7 +60,7 @@ import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAtt
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -222,6 +222,9 @@ addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction 
 addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   unversionedModelname <- pure $ unversionedModelUri modelname
   x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall unversionedModelname
+  {patch, build} <- case x of 
+    Nothing -> pure {patch: "0", build: "0"}
+    Just {versionedModelManifest} -> lift $ getPatchAndBuild versionedModelManifest
   version <- case modelUriVersion modelname of
     Just v -> pure $ Just v
     Nothing -> pure $ _.semver <$> x
@@ -311,13 +314,17 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
         else do
           mySystem <- lift getMySystem
           -- When we update a model M, we search all ModelsInUse for inverted queries that apply to M, and reapply them.
-          -- Therefore, the model we load here on demand should be in 
+          -- Therefore, the model we load here on demand should be in ModelsInUse.
           -- Create a role instance filled with the VersionedModelManifest.
           -- Add the versionedModelName as the value of the property ModelToRemove.
+          -- Set the property InstalledPatch.
           void $ createAndAddRoleInstance (EnumeratedRoleType DEP.modelsInUse) mySystem
             (RolSerialization 
               { id: Nothing
-              , properties: PropertySerialization (singleton DEP.modelToRemove [versionedModelName])
+              , properties: PropertySerialization (fromFoldable
+                  [ Tuple DEP.modelToRemove [versionedModelName]
+                  , Tuple DEP.installedPatch [patch]
+                  , Tuple DEP.installedBuild [build]])
               , binding: unwrap <<< _.versionedModelManifest <$> x})
 
       -- Add new dependencies.

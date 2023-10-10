@@ -98,6 +98,18 @@ modelExternal = "model://perspectives.domains#System$Model$External"
 modelExternalModelIdentification :: String
 modelExternalModelIdentification = "model://perspectives.domains#System$VersionedModelManifest$External$DomeinFileName"
 
+patch :: String
+patch = "model://perspectives.domains#System$VersionedModelManifest$External$Patch"
+
+build :: String
+build = "model://perspectives.domains#System$VersionedModelManifest$External$Build"
+
+installedPatch :: String
+installedPatch =  "model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$InstalledPatch"
+
+installedBuild :: String
+installedBuild =  "model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$InstalledBuild"
+
 ------------------------------------------------------------------------------------
 -- COUCHDBMANAGEMENT
 ------------------------------------------------------------------------------------

@@ -40,16 +40,16 @@ import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (DomeinFileName, ModelUri, buitenRol, deconstructBuitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.ModelDependencies (versionToInstall)
+import Perspectives.ModelDependencies (build, patch, versionToInstall)
 import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
+import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Cacheable (cacheEntity, retrieveInternally)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value)
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Prelude (Unit, bind, discard, identity, map, pure, unit, void, ($), (*>), (<$>), (<<<), (<>), (>>=))
@@ -155,6 +155,19 @@ getVersionToInstall modelUri = case unsafePartial modelUri2ManifestUrl modelUri 
     makeVersionedModelManifest :: String -> RoleInstance -> RoleInstance
     makeVersionedModelManifest semver (RoleInstance modelManifest) = RoleInstance $ buitenRol ((deconstructBuitenRol modelManifest) <> "@" <> semver)
 
+getPatchAndBuild :: RoleInstance -> MonadPerspectives {patch :: String, build :: String}
+getPatchAndBuild rid = do
+  (PerspectRol{_id, properties}) <- getPerspectRol rid
+  case lookup patch properties, lookup build properties of
+    Just p, Just b -> pure {patch: firstOrDefault p, build: firstOrDefault b}
+    Just p, Nothing -> pure {patch: firstOrDefault p, build: default}
+    Nothing, Just b -> pure {patch: default, build: firstOrDefault b}
+    Nothing, Nothing -> pure {patch: default, build: default}
+  where 
+    default :: String
+    default = "0"
+    firstOrDefault :: Array Value -> String
+    firstOrDefault = maybe default unwrap <<< head
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
 
