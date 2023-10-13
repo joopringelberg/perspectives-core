@@ -358,7 +358,7 @@ compileSimpleStep currentDomain (PublicContext pos ident) = do
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True
 
-compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
+compileSimpleStep currentDomain s@(Filler pos membeddingContext) = do
   case currentDomain of
     RDOM (r :: ADT RoleInContext) -> do
       -- The binding of a role is always an ADT RoleInContext.
@@ -385,7 +385,7 @@ compileSimpleStep currentDomain s@(Binding pos membeddingContext) = do
                 _ -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames)
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
-compileSimpleStep currentDomain s@(Binder pos binderName membeddingContext) = do
+compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
   case currentDomain of
     (RDOM (adtOfBinder :: ADT RoleInContext)) -> do
       (qBinderType :: EnumeratedRoleType) <- if isTypeUri binderName

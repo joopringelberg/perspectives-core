@@ -162,8 +162,8 @@ type AssumptionRegister = F.Object (F.Object (Array CorrelationIdentifier))
 data InformedAssumption =
   RoleAssumption ContextInstance EnumeratedRoleType
   | Me ContextInstance
-  -- Binding = filler role
-  | Binding RoleInstance                               -- RoleInstance is the role with a binding
+  -- Filler = filler role
+  | Filler RoleInstance                               -- RoleInstance is the role with a binding
   -- FilledRolesAssumption fillerId filledContextType filledType
   | FilledRolesAssumption RoleInstance ContextType EnumeratedRoleType
   | Property RoleInstance EnumeratedPropertyType

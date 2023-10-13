@@ -189,7 +189,7 @@ binding :: RoleInstance ~~> RoleInstance
 binding r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
   handlePerspectRolError' "binding" []
   \(role :: IP.PerspectRol) -> do
-    tell $ ArrayWithoutDoubles [Binding r]
+    tell $ ArrayWithoutDoubles [Filler r]
     case rol_binding role of
       Nothing -> pure []
       (Just b) -> pure [b]
@@ -256,7 +256,7 @@ getFilledRolesFromDatabase rid = ArrayT $ try
     lift $ getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid))
   >>=
   handlePerspectRolError' "getFilledRolesFromDatabase" []
-    \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Binding rid]) *> pure roles
+    \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Filler rid]) *> pure roles
 
 getFilledRolesFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 getFilledRolesFromDatabase_ rid = try 

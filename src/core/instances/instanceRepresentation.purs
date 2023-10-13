@@ -119,7 +119,7 @@ type RolRecord =
   , context :: ContextInstance
   -- While the fields above occur in every role, those below do not.
   , _rev :: Revision_
-  , binding :: Binding
+  , binding :: Filler
   -- The four fields below could also be modeled as Maybe values.
   , properties :: F.Object (Array Value)
   -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
@@ -172,9 +172,9 @@ instance Attachment PerspectRol where
 -----------------------------------------------------------
 -- BINDING
 -----------------------------------------------------------
-type Binding = Maybe RoleInstance
+type Filler = Maybe RoleInstance
 
-binding :: RoleInstance -> Binding
+binding :: RoleInstance -> Filler
 binding id = case id of
   RoleInstance "" -> Nothing
   otherwise -> (Just id)

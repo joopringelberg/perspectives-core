@@ -135,9 +135,9 @@ simpleStep' =
   <|>
   Simple <$> (RoleTypeIndividual <$> getPosition <*> try (token.brackets ((reserved "role") *> arcIdentifier)))
   <|>
-  Simple <$> (Binding <$> (getPosition <* reserved "binding") <*> (optionMaybe (reserved "in" *> arcIdentifier)))
+  Simple <$> (Filler <$> (getPosition <* reserved "binding") <*> (optionMaybe (reserved "in" *> arcIdentifier)))
   <|>
-  Simple <$> (Binder <$> (getPosition <* reserved "binder") <*> arcIdentifier <*> (optionMaybe (reserved "in" *> arcIdentifier)))
+  Simple <$> (Filled <$> (getPosition <* reserved "binder") <*> arcIdentifier <*> (optionMaybe (reserved "in" *> arcIdentifier)))
   <|>
   Simple <$> (Context <$> (getPosition <* reserved "context"))
   <|>
@@ -326,8 +326,8 @@ startOf stp = case stp of
     startOfSimple (Value p _ _) = p
     startOfSimple (PublicRole p _) = p
     startOfSimple (PublicContext p _) = p
-    startOfSimple (Binding p _) = p
-    startOfSimple (Binder p _ _) = p
+    startOfSimple (Filler p _) = p
+    startOfSimple (Filled p _ _) = p
     startOfSimple (Context p) = p
     startOfSimple (Extern p) = p
     startOfSimple (IndexedName p) = p
@@ -368,8 +368,8 @@ endOf stp = case stp of
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
     endOfSimple (PublicRole (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
     endOfSimple (PublicContext (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
-    endOfSimple (Binding (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 7}
-    endOfSimple (Binder (ArcPosition{line, column}) _ _) = ArcPosition{line, column: column + 6}
+    endOfSimple (Filler (ArcPosition{line, column}) _) = ArcPosition{line, column: column + 7}
+    endOfSimple (Filled (ArcPosition{line, column}) _ _) = ArcPosition{line, column: column + 6}
     endOfSimple (Context (ArcPosition{line, column})) = ArcPosition{line, column: column + 7}
     endOfSimple (Extern (ArcPosition{line, column})) = ArcPosition{line, column: column + 6}
     endOfSimple (IndexedName (ArcPosition{line, column})) = ArcPosition{line, column: column + 11}

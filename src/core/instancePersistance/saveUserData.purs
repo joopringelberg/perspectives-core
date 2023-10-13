@@ -61,7 +61,7 @@ import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
+import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
@@ -87,11 +87,8 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
-import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
  
-
-iedereRolInContext :: PerspectContext -> Array RoleInstance
-iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
 
 -- | Add the role instance to the end of the roles to exit.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.

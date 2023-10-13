@@ -107,7 +107,7 @@ runtimeIndexForPropertyQueries eroleType = map unwrap <$> (eroleType ###= roleAs
 -----------------------------------------------------------
 -- COMPUTING KEYS IN COMPILE TIME
 -----------------------------------------------------------
--- | Compute the keys for the filledBy (Binding) step.
+-- | Compute the keys for the filledBy (Filler) step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
 -- | (inverted) query should be stored under.
 compiletimeIndexForFillerQueries :: Partial => QueryFunctionDescription -> (PhaseTwo' MonadPerspectives) (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))

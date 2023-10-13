@@ -636,7 +636,7 @@ createDeltasFromAssumption users (RoleAssumption ctxt roleTypeId) = do
 -- The value of me of a context is indexed, and thus private. It never leads to a delta.
 createDeltasFromAssumption users (Me _) = pure unit
 
-createDeltasFromAssumption users (Binding roleInstance) = do
+createDeltasFromAssumption users (Filler roleInstance) = do
   mbnd <- lift (roleInstance ##> binding)
   case mbnd of
     Nothing -> pure unit
@@ -645,7 +645,7 @@ createDeltasFromAssumption users (Binding roleInstance) = do
       rtype <- lift (bnd ##>> OG.roleType)
       magic ctxt (SerializableNonEmptyArray $ ANE.singleton bnd) rtype users
       (try $ lift $ getPerspectRol roleInstance) >>=
-        handlePerspectRolError "createDeltasFromAssumption:Binding"
+        handlePerspectRolError "createDeltasFromAssumption:Filler"
           \(PerspectRol{bindingDelta}) -> case bindingDelta of
             Nothing -> pure unit
             Just bd -> addDelta $ DeltaInTransaction {users, delta: bd}

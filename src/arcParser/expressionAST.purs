@@ -45,10 +45,10 @@ data SimpleStep =
   | ContextTypeIndividual ArcPosition String
   | RoleTypeIndividual ArcPosition String
   | Value ArcPosition Range String
-  -- Binding has an optional embedding context.
-  | Binding ArcPosition (Maybe String)
-  -- Binder has an optional embedding context.
-  | Binder ArcPosition String (Maybe String)
+  -- Filler has an optional embedding context.
+  | Filler ArcPosition (Maybe String)
+  -- Filled has an optional embedding context.
+  | Filled ArcPosition String (Maybe String)
   | Context ArcPosition
   | Extern ArcPosition
   | IndexedName ArcPosition
@@ -137,10 +137,10 @@ instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   
   prettyPrint' t (ContextTypeIndividual _ s) = "ArcIdentifier " <> s
   prettyPrint' t (RoleTypeIndividual _ s) = "ArcIdentifier " <> s
-  prettyPrint' t (Binding _ embeddingContext) = "Binding " <> (case embeddingContext of
+  prettyPrint' t (Filler _ embeddingContext) = "Filler " <> (case embeddingContext of
     Nothing -> ""
     Just ec -> ec)
-  prettyPrint' t (Binder _ s embeddingContext) = "Binder " <> s <> (case embeddingContext of
+  prettyPrint' t (Filled _ s embeddingContext) = "Filled " <> s <> (case embeddingContext of
     Nothing -> ""
     Just ec -> " " <> ec)
   prettyPrint' t (Context _) = "Context"
