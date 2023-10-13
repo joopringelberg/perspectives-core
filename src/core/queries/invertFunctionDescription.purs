@@ -42,15 +42,15 @@ invertFunction dom qf ran = case qf of
   DataTypeGetter f -> case f of
     -- If we have the external role, use `DataTypeGetter ExternalRoleF`. That is, if the range is a Context.
     ContextF -> if isExternalRole dom
-      then pure $ Just $ DataTypeGetter ExternalRoleF
+      then pure $ Just $ DataTypeGetter ExternalRoleF 
       else Just <<< RolGetter <<< ENR <$> (unsafePartial $ domain2RoleType dom)
-    -- BindingF is the `filledBy` step. So we have filled `filledBy` filler.
-    -- Its inversion is filler `fills` filled, or: filler GetRoleBindersF filled.
-    -- We must qualify GetRoleBindersF with the type that is filled.
+    -- FillerF is the `filledBy` step. So we have filled `filledBy` filler.
+    -- Its inversion is filler `fills` filled, or: filler FilledF filled.
+    -- We must qualify FilledF with the type that is filled.
     -- That is the domain, here!
-    BindingF -> case dom of
+    FillerF -> case dom of
       (RDOM EMPTY) -> pure $ Nothing
-      (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ GetRoleBindersF role context
+      (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ FilledF role context
       otherwise -> pure $ Nothing
     ExternalRoleF -> pure $ Just $ DataTypeGetter ContextF
     -- Identity steps add nothing to the query and can be left out.
@@ -74,7 +74,7 @@ invertFunction dom qf ran = case qf of
     -- A lot of cases will never be seen in a regular query.
     _ -> pure $ Nothing
 
-  GetRoleBindersF _ _ -> pure $ Just $ DataTypeGetter BindingF
+  FilledF _ _ -> pure $ Just $ DataTypeGetter FillerF
 
   PropertyGetter pt -> pure $ Just $ Value2Role pt
 

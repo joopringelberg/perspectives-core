@@ -111,7 +111,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
             Just bw -> pure $ addTermOnRight bw backwards
           storeInvertedQuery 
             (ZQ (Just backwards') forward) 
-            users 
+            users  
             s
             (singleton prop s)
             selfOnly
@@ -148,7 +148,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
       range <- rangeOfPropertyType p
       pure $ makeComposition (SQD (VDOM range (Just p)) (Value2Role p) (domain qfd) True True) qfd
 
-    -- Replace the backwards part of the QueryWithAKink with a composition of a GetRoleBindersF step and the original
+    -- Replace the backwards part of the QueryWithAKink with a composition of a FilledF step and the original
     -- backwards part.
     -- This is a fills step.
     addBindersStep :: ADT RoleInContext -> QueryWithAKink -> MP QueryWithAKink
@@ -158,7 +158,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
       -- We do not know whether the binding (filling role) is an Aspect in its embedding context.
       backwards' <- pure $ makeComposition
         (SQD (RDOM adtOfBinding)
-          (GetRoleBindersF role context)
+          (FilledF role context)
           (RDOM $ ST ric)
           (bool2threeValued fun)
           (bool2threeValued man)) <$> bw

@@ -46,7 +46,7 @@ type VariableName = String
 
 data FunctionName =
   ContextF
-  | BindingF
+  | FillerF
   | ExternalRoleF
   | IndexedContextName
   | IndexedRoleName
@@ -101,7 +101,7 @@ derive instance ordFunctionName :: Ord FunctionName
 -- | The show function produces the very same string that the parser parses.
 instance showFunctionName :: Show FunctionName where
     show ContextF = "context"
-    show BindingF = "binding"
+    show FillerF = "binding"
     show ExternalRoleF = "external" -- TODO klopt dit met de parser?
     show IndexedContextName = "indexedContext"
     show IndexedRoleName = "indexedRole"
@@ -150,7 +150,7 @@ instance readForeignFunctionName :: ReadForeign FunctionName where
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
   ContextF -> True
-  BindingF -> True
+  FillerF -> True
   ExternalRoleF -> True
   IndexedRoleName -> True
   IndexedContextName -> True
@@ -194,7 +194,7 @@ isFunctionalFunction fn = case fn of
 isMandatoryFunction :: FunctionName -> ThreeValuedLogic
 isMandatoryFunction fn = case fn of
   ContextF -> True
-  BindingF -> False
+  FillerF -> False
   ExternalRoleF -> True
   IndexedRoleName -> False
   IndexedContextName -> False
@@ -298,7 +298,7 @@ data QueryFunction
   | TypeTimeOnlyEnumeratedRoleF String
   | TypeTimeOnlyCalculatedRoleF String
 
-  | GetRoleBindersF EnumeratedRoleType ContextType
+  | FilledF EnumeratedRoleType ContextType
 
 
 derive instance genericRepQueryFunction :: Generic QueryFunction _

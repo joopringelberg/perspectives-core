@@ -106,7 +106,7 @@ invert = invert_ >=> traverse h >=> pure <<< catMaybes
 invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
 -- NOTE moeten we hier niet iets met de args?
 invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
-
+ 
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 
 invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
@@ -217,7 +217,7 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
       makeBinding :: ADT RoleInContext -> MP QueryFunctionDescription
       makeBinding adt' = do
         b <- bindingOfADT adt'
-        pure (SQD (RDOM adt') (DataTypeGetter BindingF) (RDOM b) True False)
+        pure (SQD (RDOM adt') (DataTypeGetter FillerF) (RDOM b) True False)
 
     roleHasProperty :: ADT RoleInContext -> MP Boolean
     roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)

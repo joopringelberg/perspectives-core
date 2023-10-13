@@ -142,7 +142,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     -- FILLS STEP
     -- fills step is stored in filledInvertedQueries of the filled role.
-    QF.GetRoleBindersF enr ctxt -> do
+    QF.FilledF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
       modifyDF \dfr -> let
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the filler (binding),
@@ -159,13 +159,13 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
         description = case oneStepLess of
           -- If backwards of oneStepLess is Nothing, the backwards step of qWithAK (== qfd) consisted of just
-          -- a single step and that was GetRoleBindersF.
+          -- a single step and that was FilledF.
           -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
           -- is already the end result we want to obtain. Hence we put the Identity function in the place of backwards,
           -- where the domain and range are the range of the backward step.
           ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
           x -> x
-        in
+        in 
           foldl
             (\dfr'@{enumeratedRoles} (Tuple filledType keys) ->
               case lookup (unwrap filledType) enumeratedRoles of
@@ -199,7 +199,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     -- FILLER STEP
     -- filler step is stored in fillerInvertedQueries of the filled role.
-    QF.DataTypeGetter QF.BindingF -> do
+    QF.DataTypeGetter QF.FillerF -> do
       keysForRole <- lift $ compiletimeIndexForFilledByQueries qfd
       modifyDF \dfr@{enumeratedRoles} -> case dom of
         (RDOM EMPTY) -> dfr

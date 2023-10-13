@@ -86,7 +86,7 @@ runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-|
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel roleAspectsClosure
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
-    for fillerTypes \fillerType -> do
+    for fillerTypes \fillerType -> do 
       filledContextType <- enumeratedRoleContextType filledType
       fillerContextType <- enumeratedRoleContextType fillerType
       pure $ InvertedQueryKey filledContextType fillerContextType fillerType
@@ -119,9 +119,9 @@ compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (allLea
       (adtBinding :: ADT RoleInContext) <- lift $ lift $ getEnumeratedRole filledRole >>= binding
       case queryFunction qfd of
         -- end is the filler role.
-        (DataTypeGetter BindingF) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
+        (DataTypeGetter FillerF) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
           (InvertedQueryKey filledContext fillerContext fillerRole))
-        (DataTypeGetterWithParameter BindingF requiredFillerContext) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
+        (DataTypeGetterWithParameter FillerF requiredFillerContext) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
           (InvertedQueryKey filledContext (ContextType requiredFillerContext) fillerRole))
 
 -- | Compute the keys for the fills (Binder) step.
@@ -137,7 +137,7 @@ compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (allLeavesInAD
       -- The filled role is always an ST, because it derives directly from the filledBy clause of an
       -- EnumeratedRole - by construction a single type.
       ST (RoleInContext{context:filledContext, role:filledRole}) -> case queryFunction qfd of
-        (GetRoleBindersF _ (ContextType mrequiredFilledContext)) -> case mrequiredFilledContext of
+        (FilledF _ (ContextType mrequiredFilledContext)) -> case mrequiredFilledContext of
           "" -> Tuple filledRole [InvertedQueryKey fillerContext filledContext filledRole] -- FillerContext FilledContext FilledRole
           requiredFilledContext -> Tuple filledRole
             [InvertedQueryKey fillerContext (ContextType requiredFilledContext) filledRole]

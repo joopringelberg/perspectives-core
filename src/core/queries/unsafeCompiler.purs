@@ -85,7 +85,7 @@ compileFunction :: QueryFunctionDescription -> MP (String ~~> String)
 
 compileFunction (SQD _ (RolGetter (ENR (EnumeratedRoleType r))) _ _ _) = if isExternalRole r
   then pure $ unsafeCoerce $ externalRole
-  else pure $ unsafeCoerce $ getEnumeratedRoleInstances (EnumeratedRoleType r)
+  else pure $ unsafeCoerce $ getEnumeratedRoleInstances (EnumeratedRoleType r) 
 
 compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   (ct :: CalculatedRole) <- getPerspectType cr
@@ -147,7 +147,7 @@ compileFunction (SQD _ (ContextTypeConstant qname) ContextKind _ _) = pure $ uns
 
 compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (liftToInstanceLevel allRoleTypesInContext)
 
-compileFunction (SQD _ (DataTypeGetter BindingF) _ _ _) = pure $ unsafeCoerce binding
+compileFunction (SQD _ (DataTypeGetter FillerF) _ _ _) = pure $ unsafeCoerce binding
 
 compileFunction (SQD dom (Constant range value) _ _ _) = pure \_ -> pure value
 
@@ -402,11 +402,11 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')
 
-compileFunction (SQD _ (GetRoleBindersF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getFilledRoles contextType enumeratedRoleType)
+compileFunction (SQD _ (FilledF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getFilledRoles contextType enumeratedRoleType)
 
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
   case functionName of
-    BindingF -> pure $ unsafeCoerce bindingInContext (ContextType parameter)
+    FillerF -> pure $ unsafeCoerce bindingInContext (ContextType parameter)
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
     IsInStateF -> do 
       (State {stateFulObject}) <- getState (StateIdentifier parameter)

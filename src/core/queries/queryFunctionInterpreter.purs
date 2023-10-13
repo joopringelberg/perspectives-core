@@ -505,8 +505,8 @@ interpretSQD qfd a = case a.head of
         (cp :: CalculatedProperty) <- lift2MPQ $ getPerspectType pt
         (lift2MPQ $ PC.calculation cp) >>= flip interpret a
       (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip consOnMainPath a) <<< C <$> context rid
-      (SQD _ (DataTypeGetter BindingF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
-      (SQD _ (GetRoleBindersF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getFilledRoles contextType roleType rid
+      (SQD _ (DataTypeGetter FillerF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
+      (SQD _ (FilledF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getFilledRoles contextType roleType rid
 
       otherwise -> throwError (error $ "(head=RoleInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show rid)
 
