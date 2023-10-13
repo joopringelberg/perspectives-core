@@ -203,7 +203,7 @@ domain model://joopringelberg.nl#RouteVanDeVraag
       perspective on PotentiëleDeelnemers
         action Registreer
           letA
-            deelname <- create context Deelnames
+            deelname <- create context Deelnames -- bound to ? -- moet erachter
           in
             bind origin to Deelnemer in deelname
     user Vrijwilligers (relational) filledBy Voorziening$Vrijwilliger
