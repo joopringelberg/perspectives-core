@@ -179,3 +179,13 @@ setCredentialsView dbname = void $ addViewToDatabase dbname "defaultViews" "cred
 
 -- | Import the view definition as a String.
 foreign import credentials :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'FILLEDROLESVIEW'
+-- This view collects instances of roles that are filled by the given role.
+-----------------------------------------------------------
+setFilledRolesView :: forall f. String -> MonadPouchdb f Unit
+setFilledRolesView dbname = void $ addViewToDatabase dbname "defaultViews" "filledRolesView" ({map: filledRoles, reduce: Nothing})
+
+-- | Import the view definition as a String.
+foreign import filledRoles :: String

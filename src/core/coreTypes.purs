@@ -110,6 +110,9 @@ type PerspectivesExtraState =
 
   , typeToStorage :: Map ResourceType StorageScheme
 
+  -- We want to check on locally stored roles filled with these roles.
+  , publicRolesJustLoaded :: Array RoleInstance
+
   )
 
 data RepeatingTransaction = TransactionWithTiming

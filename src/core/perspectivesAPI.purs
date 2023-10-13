@@ -81,7 +81,7 @@ import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid, resourceIdentifier2DocLocator)
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
@@ -160,7 +160,9 @@ consumeRequest :: Consumer Request MonadPerspectives Unit
 consumeRequest = forever do
   (Request request@{corrId, reactStateSetter}) <- await
   lift (catchError
-    (dispatchOnRequest request)
+    (do 
+      dispatchOnRequest request
+      detectPublicStateChanges)
     (\e -> do
       logPerspectivesError (ApiErrorBoundary ((showRequestRecord request) <> ": " <> (show e)))
       sendResponse (Error corrId ("Request could not be handled, because: " <> (show e))) (mkApiEffect reactStateSetter))

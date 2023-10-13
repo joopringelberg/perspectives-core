@@ -36,6 +36,7 @@
 module Perspectives.Persistent
   ( class Persistent
   , dbLocalName
+  , addPublicResource
   , entitiesDatabaseName
   , entityExists
   , fetchEntiteit
@@ -57,7 +58,9 @@ module Perspectives.Persistent
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Except (catchError, lift, throwError)
+import Data.Array (cons)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -80,20 +83,24 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Perspectives.ResourceIdentifiers (pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
+import Perspectives.ResourceIdentifiers (isInPublicScheme, pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
 
 class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
   -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
   dbLocalName :: i -> MP String
+  addPublicResource :: i -> MonadPerspectives Unit
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   dbLocalName (ContextInstance id) = pouchdbDatabaseName id
+  addPublicResource _ = pure unit
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   dbLocalName (RoleInstance id) = pouchdbDatabaseName id
+  addPublicResource rid = modify \s -> s {publicRolesJustLoaded = cons rid s.publicRolesJustLoaded}
 
 instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
   dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
+  addPublicResource _ = pure unit
 
 getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -103,7 +110,11 @@ getPerspectEntiteit id =
       (Just avar) -> do
         pe <- liftAff $ read avar
         pure pe
-      Nothing -> fetchEntiteit id
+      Nothing -> do
+        if isInPublicScheme (unwrap id)
+          then addPublicResource id
+          else pure unit
+        fetchEntiteit id
 
 entitiesDatabaseName :: forall f. MonadPouchdb f String
 entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities")

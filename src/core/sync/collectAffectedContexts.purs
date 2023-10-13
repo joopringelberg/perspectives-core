@@ -43,7 +43,7 @@ import Effect.Exception (error)
 import Foreign.Object (Object, empty, lookup, values)
 import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledByQueries, runtimeIndexForFillsQueries, runtimeIndexForPropertyQueries)
+import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledByQueries, runtimeIndexForFillsQueries, runtimeIndexForFillsQueries', runtimeIndexForPropertyQueries)
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, execMonadPerspectivesQuery, runMonadPerspectivesQuery, (###=), (##=), (##>), (##>>))
@@ -434,9 +434,9 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
             ))
       -- All InvertedQueries with a backwards step that is `filledBy <TypeOfBinder>`, iff we actually bind something:
       -- Index with the embedding context. In fillsInvertedQueries we store (the inverted query that would begin with)
-      -- the filled step away from filler (filler). However, because of cardinality, we apply these queries to the
+      -- the fills step away from filler. However, because of cardinality, we apply these queries to the
       -- filled role instead.
-      -- We do use, however, the context type of the filler to index the binderCalculations.
+      -- We do use, however, the context type of the filler to index the fillsCalculations.
       users2 <- concat <$> (for fillsKeys \fillsKey -> case EM.lookup fillsKey fillsCalculations of
         Nothing -> pure []
         Just calculations -> concat <$> for calculations
@@ -459,6 +459,39 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
             Just calculations -> concat <$> for calculations (handleBackwardQuery bnd))
         otherwise -> pure []
       pure (nub $ union users1 (users2 `union` users3))
+
+-----------------------------------------------------------
+-- RE-EVALUATE CONSEQUENCES OF CHANGES TO PUBLIC FILLERS
+-----------------------------------------------------------
+-- | For a role that is filled by a public role, follow all queries from that filled role
+-- | that come from the filler role.
+-- | To be precise: execute all queries in the fillsInvertedQueries on the filled role, 
+-- | starting with that filled role.
+-- | This will add the relevant InvertedQueryResults (for STATE EVALUATION) to the current Transaction.
+
+reEvaluatePublicFillerChanges :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+reEvaluatePublicFillerChanges filled filler = do
+  filledType <- lift (filled ##>> OG.roleType)
+  -- `fillsKeys` are computed using all types of filled.
+  fillsKeys <- lift $ unsafePartial runtimeIndexForFillsQueries' filled
+  -- We've stored the relevant InvertedQueries with the type of the filled,
+  -- so we execute them on any filler that is a specialisation of (or equal to) the required filler type.
+  -- Includes calculations from all types of fillerType.
+  fillsCalculations <- lift $ compileInvertedQueryMap _fillsInvertedQueries filledType
+  -- All InvertedQueries with a backwards step that is `filledBy <TypeOfBinder>`, iff we actually bind something:
+  -- Index with the embedding context. In fillsInvertedQueries we store (the inverted query that would begin with)
+  -- the fills step away from filler. However, because of cardinality, we apply these queries to the
+  -- filled role instead.
+  -- We do use, however, the context type of the filler to index the fillsCalculations.
+  concat <$> (for fillsKeys \fillsKey -> case EM.lookup fillsKey fillsCalculations of
+    Nothing -> pure []
+    Just calculations -> concat <$> for calculations
+      (\iq -> if isForSelfOnly iq
+        -- These inverted queries skip the first step and so must be applied to the filled itself.
+        -- NOTE/TODO: ik denk dat het tweemaal filled moet zijn. De forwards query wordt toegepast op het tweede argument.
+        then handleSelfOnlyQuery iq filled filler
+        else handleBackwardQuery filled iq >>= pure <<< join <<< map snd
+    ))
 
 -- | Runs the forward part of the QueryWithAKink. That is part of the original query. Assumptions collected
 -- | during evaluation are turned into Deltas for peers with a perspective and collected in the current transaction.

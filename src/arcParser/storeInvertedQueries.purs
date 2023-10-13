@@ -140,7 +140,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
         CP _ -> pure unit
 
-    -- add to fillsInvertedQueries of the role that we apply `binder enr` to (the domain of the step; the role that is bound).
+    -- FILLS STEP
+    -- fills step is stored in fillsInvertedQueries of the filled role.
     QF.GetRoleBindersF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
       modifyDF \dfr -> let
@@ -195,8 +196,9 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 )
             dfr
             (compiletimeIndexForFillsQueries qfd) -- qfd is the ORIGINAL backward query.
-    --
-    -- add to filledByInvertedQueries of the role that we apply `binding` to (the domain of the step; the role that binds).
+
+    -- FILLER STEP
+    -- filler step is stored in filledByInvertedQueries of the filled role.
     QF.DataTypeGetter QF.BindingF -> do
       keysForRole <- lift $ compiletimeIndexForFilledByQueries qfd
       modifyDF \dfr@{enumeratedRoles} -> case dom of

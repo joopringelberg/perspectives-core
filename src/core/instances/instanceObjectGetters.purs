@@ -25,7 +25,7 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (elemIndex, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton)
+import Data.Array (concat, elemIndex, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton)
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
@@ -35,9 +35,9 @@ import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, keys, lookup)
+import Foreign.Object (Object, keys, lookup, values)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -240,6 +240,32 @@ getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ ge
       {context:ct, role, instances} -> do
         tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId ct role]
         pure instances
+
+getAllFilledRoles :: RoleInstance -> MonadPerspectives (Array RoleInstance)
+getAllFilledRoles rid = (try $ getPerspectEntiteit rid) >>=
+  handlePerspectRolError' "getFilledRoles" []
+    \(filler :: IP.PerspectRol) -> pure $ concat $ concat (values <$> values (rol_gevuldeRollen filler))
+
+
+-- | Retrieve from the database all roles filled by this one.
+-- | Is especially useful for a public filler, as that carries no inverse administration of the (private) roles it fills.
+getFilledRolesFromDatabase :: RoleInstance ~~> RoleInstance
+getFilledRolesFromDatabase rid = ArrayT $ try 
+  (do
+    db <- lift entitiesDatabaseName
+    lift $ getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid))
+  >>=
+  handlePerspectRolError' "getFilledRolesFromDatabase" []
+    \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Binding rid]) *> pure roles
+
+getFilledRolesFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInstance)
+getFilledRolesFromDatabase_ rid = try 
+  (do
+    db <- entitiesDatabaseName
+    getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid))
+  >>=
+  handlePerspectRolError' "getFilledRolesFromDatabase_" []
+    \(roles :: Array RoleInstance) -> pure roles
 
 getProperty :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getProperty pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=

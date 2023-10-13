@@ -94,3 +94,13 @@ exports.roleSpecialisations = (function( doc )
       emit(doc.contents._id, doc.contents._id);
     }
  }).toString();
+
+ // Emit the filler of the role.
+exports.filledRoles = (function(doc)
+  {
+    // a proxy for being a role:
+    if (doc.contents.universeRoleDelta)
+    {
+      emit(doc.contents.binding, doc.contents._id);
+    }
+  }).toString();

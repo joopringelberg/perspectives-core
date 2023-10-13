@@ -250,7 +250,7 @@ changeRol_type :: String -> PerspectRol -> PerspectRol
 changeRol_type tp (PerspectRol cr) = PerspectRol $ cr {pspType = EnumeratedRoleType tp}
 
 rol_binding :: PerspectRol -> Maybe RoleInstance
-rol_binding (PerspectRol{binding}) = binding
+rol_binding (PerspectRol{binding}) = binding 
 
 -- | The first argument is the new binding;
 -- | the second argument is the role instance that receives the binding.
