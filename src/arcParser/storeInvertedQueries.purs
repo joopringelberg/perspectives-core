@@ -304,7 +304,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     -- to the domain (a context type), we can not attach an inverted query anywhere
     QF.ExternalCoreContextGetter f -> pure unit
 
-    -- The query would be added to invertedQueries of the context. Such inverse queries are run when a new
+    -- The query would be added to roleInvertedQueries of the context. Such inverse queries are run when a new
     -- instance of the role type is added to the context (or when it is removed). But the external role never changes,
     -- so this is superfluous.
     QF.DataTypeGetter QF.ExternalRoleF -> pure unit
@@ -372,10 +372,10 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     -- Add an inverted query to the set of inverted queries on a Context type,
     -- for the `role` step (and therefore indexed by EnumeratedRoleType).
     addPathToRoleInvertedQueries :: Context -> QueryWithAKink -> Array RoleInContext -> EnumeratedRoleType -> Context
-    addPathToRoleInvertedQueries (Context contextRecord@{_id, invertedQueries}) inverseQuery modifiesRoleInstancesOf eRoleType = Context contextRecord {invertedQueries = addInvertedQueryIndexedByRole
+    addPathToRoleInvertedQueries (Context contextRecord@{_id, roleInvertedQueries}) inverseQuery modifiesRoleInstancesOf eRoleType = Context contextRecord {roleInvertedQueries = addInvertedQueryIndexedByRole
       (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
       eRoleType
-      invertedQueries
+      roleInvertedQueries
       modifiesRoleInstancesOf
       _id
     }

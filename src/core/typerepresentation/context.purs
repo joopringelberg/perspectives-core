@@ -62,7 +62,7 @@ type ContextRecord =
 
   , indexedContext :: Maybe ContextInstance
 
-  , invertedQueries :: Object (Array InvertedQuery)
+  , roleInvertedQueries :: Object (Array InvertedQuery)
 
   , roleAliases :: Object (EnumeratedRoleType)
 
@@ -92,7 +92,7 @@ defaultContext id dname kind context pos public = Context { _id: (ContextType id
 
   , indexedContext: Nothing
 
-  , invertedQueries: empty
+  , roleInvertedQueries: empty
 
   , roleAliases: empty
   }

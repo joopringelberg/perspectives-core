@@ -385,7 +385,7 @@ addRoleObservingContexts :: ContextType -> ContextInstance -> EnumeratedRoleType
 addRoleObservingContexts ctxtType id roleType roleInstance = do
   -- the inverted queries stored on an EnumeratedRole in the contextInvertedQueries member (`context` step).
   (contextCalculations :: Object (Array InvertedQuery)) <- lift $ compileContextInvertedQueries roleType
-  -- the inverted queries stored on a Context in the invertedQueries member (`role` step).
+  -- the inverted queries stored on a Context in the roleInvertedQueries member (`role` step).
   roleCalculations <- lift $ compileRoleInvertedQueries ctxtType
   -- Index with the embedding context. In _contextInvertedQueries we store (the inverted query that begins with)
   -- the context step away from role instance. We then arrive at context instance id.
@@ -850,7 +850,7 @@ compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
     onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "contextInvertedQueries")
 
 -- | Compiles the two parts of the description of the inverted queries stored
--- | on a Context in the invertedQueries member.
+-- | on a Context in the roleInvertedQueries member.
 -- | stores the result in cache.
 compileRoleInvertedQueries :: ContextType -> MonadPerspectives (Object (Array InvertedQuery))
 compileRoleInvertedQueries ct@(ContextType ctxtType) = do
@@ -870,7 +870,7 @@ compileRoleInvertedQueries ct@(ContextType ctxtType) = do
           pure compiledCalculations
   where
     onDelta :: ContextType -> Traversal' DomeinFile (Object (Array InvertedQuery))
-    onDelta (ContextType x) = _Newtype <<< prop (SProxy :: SProxy "contexts") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "invertedQueries")
+    onDelta (ContextType x) = _Newtype <<< prop (SProxy :: SProxy "contexts") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "roleInvertedQueries")
 
 areCompiled :: Object (Array InvertedQuery) -> Boolean
 areCompiled ar = case head $ values ar of

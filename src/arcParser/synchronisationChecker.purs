@@ -268,13 +268,13 @@ checkSynchronization = do
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (PropertySynchronizationIncomplete propId source destinations)
       otherwise -> pure unit
     pure unit
-  for_ contexts \c@(Context{_id, invertedQueries}) -> do
+  for_ contexts \c@(Context{_id, roleInvertedQueries}) -> do
     -- All roles, including Aspect roles, but without the External Role.
     allLocalRoles <- lift $ lift $ allRoles (contextADT c)
     for_ (cons (ENR $ externalRole c) allLocalRoles) \roleType -> case roleType of
       ENR roleId -> do
         -- CHECK INVERTED QUERIES FOR 'CONTEXT' AND '<ROLE>' OPERATORS
-        projectedGraph <- unsafePartial projectForRoleInstanceDeltas roleId invertedQueries
+        projectedGraph <- unsafePartial projectForRoleInstanceDeltas roleId roleInvertedQueries
         case checkAllStartpoints projectedGraph of
           none | null none -> pure unit
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleSynchronizationIncomplete roleId source destinations)
@@ -284,3 +284,4 @@ checkSynchronization = do
           none | null none -> pure unit
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleBindingSynchronizationIncomplete roleId source destinations)
       otherwise -> pure unit
+ 

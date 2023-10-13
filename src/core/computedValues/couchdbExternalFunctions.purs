@@ -449,17 +449,17 @@ modifyInvertedQuery add = modifyInvertedQuery'
         -- after the author of the imported model referenced it.
         Nothing -> dfr
         -- Just (Context cr@{}) -> dfr
-        Just (CTXT.Context cr@{invertedQueries}) ->
+        Just (CTXT.Context cr@{roleInvertedQueries}) ->
           dfr {contexts = insert
             contextTypeName
-            (CTXT.Context cr {invertedQueries = if add
+            (CTXT.Context cr {roleInvertedQueries = if add
               then addInvertedQueryIndexedByRole
                 invertedQuery
                 roleType
-                invertedQueries
+                roleInvertedQueries
                 []
                 (ContextType contextTypeName)
-              else deleteInvertedQueryIndexedByRole invertedQuery roleType invertedQueries
+              else deleteInvertedQueryIndexedByRole invertedQuery roleType roleInvertedQueries
               })
             contexts}
 

@@ -95,7 +95,7 @@ runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-|
 runtimeIndexForContextQueries :: ContextInstance -> MonadPerspectives (Array ContextType)
 runtimeIndexForContextQueries contextInstance = contextInstance ##= (contextType >=> liftToInstanceLevel contextAspectsClosure)
 
--- | Index member `invertedQueries` of ContextType with this key computed from an EnumeratedRoleType.
+-- | Index member `roleInvertedQueries` of ContextType with this key computed from an EnumeratedRoleType.
 runTimeIndexForRoleQueries :: EnumeratedRoleType -> MonadPerspectives (Array EnumeratedRoleType)
 runTimeIndexForRoleQueries roleType = roleType ###= roleAspectsClosure
 
