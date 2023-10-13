@@ -468,16 +468,16 @@ modifyInvertedQuery add = modifyInvertedQuery'
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{fillsInvertedQueries}) -> dfr {enumeratedRoles = insert
+        Just (EnumeratedRole rr@{filledInvertedQueries}) -> dfr {enumeratedRoles = insert
           roleTypeName
-          (EnumeratedRole rr {fillsInvertedQueries = if add
+          (EnumeratedRole rr {filledInvertedQueries = if add
             then addInvertedQueryIndexedByTripleKeys
               invertedQuery
               keys
-              fillsInvertedQueries
+              filledInvertedQueries
               []
               (EnumeratedRoleType roleTypeName)
-            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys fillsInvertedQueries})
+            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys filledInvertedQueries})
           enumeratedRoles}
 
     modifyInvertedQuery' (FilledByInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
@@ -485,16 +485,16 @@ modifyInvertedQuery add = modifyInvertedQuery'
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
         Nothing -> dfr
-        Just (EnumeratedRole rr@{filledByInvertedQueries}) -> dfr {enumeratedRoles = insert
+        Just (EnumeratedRole rr@{fillerInvertedQueries}) -> dfr {enumeratedRoles = insert
           roleTypeName
-          (EnumeratedRole rr {filledByInvertedQueries = if add
+          (EnumeratedRole rr {fillerInvertedQueries = if add
             then addInvertedQueryIndexedByTripleKeys
               invertedQuery
               keys
-              filledByInvertedQueries
+              fillerInvertedQueries
               []
               (EnumeratedRoleType roleTypeName)
-            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys filledByInvertedQueries})
+            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys fillerInvertedQueries})
           enumeratedRoles}
 
     modifyInvertedQuery' (OnPropertyDelta keys typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->

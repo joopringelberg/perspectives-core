@@ -421,7 +421,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
       -- so we execute them on any filler that is a specialisation of (or equal to) the required filler type.
       -- Includes calculations from all types of fillerType.
       fillsCalculations <- lift $ compileInvertedQueryMap _fillsInvertedQueries filledType
-        -- Index with the embedding context. In filledByInvertedQueries we store (the inverted query that
+        -- Index with the embedding context. In fillerInvertedQueries we store (the inverted query that
         -- begins with) the filler step away from filled.
         -- Its context type we use to index the filledByCalculations.
       users1 <- concat <$> (for filledByKeys \filledByKey -> case EM.lookup filledByKey filledByCalculations of
@@ -433,7 +433,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
             else handleBackwardQuery filled iq >>= pure <<< join <<< map snd
             ))
       -- All InvertedQueries with a backwards step that is `filledBy <TypeOfBinder>`, iff we actually bind something:
-      -- Index with the embedding context. In fillsInvertedQueries we store (the inverted query that would begin with)
+      -- Index with the embedding context. In filledInvertedQueries we store (the inverted query that would begin with)
       -- the fills step away from filler. However, because of cardinality, we apply these queries to the
       -- filled role instead.
       -- We do use, however, the context type of the filler to index the fillsCalculations.
@@ -465,7 +465,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
 -----------------------------------------------------------
 -- | For a role that is filled by a public role, follow all queries from that filled role
 -- | that come from the filler role.
--- | To be precise: execute all queries in the fillsInvertedQueries on the filled role, 
+-- | To be precise: execute all queries in the filledInvertedQueries on the filled role, 
 -- | starting with that filled role.
 -- | This will add the relevant InvertedQueryResults (for STATE EVALUATION) to the current Transaction.
 
@@ -479,7 +479,7 @@ reEvaluatePublicFillerChanges filled filler = do
   -- Includes calculations from all types of fillerType.
   fillsCalculations <- lift $ compileInvertedQueryMap _fillsInvertedQueries filledType
   -- All InvertedQueries with a backwards step that is `filledBy <TypeOfBinder>`, iff we actually bind something:
-  -- Index with the embedding context. In fillsInvertedQueries we store (the inverted query that would begin with)
+  -- Index with the embedding context. In filledInvertedQueries we store (the inverted query that would begin with)
   -- the fills step away from filler. However, because of cardinality, we apply these queries to the
   -- filled role instead.
   -- We do use, however, the context type of the filler to index the fillsCalculations.
@@ -708,7 +708,7 @@ createDeltasFromAssumption users (Context roleInstance) = do
   rtype <- lift (roleInstance ##>> OG.roleType)
   magic ctxt (SerializableNonEmptyArray $ ANE.singleton roleInstance) rtype users
 
--- The forwards part of a QueryWithAKink in an fillsInvertedQueries or filledByInvertedQueries
+-- The forwards part of a QueryWithAKink in an filledInvertedQueries or fillerInvertedQueries
 -- never starts with 'external', because these queries are applied to respectively the
 -- new binding or the role that binds.
 -- Whenever 'external' is applied, a 'context' step has been applied before - leading
@@ -791,10 +791,10 @@ aisInPropertyDelta id property replacementProperty eroleType = do
         onPropertyDelta (EnumeratedPropertyType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedProperties") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "onPropertyDelta")
 
 _filledByInvertedQueries :: InvertedQueryMapsLens
-_filledByInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "filledByInvertedQueries")
+_filledByInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "fillerInvertedQueries")
 
 _fillsInvertedQueries :: InvertedQueryMapsLens
-_fillsInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "fillsInvertedQueries")
+_fillsInvertedQueries = _Newtype <<< prop (SProxy :: SProxy "filledInvertedQueries")
 
 type InvertedQueryMapsLens = Lens' EnumeratedRole InvertedQueryMap
 

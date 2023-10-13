@@ -82,11 +82,11 @@ projectForRoleInstanceDeltas etype onContextDelta_role = do
 projectForRoleBindingDeltas :: Partial => EnumeratedRoleType -> ContextType -> PhaseThree UserGraphProjection
 projectForRoleBindingDeltas etype ctype = do
   UserGraph (EncodableMap edgesObject) <- (lift $ gets (_.userGraph <<< _.dfr))
-  EnumeratedRole{filledByInvertedQueries, fillsInvertedQueries} <- lift $ lift $ getEnumeratedRole etype
+  EnumeratedRole{fillerInvertedQueries, filledInvertedQueries} <- lift $ lift $ getEnumeratedRole etype
   -- We start from RoleInContext{context: ctype, role: etype}. We want all InvertedQueries that go to any other
   -- RoleInContext.
-  invertedQueries1 <- pure $ concat $ fromFoldable $ values $ filterKeys (\(InvertedQueryKey startctxt _ _) -> startctxt == ctype) (unwrap filledByInvertedQueries)
-  invertedQueries2 <- pure $ concat $ fromFoldable $ values $ filterKeys (\(InvertedQueryKey startctxt _ _) -> startctxt == ctype) (unwrap fillsInvertedQueries)
+  invertedQueries1 <- pure $ concat $ fromFoldable $ values $ filterKeys (\(InvertedQueryKey startctxt _ _) -> startctxt == ctype) (unwrap fillerInvertedQueries)
+  invertedQueries2 <- pure $ concat $ fromFoldable $ values $ filterKeys (\(InvertedQueryKey startctxt _ _) -> startctxt == ctype) (unwrap filledInvertedQueries)
   invertedQueries <- pure $ invertedQueries1 <> invertedQueries2
   users <- usersWithAPerspective invertedQueries
   startpoints <- usersWithAModifyingPerspective invertedQueries

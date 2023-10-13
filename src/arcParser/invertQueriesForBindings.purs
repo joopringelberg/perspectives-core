@@ -67,7 +67,7 @@ import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType)
 -- | If the role, or its filler, adds properties that are in the Map PropertyType (Array StateIdentifier)
 -- | provided as third argument, store an InvertedQuery (including the property) for each of them on the
 -- | PropertyType.
--- | If the filler adds properties, store an InvertedQuery in fillsInvertedQueries of the filler.
+-- | If the filler adds properties, store an InvertedQuery in filledInvertedQueries of the filler.
 -- | The backwards part of each of these inverted queries is postpended with the backwards part that leads from the
 -- | role.
 -- | This function does not have to handle the RoleVerbs on the root of the filler hiërarchy.

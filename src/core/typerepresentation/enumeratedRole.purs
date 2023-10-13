@@ -77,8 +77,8 @@ type EnumeratedRoleRecord =
   , mandatory :: Boolean
 
   -- The keys in these objects are the String representations of context types.
-  , filledByInvertedQueries :: InvertedQueryMap
-  , fillsInvertedQueries :: InvertedQueryMap
+  , fillerInvertedQueries :: InvertedQueryMap
+  , filledInvertedQueries :: InvertedQueryMap
 
   , contextInvertedQueries :: OBJ.Object (Array InvertedQuery)
 
@@ -117,8 +117,8 @@ defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = Enu
 
   , pos: pos
 
-  , filledByInvertedQueries: empty
-  , fillsInvertedQueries: empty
+  , fillerInvertedQueries: empty
+  , filledInvertedQueries: empty
   , contextInvertedQueries: OBJ.empty
 
   , indexedRole: Nothing

@@ -141,7 +141,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         CP _ -> pure unit
 
     -- FILLS STEP
-    -- fills step is stored in fillsInvertedQueries of the filled role.
+    -- fills step is stored in filledInvertedQueries of the filled role.
     QF.GetRoleBindersF enr ctxt -> do
       -- Compute the keys on the base of the original backwards query.
       modifyDF \dfr -> let
@@ -198,7 +198,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             (compiletimeIndexForFillsQueries qfd) -- qfd is the ORIGINAL backward query.
 
     -- FILLER STEP
-    -- filler step is stored in filledByInvertedQueries of the filled role.
+    -- filler step is stored in fillerInvertedQueries of the filled role.
     QF.DataTypeGetter QF.BindingF -> do
       keysForRole <- lift $ compiletimeIndexForFilledByQueries qfd
       modifyDF \dfr@{enumeratedRoles} -> case dom of
@@ -340,21 +340,21 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     }
 
     addPathToFillsInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFillsInvertedQueries (EnumeratedRole rolRecord@{_id, fillsInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {fillsInvertedQueries =
+    addPathToFillsInvertedQueries (EnumeratedRole rolRecord@{_id, filledInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {filledInvertedQueries =
       addInvertedQueryIndexedByTripleKeys
         (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
         keys
-        fillsInvertedQueries
+        filledInvertedQueries
         modifiesRoleBindingOf
         _id
         }
 
     addPathToFilledByInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFilledByInvertedQueries (EnumeratedRole rolRecord@{_id, filledByInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {filledByInvertedQueries =
+    addPathToFilledByInvertedQueries (EnumeratedRole rolRecord@{_id, fillerInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {fillerInvertedQueries =
       addInvertedQueryIndexedByTripleKeys
         (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
         keys
-        filledByInvertedQueries
+        fillerInvertedQueries
         modifiesRoleBindingOf
         _id}
 

@@ -64,7 +64,7 @@ import Prelude (bind, map, pure, ($), (<#>), (<$>), (<<<), (>=>), (>>=))
 -----------------------------------------------------------
 -- COMPUTING KEYS IN RUN TIME
 -----------------------------------------------------------
--- | Index member `fillsInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
+-- | Index member `filledInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding. We look in the **filled** EnumeratedRoleType!
 runtimeIndexForFillsQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = runtimeIndexForFillsQueries' filled
@@ -79,7 +79,7 @@ runtimeIndexForFillsQueries' filled = do
       fillerContextType <- enumeratedRoleContextType fillerType
       pure $ InvertedQueryKey fillerContextType filledContextType filledType
 
--- | Index member `filledByInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
+-- | Index member `fillerInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding.
 runtimeIndexForFilledByQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
 runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = do
