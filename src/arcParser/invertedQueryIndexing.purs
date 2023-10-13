@@ -66,11 +66,11 @@ import Prelude (bind, map, pure, ($), (<#>), (<$>), (<<<), (>=>), (>>=))
 -----------------------------------------------------------
 -- | Index member `filledInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding. We look in the **filled** EnumeratedRoleType!
-runtimeIndexForFillsQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
-runtimeIndexForFillsQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = runtimeIndexForFillsQueries' filled
+runtimeIndexForFilledQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
+runtimeIndexForFilledQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = runtimeIndexForFilledQueries' filled
 
-runtimeIndexForFillsQueries' :: RoleInstance -> MonadPerspectives (Array InvertedQueryKey)
-runtimeIndexForFillsQueries' filled = do
+runtimeIndexForFilledQueries' :: RoleInstance -> MonadPerspectives (Array InvertedQueryKey)
+runtimeIndexForFilledQueries' filled = do
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel roleAspectsClosure
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
@@ -81,8 +81,8 @@ runtimeIndexForFillsQueries' filled = do
 
 -- | Index member `fillerInvertedQueries` of EnumeratedRoleType with this key computed from a RoleBindingDelta
 -- | with type SetFirstBinding or ReplaceBinding.
-runtimeIndexForFilledByQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
-runtimeIndexForFilledByQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = do
+runtimeIndexForFillerQueries :: Partial => RoleBindingDelta -> MonadPerspectives (Array InvertedQueryKey)
+runtimeIndexForFillerQueries (RoleBindingDelta{filled, filler, deltaType}) {-| deltaType /= RemoveBinding-} = do
   filledTypes <- filled ##= roleType >=> liftToInstanceLevel roleAspectsClosure
   concat <$> for filledTypes \(filledType :: EnumeratedRoleType) -> do
     fillerTypes <- (getEnumeratedRole >=> pure <<< map roleInContext2Role <<< allLeavesInADT <<< _.binding <<< unwrap) filledType
@@ -110,8 +110,8 @@ runtimeIndexForPropertyQueries eroleType = map unwrap <$> (eroleType ###= roleAs
 -- | Compute the keys for the filledBy (Binding) step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
 -- | (inverted) query should be stored under.
-compiletimeIndexForFilledByQueries :: Partial => QueryFunctionDescription -> (PhaseTwo' MonadPerspectives) (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
-compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (allLeavesInADT $ roleDomain qfd) keysForRoleInContext
+compiletimeIndexForFillerQueries :: Partial => QueryFunctionDescription -> (PhaseTwo' MonadPerspectives) (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
+compiletimeIndexForFillerQueries qfd | isRoleDomain $ domain qfd = for (allLeavesInADT $ roleDomain qfd) keysForRoleInContext
   where
     -- start is filled, because filledBy goes from filled to filler.
     keysForRoleInContext :: RoleInContext -> (PhaseTwo' MonadPerspectives) (Tuple EnumeratedRoleType (Array InvertedQueryKey))
@@ -124,11 +124,11 @@ compiletimeIndexForFilledByQueries qfd | isRoleDomain $ domain qfd = for (allLea
         (DataTypeGetterWithParameter FillerF requiredFillerContext) -> pure $ Tuple filledRole ((allLeavesInADT adtBinding) <#> \(RoleInContext{context:fillerContext, role:fillerRole}) ->
           (InvertedQueryKey filledContext (ContextType requiredFillerContext) fillerRole))
 
--- | Compute the keys for the fills (Binder) step.
+-- | Compute the keys for the filled step.
 -- | Returns a map whose keys identify EnumeratedRoles and whose values are Arrays of keys that the given
 -- | (inverted) query should be stored under.
-compiletimeIndexForFillsQueries :: Partial => QueryFunctionDescription -> (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
-compiletimeIndexForFillsQueries qfd | isRoleDomain $ domain qfd = (allLeavesInADT $ roleDomain qfd) <#>
+compiletimeIndexForFilledQueries :: Partial => QueryFunctionDescription -> (Array (Tuple EnumeratedRoleType (Array InvertedQueryKey)))
+compiletimeIndexForFilledQueries qfd | isRoleDomain $ domain qfd = (allLeavesInADT $ roleDomain qfd) <#>
   keysForRoleInContext
   where
     -- start is the filler, because fills goes from filler to filled.

@@ -153,8 +153,8 @@ data SeparateInvertedQuery =
   -- Type of the context of the role instance; Type of the role instance to store on; InvertedQuery
   ContextInvertedQuery ContextType TypeName InvertedQuery |                      -- `context` step
   -- Triple keys; Type of the role instance to store on; InvertedQuery
-  FilledByInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |        -- `filledBy` step
-  FillsInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |           -- `fills` step
+  FillerInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |        -- `filledBy` step
+  FilledInvertedQuery (Array InvertedQueryKey) TypeName InvertedQuery |           -- `fills` step
   -- EnumeratedRoleTypes to index with; EnumeratedProperty to store on; InvertedQuery
   OnPropertyDelta (Array EnumeratedRoleType) TypeName InvertedQuery              -- `Value2Role` step.
 

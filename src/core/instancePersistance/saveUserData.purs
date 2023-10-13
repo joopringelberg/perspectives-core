@@ -27,7 +27,6 @@
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER
--- | except for saveContextInstance (no CURRENTUSER, nor SYNCHRONISATION)
 
 module Perspectives.SaveUserData
   ( changeRoleBinding
@@ -38,7 +37,6 @@ module Perspectives.SaveUserData
   , removeContextInstance
   , removeRoleInstance
   , replaceBinding
-  , saveContextInstance
   , scheduleContextRemoval
   , scheduleRoleRemoval
   , setBinding
@@ -51,9 +49,8 @@ module Perspectives.SaveUserData
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.State (lift)
-import Data.Array (concat, cons, delete, elemIndex, find, head, nub, union)
+import Data.Array (concat, cons, delete, elemIndex, find, nub, union)
 import Data.Array.NonEmpty (singleton)
-import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, for_, traverse)
@@ -63,7 +60,7 @@ import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
 import Perspectives.Authenticate (sign)
-import Perspectives.CollectAffectedContexts (addRoleObservingContexts, usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
+import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, context_iedereRolInContext, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
@@ -74,7 +71,7 @@ import Perspectives.Identifiers (deconstructBuitenRol, typeUri2ModelUri, isExter
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getUnlinkedRoleInstances, isMe, roleType_)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit, saveEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -92,52 +89,6 @@ import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, discard, join, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
  
--- | This function takes care of
--- | PERSISTENCE
--- | QUERY UPDATES
--- | RULE TRIGGERING
--- | but nothing else. It is only used by loadAndSaveCrlFile. This means that we only deal with
--- | contexts that have been created from a source file, freshly as it were, fully equipped with
--- | roles.
-saveContextInstance :: Updater ContextInstance
-saveContextInstance id = do
-  (ctxt@(PerspectContext{pspType:cType})) <- lift $ saveEntiteit id
-  subject <- getSubject
-  forWithIndex_ (context_iedereRolInContext ctxt) \roleName instances ->
-    case head instances of
-      Nothing -> pure unit
-      -- STATE CHANGES
-      Just i -> addRoleObservingContexts cType id (EnumeratedRoleType roleName) i
-  for_ (iedereRolInContext ctxt) \(rol :: RoleInstance) -> do
-    (PerspectRol{_id, binding, pspType:roleType, filledRoles}) <- lift $ saveEntiteit rol
-    case binding of
-      Nothing -> pure unit
-      Just fillerId -> (lift $ findFilledRoleRequests fillerId cType roleType) >>= addCorrelationIdentifiersToTransactie
-    for_ filledRoles \roleMap ->
-      for_ roleMap \instances ->
-        for_ instances \binder ->
-          -- no attempt is made to look up role 'binder'.
-          (lift $ findBindingRequests binder) >>= addCorrelationIdentifiersToTransactie
-    -- For rule triggering, not for the delta or SYNCHRONISATION:
-    case binding of 
-      Just b -> do 
-        fillerType <- lift $ roleType_ b
-        void $ usersWithPerspectiveOnRoleBinding (RoleBindingDelta
-          { filled: rol
-          , filledType: roleType
-          , filler: binding
-          , fillerType: Just fillerType
-          , oldFiller: Nothing
-          , oldFillerType: Nothing
-          , deltaType: SetFirstBinding
-          , subject
-          })
-          true
-      _ -> pure unit
-  (_ :: PerspectRol) <- lift $ saveEntiteit (context_buitenRol ctxt)
-  -- For roles with a binding equal to R: detect the binder <RoleType> requests for R
-  -- For roles that are bound by role R: detect the binding requests for R.
-  pure unit
 
 iedereRolInContext :: PerspectContext -> Array RoleInstance
 iedereRolInContext ctxt = nub $ join $ values (context_iedereRolInContext ctxt)
@@ -274,10 +225,10 @@ handleRoleOnContextRemoval roleId = (lift $ try $ (getPerspectRol roleId)) >>= h
 -- | is affected when the role instance is removed.
 -- STATE EVALUATION and computing peers with a perspective on the instance.
 statesAndPeersForRoleInstanceToRemove :: PerspectRol -> MonadPerspectivesTransaction (Array RoleInstance)
-statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, pspType:roleType, binding, filledRoles}) = do
+statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, context, pspType:roleType, binding, filledRoles}) = do
   -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from adding Deltas to the transaction
   -- for the continuation of the path beyond the given role instance.
-  users1 <- usersWithPerspectiveOnRoleInstance roleType roleId false
+  users1 <- usersWithPerspectiveOnRoleInstance roleType roleId context false
   -- Users from the inverted queries on the incoming fills relation (the role that fills this role):
   users2 <- usersWithPerspectiveOnRoleBinding' roleId binding roleType
   -- Users from the inverted queries on the outgoing fills relation (roles that are filled by this role):

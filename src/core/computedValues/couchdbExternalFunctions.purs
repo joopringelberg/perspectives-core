@@ -463,7 +463,7 @@ modifyInvertedQuery add = modifyInvertedQuery'
               })
             contexts}
 
-    modifyInvertedQuery' (FillsInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (FilledInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup roleTypeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.
@@ -480,7 +480,7 @@ modifyInvertedQuery add = modifyInvertedQuery'
             else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys filledInvertedQueries})
           enumeratedRoles}
 
-    modifyInvertedQuery' (FilledByInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
+    modifyInvertedQuery' (FillerInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
       case lookup roleTypeName enumeratedRoles of
         -- It should be there! But it seems possible that the author of this model removed typeName
         -- after the author of the imported model referenced it.

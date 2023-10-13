@@ -167,7 +167,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
       -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
       -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
-      users <- usersWithPerspectiveOnRoleInstance rolName roleId true
+      users <- usersWithPerspectiveOnRoleInstance rolName roleId contextId true
       -- SYNCHRONISATION
       subject <- getSubject
       author <- getAuthor
@@ -210,7 +210,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
         -- As a side effect, usersWithPerspectiveOnRoleInstance adds Deltas to the transaction for the continuation of the
         -- path beyond the given role instance.
         -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from doing this.
-        users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) false
+        users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) contextId false
         subject <- getSubject
       -- SYNCHRONISATION
         author <- getAuthor
