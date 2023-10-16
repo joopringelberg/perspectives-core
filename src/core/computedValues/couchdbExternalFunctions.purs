@@ -193,7 +193,7 @@ updateModel arrWithModelName arrWithDependencies versions = case head arrWithMod
     allModelsInUse = do
       system <- getMySystem
       propertyGetter <- getDynamicPropertyGetter
-        DEP.modelExternalModelIdentification
+        DEP.versionedDomeinFileName
         (ST $ EnumeratedRoleType DEP.modelsInUse)
       values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType DEP.modelsInUse) >=> propertyGetter)
       pure $ DomeinFileId <<< unwrap <$> values

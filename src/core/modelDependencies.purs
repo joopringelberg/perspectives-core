@@ -4,6 +4,7 @@ module Perspectives.ModelDependencies  where
 -- | None of these identifiers can be changed in their models without breaking the PDR.
 -- | Relevant models are:
 -- |    * model://perspectives.domains#System
+-- |    * model://perspectives.domains#CouchdbManagement
 -- |    * model://perspectives.domains#BrokerServices
 
 ------------------------------------------------------------------------------------
@@ -95,8 +96,14 @@ modelUrl = "model://perspectives.domains#System$Model$External$Url"
 modelExternal :: String
 modelExternal = "model://perspectives.domains#System$Model$External"
 
-modelExternalModelIdentification :: String
-modelExternalModelIdentification = "model://perspectives.domains#System$VersionedModelManifest$External$DomeinFileName"
+modelManifest :: String
+modelManifest = "model://perspectives.domains#System$VersionedModelManifest$External"
+
+domeinFileName :: String
+domeinFileName = "model://perspectives.domains#System$ModelManifest$External$DomeinFileName"
+
+versionedDomeinFileName :: String
+versionedDomeinFileName = "model://perspectives.domains#System$VersionedModelManifest$External$DomeinFileName"
 
 patch :: String
 patch = "model://perspectives.domains#System$VersionedModelManifest$External$Patch"
