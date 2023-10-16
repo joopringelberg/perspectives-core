@@ -88,8 +88,6 @@ type PerspectivesExtraState =
 
   , developmentRepository :: String
 
-  , publicRepository :: String
-
   -- Do not confuse with transactionFlag! This member is used for numbering transactions that are sent to peers.
   , transactionNumber :: Int
 

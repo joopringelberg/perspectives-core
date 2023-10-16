@@ -33,19 +33,18 @@ import Perspectives.AMQP.Stomp (StompClient)
 import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, PerspectivesState, RepeatingTransaction, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
-import Perspectives.Persistence.API (PouchdbUser, Url)
+import Perspectives.Persistence.API (PouchdbUser)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> Url -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> PerspectivesState
-newPerspectivesState uinfo publicRepo transFlag transactionWithTiming modelToLoad =
+newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> PerspectivesState
+newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
-  , publicRepository: publicRepo
   , systemIdentifier: uinfo.systemIdentifier
   , couchdbUrl: uinfo.couchdbUrl 
   , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of 
@@ -60,7 +59,7 @@ newPerspectivesState uinfo publicRepo transFlag transactionWithTiming modelToLoa
   , stompClient: Nothing
   , databases: empty
   , warnings: []
-  , transactionFlag: transFlag
+  , transactionFlag: transFlag 
   , transactionWithTiming
   , modelToLoad
   , transactionFibers: Map.empty
@@ -88,9 +87,6 @@ queryAssumptionRegister = gets _.queryAssumptionRegister
 
 queryAssumptionRegisterModify :: (AssumptionRegister -> AssumptionRegister) -> MonadPerspectives Unit
 queryAssumptionRegisterModify f = modify \(s@{queryAssumptionRegister: q}) -> s {queryAssumptionRegister = f q}
-
-publicRepository :: MonadPerspectives String
-publicRepository = gets _.publicRepository
 
 developmentRepository :: MonadPerspectives String
 developmentRepository = gets _.developmentRepository

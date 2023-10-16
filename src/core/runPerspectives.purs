@@ -34,10 +34,10 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (bind, show, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a. String -> String -> String -> String -> Int -> String -> MonadPerspectives a
+runPerspectives :: forall a. String -> String -> String -> String -> Int -> MonadPerspectives a
   -> Aff a
-runPerspectives userName password systemId host port publicRepo mp = do
-  transactionFlag <- new 0
+runPerspectives userName password systemId host port mp = do
+  transactionFlag <- new 0 
   transactionWithTiming <- empty
   modelToLoad <- empty
   (rf :: AVar PerspectivesState) <- new $
@@ -47,7 +47,6 @@ runPerspectives userName password systemId host port publicRepo mp = do
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
         -- , userName: UserName userName
         }
-      publicRepo
       transactionFlag
       transactionWithTiming
       modelToLoad) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })

@@ -26,7 +26,7 @@ where
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (catMaybes, cons, filter, foldM)
+import Data.Array (catMaybes, cons, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -54,7 +54,6 @@ import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.Identifiers (isModelUri)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
 import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
@@ -105,15 +104,15 @@ main = pure unit
 -- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
 -- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
-runPDR :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-runPDR usr rawPouchdbUser publicRepo callback = void $ runAff handler do
+runPDR :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+runPDR usr rawPouchdbUser callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -311,15 +310,15 @@ createUser userName password couchdbUrl = void $ runAff
   (createPerspectivesUser userName password couchdbUrl)
 
 -- TODO publicRepo should be no longer important?
-createAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
+createAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+createAccount usr rawPouchdbUser callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Set up.
@@ -342,8 +341,8 @@ createAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
       callback true
 
 -- | This is for development only! Assumes the user identifier equals the user name.
-resetAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
+resetAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr rawPouchdbUser callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
@@ -351,7 +350,7 @@ resetAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           (do
             (catchError do
@@ -424,8 +423,8 @@ deleteDb dbname = do
     Right _ -> pure unit
 
 -- NOTE: Only local databases are removed.
-removeAccount :: UserName -> Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
+removeAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+removeAccount usr rawPouchdbUser callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in removeAccount")
@@ -438,7 +437,7 @@ removeAccount usr rawPouchdbUser publicRepo callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -476,14 +475,11 @@ addIndexedNames = do
   iContexts <- indexedContexts_ contextInstances
   modify \ps -> ps {indexedRoles = iRoles, indexedContexts = iContexts}
 
--- | Recompiles a number of essential models. Use this function when the definition of the DomeinFile
+-- | Recompiles all models in an installation. Use this function when the definition of the DomeinFile
 -- | has changed. The local models directory of the user that is provided, will have the freshly compiled
--- | DomeinFiles, so this user can be booted. The essential models include model:ModelManagement, so that
--- | using this account, all models can be recompiled from the client.
--- | These functions depend heavily on the Perspectives types in model:System and
--- | model:ModelManagement.
-recompileBasicModels :: Foreign -> Url -> (Boolean -> Effect Unit) -> Effect Unit
-recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
+-- | DomeinFiles, so this user can be booted. 
+recompileLocalModels :: Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+recompileLocalModels rawPouchdbUser callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
@@ -491,13 +487,15 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser publicRepo transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
         runPerspectivesWithState
           (do
             addAllExternalFunctions
             modelsDb <- modelsDatabaseName
             {rows:allModels} <- documentsInDatabase modelsDb includeDocs
-            uninterpretedDomeinFiles <- for (filter (isModelUri <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
+            -- As doc is still uninterpreted, we can only rely on the rows.id member of the PouchdbAllDocs record. These, however, are DomeinFileIdentifiers.
+            -- We do not have a useful test on the form of such identifiers.
+            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
@@ -506,14 +504,14 @@ recompileBasicModels rawPouchdbUser publicRepo callback = void $ runAff handler
               (ENR $ EnumeratedRoleType sysUser)
               (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
             case r of 
-              Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 
+              Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) 
               _ -> pure unit
           )
           state
   where
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = do
-      logPerspectivesError $ Custom $ "An error condition in recompileBasicModels: " <> (show e)
+      logPerspectivesError $ Custom $ "An error condition in recompileLocalModels: " <> (show e)
       callback false
     handler (Right e) = do
       logPerspectivesError $ Custom $ "Basic models recompiled!"

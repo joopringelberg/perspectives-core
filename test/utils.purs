@@ -32,7 +32,7 @@ couchdbPort :: Int
 couchdbPort = 5984
 
 runP_ :: forall a. String -> MonadPerspectives a -> Aff a
-runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort developmentRepository_
+runP_ username = runPerspectives username "geheim" username couchdbHost couchdbPort
 -- "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a
