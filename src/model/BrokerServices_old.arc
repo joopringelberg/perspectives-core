@@ -105,7 +105,7 @@ domain model://perspectives.domains#BrokerServices
     state NoAdministrator = not exists Administrator
       on entry
         do for sys:Invitation$Guest
-          bind extern >> binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> Administrator to Administrator
+          bind extern >> binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> Administrator >>= first to Administrator
     state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
       on entry
         do for BrokerContract$Administrator
