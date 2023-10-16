@@ -433,8 +433,10 @@ domain model://perspectives.domains#CouchdbManagement
 
       
       perspective on External
-        props (IsPublic, NameSpace_) verbs (Consult)
-        props ()
+        props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
+
+        action CompileRepositoryModels
+          callEffect p:CompileRepositoryModels( RepositoryUrl + ReadModels, RepositoryUrl + ReadInstances )
 
       -- The desogm pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.

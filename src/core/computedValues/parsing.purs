@@ -27,7 +27,7 @@ module Perspectives.Extern.Parsing where
 import Prelude
 
 import Control.Monad.Error.Class (catchError)
-import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Class (lift) 
 import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -100,13 +100,14 @@ removeFromRepository modelUris _ = case head modelUris of
   _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument.")
 
 
--- | Parse and compile all models found at the URL.
+-- | Parse and compile all models found at the URL, e.g. https://perspectives.domains/models_perspectives_domains
 compileRepositoryModels ::
   Array Url ->
+  Array Url -> 
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-compileRepositoryModels url_ _ = case head url_ of
-  Just url -> recompileModelsAtUrl url
-  _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments")
+compileRepositoryModels modelsurl_ manifestsurl_ _ = case head modelsurl_, head manifestsurl_ of
+  Just modelsurl, Just manifestsurl -> recompileModelsAtUrl modelsurl manifestsurl
+  _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments")
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.

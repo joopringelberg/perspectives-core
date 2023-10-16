@@ -40,7 +40,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       (Right id) -> do
         -- logShow id
         assert "'MyRole' should be parsed as a the simple step Binding" case id of
-          (Simple (Binding (ArcPosition{column: 1, line: 1}) _)) -> true
+          (Simple (Filler (ArcPosition{column: 1, line: 1}) _)) -> true
           otherwise -> false
 
   test "SimpleStep: Variable" do
