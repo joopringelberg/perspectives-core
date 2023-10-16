@@ -32,7 +32,7 @@ import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except (ExceptT, runExceptT)
 import Control.Monad.State (execState)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, difference, elemIndex, filter, head)
+import Data.Array (catMaybes, difference, elemIndex, filter, head, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -152,12 +152,14 @@ type Skipped = Array UninterpretedDomeinFile
 executeInTopologicalOrder :: forall m. MonadThrow MultiplePerspectivesErrors m =>
   ToSort ->
   (UninterpretedDomeinFile -> m UninterpretedDomeinFile) ->
-  m Unit
-executeInTopologicalOrder toSort action = void $ TOP.executeInTopologicalOrder
+  m Boolean
+executeInTopologicalOrder toSort action = TOP.executeInTopologicalOrder
   (\(UninterpretedDomeinFile{contents}) -> contents._id)
   (\(UninterpretedDomeinFile{contents}) -> difference contents.referredModels [contents._id])
   toSort
   action
+    >>=
+    \sorted -> pure $ null (toSort `difference` sorted)
 
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   { _rev :: String
@@ -174,3 +176,6 @@ instance readForeignUninterpretedDomeinFile :: ReadForeign UninterpretedDomeinFi
 derive instance genericUninterpretedDomeinFile :: Generic UninterpretedDomeinFile _
 instance showUninterpretedDomeinFiles :: Show UninterpretedDomeinFile where
   show (UninterpretedDomeinFile {contents}) = contents._id <> " <- " <> show contents.referredModels
+
+instance Eq UninterpretedDomeinFile where
+  eq (UninterpretedDomeinFile {contents:c1}) (UninterpretedDomeinFile {contents:c2}) = c1._id == c2._id

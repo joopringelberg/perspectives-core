@@ -504,18 +504,18 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
               (ENR $ EnumeratedRoleType sysUser)
               (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
             case r of 
-              Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) 
-              _ -> pure unit
+              Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) *> pure false
+              Right success -> pure success
           )
           state
   where
-    handler :: Either Error Unit -> Effect Unit
+    handler :: Either Error Boolean -> Effect Unit
     handler (Left e) = do
       logPerspectivesError $ Custom $ "An error condition in recompileLocalModels: " <> (show e)
       callback false
     handler (Right e) = do
       logPerspectivesError $ Custom $ "Basic models recompiled!"
-      callback true
+      callback e
 
 retrieveAllCredentials :: MonadPerspectives Unit
 retrieveAllCredentials = do
