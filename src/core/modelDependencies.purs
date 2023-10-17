@@ -123,6 +123,9 @@ installedBuild =  "model://perspectives.domains#System$PerspectivesSystem$Models
 versionToInstall :: String
 versionToInstall = "model://perspectives.domains#CouchdbManagement$ModelManifest$External$VersionToInstall"
 
+modelURI :: String
+modelURI = "model://perspectives.domains#CouchdbManagement$VersionedModelManifest$External$ModelURI"
+
 ------------------------------------------------------------------------------------
 -- INVITATION
 ------------------------------------------------------------------------------------

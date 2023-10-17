@@ -84,7 +84,7 @@ recompileModelsAtUrl modelsDb manifestsDb = do
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right df@(DomeinFile dfr) -> lift $ lift do
-            log $  "Recompiled '" <> contents._id <> "' succesfully!"
+            log $  "Recompiled '" <> contents._id <> "' succesfully (" <> _id <> ")!"
             -- storeDomeinFileInCouchdbPreservingAttachments df
             mattachment <- getAttachment modelsDb _id "screens.js"
             _rev' <- addDocument modelsDb (setRevision _rev df) _id
