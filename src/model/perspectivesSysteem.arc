@@ -427,6 +427,7 @@ domain model://perspectives.domains#System
     external
       property ModelName (functional) = binder Versions >> context >> extern >> binder Manifests >> LocalModelName
       property Description (mandatory, String)
+        minLength = 81
       -- Notice that we have to register the DomeinFileName on the context role in the collection (ModelManifest$Versions),
       -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
       property DomeinFileName (functional) = binder Versions >> context >> extern >> ModelManifest$External$DomeinFileName

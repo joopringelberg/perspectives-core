@@ -518,6 +518,13 @@ domain model://perspectives.domains#CouchdbManagement
   case ModelManifest 
     aspect sys:ModelManifest
 
+    -- If a Version was recommended but is no longer so, the action in this state
+    -- will set the RecommendedVersion.
+    state NoRecommendations = not exists filter Versions with IsRecommended
+      on entry
+        do for Author
+          VersionToInstall = extern >> HighestVersion for External
+
     external
       aspect sys:ModelManifest$External
       -- Description
@@ -544,7 +551,7 @@ domain model://perspectives.domains#CouchdbManagement
     on exit
       do for Author
         delete context bound to Versions
-
+    
     -- The external role of the Repository.
     context Repository = extern >> binder Manifests >> context >> extern >>= first
 
