@@ -96,6 +96,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceTy
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
+import Perspectives.SetupCouchdb (setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
@@ -586,6 +587,23 @@ createCouchdbDatabase databaseUrls databaseNames _ = case head databaseUrls, hea
   Just databaseUrl, Just databaseName -> lift $ withDatabase (databaseUrl <> databaseName) (pure <<< const unit)
   _, _ -> pure unit
 
+-- | Create a database with all views that are useful for retrieving role- and context instances
+createEntitiesDatabase  :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
+createEntitiesDatabase databaseUrls databaseNames _ = case head databaseUrls, head databaseNames of
+  -- NOTE: misschien moet er een slash tussen
+  Just databaseUrl, Just databaseName -> lift $ withDatabase (databaseUrl <> databaseName) 
+    (\_ -> do
+      dbName <- pure (databaseUrl <> databaseName)
+      setRoleView dbName
+      setRoleFromContextView dbName
+      setPendingInvitationView dbName
+      setContextView dbName
+      setCredentialsView dbName
+      setFilledRolesView dbName
+      )
+  _, _ -> pure unit
+
+
 -- | RoleInstance is an instance of model:CouchdbManagement$CouchdbServer$Repositories.
 -- | Execution of this function requires the user to have a SERVERADMIN account.
 deleteCouchdbDatabase :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
@@ -756,7 +774,8 @@ externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
   [ 
   -- SERVERADMIN
-    Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2, isFunctional: True}
+    Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2, isFunctional: True}    
+  , Tuple "model://perspectives.domains#Couchdb$createEntitiesDatabase" {func: unsafeCoerce createEntitiesDatabase, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2, isFunctional: True}

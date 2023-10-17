@@ -115,11 +115,9 @@ domain model://perspectives.domains#CouchdbManagement
               letA 
                 couchdburl <- "http://localhost:" + CouchdbServers$CouchdbPort + "/"
               in 
-                callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories" )
+                callEffect cdb:CreateEntitiesDatabase( Url, "cw_servers_and_repositories" )
                 callEffect cdb:MakeDatabaseWriteProtected( Url, "cw_servers_and_repositories" )
                 callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
-                --callEffect cdb:CreateCouchdbDatabase( Url, "cw_servers_and_repositories_write" )
-                --callEffect cdb:ReplicateContinuously( Url, couchdburl, "cw_servers_and_repositories_write", "cw_servers_and_repositories" )
                 -- As the databases are now ready, we can create and publish the CouchdbServer.
                 create_ context CouchdbServer bound to origin
 
@@ -311,7 +309,7 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
               -- instances
-              callEffect cdb:CreateCouchdbDatabase( baseurl, readinstances )
+              callEffect cdb:CreateEntitiesDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
         on exit
