@@ -84,18 +84,6 @@ indexedContext = "model://perspectives.domains#System$PerspectivesSystem$Indexed
 indexedContextName :: String
 indexedContextName = "model://perspectives.domains#System$PerspectivesSystem$IndexedContexts$Name"
 
-modelDescription :: String
-modelDescription = "model://perspectives.domains#System$Model$External$Description"
-
-modelManagementDescription :: String
-modelManagementDescription = "model://perspectives.domains#ModelManagement$ManagedModel$ModelDescription"
-
-modelUrl :: String
-modelUrl = "model://perspectives.domains#System$Model$External$Url"
-
-modelExternal :: String
-modelExternal = "model://perspectives.domains#System$Model$External"
-
 modelManifest :: String
 modelManifest = "model://perspectives.domains#System$ModelManifest$External"
 
@@ -129,6 +117,8 @@ modelURI = "model://perspectives.domains#CouchdbManagement$VersionedModelManifes
 ------------------------------------------------------------------------------------
 -- INVITATION
 ------------------------------------------------------------------------------------
+
+-- TODO, IMPORTANT! this type is no longer implemented in model:System, but it is used in code.
 privateChannel :: String
 privateChannel = "model://perspectives.domains#System$Invitation$PrivateChannel"
 

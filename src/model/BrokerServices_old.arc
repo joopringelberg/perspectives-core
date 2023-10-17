@@ -67,6 +67,7 @@ domain model://perspectives.domains#BrokerServices
         props (Name) verbs (Consult)
 
   -- A Managed service.
+  -- PDRDEPENDENCY
   case BrokerService
     state NoAdministrator = not exists Administrator
       on entry
@@ -74,7 +75,9 @@ domain model://perspectives.domains#BrokerServices
           bind sys:Me to Administrator
     external
       property Name (mandatory, String)
+      -- PDRDEPENDENCY
       property Url (mandatory, String)
+      -- PDRDEPENDENCY
       property Exchange (mandatory, String)
 
     user Administrator filledBy sys:PerspectivesSystem$User
@@ -97,9 +100,11 @@ domain model://perspectives.domains#BrokerServices
       perspective on Administrator
         only (Fill, Create)
 
+    -- PDRDEPENDENCY
     context Accounts (relational) filledBy BrokerContract
 
   -- The contract between an end user and a BrokerService.
+  -- PDRDEPENDENCY
   case BrokerContract
     aspect sys:Invitation
     state NoAdministrator = not exists Administrator
@@ -121,10 +126,14 @@ domain model://perspectives.domains#BrokerServices
       view ForAccountHolder (Url, Exchange)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
+    -- PDRDEPENDENCY
     user AccountHolder filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee
+      -- PDRDEPENDENCY
       property AccountName (mandatory, String)
+      -- PDRDEPENDENCY
       property AccountPassword (mandatory, String)
+      -- PDRDEPENDENCY
       property QueueName (mandatory, String)
       property ConfirmationCode (String)
 

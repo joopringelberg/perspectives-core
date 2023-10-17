@@ -1,4 +1,6 @@
 -- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2022, 2023
+
+-- PDRDEPENDENCY
 domain model://perspectives.domains#System
   use sys for model://perspectives.domains#System
   use cdb for model://perspectives.domains#Couchdb
@@ -43,17 +45,24 @@ domain model://perspectives.domains#System
 
   -- Used as model:System$RoleWithId$Id in the PDR code.
   thing RoleWithId
+    -- PDRDEPENDENCY
     property Id = callExternal util:RoleIdentifier() returns String
 
+  -- PDRDEPENDENCY
   user WithCredentials filledBy sys:PerspectivesSystem$User
     -- | The value of field systemIdentifier of the PouchdbUser object that is passed in to runPDR.
     -- | Currently, this is the raw username that is used to log into MyContexts, e.g. "dev1".
+    -- PDRDEPENDENCY
     property UserName = SpecificUserName orElse callExternal util:SystemIdentifier() returns String
     property SpecificUserName (String)
+    -- PDRDEPENDENCY
     property Password (String)
+    -- PDRDEPENDENCY
     property AuthorizedDomain (String)
 
+  -- PDRDEPENDENCY
   case PerspectivesSystem
+    -- PDRDEPENDENCY
     indexed sys:MySystem
     aspect sys:RootContext
     aspect sys:ContextWithNotification
@@ -70,20 +79,26 @@ domain model://perspectives.domains#System
 
     external
       aspect sys:RootContext$External
+      -- PDRDEPENDENCY
       property ConnectedToAMQPBroker (Boolean)
       property CardClipBoard (String)
       property ShowLibraries (Boolean)
 
       view ShowLibraries (ShowLibraries)
 
+    -- PDRDEPENDENCY
     user User (mandatory)
       property LastName (mandatory, relational, String)
       property FirstName (mandatory, relational, String)
+      -- PDRDEPENDENCY
       property Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       -- User instances need not have a value for this property. It is used in the PDR to
       -- ensure serialisation of the User role.
+      -- PDRDEPENDENCY
       property Id (String)
       -- property Id = callExternal util:RoleIdentifier() returns String
+
+      -- PDRDEPENDENCY
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
       perspective on User
@@ -159,6 +174,7 @@ domain model://perspectives.domains#System
 
     user Contacts = filter (callExternal cdb:RoleInstances( "model://perspectives.domains#System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
 
+    -- PDRDEPENDENCY
     user Installer
       perspective on StartContexts
         only (CreateAndFill)
@@ -179,9 +195,13 @@ domain model://perspectives.domains#System
 
     context AllRepositories = BaseRepository union Repositories
 
+    -- PDRDEPENDENCY
     context ModelsInUse (relational) filledBy sys:VersionedModelManifest
+      -- PDRDEPENDENCY
       property ModelToRemove (String)
+      -- PDRDEPENDENCY
       property InstalledPatch (Number)
+      -- PDRDEPENDENCY
       property InstalledBuild (Number)
       property UpdateOnBuild (Boolean)
       state InstallBuild = UpdateOnBuild and InstalledBuild < Build
@@ -201,11 +221,15 @@ domain model://perspectives.domains#System
     --     < callExternal util:SelectR( "\\.(\\d+)$", Version ) returns Number
 
     -- All context types that have been declared to be 'indexed' have an instance that fills this role.
+    -- PDRDEPENDENCY
     context IndexedContexts (mandatory) filledBy sys:RootContext
+      -- PDRDEPENDENCY
       property Name (mandatory, String)
 
     -- All role types that have been declared to be 'indexed' have an instance that fills this role.
+    -- PDRDEPENDENCY
     thing IndexedRoles (relational)
+      -- PDRDEPENDENCY
       property Name (mandatory, String)
 
 
@@ -261,8 +285,11 @@ domain model://perspectives.domains#System
 
 
   -- Use this as an aspect in contexts that should store their own notifications.
+  -- PDRDEPENDENCY
   case ContextWithNotification
+    -- PDRDEPENDENCY
     thing Notifications (relational)
+      -- PDRDEPENDENCY
       property Message (String)
     -- As soon as we have perspective contextualisation, add NotifiedUser as an Aspect to all users that can be notified.
     user NotifiedUser
@@ -277,23 +304,31 @@ domain model://perspectives.domains#System
   case PhysicalContext
     user UserWithAddress
       -- The public URL of the PDR of the UserWithAddress.
+      -- PDRDEPENDENCY
       property Host (String)
       -- The port where Couchdb listens.
+      -- PDRDEPENDENCY
       property Port (Number)
       -- The public URL of the RelayServer of the UserWithAddress
+      -- PDRDEPENDENCY
       property RelayHost (String)
       -- The port where Couchdb listens on the RelayServer.
+      -- PDRDEPENDENCY
       property RelayPort (String)
 
   -- A Channel is shared by just two users.
+  -- PDRDEPENDENCY
   case Channel
     aspect sys:PhysicalContext
     external
+      -- PDRDEPENDENCY
       property ChannelDatabaseName (mandatory, String)
+    -- PDRDEPENDENCY
     user Initiator filledBy sys:PerspectivesSystem$User
       aspect sys:PhysicalContext$UserWithAddress
       perspective on ConnectedPartner
       perspective on Initiator
+    -- PDRDEPENDENCY
     user ConnectedPartner filledBy sys:PerspectivesSystem$User
       -- The public URL of the PDR of the partner.
       aspect sys:PhysicalContext$UserWithAddress
@@ -303,8 +338,10 @@ domain model://perspectives.domains#System
     user You = filter (Initiator union ConnectedPartner) with not filledBy sys:Me
 
   case RootContext
+    -- PDRDEPENDENCY
     external
       property Name (mandatory, String)
+    -- PDRDEPENDENCY
     user RootUser filledBy sys:PerspectivesSystem$User
 
   case Invitation
@@ -404,12 +441,14 @@ domain model://perspectives.domains#System
 
   case ModelManifest
     aspect sys:RootContext
+    -- PDRDEPENDENCY
     external
       aspect sys:RootContext$External
       property Description (mandatory, String)
       property IsLibrary (mandatory, Boolean)
       -- The value of this property will be set automatically by the Couchdb:VersionedModelManifest$Author.
       -- It must be a local DomeinFileId, e.g. perspectives_domains-System.json (WITHOUT the version!)
+      -- PDRDEPENDENCY
       property DomeinFileName (mandatory, String)
       
     context Versions (relational) filledBy VersionedModelManifest
@@ -430,9 +469,12 @@ domain model://perspectives.domains#System
         minLength = 81
       -- Notice that we have to register the DomeinFileName on the context role in the collection (ModelManifest$Versions),
       -- to serve in the pattern that creates a DNS URI, so it can be a public resource.
+      -- PDRDEPENDENCY
       property DomeinFileName (functional) = binder Versions >> context >> extern >> ModelManifest$External$DomeinFileName
       property Version (functional)        = binder Versions >> Versions$Version
+      -- PDRDEPENDENCY
       property Patch (Number)
+      -- PDRDEPENDENCY
       property Build (Number)
     user Visitor = sys:Me
       perspective on extern

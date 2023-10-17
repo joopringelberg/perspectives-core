@@ -545,6 +545,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- The version to install. It depends on a calculation, but we have to store it explicitly 
       -- so we can even retrieve it on system startup.
       -- This property must be published.
+      -- PDRDEPENDENCY
       property VersionToInstall (String)
     
     -- Embedded contexts are not removed automatically with their embedder!
@@ -657,6 +658,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- VersionedModelManifest$External$DomeinFileName
       -- VersionedModelManifest$External$Version
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
+      -- PDRDEPENDENCY
       property ModelURI (functional) = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
       property VersionedModelURI = VersionedModelManifest$External$ModelURI + "@" + External$Version
       property ArcFile (File)
