@@ -445,7 +445,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
 reEvaluatePublicFillerChanges :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
 reEvaluatePublicFillerChanges filled filler = do
   filledType <- lift (filled ##>> OG.roleType)
-  -- `fillsKeys` are computed using all types of filled.
+  -- `filledKeys` are computed using all types of filled.
   filledKeys <- lift $ unsafePartial runtimeIndexForFilledQueries' filled
   -- We've stored the relevant InvertedQueries with the type of the filled,
   -- so we execute them on any filler that is a specialisation of (or equal to) the required filler type.
@@ -461,7 +461,6 @@ reEvaluatePublicFillerChanges filled filler = do
     Just calculations -> concat <$> for calculations
       (\iq -> if isForSelfOnly iq
         -- These inverted queries skip the first step and so must be applied to the filled itself.
-        -- NOTE/TODO: ik denk dat het tweemaal filled moet zijn. De forwards query wordt toegepast op het tweede argument.
         then handleSelfOnlyQuery iq filled filler
         else handleBackwardQuery filled iq >>= pure <<< join <<< map snd
     ))

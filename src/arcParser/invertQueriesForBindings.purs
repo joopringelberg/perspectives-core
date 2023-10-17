@@ -59,7 +59,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType)
 
--- | For a User RoleType, and an ADT EnumeratedRoleType that represents the Object of a Perspective,
+-- | For a User RoleType, and an ADT RoleInContext that represents the Object of a Perspective,
 -- | construct and distribute InvertedQueries that ensure that this User is notified of changes to the filler
 -- | of the role and its properties, recursively.
 -- | NOTE: this function does not handle the inversion of the Perspective Object itself!
