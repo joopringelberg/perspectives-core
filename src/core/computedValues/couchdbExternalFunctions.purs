@@ -775,7 +775,7 @@ externalFunctions =
   [ 
   -- SERVERADMIN
     Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2, isFunctional: True}    
-  , Tuple "model://perspectives.domains#Couchdb$createEntitiesDatabase" {func: unsafeCoerce createEntitiesDatabase, nArgs: 2, isFunctional: True}
+  , Tuple "model://perspectives.domains#Couchdb$CreateEntitiesDatabase" {func: unsafeCoerce createEntitiesDatabase, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3, isFunctional: True}
   , Tuple "model://perspectives.domains#Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2, isFunctional: True}
