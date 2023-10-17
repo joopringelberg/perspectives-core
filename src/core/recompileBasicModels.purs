@@ -77,7 +77,7 @@ recompileModelsAtUrl modelsDb manifestsDb = do
     _ -> pure unit
   where
     recompileModelAtUrl :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-    recompileModelAtUrl model@(UninterpretedDomeinFile{_rev, contents}) =
+    recompileModelAtUrl model@(UninterpretedDomeinFile{_id, _rev, contents}) =
       do
         log ("Recompiling " <> contents._id)
         r <- lift $ loadAndCompileArcFile_ contents.arc
@@ -86,11 +86,11 @@ recompileModelsAtUrl modelsDb manifestsDb = do
           Right df@(DomeinFile dfr) -> lift $ lift do
             log $  "Recompiled '" <> contents._id <> "' succesfully!"
             -- storeDomeinFileInCouchdbPreservingAttachments df
-            mattachment <- getAttachment modelsDb contents._id "screens.js"
-            _rev' <- addDocument modelsDb (setRevision _rev df) contents._id
+            mattachment <- getAttachment modelsDb _id "screens.js"
+            _rev' <- addDocument modelsDb (setRevision _rev df) _id
             case mattachment of 
               Nothing -> pure unit
-              Just attachment -> void $ addAttachment modelsDb contents._id _rev' "screens.js" attachment (MediaType "text/exmascript")
+              Just attachment -> void $ addAttachment modelsDb _id _rev' "screens.js" attachment (MediaType "text/exmascript")
         pure model
     getVersionedDomeinFileName :: String -> MonadPerspectivesTransaction (Maybe String)
     getVersionedDomeinFileName rid = do 
@@ -163,6 +163,7 @@ executeInTopologicalOrder toSort action = TOP.executeInTopologicalOrder
 
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   { _rev :: String
+  , _id :: String
   , contents ::
     { referredModels :: Array String
     , arc :: String

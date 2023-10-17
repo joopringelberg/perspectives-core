@@ -97,7 +97,7 @@ modelExternal :: String
 modelExternal = "model://perspectives.domains#System$Model$External"
 
 modelManifest :: String
-modelManifest = "model://perspectives.domains#System$VersionedModelManifest$External"
+modelManifest = "model://perspectives.domains#System$ModelManifest$External"
 
 domeinFileName :: String
 domeinFileName = "model://perspectives.domains#System$ModelManifest$External$DomeinFileName"

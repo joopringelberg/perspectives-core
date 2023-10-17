@@ -107,7 +107,7 @@ compileRepositoryModels ::
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 compileRepositoryModels modelsurl_ manifestsurl_ _ = case head modelsurl_, head manifestsurl_ of
   Just modelsurl, Just manifestsurl -> recompileModelsAtUrl modelsurl manifestsurl
-  _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments")
+  _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments") 
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
@@ -116,5 +116,5 @@ externalFunctions =
   [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1, isFunctional: True}
   , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 1, isFunctional: True}
+  , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 2, isFunctional: True}
 ]
