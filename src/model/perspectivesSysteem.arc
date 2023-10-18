@@ -205,7 +205,20 @@ domain model://perspectives.domains#System
       property InstalledBuild (Number)
       property UpdateOnBuild (Boolean)
       state InstallBuild = UpdateOnBuild and InstalledBuild < Build
+        on entry
+          notify User
+            "Installing a new build of { ModelName }."
+          do for User
+            callEffect cdb:UpdateModel( ModelToRemove, false )
+            InstalledBuild = Build
+
       state InstallUpdate = InstalledPatch < Patch
+        on entry
+          notify User
+            "Installing a new patch for { ModelName }."
+          do for User
+            callEffect cdb:UpdateModel( ModelToRemove, false )
+            InstalledPatch = Patch
       on exit
         -- notify User
         --   "Model {ModelToRemove} has been removed completely."
