@@ -146,6 +146,7 @@ runPDR usr rawPouchdbUser callback = void $ runAff handler do
     run state = catchError 
       (do 
         log "Starting the Perspectives API."
+        -- The very first request will invoke detectPublicStateChanges.
         runPerspectivesWithState setupApi state)
       \e -> do
         logPerspectivesError $ Custom $ "API stopped because: " <> show e

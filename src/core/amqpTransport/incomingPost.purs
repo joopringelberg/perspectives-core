@@ -48,7 +48,7 @@ import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
@@ -92,10 +92,12 @@ incomingPost = do
             -- That is why we acknowledge first.
             -- The risk is that the PDR may not handle the message fully and then it is lost.
             lift $ acknowledge ack
-            lift (runMonadPerspectivesTransaction'
-              false
-              (ENR $ EnumeratedRoleType sysUser)
-              (executeTransaction body))
+            lift do 
+              runMonadPerspectivesTransaction'
+                false
+                (ENR $ EnumeratedRoleType sysUser)
+                (executeTransaction body)
+              detectPublicStateChanges
 
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do
