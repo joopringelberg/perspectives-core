@@ -92,14 +92,14 @@ completeInversions = invert >=> pure <<< catMaybes <<< map f
 -- | semantics. See the text Filtering Inverted Queries.docx.
 -- | INVARIANT: All QueryWithAKink instances will have a backwards part.
 invert :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink)
-invert = invert_ >=> traverse h >=> pure <<< catMaybes
+invert = invert_ >=> pure <<< catMaybes <<< map h
   where
-    h :: QueryWithAKink_ -> PhaseThree (Maybe QueryWithAKink)
+    h :: QueryWithAKink_ -> Maybe QueryWithAKink
     h (ZQ_ steps q) = case unsnoc steps of
       -- Remove candidates without a backwards part.
-      Nothing -> pure Nothing
+      Nothing -> Nothing
       -- Creates a right-associative composition that preserves the order in steps.
-      Just {init, last} -> pure $ Just $ ZQ (Just $ foldr compose last init) q
+      Just {init, last} -> Just $ ZQ (Just $ foldr compose last init) q
 
 -- | The QueryFunctionDescriptions in the Array of each QueryWithAKink_
 -- | are inversed wrt the orinal query.
@@ -144,18 +144,25 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
     case lefts, rights of 
       [], _ -> pure rights
       _, [] -> pure lefts
-      _, _ -> pure do
-        (ZQ_ left_inverted_steps mLeft_forward) <- lefts
-        (ZQ_ right_inverted_steps mRight_forward) <- rights
-        -- The range of mLeft_forward must equal the domain of mRight_forward.
-        guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
-          Just ran, Just domn -> ran == domn
-          -- If the forward of the left part is Nothing, left has been inverted entirely and 
-          -- may be combined with any inversion of right.
-          Nothing, _ -> true
-          _, _ -> false
-        pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
-                    (mLeft_forward `composeOverMaybe` mRight_forward)
+      _, _ -> do 
+        comprehension <- pure $ comprehend lefts rights
+        result <- pure $ lefts <> comprehension
+        pure result
+  
+  where
+    comprehend :: Array QueryWithAKink_ -> Array QueryWithAKink_ -> Array QueryWithAKink_
+    comprehend lefts rights = do
+      (ZQ_ left_inverted_steps mLeft_forward) <- lefts
+      (ZQ_ right_inverted_steps mRight_forward) <- rights
+      -- The range of mLeft_forward must equal the domain of mRight_forward.
+      guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
+        Just ran, Just domn -> ran == domn
+        -- If the forward of the left part is Nothing, left has been inverted entirely and 
+        -- may be combined with any inversion of right.
+        Nothing, _ -> true
+        _, _ -> false
+      pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
+                  (mLeft_forward `composeOverMaybe` mRight_forward)
 
 invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
 
@@ -194,6 +201,8 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
 
+-- TODO hier ontbreekt iets. We geven hier maar één pad terug!
+-- Expandeer eerst en inverteer dan.
 invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
   (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
   if hasProp
