@@ -197,6 +197,7 @@ domain model://perspectives.domains#System
 
     -- PDRDEPENDENCY
     context ModelsInUse (relational) filledBy sys:VersionedModelManifest
+      -- Includes a semantic version number.
       -- PDRDEPENDENCY
       property ModelToRemove (String)
       -- PDRDEPENDENCY
@@ -469,7 +470,7 @@ domain model://perspectives.domains#System
       -- We need it on this role so we can create an instance of VersionedModelManifest based on
       -- the Version value.
       property Version (mandatory, String)
-        pattern = "^[0-9]+\\.[0-9]+$" "The form MAJOR.MINOR where both are integer numbers."
+        pattern = "^[0-9]+\\.[0-9]+(?:\\.dev)?$" "The form MAJOR.MINOR where both are integer numbers, or MAJOR.MINOR.dev."
       -- E.g. "System@1.0.0"
       property VersionedLocalModelName = (context >> extern >> binder Manifests >> LocalModelName >>= first) + "@" + Versions$Version
       -- dit kan weer weg!
