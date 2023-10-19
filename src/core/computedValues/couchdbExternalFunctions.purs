@@ -184,6 +184,7 @@ updateModel arrWithModelName arrWithDependencies versions = case head arrWithMod
       -- Find all models in use.
       models' <- lift (allModelsInUse >>= traverse getDomeinFile)
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
+      -- These are the 'incoming' InvertedQueries: those that are attached to types of this model.
       lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
         forWithIndex_ invertedQueries
           \domainName queries -> if domainName == unversionedModelname

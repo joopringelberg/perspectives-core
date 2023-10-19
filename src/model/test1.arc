@@ -44,10 +44,21 @@ domain model://joopringelberg.nl#Test1
   case JoopsApp
     indexed joop:MyVersionOfJoopsApp
     aspect sys:RootContext
+    aspect sys:ContextWithNotification
     external
       aspect sys:RootContext$External
+
+      state ClipboardFilled = exists binder model://perspectives.domains#System$PerspectivesSystem$StartContexts >> context >> extern >> CardClipBoard
+        on entry
+          notify Manager
+            "Something on the clipboard!"
+        on exit
+          notify Manager
+            "Clipboard empty again!"
     
     user Manager = sys:Me
+      perspective on Manager
+        props (FirstName) verbs (Consult)
       action MakeTestDatabase
         callEffect cdb:CreateCouchdbDatabase( "https://localhost:6984/", "testjoop" )
         callEffect cdb:MakeDatabasePublic( "https://localhost:6984/", "testjoop" )

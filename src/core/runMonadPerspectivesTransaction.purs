@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (concat, filterA, head, index, length, nub, null, reverse, sort, unsafeIndex)
+import Data.Array (concat, filterA, index, length, nub, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
@@ -222,46 +222,41 @@ runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= l
         computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
         computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
           activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
-          case head activeInstances of
-            Nothing -> pure []
-            Just contextInstance -> do
-              -- States includes root states of Aspects.
-              states <- contextInstance ##= contextType >=> liftToInstanceLevel contextRootStates
-              for activeInstances \cid -> do
-                -- Note that the user may play different roles in the various context instances.
-                (mmyType :: Maybe RoleType) <- cid ##> getMyType
-                case mmyType of
-                  Nothing -> pure []
-                  Just (CR myType) -> if isGuestRole myType
-                    then do
-                      (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
-                      case mmguest of
-                        -- If the Guest role is not filled, don't execute bots on its behalf!
-                        Nothing -> pure []
-                        otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-                    else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-                  Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
+          for activeInstances \cid -> do
+            -- States includes root states of Aspects.
+            states <- cid ##= contextType >=> liftToInstanceLevel contextRootStates
+            -- Note that the user may play different roles in the various context instances.
+            (mmyType :: Maybe RoleType) <- cid ##> getMyType
+            case mmyType of
+              Nothing -> pure []
+              Just (CR myType) -> if isGuestRole myType
+                then do
+                  (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
+                  case mmguest of
+                    -- If the Guest role is not filled, don't execute bots on its behalf!
+                    Nothing -> pure []
+                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+                else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
+              Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
+              
         computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
           activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
-          case head activeInstances of
-            Nothing -> pure []
-            Just roleInstance -> do
+          -- If the roleInstance has no recorded states, this means it has been marked for removal
+          -- and has exited all its states. We should not do that again!
+          for activeInstances \rid -> do
+            (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
               -- Neem aspecten hier ook mee!
-              states <- roleInstance ##= roleType >=> liftToInstanceLevel roleRootStates
-              -- If the roleInstance has no recorded states, this means it has been marked for removal
-              -- and has exited all its states. We should not do that again!
-              for activeInstances \rid -> do
-                (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
-                case mmyType of
-                  Nothing -> pure []
-                  Just (CR myType) -> if isGuestRole myType
-                    then do
-                      (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
-                      case mmguest of
-                        Nothing -> pure []
-                        otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-                    else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-                  Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
+            states <- rid ##= roleType >=> liftToInstanceLevel roleRootStates
+            case mmyType of
+              Nothing -> pure []
+              Just (CR myType) -> if isGuestRole myType
+                then do
+                  (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
+                  case mmguest of
+                    Nothing -> pure []
+                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+                else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
+              Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
 
         isGuestRole :: CalculatedRoleType -> Boolean
         isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
