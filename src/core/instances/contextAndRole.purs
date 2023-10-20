@@ -400,18 +400,6 @@ rol_padOccurrence n =  case floor( log( toNumber n) / ln10 ) of
   2 -> "0" <> show n
   _ -> show n
 
--- Assume the Array is sorted alphabetically. Role index numbers follow the (last) underscore ("_") and are left padded with zeroes.
--- getNextRolIndex :: Array RoleInstance -> Int
--- getNextRolIndex rolIds = case Arr.last rolIds of
---   Nothing -> 0
---   (Just id) -> case lastIndexOf (Pattern "_") (NT.unwrap id) of
---     Nothing -> 0
---     (Just n) -> let {after} = splitAt (n + 1) (NT.unwrap id) in
---       case fromString after of
---         Nothing -> 0
---         (Just x) -> x + 1
-
--- TODO #3
 getNextRolIndex :: Array RoleInstance -> Int
 getNextRolIndex rolIds = case (maximum $ rolIds <#> \(RoleInstance id) -> case lastIndexOf (Pattern "_") id of
   Nothing -> 0
