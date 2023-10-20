@@ -3,8 +3,8 @@
 
 // NOTE. We have to decide in coding time whether to include the browser or the Node version
 // Otherwise, we'd carry the Node code to the browser and vice versa.
-import PouchDB from "pouchdb-browser";
-import PouchDB from "pouchdb";
+var PouchDB = require('pouchdb-browser').default;
+// var PouchDB = require('pouchdb');
 
 // TODO. Zodra we een encoding toepassen waarbij _rev, _id en _attachments bewaard blijven, is deze functie overbodig.
 exports.addNameAndVersionHack = function( doc, name, rev, attachments)

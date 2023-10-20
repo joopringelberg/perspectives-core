@@ -20,7 +20,7 @@
 
 // END LICENSE
 
-import Stomp from "@stomp/stompjs";
+var Stomp = require( "@stomp/stompjs" );
 
 
 function createStompClientImpl ( url )
