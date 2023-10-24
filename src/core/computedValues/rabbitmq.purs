@@ -107,6 +107,8 @@ deleteAMQPaccount ::
   MonadPerspectivesTransaction Unit
 deleteAMQPaccount url_ nodeName_ adminUserName_ adminPassword_ accountName_ _ = pure unit
 
+
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)

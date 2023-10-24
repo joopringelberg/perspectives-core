@@ -37,7 +37,7 @@ import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
-import Perspectives.Guid as GUID
+import Perspectives.Cuid2 (cuid2)
 import Perspectives.Identifiers (isUrl, modelUri2ModelUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
@@ -267,7 +267,8 @@ resourceIdentifier2WriteDocLocator resId = do
 -- | Such identifiers are only ever created when processing a Transaction for a publishing Proxy role.
 createResourceIdentifier :: ResourceType -> MonadPerspectivesTransaction ResourceIdentifier
 createResourceIdentifier ctype = do
-  g <- show <$> liftEffect GUID.guid
+  s <- lift $ getSystemIdentifier
+  g <- liftEffect $ cuid2 s
   createResourceIdentifier' ctype g  
 
 -- | This function never creates an identifier in the Public scheme.
