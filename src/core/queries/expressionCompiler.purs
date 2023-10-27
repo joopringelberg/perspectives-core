@@ -568,9 +568,7 @@ compileUnaryStep currentDomain (LogicalNot pos s) = do
 
 compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
-  case range descriptionOfs of
-    CDOM _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
-    otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool Nothing) True True
+  pure $ UQD currentDomain (QF.UnaryCombinator ExistsF) descriptionOfs (VDOM PBool Nothing) True True
 
 compileUnaryStep currentDomain st@(FilledBy pos s) = do
   descriptionOfs <- compileStep currentDomain s
