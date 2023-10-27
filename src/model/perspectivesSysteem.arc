@@ -20,27 +20,59 @@ domain model://perspectives.domains#System
   on entry
     do for sys:PerspectivesSystem$Installer
       letA
-        indexedcontext <- create role IndexedContexts in sys:MySystem
+        -- Installer has sufficient perspectives on IndexedContexts, IndexedRoles and StartContexts.
+        indexedsystem <- create role IndexedContexts in sys:MySystem
+        indexedworld <- create role IndexedContexts in sys:MySystem
         indexedrole <- create role IndexedRoles in sys:MySystem
+        -- TheWorld must be re-created for each installation. The model context of System is entered only once in an installation.
+        -- Received delta's for re-creating the world are probably never executed, but since each user creates the same resource,
+        -- this is no problem.
+        theworld <- create context TheWorld named "TheWorld"
       in 
         bind sys:MySystem >> extern to StartContexts in sys:MySystem
         Name = "My System" for sys:MySystem >> extern
-        bind_ sys:MySystem >> extern to indexedcontext
+        bind_ sys:MySystem >> extern to indexedsystem
         -- TODO. Zonder kwalificatie zegt de compiler dat "Name" niet bestaat voor IndexedContexts. Maar er is een naamconflict met RootContext$Extern$Name
-        IndexedContexts$Name = sys:MySystem >> indexedName for indexedcontext
+        IndexedContexts$Name = sys:MySystem >> indexedName for indexedsystem
         bind_ sys:Me to indexedrole
         Name = sys:Me >> indexedName for indexedrole
         -- Equivalently:
         -- Name = "model://perspectives.domains#System$Me"
 
-        -- NOTE that we should uncomment this line but cannot do so until 
-        --    * this resource and its model is available;
-        --    * we can compile model://perspectives.domains/System in a MyContexts installation that holds model://perspectives.domains/CouchdbManagement.
+        -- NOTE that the following line only compiles correctly when
+        --    * the referred Repository and the type describing its model (model://perspectives.domains/CouchdbManagement) are available;
+        -- which in turn requires a previously existing installation with both the System and CouchdbManagement model available to compile them.
         -- This is because the line below is a forward reference to a CouchdbManagement type.
         -- This is a Catch22 situation.
-        -- Now add the perspectives.domains repository as BaseRepository:
+
+        -- Add the perspectives.domains repository as BaseRepository:
         bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
 
+        bind_ theworld >> extern to indexedworld
+        IndexedContexts$Name = sys:TheWorld >> indexedName for indexedworld
+  
+  state FirstInstallation = callExternal util:SystemParameter( "IsFirstInstallation" ) returns Boolean
+    on entry
+      do for sys:PerspectivesSystem$Installer
+        letA
+          -- This role instance will be shared with peers. MISSING PERSPECTIVE
+          myperson <- create role PerspectivesUsers in sys:TheWorld
+          -- When a Person is used to fill a user role, SocialEnvironment will be shared with peers. MISSING PERSPECTIVE
+          mysocialenvironment <- create context SocialEnvironment
+          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
+          indexedsocialenvironment <- create role IndexedContexts in sys:MySystem
+        in 
+          -- The instance of Me will not be shared with peers.
+          bind myperson to Me in mysocialenvironment
+          -- notice that there is a state in User that is entered as soon as we have 
+          -- SocialEnvironment$Me, on entry of which we fill sys:Me.
+          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
+          bind_ mysocialenvironment >> extern to indexedsocialenvironment
+          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
+          IndexedContexts$Name = sys:MySocialEnvironment >> indexedName for indexedsocialenvironment
+          bind mysocialenvironment >> extern to SocialEnvironment in sys:MySystem
+
+  -- PDRDEPENDENCY
   aspect user sys:PerspectivesSystem$Installer
 
   -- Used as model:System$RoleWithId$Id in the PDR code.
@@ -60,6 +92,57 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     property AuthorizedDomain (String)
 
+  user Identifiable
+      property LastName (mandatory, relational, String)
+      property FirstName (mandatory, relational, String)
+
+  -- TheWorld is shared by everyone. It is identified by def:#TheWorld.
+  case TheWorld
+    indexed sys:TheWorld
+    aspect sys:RootContext
+    user PerspectivesUsers (relational)
+      aspect sys:Identifiable
+      -- Having a PublicKey is a proxy for having an installation.
+      -- A Persons instance without a keypair can fill User roles, but does not
+      -- participate (yet) in the Perspectives Universe.
+      property PublicKey (String)
+      -- the private key is never available in Perspectives data, only as an object in IndexedDB.
+    user NonPerspectivesUsers (relational)
+      aspect sys:Identifiable
+  
+  -- MySocialEnvironment is the same on all of my devices.
+  case SocialEnvironment
+    indexed sys:MySocialEnvironment
+    -- As we share SocialEnvironment over installations, this will happen only in the first installation.
+    aspect sys:RootContext
+    state InitMe = not exists Me 
+      on entry
+        do for Initializer
+          -- Initializer has a sufficient perspective, but Me is never shared anyway.
+          bind sys:TheWorld >> PerspectivesUsers >>= first to Me
+          bind sys:TheWorld >> PerspectivesUsers >>= first to Persons
+    -- To fill other user roles: require Persons as user role filler if there is no need to consider a natural person
+    -- to be a peer with whom one wants to synchronize. Require PerspectivesSystem$Users otherwise.
+    -- Using Persons rather than TheWorld$PerspectivesUsers or TheWorld$NonPerspectivesUsers creates a layer of indirection
+    -- that allows us to switch rather painlessly from NonPerspectivesuser to PerspectivesUsers.
+    -- Persons will be synchronized between peers.
+    user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
+    user Me filledBy PerspectivesUsers
+      perspective on Persons
+        all roleverbs
+        props (FirstName, LastName) verbs (SetPropertyValue, Consult)
+      perspective on Me
+        props (FirstName, LastName, PublicKey) verbs (Consult)
+        action ExportForAnotherInstallation
+          callEffect ser:SerialiseFor( [role model://perspectives.domains#System$SocialEnvironment$Me], context >> extern ) 
+      -- Me uses this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
+      -- that previously was filled by a NonPerspectivesUsers instance.
+      perspective on sys:TheWorld >> PerspectivesUsers
+        props (FirstName, LastName) verbs (Consult)
+    user Initializer = sys:Me
+      perspective on Me
+        only (Fill)
+  
   -- PDRDEPENDENCY
   case PerspectivesSystem
     -- PDRDEPENDENCY
@@ -76,6 +159,11 @@ domain model://perspectives.domains#System
       perspective of User
         action UploadCouchdb
           callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
+    
+    state NoSocialEnvironment = (not exists SocialEnvironment) and (exists sys:MySocialEnvironment)
+      on entry
+        do for User
+          bind sys:MySocialEnvironment >> extern to SocialEnvironment
 
     external
       aspect sys:RootContext$External
@@ -87,9 +175,29 @@ domain model://perspectives.domains#System
       view ShowLibraries (ShowLibraries)
 
     -- PDRDEPENDENCY
-    user User (mandatory)
-      property LastName (mandatory, relational, String)
-      property FirstName (mandatory, relational, String)
+    -- To fill other user roles: require User if one want to synchronize with the natural person 
+    -- represented by that User. Require SocialEnvironment$Persons otherwise.
+    -- Why fill User with Persons? Whenever we have a PerspectivesSystem$User instance, there is, 
+    -- by construction, a PerspectivesUsers behind it. We do not need the extra indirection here.
+    -- However, to be able to use Persons effectively when we don't care whether or not there is 
+    -- a PerspectivesUsers behind it, we have to have Persons for PerspectivesUsers, too.
+    user User (mandatory) filledBy Persons
+      -- This will happen on importing SocialEnvironment and Me from another installation.
+      -- If we import a peer's data, we will get a User instance that is already filled.
+      state FillWithPerson = (not exists binding) and exists sys:MySocialEnvironment >> Me
+        on entry
+          do for User
+            -- User has a sufficient perspective on itself to do this.
+            bind_ sys:MySocialEnvironment >> Me >> binding >> binder Persons >>= first to origin
+      -- A user is never a Persons instance in SocialEnvironment (it is Me in that context).
+      -- Each peer User instance that is reconstructed by me, enters this state. 
+      -- Each peer should be a Persons instance in my social environment.
+      state NotInSocialEnvironment = not binding >> binder Persons >> context >>= first == sys:MySocialEnvironment
+        on entry
+          do for User
+            -- MISSING PERSPECTIVE
+            bind origin to Persons in sys:MySocialEnvironment
+
       -- PDRDEPENDENCY
       property Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
       -- User instances need not have a value for this property. It is used in the PDR to
@@ -98,11 +206,16 @@ domain model://perspectives.domains#System
       property Id (String)
       -- property Id = callExternal util:RoleIdentifier() returns String
 
+      -- An installation that introduced a natural person as a NonPerspectivesUsers instance, will have created its own Persons instance.
+      -- Only the PerspectivesUsers instance is unique and shared by all installations.
+      -- These are all PerspectivesSystem$User instances that represent the current user (across different devices).
+      property SystemIdentities = binding >> binder Persons >> binder User
+
       -- PDRDEPENDENCY
       indexed sys:Me
       view VolledigeNaam (FirstName, LastName)
       perspective on User
-        only (CreateAndFill)
+        only (Create, Fill)
         props (LastName, FirstName) verbs (SetPropertyValue)
         props (Channel) verbs (Consult)
       perspective on StartContexts
@@ -140,6 +253,8 @@ domain model://perspectives.domains#System
         props (InviterLastName, Message) verbs (Consult)
       perspective on SystemCaches
         defaults
+      perspective on SocialEnvironment
+        only (CreateAndFill)
 
       screen "Home"
         tab "SystemCaches"
@@ -171,8 +286,14 @@ domain model://perspectives.domains#System
             table PendingInvitations
               props (InviterLastName, Message) verbs (Consult)
 
+    context SocialEnvironment filledBy SocialEnvironment
 
-    user Contacts = filter (callExternal cdb:RoleInstances( "model://perspectives.domains#System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
+    -- Note that some of these may be NonPerspectivesUsers.
+    user Contacts = SocialEnvironment >> binding >> context >> Persons
+
+    -- The User role of each of the Systems I run.
+    -- Synchronization depends on this collection.
+    user SystemIdentities = User >> binding >> binding >> binder Persons >> binder User
 
     -- PDRDEPENDENCY
     user Installer
@@ -185,6 +306,8 @@ domain model://perspectives.domains#System
         only (Create, Fill)
         props (IndexedRoles$Name) verbs (SetPropertyValue)
       perspective on BaseRepository
+        only (CreateAndFill)
+      perspective on SocialEnvironment
         only (CreateAndFill)
 
     context OutgoingInvitations (relational) filledBy Invitation
