@@ -65,6 +65,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad =
   , transactionFibers: Map.empty
   , typeToStorage: Map.empty
   , publicRolesJustLoaded: []
+  , isFirstInstallation: false
   }
 
 -----------------------------------------------------------

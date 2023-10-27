@@ -24,6 +24,7 @@
 
 module Perspectives.Extern.Utilities where
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
@@ -163,6 +164,14 @@ evalExpression_ exprArray roleId = ArrayT case head exprArray of
   Just expr -> runArrayT $ evalExpression expr roleId
   _ -> pure []
 
+-- | Return various values from PerspectivesState or even other state.
+systemParameter_ :: Array String -> ContextInstance -> MonadPerspectivesQuery String
+systemParameter_ parArray _ = ArrayT case head parArray of 
+  Just par -> case par of
+    "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation)
+    _ -> pure [] 
+  _ -> pure []
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -177,4 +186,5 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$Random" {func: unsafeCoerce random, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$FormatDateTime" {func: unsafeCoerce formatDateTime_, nArgs: 3, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$EvalExpression" {func: unsafeCoerce evalExpression_, nArgs: 1, isFunctional: Unknown}
+  , Tuple "model://perspectives.domains#Utilities$SystemParameter" {func: unsafeCoerce systemParameter_, nArgs: 1, isFunctional: True}
   ]

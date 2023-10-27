@@ -380,7 +380,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
     
     initSystem :: MonadPerspectivesTransaction Unit
     initSystem = do
-      -- Create the model instance
+      -- Create the system instance
       sysId <- lift getSystemIdentifier
       cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId
       r <- runExceptT $ constructEmptyContext 

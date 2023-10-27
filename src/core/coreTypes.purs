@@ -111,6 +111,8 @@ type PerspectivesExtraState =
   -- We want to check on locally stored roles filled with these roles.
   , publicRolesJustLoaded :: Array RoleInstance
 
+  , isFirstInstallation :: Boolean
+
   )
 
 data RepeatingTransaction = TransactionWithTiming
