@@ -30,7 +30,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, PerspectivesState, RepeatingTransaction, MonadPerspectives)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RuntimeOptions)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
@@ -38,8 +38,8 @@ import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> PerspectivesState
-newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad =
+newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> PerspectivesState
+newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -65,7 +65,13 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad =
   , transactionFibers: Map.empty
   , typeToStorage: Map.empty
   , publicRolesJustLoaded: []
-  , isFirstInstallation: false
+  , runtimeOptions
+  }
+
+defaultRuntimeOptions :: RuntimeOptions
+defaultRuntimeOptions = 
+  { isFirstInstallation: true
+  , useSystemVersion: Nothing
   }
 
 -----------------------------------------------------------

@@ -168,7 +168,7 @@ evalExpression_ exprArray roleId = ArrayT case head exprArray of
 systemParameter_ :: Array String -> ContextInstance -> MonadPerspectivesQuery String
 systemParameter_ parArray _ = ArrayT case head parArray of 
   Just par -> case par of
-    "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation)
+    "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation <<< _.runtimeOptions)
     _ -> pure [] 
   _ -> pure []
 

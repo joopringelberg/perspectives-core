@@ -47,7 +47,7 @@ import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
-import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), (##=), (##>>))
+import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -64,7 +64,7 @@ import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
-import Perspectives.PerspectivesState (newPerspectivesState, resetCaches)
+import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
@@ -112,7 +112,7 @@ runPDR usr rawPouchdbUser callback = void $ runAff handler do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -310,16 +310,15 @@ createUser userName password couchdbUrl = void $ runAff
   handleError
   (createPerspectivesUser userName password couchdbUrl)
 
--- TODO publicRepo should be no longer important?
-createAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
-createAccount usr rawPouchdbUser callback = void $ runAff handler
+createAccount :: UserName -> Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
+createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Set up.
@@ -351,7 +350,7 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
         runPerspectivesWithState
           (do
             (catchError do
@@ -438,7 +437,7 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -488,7 +487,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions
         runPerspectivesWithState
           (do
             addAllExternalFunctions
@@ -507,7 +506,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
             case r of 
               Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) *> pure false
               Right success -> pure success
-          )
+          ) 
           state
   where
     handler :: Either Error Boolean -> Effect Unit
@@ -524,7 +523,7 @@ retrieveAllCredentials = do
   userNameGetter <- getterFromPropertyType (CP $ CalculatedPropertyType userWithCredentialsUsername)
   rows :: Array (Tuple String Credential) <- foldM
     (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
-      handlePerspectRolError' "retrieveAllCredentials_Password" rows'
+      handlePerspectRolError' "retrieveAllCredentials_Password" rows' 
         \pw -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
           handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 
             (\authorizedDomain ->  (try (roleId ##>> userNameGetter)) >>=

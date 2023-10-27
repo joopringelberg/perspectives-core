@@ -111,9 +111,18 @@ type PerspectivesExtraState =
   -- We want to check on locally stored roles filled with these roles.
   , publicRolesJustLoaded :: Array RoleInstance
 
-  , isFirstInstallation :: Boolean
+  , runtimeOptions :: RuntimeOptions
 
   )
+
+-- | These are options that can be provided to the PDR at startup.
+type RuntimeOptions = 
+  -- Default: true. Should be false when someone installs MyContexts on a second device.
+  { isFirstInstallation :: Boolean
+  -- Default: Nothing. Provide a value to test setup of an experimental new System version.
+  , useSystemVersion :: Maybe String
+  }
+
 
 data RepeatingTransaction = TransactionWithTiming
   { transaction :: MonadPerspectivesTransaction Unit
