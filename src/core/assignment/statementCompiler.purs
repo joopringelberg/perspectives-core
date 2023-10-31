@@ -46,7 +46,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -60,7 +60,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
-import Prelude (bind, discard, pure, show, unit, ($), (&&), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=), (||), (-))
+import Prelude (bind, discard, map, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=), (||))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -227,10 +227,10 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           else pure unit
         -- the possible bindings of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (bindings).
         qualifies <- do
-          (possibleBinding :: ADT RoleInContext) <- lift $ lift (bindingOfRole (ENR qualifiedRoleIdentifier))
+          (possibleBinding :: ADT EnumeratedRoleType) <- lift $ lift ((bindingOfRole (ENR qualifiedRoleIdentifier)) >>= allFillers <<< (map roleInContext2Role))
           -- On comparing roles, their binding counts! TODO. Dit is niet recursief genoeg.
           bindings' <- lift $ lift $ allFillers (roleInContext2Role <$> (unsafePartial domain2roleType (range bindings)))
-          lift $ lift ((roleInContext2Role <$> possibleBinding) `equalsOrGeneralisesRoleADT` bindings')
+          lift $ lift (possibleBinding `equalsOrGeneralisesRoleADT` bindings')
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True
