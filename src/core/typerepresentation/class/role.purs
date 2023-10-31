@@ -24,8 +24,9 @@ module Perspectives.Representation.Class.Role where
 
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (cons, foldMap)
+import Data.Array (cons, foldMap, uncons)
 import Data.Map (Map)
+import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
@@ -238,11 +239,15 @@ directProperties = reduce magic
 --------------------------------------------------------------------------------------------------
 ---- ALLFILLERS
 --------------------------------------------------------------------------------------------------
--- | All fillers, computed recursively over binding, of the Role ADT.
+-- | All fillers of a role (but not the role itself), computed recursively over binding, of the Role ADT.
 -- | UNIVERSAL is treated like EMPTY.
--- Ik wil naar ADT EnumeratedRoleType, van ADT EnumeratedRoleType
 allFillers :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-allFillers = reduce magic
+allFillers = reduce magic >=> case _ of 
+  PROD as -> case uncons as of 
+    Nothing -> pure $ PROD []
+    -- Slightly shaky but based on the constructon below.
+    Just {head, tail} -> pure $ PROD tail
+  otherwise -> pure otherwise
   where
     magic :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
     magic role = do
@@ -251,7 +256,19 @@ allFillers = reduce magic
         EMPTY -> pure $ ST role
         otherwise -> do
           expansion <- reduce magic (roleInContext2Role <$> otherwise)
-          pure $ product [ST role, expansion]
+          pure $ PROD [ST role, expansion]
+
+rolaAndAllFillers :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+rolaAndAllFillers = reduce magic
+  where
+    magic :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
+    magic role = do
+      EnumeratedRole{binding} <- getEnumeratedRole role
+      case binding of 
+        EMPTY -> pure $ ST role
+        otherwise -> do
+          expansion <- reduce magic (roleInContext2Role <$> otherwise)
+          pure $ PROD [ST role, expansion]
 
 --------------------------------------------------------------------------------------------------
 ---- ROLESET

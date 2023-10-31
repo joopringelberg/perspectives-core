@@ -33,7 +33,7 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (concat, cons, elemIndex, findIndex, intercalate, intersect, length, nub, singleton, uncons, union)
+import Data.Array (catMaybes, concat, elemIndex, filter, findIndex, intercalate, intersect, length, nub, null, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (foldMap, foldl)
@@ -49,7 +49,7 @@ import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, flip, map, pure, show, ($), (&&), (/=), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, map, pure, show, ($), (&&), (/=), (<$>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -127,132 +127,52 @@ product = (foldl prod' EMPTY) >>> \(p :: ADT a) -> case p of
   prod' t1@(ST x) t2@(ST y) = if x == y then t1 else PROD [t1, t2]
   prod' a b = PROD [a, b]
 
+-- | Sums and products in binary notation.
 data ADT' a = ST' a | SUM' (ADT' a) (ADT' a) | PROD' (ADT' a) (ADT' a) | EMPTY' | UNIVERSAL'
 
 derive instance Generic (ADT' a) _
 instance (Eq a) => Eq (ADT' a) where
   eq b1 b2 = genericEq b1 b2
 
-toDNF :: forall a. ADT' a -> ADT' a
-toDNF (PROD' p (SUM' s1 s2)) = SUM' (toDNF (PROD' p s1)) (toDNF (PROD' p s2))
-toDNF (PROD' (SUM' s1 s2) p) = SUM' (toDNF (PROD' p s1)) (toDNF (PROD' p s2))
-toDNF x = x
+newtype Disjunct a = Disjunct (Array (Conjunct a)) 
+newtype Conjunct a = Conjunct (Array a)
 
-toADT' :: forall a. ADT a -> ADT' a
-toADT' (ST a) = ST' a
-toADT' EMPTY = EMPTY'
-toADT' UNIVERSAL = UNIVERSAL'
-toADT' (SUM as) = case uncons as of 
-  Just {head, tail} -> foldl (\adt' adt -> SUM' (toADT' adt) adt') (toADT' head) tail
-  Nothing -> EMPTY'
-toADT' (PROD as) = case uncons as of 
-  Just {head, tail} -> foldl (\adt' adt -> PROD' (toADT' adt) adt') (toADT' head) tail
-  Nothing -> EMPTY' 
-
-toADT :: forall a. Eq a => ADT' a -> ADT a
-toADT (ST' a) = ST a
-toADT EMPTY' = EMPTY
-toADT UNIVERSAL' = UNIVERSAL
-toADT (SUM' a as) = let
-  adt = toADT a
-  in unsafePartial case toADT as of
-    SUM ys -> if isJust $ elemIndex adt ys
-      then SUM ys
-      else SUM $ cons adt ys
-    y -> SUM [adt, y]
-toADT (PROD' a as) = let
-  adt = toADT a
-  in unsafePartial case toADT as of
-    PROD ys -> if isJust $ elemIndex adt ys
-      then PROD ys
-      else PROD $ cons adt ys
-    y -> PROD [adt, y]
-
-toLeftAssociative :: forall a. Eq a => ADT' a -> ADT' a
-toLeftAssociative (SUM' (SUM' a b ) c) = SUM' a $ toLeftAssociative (SUM' b c)
-toLeftAssociative (PROD' (PROD' a b ) c) = PROD' a $ toLeftAssociative(PROD' b c)
-toLeftAssociative x = x
-
-reduceEmptyAndUniversal :: forall a. Eq a => ADT' a -> ADT' a
-reduceEmptyAndUniversal (PROD' x EMPTY') = reduceEmptyAndUniversal x
-reduceEmptyAndUniversal (PROD' EMPTY' x) = reduceEmptyAndUniversal x
-reduceEmptyAndUniversal (PROD' _ UNIVERSAL') = UNIVERSAL'
-reduceEmptyAndUniversal (PROD' UNIVERSAL' _) = UNIVERSAL'
-
-reduceEmptyAndUniversal (SUM' _ EMPTY') = EMPTY'
-reduceEmptyAndUniversal (SUM' EMPTY' _) = EMPTY'
-reduceEmptyAndUniversal (SUM' x UNIVERSAL') = x
-reduceEmptyAndUniversal (SUM' UNIVERSAL' x) = x
-
-reduceEmptyAndUniversal (PROD' x y) = let
-  r = reduceEmptyAndUniversal y
-  in
-    if x == r
-      then x
-      else PROD' x r
-reduceEmptyAndUniversal (SUM' x y) = let
-  r = reduceEmptyAndUniversal y
-  in
-    if x == r
-      then x
-      else SUM' x r
-reduceEmptyAndUniversal x = x
-
--- If adt is a SUM, that sum is in normal form (its members are products).
 toDisjunctiveNormalForm :: forall a. Eq a => ADT a -> ADT a
-toDisjunctiveNormalForm adt = let 
-  adt' = toADT' adt
-  leftA = toLeftAssociative adt'
-  reduced = reduceEmptyAndUniversal leftA
-  dnf = toDNF reduced
-  adtOut = toADT dnf
-  in adtOut
+toDisjunctiveNormalForm adt = fromDisjunctiveNormalForm $ reduceEmptyAndUniversal' $ toDisjunctiveNormalForm' adt
 
--- | From two ADTs, compute an ADT that represents their commonality.
--- | The result is simplified according to these rules:
--- | SUM [EMPTY, ..] = EMPTY
--- | SUM [UNIVERSAL, ..] = [..]
--- | SUM [ST x, SUM [..] ] = SUM [x, ..]
--- | SUM [SUM [..], SUM[..]] = SUM [.. ..]
--- | SUM [x, .. x] = SUM[.., x]
--- | SUM [x] = x
--- | PRODUCT [UNIVERSAL, ..] = UNIVERSAL
--- | PRODUCT [EMPTY, ..] = [..]
--- | PRODUCT [PRODUCT[..], ST x] = PRODUCT[.., x]
--- | PRODUCT [PRODUCT[..], PRODUCT[..]] = PRODUCT[.. ..]
--- | PRODUCT [x, .. x] = PRODUCT[.., x]
--- | PRODUCT [x] = x
--- intersectionOfADT :: forall a. Eq a => ADT a -> ADT a -> ADT a
--- -- 5 cases
--- intersectionOfADT EMPTY _ = EMPTY
--- -- 5 cases, total is 10
--- intersectionOfADT UNIVERSAL x = x
--- -- 1 case, total is 11
--- intersectionOfADT t@(ST x) (ST y) = if x == y then t else EMPTY
--- -- 1 case, total is 12
--- intersectionOfADT (ST x) (SUM terms) = EMPTY
--- -- 1 case, total is 13
--- intersectionOfADT t@(ST _) (PROD terms) = if isJust $ elemIndex t terms then t else EMPTY
--- -- 1 case, total is 14. 2 ST cases missing: ST UNIVERSAL and ST EMPTY. Covered by flip in last case.
--- intersectionOfADT (PROD terms1) (PROD terms2) = let i = intersect terms1 terms2 in
---   if null i then EMPTY else (product i)
--- -- 1 case, total is 15
--- intersectionOfADT (PROD terms) t2@(SUM _) = if isJust $ elemIndex t2 terms then t2 else EMPTY
--- -- 1 case, total is 16, 3 PROD cases missing: PROD ST, PROD UNIVERSAL, PROD EMPTY. Covered by flip in last case.
--- intersectionOfADT (SUM terms1) (SUM terms2) = sum (union terms1 terms2)
--- -- 4 SUM cases missing, 9 missing in total: SUM ST, SUM PROD, SUM UNIVERSAL, SUM EMPTY. Covered by flip in last case.
--- intersectionOfADT a b = intersectionOfADT b a
---
--- -- | From two ADT's compute an ADT that represents their union
--- unionOfADT :: forall a. Eq a => ADT a -> ADT a -> ADT a
--- unionOfADT EMPTY x = x
--- unionOfADT UNIVERSAL _ = UNIVERSAL
--- unionOfADT t1@(ST _) t2@(ST _) = product [t1, t2]
--- unionOfADT t1@(ST _) t2@(SUM _) = product [t1, t2]
--- unionOfADT t1@(ST _) t2@(PROD _) = product [t2, t1]
--- unionOfADT t1@(PROD _) t2@(PROD _) = product [t1, t2]
--- unionOfADT t1@(PROD _) t2@(SUM _) = product [t1, t2]
+  where
+    fromDisjunctiveNormalForm :: Disjunct (ADT a) -> ADT a
+    fromDisjunctiveNormalForm (Disjunct cjs) = SUM (PROD <<< (\(Conjunct a) -> a) <$> cjs)
 
+    toDisjunctiveNormalForm' :: ADT a -> Disjunct (ADT a)
+    toDisjunctiveNormalForm' x@(ST a) = Disjunct [(Conjunct [ST a])]
+    toDisjunctiveNormalForm' (SUM ts) = Disjunct $ concat $ (\(Disjunct x) -> x) <<< toDisjunctiveNormalForm' <$> ts
+    toDisjunctiveNormalForm' (PROD ts) = Disjunct $ matrixMultiply ((\(Disjunct x) -> x) <<< toDisjunctiveNormalForm' <$> ts)
+    toDisjunctiveNormalForm' EMPTY = Disjunct [Conjunct [EMPTY]]
+    toDisjunctiveNormalForm' UNIVERSAL = Disjunct [Conjunct [UNIVERSAL]]
+
+    reduceEmptyAndUniversal' :: Disjunct (ADT a) -> Disjunct (ADT a)
+    reduceEmptyAndUniversal' (Disjunct cjs) = Disjunct $ catMaybes (x <$> cjs)
+      where
+        x :: Conjunct (ADT a) -> Maybe (Conjunct (ADT a))
+        x (Conjunct as) = if isJust $ elemIndex UNIVERSAL as
+          then Nothing
+          else if isJust $ elemIndex EMPTY as 
+            then Just $ Conjunct $ filter (eq EMPTY) as
+            else Just $ Conjunct as
+
+    matrixMultiply :: forall b. Array (Array (Conjunct b)) -> Array (Conjunct b)
+    matrixMultiply conjuncts = case uncons conjuncts of
+      Nothing -> []
+      Just {head, tail} -> if null tail
+        then head
+        else foldl multiply head tail
+      where
+      multiply :: Array (Conjunct b) -> Array (Conjunct b) -> Array (Conjunct b)
+      multiply cjs1 cjs2 = do
+        Conjunct cj1 <- cjs1
+        Conjunct cj2 <- cjs2
+        pure $ Conjunct $ cj1 <> cj2
 
 -- | The `Reducible` class implements a pattern to recursively process an ADT.
 class Reducible a b where

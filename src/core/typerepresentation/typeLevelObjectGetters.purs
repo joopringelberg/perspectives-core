@@ -50,11 +50,11 @@ import Perspectives.Identifiers (areLastSegmentsOf, typeUri2ModelUri, endsWithSe
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.ModelDependencies (rootUser)
-import Perspectives.Persistence.API (getViewOnDatabase)
+import Perspectives.Persistence.API (getViewOnDatabase) 
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, reduce, toDisjunctiveNormalForm, equalsOrSpecialisesADT_)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, equalsOrSpecialisesADT_, reduce, toDisjunctiveNormalForm)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
