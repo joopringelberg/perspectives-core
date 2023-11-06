@@ -34,6 +34,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
+import Data.Nullable (Nullable)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, Fiber, throwError)
@@ -119,8 +120,8 @@ type PerspectivesExtraState =
 type RuntimeOptions = 
   -- Default: true. Should be false when someone installs MyContexts on a second device.
   { isFirstInstallation :: Boolean
-  -- Default: Nothing. Provide a value to test setup of an experimental new System version.
-  , useSystemVersion :: Maybe String
+  -- Default: null. Provide a value to test setup of an experimental new System version.
+  , useSystemVersion :: Nullable String
   }
 
 

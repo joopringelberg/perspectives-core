@@ -71,7 +71,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createPerspectivesUser, createUserDatabases, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
@@ -301,14 +301,6 @@ initialisePersistence :: UserName -> Password -> Maybe Url -> Effect Unit
 initialisePersistence userName password couchdbUrl = void $ runAff
   handleError
   (setupPerspectivesInCouchdb userName password couchdbUrl)
-
--- | Implementation notes:
--- |  1. couchdbUrl should terminate on a forward slash.
--- OBSOLETE??
-createUser :: UserName -> Password -> Maybe Url -> Effect Unit
-createUser userName password couchdbUrl = void $ runAff
-  handleError
-  (createPerspectivesUser userName password couchdbUrl)
 
 createAccount :: UserName -> Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
 createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler

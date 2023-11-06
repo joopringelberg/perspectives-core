@@ -1,9 +1,9 @@
 -- Route van de Vraag - Copyright Joop Ringelberg 2023
 
-domain model://joopringelberg.nl#RouteVanDeVraag
+domain model://joopringelberg.nl#Route
   use sys for model://perspectives.domains#System
   use psys for model://perspectives.domains#System$PerspectivesSystem -- LET OP: moet hier een $ achter?
-  use rvdv for model://joopringelberg.nl#RouteVanDeVraag
+  use rvdv for model://joopringelberg.nl#Route
 
   -------------------------------------------------------------------------------
   ---- OPZETTEN
@@ -79,9 +79,9 @@ domain model://joopringelberg.nl#RouteVanDeVraag
     external
       aspect sys:RootContext$External
 
-    user Betrokkene = syst:Me
+    user Betrokkene = sys:Me
       perspective on MijnRoute
-        props (Voorziening) verbs (Consult)
+        props (Organisatie) verbs (Consult)
       perspective on MijnCaseLoad
         props (Voornaam, Achternaam) verbs (Consult)
       perspective on MijnIntakes
@@ -91,17 +91,18 @@ domain model://joopringelberg.nl#RouteVanDeVraag
       perspective on MijnPlekken
         props (Naam) verbs (Consult)
 
-    context MijnRoute = Betrokkene >> fills RouteVanDeVraag$Deelnemer >> context >> extern
+    context MijnRoute = Betrokkene >> fills Route$Deelnemer >> context >> extern
 
-    context MijnCaseLoad = Betrokkene >> fills RouteVanDeVraag$Ondersteuner >> context >> extern
+    context MijnCaseLoad = Betrokkene >> fills Route$Ondersteuner >> context >> extern
 
-    context MijnIntakes = Betrokkene >> fills RouteVanDeVraag$Ambassadeur >> context >> extern
+    context MijnIntakes = Betrokkene >> fills Route$Ambassadeur >> context >> extern
 
     context MijnPlekken = Betrokkene >> fills Verantwoordelijke >> context >> extern
 
     context MijnVoorzieningen = (MijnRoute union MijnCaseLoad union MijnIntakes) fills Routes >> context >> extern
 
-  party Voorziening
+  -- De organisatie is de overkoepeling van Locaties, met medewerkers enzovoort.
+  party Organisatie
     extern
       property Naam (String)
       aspect Locatie
@@ -117,55 +118,56 @@ domain model://joopringelberg.nl#RouteVanDeVraag
 
     user Vrijwilligers filledBy Persoon
 
-    user Beheerder filledBy Persoon
-      perspective on Plekken
+    user Coordinator filledBy Persoon
+      perspective on Locaties
         only (CreateAndFill, Remove)
         props (Naam) verbs (SetPropertyValue)
       perspective on Werknemers
         only (CreateAndFill, Remove)
-        -- TODO maak een view voor Persoon en laat Beheerder die geheel onderhouden.
+        -- TODO maak een view voor Persoon en laat Coordinator die geheel onderhouden.
         props (Voornaam, Achternaam)
       perspective on Vrijwilligers
         only (CreateAndFill, Remove)
-        -- TODO maak een view voor Persoon en laat Beheerder die geheel onderhouden.
+        -- TODO maak een view voor Persoon en laat Coordinator die geheel onderhouden.
         props (Voornaam, Achternaam)
       
 
-    context Routes (relational) filledBy RouteVanDeVraag
+    context Routes (relational) filledBy Route
 
-    context Plekken filledBy Plek
+    context Locaties filledBy Locatie
 
-  -- Een plek biedt sessies van een bepaald type.
-  case Plek
+  -- Een Locatie biedt Bijeenkomsten van een bepaald type.
+  case Locatie
     extern 
       property Naam (String)
       aspect Locatie
     
-    context Voorziening = extern >> fills Plekken >> context
+    context Organisatie = extern >> fills Locaties >> context
 
-    user Verantwoordelijke filledBy Voorziening$Werknemer
-      perspective on Sessies
+    user Verantwoordelijke filledBy Organisatie$Werknemer
+      perspective on Bijeenkomsten
         only (CreateAndFill, Remove)
         props (Vanaf, Tot) verbs (SetPropertyValue)
         props (AantalDeelnemers) verbs (Consult)
     
-    thing Sessies filledBy Sessie
+    thing Bijeenkomsten filledBy Bijeenkomst
 
-  case RouteVanDeVraag
+  -- Een route is de persoonlijke weg die een deelnemer af wil leggen.
+  case Route
     external
       property Datum (DateTime)
       property Plaats (String)
       property Voornaam = context >> Deelnemer >> FirstName
       property Achternaam = context >> Deelnemer >> LastName
-      property Voorziening = fills Routes >> context >> extern
+      property Organisatie = fills Routes >> context >> extern
     
     user Deelnemer filledBy Persoon
       property Noodtelefoon (String)
-      perspective on Sessies
+      perspective on Bijeenkomsten
 
-    user Ambassadeur filledBy Voorziening$Werknemer
+    user Ambassadeur filledBy Organisatie$Werknemer
 
-    user Ondersteuner filledBy Voorziening$Werknemer
+    user Ondersteuner filledBy Organisatie$Werknemer
 
     thing Financiering filledBy FinancieringsBasis
 
@@ -175,25 +177,28 @@ domain model://joopringelberg.nl#RouteVanDeVraag
       property Startvraag (String)
       property VraagVerheldering (String)
 
-    context Sessies = Deelnemer >> fills Deelname$Deelnemer >> context >> extern >> fills Deelnames >> context >> extern
+    context Bijeenkomsten = Deelnemer >> fills Deelname$Deelnemer >> context >> extern >> fills Deelnames >> context >> extern
 
     thing Evaluaties (relational)
       property Datum (DateTime)
       property Verslag (String)
 
-  activity Sessie
+  -- Een workshop is een bepaald type activiteit voor deelnemers.
+  case Workshop
+  -- Een Bijeenkomst vindt plaats in het kader van een Workshop.
+  activity Bijeenkomst
     external
       property Vanaf (DateTime)
       property Tot (DateTime)
       property AantalDeelnemers = context >> Deelnames >>= count
-    user Initiator = extern >> fills Sessies >> context >> Verantwoordelijke
+    user Initiator = extern >> fills Bijeenkomsten >> context >> Verantwoordelijke
       perspective on Leider
       perspective on Vrijwilliger
       perspective on Deelnames
         props (Voornaam, Achternaam, Vraag) verbs (Consult)
-    user Leider filledBy Voorziening$Werknemer
+    user Leider filledBy Organisatie$Werknemer
       -- Nodig voor de action Registreer.
-      perspective on Deelnames >> context >> Deelnemer
+      perspective on Deelnames >> binding >> context >> Deelnemer
         only (CreateAndFill)
       perspective on Deelnames
         only (CreateAndFill, Remove)
@@ -206,34 +211,14 @@ domain model://joopringelberg.nl#RouteVanDeVraag
             deelname <- create context Deelnames -- bound to ? -- moet erachter
           in
             bind origin to Deelnemer in deelname
-    user Vrijwilligers (relational) filledBy Voorziening$Vrijwilliger
+    user Vrijwilligers (relational) filledBy Organisatie$Vrijwilliger
 
-    user Deelnemers = Deelnames >> binding >> context Deelnemer
+    user Bezoeker (relational) filledBy Deelnemer
       perspective on Leider
       perspective on Vrijwilligers
       perspective on extern
-      perspective on Plek
+      perspective on Locatie
 
-    context Deelnames (relational) filledBy Deelname
+    context Locatie = extern >> fills Bijeenkomsten >> context 
 
-    context Plek = extern >> fills sessies >> context 
-
-    user PotentiëleDeelnemers = Plek >> Voorziening >> Routes >> Deelnemer
-
-  activity Deelname
-  	external
-      property Vraag = context >> Deelname$Route >> RouteVanDeVraag$Route >> Startvraag
-      property Voornaam = context >> Deelnemer >> FirstName
-      property Achternaam = context >> Deelnemer >> LastName
-
-    user Deelnemer filledBy RouteVanDeVraag$Deelnemer
-      perspective on Route
-        -- Hier zou een button met een generieke tekst genoeg zijn.
-
-    user SessieBegeleider = extern >> fills Deelnames >> context (Initiator union Leider union Vrijwilligers)
-      -- Navigeer naar de RouteVanDeVraag van deze deelnemer.
-      perspective on Route
-
-	  -- ruimte voor persoonlijke werkstukken, foto's, enz.
-
-    context Route = Deelnemer >> fills RouteVanDeVraag$Deelnemer >> context
+    user PotentiëleDeelnemers = Locatie >> Organisatie >> Routes >> Deelnemer

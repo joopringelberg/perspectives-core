@@ -25,6 +25,7 @@ module Perspectives.PerspectivesState where
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..))
+import Data.Nullable (null)
 import Effect.Aff.AVar (AVar)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
@@ -71,7 +72,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
 defaultRuntimeOptions :: RuntimeOptions
 defaultRuntimeOptions = 
   { isFirstInstallation: true
-  , useSystemVersion: Nothing
+  , useSystemVersion: null
   }
 
 -----------------------------------------------------------

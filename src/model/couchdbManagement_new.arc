@@ -645,7 +645,8 @@ domain model://perspectives.domains#CouchdbManagement
     state UploadToRepository = extern >> (ArcOK and SourcesChanged)
       on entry
         do for Author
-          callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, extern >> ArcSource )
+          callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, 
+            callExternal util:ReplaceR( "bind publicrole.*in sys:MySystem", "", extern >> ArcSource ) returns String)
           SourcesChanged = false for extern
           LastChangeDT = (callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime) for extern
           Build = extern >> Build + 1 for extern

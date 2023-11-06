@@ -43,7 +43,8 @@ domain model://perspectives.domains#System
         --    * the referred Repository and the type describing its model (model://perspectives.domains/CouchdbManagement) are available;
         -- which in turn requires a previously existing installation with both the System and CouchdbManagement model available to compile them.
         -- This is because the line below is a forward reference to a CouchdbManagement type.
-        -- This is a Catch22 situation.
+        -- This is a Catch22 situation that fully plays out when we recompile all models of an installation. 
+        -- For that reason, it is removed from the source that is included in the DomeinFile.
 
         -- Add the perspectives.domains repository as BaseRepository:
         bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
@@ -51,19 +52,15 @@ domain model://perspectives.domains#System
         bind_ theworld >> extern to indexedworld
         IndexedContexts$Name = sys:TheWorld >> indexedName for indexedworld
   
-  state FirstInstallation = callExternal util:SystemParameter( "IsFirstInstallation" ) returns Boolean
+  state FirstInstallation = (callExternal util:SystemParameter( "IsFirstInstallation" ) returns Boolean) and (exists sys:TheWorld >> PerspectivesUsers)
     on entry
       do for sys:PerspectivesSystem$Installer
         letA
-          -- This role instance will be shared with peers. MISSING PERSPECTIVE
-          myperson <- create role PerspectivesUsers in sys:TheWorld
           -- When a Person is used to fill a user role, SocialEnvironment will be shared with peers. MISSING PERSPECTIVE
           mysocialenvironment <- create context SocialEnvironment
           -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
           indexedsocialenvironment <- create role IndexedContexts in sys:MySystem
         in 
-          -- The instance of Me will not be shared with peers.
-          bind myperson to Me in mysocialenvironment
           -- notice that there is a state in User that is entered as soon as we have 
           -- SocialEnvironment$Me, on entry of which we fill sys:Me.
           -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
@@ -100,6 +97,10 @@ domain model://perspectives.domains#System
   case TheWorld
     indexed sys:TheWorld
     aspect sys:RootContext
+    state NoPerspectivesUsers = not exists PerspectivesUsers
+      on entry
+        do for Initializer
+          create role PerspectivesUsers
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
       -- Having a PublicKey is a proxy for having an installation.
@@ -109,6 +110,9 @@ domain model://perspectives.domains#System
       -- the private key is never available in Perspectives data, only as an object in IndexedDB.
     user NonPerspectivesUsers (relational)
       aspect sys:Identifiable
+    user Initializer = sys:Me
+      perspective on PerspectivesUsers
+        only (Create)
   
   -- MySocialEnvironment is the same on all of my devices.
   case SocialEnvironment
@@ -154,12 +158,8 @@ domain model://perspectives.domains#System
       on entry
         do for User
           create context Caches bound to SystemCaches
-
-    state NoBaseRepository = not exists BaseRepository
-      perspective of User
-        action UploadCouchdb
-          callEffect cdb:AddModelToLocalStore( "model://perspectives.domains#CouchdbManagement" )
     
+    -- This is for installations that come after the first one.
     state NoSocialEnvironment = (not exists SocialEnvironment) and (exists sys:MySocialEnvironment)
       on entry
         do for User
@@ -189,14 +189,14 @@ domain model://perspectives.domains#System
           do for User
             -- User has a sufficient perspective on itself to do this.
             bind_ sys:MySocialEnvironment >> Me >> binding >> binder Persons >>= first to origin
-      -- A user is never a Persons instance in SocialEnvironment (it is Me in that context).
+      -- A user is never a Persons instance in his own SocialEnvironment (it is Me in that context). CURRENTLY, IT IS A PERSONS, TOO!
       -- Each peer User instance that is reconstructed by me, enters this state. 
-      -- Each peer should be a Persons instance in my social environment.
+      -- Each peer should be a Persons instance in MY social environment.
       state NotInSocialEnvironment = not binding >> binder Persons >> context >>= first == sys:MySocialEnvironment
         on entry
           do for User
             -- MISSING PERSPECTIVE
-            bind origin to Persons in sys:MySocialEnvironment
+            bind origin >> binder Persons >> binder PerspectivesUsers to Persons in sys:MySocialEnvironment
 
       -- PDRDEPENDENCY
       property Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName

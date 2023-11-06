@@ -38,14 +38,14 @@ modelDirectory = "./src/model"
 -- | This function also ensures CURRENTUSER.
 -- | Note that the repository should have model://perspectives.domains#Couchdb, model://perspectives.domains#Serialise and model://perspectives.domains#System.
 setupUser :: MonadPerspectives Unit
-setupUser = do
-  -- First, upload model:System to perspect_models.
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))
-  entitiesDatabaseName >>= setRoleView
-  entitiesDatabaseName >>= setRoleFromContextView
+setupUser = do 
+  entitiesDatabaseName >>= setRoleView 
+  entitiesDatabaseName >>= setRoleFromContextView 
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
   entitiesDatabaseName >>= setFilledRolesView
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView
+  -- Finally, upload model:System to perspect_models.
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))

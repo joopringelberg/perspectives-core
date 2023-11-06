@@ -24,6 +24,7 @@
 
 module Perspectives.Extern.Couchdb where
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.AvarMonadAsk (modify) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
@@ -39,6 +40,7 @@ import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
+import Data.Nullable (toMaybe)
 import Data.String (Replacement(..), replace, Pattern(..))
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
@@ -72,6 +74,7 @@ import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
+import Perspectives.ModelDependencies (systemModelName)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -227,9 +230,16 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   {patch, build} <- case x of 
     Nothing -> pure {patch: "0", build: "0"}
     Just {versionedModelManifest} -> lift $ getPatchAndBuild versionedModelManifest
-  version <- case modelUriVersion modelname of
-    Just v -> pure $ Just v
-    Nothing -> pure $ _.semver <$> x
+  -- TODO. msversion is geen Maybe waarde!
+  msversion <- lift (toMaybe <$> gets (_.useSystemVersion <<< _.runtimeOptions))
+  version' <- case modelUriVersion modelname of
+      Just v -> pure $ Just v
+      Nothing -> pure $ _.semver <$> x
+  version <- if unversionedModelname == systemModelName
+    then case msversion of
+      Nothing -> pure version'
+      Just v -> pure $ Just v
+    else pure version'
   -- If we can find a version at all, this is it.
   versionedModelName <- pure (unversionedModelname <> (maybe "" ((<>) "@") version))
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl versionedModelName
@@ -528,7 +538,7 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
     then do
       mdf <- try $ getPerspectEntiteit dfId
       case mdf of
-        Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err)
+        Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err) 
         Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
 
