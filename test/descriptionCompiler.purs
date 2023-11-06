@@ -380,7 +380,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
         Just (CalculatedRole{calculation}) -> do
           assert "The calculation should be (BinaryCombinator \"filter\")"
             case calculation of
-              (Q (BQD _ (BinaryCombinator FilterF) _ _ _ _ _)) -> true
+              (Q (UQD _ FilterF  _ _ _ _)) -> true
               otherwise -> false
               )
 

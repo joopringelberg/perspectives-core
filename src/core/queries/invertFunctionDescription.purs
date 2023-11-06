@@ -29,10 +29,10 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, functional, mandatory, range, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, Range, RoleInContext(..), roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction, isMandatoryFunction)
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType(..))
 import Prelude (class Monoid, class Semigroup, pure, ($), (<$>), (<>), (<<<), bind)
 
@@ -165,23 +165,6 @@ domain2RoleType (RDOM adt) = fromJust <$> domain2RoleType' adt
 
 domain2PropertyType :: Partial => Domain -> PropertyType
 domain2PropertyType (VDOM _ (Just pt)) = pt
-
--- | Create a QueryFunctionDescription with composition.
-compose :: QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
-compose f1 f2 = BQD
-  (domain f1)
-  (BinaryCombinator ComposeF)
-  f1
-  f2
-  (range f2)
-  (and (functional f1)(functional f2))
-  (and (mandatory f1)(mandatory f2))
-
-composeOverMaybe :: Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription
-composeOverMaybe (Just left) (Just right) = Just $ compose left right
-composeOverMaybe Nothing (Just right) = Just right
-composeOverMaybe (Just left) Nothing = Just left
-composeOverMaybe _ _ = Nothing
 
 -- | Paths is the general representation of the result of invertFunction. It holds a main path (the first member)
 -- | and an array of secondary paths.

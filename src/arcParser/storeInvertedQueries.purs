@@ -25,7 +25,7 @@ module Perspectives.Parsing.Arc.PhaseThree.StoreInvertedQueries where
 import Control.Monad.Except (lift)
 import Control.Monad.Reader (ReaderT, ask)
 import Data.Array (foldl, union, concat, fromFoldable)
-import Data.Map (Map, lookup, values) as Map
+import Data.Map (Map, values) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
@@ -50,7 +50,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (Unit, bind, flip, identity, pure, unit, ($), (<$>), (<>), (==))
+import Prelude (Unit, bind, discard, flip, pure, unit, ($), (<$>), (<>), (==))
 
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 -- | Modifies the DomeinFile in PhaseTwoState.
@@ -75,32 +75,35 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
   --    ^s1 << ^s2 << ^s3 ()    and for this we store an InvertedQuery with s3
   -- where x << y equals y >> x.
 
--- TODO: REMOVE THE FILTER FROM THE FORWARDS PART. See inversion of FilterF for a rationale.
-
   case backward of
-    Just (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _) -> case qfd1 of
-      -- A filters is handled only in those kinked queries where it is the first step of the forwards part.
-      (UQD _ FilterF _ _ _ _) -> pure unit
-      _ -> case qfd2 of 
-        -- forwards part is a standalone filter.
-        filter@(UQD _ FilterF _ _ _ _) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly (Just filter)
-        -- forwards part is a composition whose first step is a filter.
-        (BQD _ (BinaryCombinator ComposeF) filter@(UQD _ FilterF criterium _ _ _) _ _ _ _) -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly (Just filter)
-        _ -> unsafePartial $ setPathForStep qfd1 qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly Nothing
-    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) statesPerProperty selfOnly Nothing
+    -- Think of this as: {first source step} << filter criterium << {last criterium step} (NOTICE the inverse composition step <<)
+    Just (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _) -> case qfd2 of
+      -- qfd1 is the inverted criterium. 
+      (BQD _ (BinaryCombinator ComposeF) filter@(UQD _ FilterF criterium _ _ _) source _ _ _) -> do 
+        -- Drop the filter. Store  {first source step} << {last criterium step}
+        unsafePartial $ setPathForStep 
+          qfd1
+          (ZQ (Just $ makeComposition qfd1 source) $ forwards qwk)
+          users 
+          roleStates
+          statesPerProperty 
+          selfOnly 
+          Nothing
+        -- prepend the filter to the source. Store {first source step} << filter criterium.
+        unsafePartial $ setPathForStep 
+          source
+          (ZQ (Just source) $ forwards qwk)
+          users 
+          (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) 
+          statesPerProperty 
+          selfOnly 
+          (Just filter)
+      _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly Nothing
+    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly Nothing
     otherwise -> lift $ throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
-  where
-    -- When the first step of forwards is a filter, we dismount that and make it the first step of backwards.
-    -- TODO: hij mag op forwards ook aanwezig blijven! CONTROLEER nog of het inderdaad zo is dat forwards op dezelfde resource wordt toegepast als backwards.
-    moveFilter :: QueryWithAKink -> QueryWithAKink
-    moveFilter d@(ZQ mbackwards mforwards) = case mforwards of 
-      Just filter@(UQD _ FilterF _ _ _ _) -> ZQ ((makeComposition filter) <$> mbackwards) Nothing
-      Just (BQD _ (BinaryCombinator ComposeF) filter@(UQD _ FilterF _ _ _ _) theRest _ _ _) -> ZQ ((makeComposition filter) <$> mbackwards) (Just theRest)
-      _ -> d
-
 -- | The function is partial, because we just handle the SQD case.
--- | The first argument is the backward path of the second argument.
+-- | The first argument is the first step of the backward path of the second argument (but, in the case the backwards part holds a filter, it may have been changed).
 -- | This is not a recursive function! It merely adds the QueryWithAKink to a Context, Role or Property type.
 -- | Modifies the DomeinFile in PhaseTwoState.
 setPathForStep :: Partial =>
@@ -115,6 +118,7 @@ setPathForStep :: Partial =>
 setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly mfilter = do
   {modifiesRoleInstancesOf, modifiesRoleBindingOf, modifiesPropertiesOf} <- ask
   case qf of
+    -- The original property expression can never be the source in `filter source with criterium`, so we ignore mfilter.
     QF.Value2Role pt -> if dom == ran
       -- This handles cases like `step >>= sum`, where we construct a Value2Role
       -- but really must ignore it.
@@ -130,9 +134,10 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               -- Default value. Should be computed per case.
               , modifies: false
               , statesPerProperty: EncodableMap statesPerProperty
-              -- NOTE. Mag het voorkomen dat de property niet in statesPerProperty zit?
-              -- en wat is de betekenis van een InvertedQuery zonder states?
-              , states: maybe [] identity (Map.lookup (ENP p) statesPerProperty)
+              -- The inverted query is the inversion of the computation of the Perspective object. This object should be available
+              -- to the user in all states that the perspective is valid in. These states are not listed explicitly in the Perspective,
+              -- but can be computed from the union of the StateSpecs of the roleVerbs, propertyVerbs and actions.
+              , states
               , selfOnly
               })
             -- Maybe add modifiesPropertiesOf here; but do we then need to check on
@@ -321,32 +326,37 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     -- We could omit the first backwards step, as in runtime we have the context of a role instance at hand.
     -- However, we handle that situation by `handlebackwardsQuery` and that function expects a RoleInstance.
-    QF.DataTypeGetter QF.ContextF -> modifyDF \dfr@{enumeratedRoles} -> foldl
-      (\dfr' ric@(RoleInContext{context, role}) ->
-          case lookup (unwrap role) enumeratedRoles of
-            Nothing -> addInvertedQueryForDomain (unwrap role)
-              (InvertedQuery
-                { description: qWithAK
-                , backwardsCompiled: Nothing
-                , forwardsCompiled: Nothing
-                , users
-                -- Default value. But is not used while adding a model to an installation.
-                , modifies: false
-                , statesPerProperty: EncodableMap statesPerProperty
-                , states
-                , selfOnly
-                })
-              (ContextInvertedQuery context)
-              dfr'
-            Just en -> dfr' {enumeratedRoles = insert (unwrap role)
-              (addPathToContextInvertedQueries
-                en
-                qWithAK
-                modifiesRoleInstancesOf
-                context)
-              enumeratedRoles})
-        dfr
-        (allLeavesInADT $ unsafePartial roleDomain qfd) -- qfd is the original backwards path.
+    QF.DataTypeGetter QF.ContextF -> do
+      description <- case mfilter of 
+        Nothing -> pure qWithAK
+        -- If there is a filter, prepend it to the backwards part.
+        Just filter -> pure $ ZQ ((makeComposition filter) <$> backwards qWithAK) (forwards qWithAK)
+      modifyDF \dfr@{enumeratedRoles} -> foldl
+        (\dfr' ric@(RoleInContext{context, role}) ->
+            case lookup (unwrap role) enumeratedRoles of
+              Nothing -> addInvertedQueryForDomain (unwrap role)
+                (InvertedQuery
+                  { description
+                  , backwardsCompiled: Nothing
+                  , forwardsCompiled: Nothing
+                  , users
+                  -- Default value. But is not used while adding a model to an installation.
+                  , modifies: false
+                  , statesPerProperty: EncodableMap statesPerProperty
+                  , states
+                  , selfOnly
+                  })
+                (ContextInvertedQuery context)
+                dfr'
+              Just en -> dfr' {enumeratedRoles = insert (unwrap role)
+                (addPathToContextInvertedQueries
+                  en
+                  description
+                  modifiesRoleInstancesOf
+                  context)
+                enumeratedRoles})
+          dfr
+          (allLeavesInADT $ unsafePartial roleDomain qfd) -- qfd is the original backwards path.
 
     -- As there is, by construction, no link from the range (an external role type)
     -- to the domain (a context type), we can not attach an inverted query anywhere
@@ -366,7 +376,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     _ -> lift $ throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
-  where
+  where 
     addPathToProperty :: EnumeratedProperty ->
       QueryWithAKink ->
       Map.Map EnumeratedRoleType (ExplicitSet EnumeratedPropertyType) ->
@@ -379,7 +389,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       , users
       , modifies:false
       , statesPerProperty: EncodableMap statesPerProperty
-      , states: maybe [] identity (Map.lookup (ENP _id) statesPerProperty)
+      , states
       , selfOnly})
       eroleType
       onPropertyDelta

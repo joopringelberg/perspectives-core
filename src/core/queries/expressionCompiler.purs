@@ -37,7 +37,7 @@ import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, foldMap, fromFoldable, head, length, null, uncons)
 import Data.Either (Either(..))
 import Data.Map (Map, empty, singleton)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust) 
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (keys, lookup)
@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, handleSequenceFunctions, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, handleSequenceFunctions, makeComposition, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -592,14 +592,13 @@ compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of
     Filter pos -> do
-      f1 <- compileStep currentDomain left
-      f2 <- compileStep (range f1) right
-      -- f1 is the source to be filtered, f2 is the criterium.
-      case range f2 of
-        VDOM PBool _ -> if pessimistic $ functional f2
-          then pure $ BQD currentDomain (QF.BinaryCombinator FilterF) f1 f2 (range f1) (functional f1) False
+      source <- compileStep currentDomain left
+      criterium <- compileStep (range source) right
+      case range criterium of
+        VDOM PBool _ -> if pessimistic $ functional criterium
+          then pure $ makeComposition source (UQD currentDomain QF.FilterF criterium (range source) (functional source) False)
           else throwError $ NotFunctional (startOf right) (endOf right) right
-        otherwise -> throwError $ NotABoolean (startOf right)
+        otherwise -> throwError $ NotABoolean (startOf right) 
     Compose pos -> do
       f1 <- compileStep currentDomain left
       f2 <- compileStep (range f1) right

@@ -24,7 +24,7 @@ module Perspectives.Query.Kinked where
 
 import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, elemIndex, foldr, intercalate, unsnoc)
+import Data.Array (catMaybes, elemIndex, foldr, intercalate, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Show.Generic (genericShow)
@@ -33,8 +33,8 @@ import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.Inversion (compose, composeOverMaybe, invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain, makeComposition, range, replaceDomain, roleInContext2Role)
+import Perspectives.Query.Inversion (invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, makeComposition, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -48,7 +48,9 @@ import Prelude (class Show, append, bind, discard, join, map, pure, ($), (<$>), 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
 --------------------------------------------------------------------------------------------------------------
--- This we use in the invert_ function. The first part is backwards-facing (inverted). The second part is forwards-facing (not inverted).
+-- This we use in the invert_ function. The first part is backwards-facing (inverted). It is an array of separate steps,
+-- each one inverted, in inverse order of the original query.
+-- The second part is forwards-facing (not inverted).
 data QueryWithAKink_ = ZQ_ (Array QueryFunctionDescription) (Maybe QueryFunctionDescription)
 
 derive instance genericQueryWithAKink_ :: Generic QueryWithAKink_ _
@@ -99,7 +101,7 @@ invert = invert_ >=> pure <<< catMaybes <<< map h
       -- Remove candidates without a backwards part.
       Nothing -> Nothing
       -- Creates a right-associative composition that preserves the order in steps.
-      Just {init, last} -> Just $ ZQ (Just $ foldr compose last init) q
+      Just {init, last} -> Just $ ZQ (Just $ foldr makeComposition last init) q
 
 -- | The QueryFunctionDescriptions in the Array of each QueryWithAKink_
 -- | are inversed wrt the orinal query.
@@ -111,20 +113,18 @@ invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 
 invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
   (BQD _ (BinaryCombinator UnionF) conj1 conj2 _ _ _) -> append <$>
-    invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
-    invert_ (compose conj2 (replaceDomain r (range conj2)))
+    invert_ (makeComposition conj1 (replaceDomain r (range conj1))) <*>
+    invert_ (makeComposition conj2 (replaceDomain r (range conj2)))
 
   (BQD _ (BinaryCombinator IntersectionF) conj1 conj2 _ _ _) -> append <$>
-    invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
-    invert_ (compose conj2 (replaceDomain r (range conj2)))
-
-  (BQD _ (BinaryCombinator FilterF) source criterium ran _ _) -> append <$> invert_ (compose source criterium) <*> invert_ (compose source r)
+    invert_ (makeComposition conj1 (replaceDomain r (range conj1))) <*>
+    invert_ (makeComposition conj2 (replaceDomain r (range conj2)))
 
   (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 ran _ _) -> invert_ (BQD dom (BinaryCombinator ComposeF) qfd1 (BQD (range qfd1) (BinaryCombinator ComposeF) qfd2 r ran f m) ran f m)
 
   (BQD _ (BinaryCombinator FilledByF) conj1 conj2 _ _ _) -> append <$>
-    invert_ (compose conj1 (replaceDomain r (range conj1))) <*>
-    invert_ (compose conj2 (replaceDomain r (range conj2)))
+    invert_ (makeComposition conj1 (replaceDomain r (range conj1))) <*>
+    invert_ (makeComposition conj2 (replaceDomain r (range conj2)))
 
   (BQD _ (BinaryCombinator SequenceF) qfd1 qfd2 ran _ _) -> do
     q1 <- invert_ qfd1
@@ -136,8 +136,8 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
     case varExpr of
       Nothing -> pure []
       Just qfd | qq == qfd -> pure []
-      Just qfd -> invert_ (compose qfd r)
-
+      Just qfd -> invert_ (makeComposition qfd r)
+  
   otherwise -> do
     (lefts :: Array QueryWithAKink_) <- invert_ l
     (rights :: Array QueryWithAKink_) <- invert_ r
@@ -146,8 +146,11 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       _, [] -> pure lefts
       _, _ -> do 
         comprehension <- pure $ comprehend lefts rights
-        result <- pure $ lefts <> comprehension
-        pure result
+        -- If the next step is a filter, just return the comprehension. This is because storeInvertedQueries will 
+        -- re-create the lefts, but then with a condition.
+        if hasFilter r
+          then pure comprehension
+          else pure $ lefts <> comprehension
   
   where
     comprehend :: Array QueryWithAKink_ -> Array QueryWithAKink_ -> Array QueryWithAKink_
@@ -161,10 +164,24 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
         -- may be combined with any inversion of right.
         Nothing, _ -> true
         _, _ -> false
+      -- This is where we invert the order of the steps.
+      -- That's obvious if both left and right were single steps.
+      -- Remember we have right-assoicativity: s1 >> (s2 >> s3).
+      -- So when right has multiple steps, we receive them from the recursive call in reverse order: [s3, s2].
+      -- We must then add the left step to the end of those steps: [s3, s2] <> [s1].
       pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
                   (mLeft_forward `composeOverMaybe` mRight_forward)
+    
+    hasFilter :: QueryFunctionDescription -> Boolean
+    hasFilter qfd = case qfd of 
+      (UQD _ FilterF _ _ _ _) -> true
+      (BQD _ (BinaryCombinator ComposeF) (UQD _ FilterF _ _ _ _) _ _ _ _) -> true
+      _ -> false
 
-invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ (compose source criterium)
+-- invert_ (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = invert_ $ 
+--   makeComposition source $
+--     makeComposition (UQD (range source) FilterF criterium (range source) True False)
+--       criterium
 
 invert_ (BQD _ (BinaryCombinator f) qfd1 qfd2 _ _ _) = append <$> invert_ qfd1 <*> invert_ qfd2
 
@@ -180,6 +197,22 @@ invert_ (UQD _ (BindVariable varName) qfd _ _ _) = do
 -- part of the seqence that is the qfd.
 invert_ (UQD _ WithFrame qfd _ _ _) = do
   withFrame (invert_ qfd)
+
+-- The inverted criterium is a function with the type T to be filtered as range.
+-- Ultimately, we do not want to prepend the filter to the inverted criterium. A case analysis shows why:
+-- If the criterum turns true on an instance of T, it would pass it on.
+-- If the criterium turns false on an instance of T, a peer needs to know (but the filter would prevent him from receiving a delta).
+-- However, it must be prepended to the inversion of the steps to the left of the filter step in the original query.
+-- For that reason, we prepend it here but remove it when we store inverted queries.
+-- Notice that the filter never ends up in the forward part.
+invert_ filter@(UQD _ FilterF criterium _ _ _) = do
+  criteriumInversions :: Array QueryWithAKink_ <- invert_ criterium
+  pure $ addFilter <$> criteriumInversions
+  -- An inversion of criterium is a query whose range is the type of items to be judged. 
+  -- We append the filter to such an inverted query (apply the filter to items of the range type!).
+  where
+    addFilter :: QueryWithAKink_ -> QueryWithAKink_
+    addFilter (ZQ_ steps forward) = ZQ_ (snoc steps filter) forward
 
 invert_ (UQD _ _ qfd _ _ _) = invert_ qfd
 
@@ -230,6 +263,18 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
 
     roleHasProperty :: ADT RoleInContext -> MP Boolean
     roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)
+
+-- Get all instances of the type of the domain. 
+invert_ (SQD dom (RoleIndividual rid) ran fun man) = case dom of 
+  CDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
+  RDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") dom Unknown Unknown] Nothing]
+  _ -> pure []
+
+-- Get all instances of the type of the domain. 
+invert_ (SQD dom (ContextIndividual rid) ran fun man) = case dom of 
+  CDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
+  RDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") dom Unknown Unknown] Nothing]
+  _ -> pure []
 
 invert_ (SQD dom f ran _ _) = do
   (minvertedF :: Maybe QueryFunction) <- invertFunction dom f ran

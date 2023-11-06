@@ -276,6 +276,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 -- If the state's StateFulObject is a context type (Cnt), and the context is in that state, obtain all user role instances from the context (and we're done)
+                -- Note that the context is (one of the) result(s) of the backwards query.
                 State.Cnt _ -> (lift $ contextIsInState stateId cid) >>= if _
                   then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                   else pure accumulatedUsers
@@ -469,12 +470,14 @@ reEvaluatePublicFillerChanges filled filler = do
 -- | during evaluation are turned into Deltas for peers with a perspective and collected in the current transaction.
 -- | These peers are provided as user role instances grouped together with their context.
 -- | The System User is excluded (no deltas generated for him).
+-- | The functional result is just based on what is passed in as the last parameter.
 runForwardsComputation ::
   RoleInstance ->
   InvertedQuery ->
   (Array ContextWithUsers) ->
   MonadPerspectivesTransaction (Array RoleInstance)
 runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled, statesPerProperty, states}) cwus = do
+-- TODO. CONTROLEER EERST OF ER USERS ZIJN IN CWUS. Zo nee, dan kun je meteen stoppen.
   case forwards description of
     Nothing -> do
       -- This case arises for example for a perspective on an EnumeratedRoleType in the same context.
@@ -531,6 +534,7 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
     -- role (and its binding) that carries the properties.
     -- NOTE: THE RESULT OF THE FORWARD PART MAY BE A PROPERTY VALUE!
     Just fw -> do
+      -- TODO. ALS ER GEEN USERS ZIJN, VOER DAN DE FORWARDS QUERY NIET UIT!
       -- Run the query interpreter on the same role instance as the backwards query,
       -- resulting in all the paths that lead up to a role result.
       (rinstances :: Array (DependencyPath)) <- lift ((singletonPath (R roleInstance)) ##= interpret fw)
@@ -694,7 +698,7 @@ createDeltasFromAssumption users (State contextInstance) = pure unit
 -- State is private, hence no deltas should be generated.
 createDeltasFromAssumption users (RoleState _) = pure unit
 
--- | Add a UniverseContextDelta, UniverseRoleDelta and a ContextDelta.
+-- | Add a UniverseContextDelta, UniverseRoleDelta and a ContextDelta to the current Transaction.
 magic :: ContextInstance -> SerializableNonEmptyArray RoleInstance -> EnumeratedRoleType ->  Array RoleInstance -> MonadPerspectivesTransaction Unit
 magic ctxt roleInstances rtype users =  do
   ctype <- lift (ctxt ##>> contextType)

@@ -57,7 +57,6 @@ data FunctionName =
   | ExistsF
   | FilledByF
   | FillsF
-  | FilterF
   | ComposeF
   | ComposeSequenceF
   | UnionF
@@ -112,7 +111,6 @@ instance showFunctionName :: Show FunctionName where
     show ExistsF = "exists"
     show FilledByF = "filledBy"
     show FillsF = "fills"
-    show FilterF = "filter"
     show ComposeF = "compose"
     show ComposeSequenceF = "composeSequence"
     show UnionF = "union"
@@ -161,7 +159,6 @@ isFunctionalFunction fn = case fn of
   ExistsF -> True
   FilledByF -> True
   FillsF -> True
-  FilterF -> Unknown
   ComposeF -> Unknown
   ComposeSequenceF -> True
   UnionF -> False
@@ -205,7 +202,6 @@ isMandatoryFunction fn = case fn of
   ExistsF -> True
   FilledByF -> True
   FillsF -> True
-  FilterF -> False
   ComposeF -> Unknown
   ComposeSequenceF -> Unknown
   UnionF -> False
@@ -256,6 +252,8 @@ data QueryFunction
   | BindResultFromCreatingAssignment VariableName
   | AssignmentOperator FunctionName
   | WithFrame
+
+  | FilterF
 
   | TypeGetter FunctionName
   | RoleTypeConstant RoleType

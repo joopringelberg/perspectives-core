@@ -264,7 +264,6 @@ replaceDomain :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
 replaceDomain (SQD dom f ran fun man) d = (SQD d f ran fun man)
 replaceDomain (UQD dom f qfd ran fun man) d = (UQD d f (replaceDomain qfd d) ran fun man)
 replaceDomain (BQD dom f qfd1 qfd2 ran fun man) d = case f of
-  (BinaryCombinator FilterF) -> (BQD d f (replaceDomain qfd1 d) qfd2 ran fun man)
   (BinaryCombinator ComposeF) -> (BQD d f (replaceDomain qfd1 d) qfd2 ran fun man)
   otherwise -> (BQD d f (replaceDomain qfd1 d) (replaceDomain qfd2 d) ran fun man)
 replaceDomain (MQD dom f qfds ran fun man) d = (MQD d f (flip replaceDomain d <$> qfds) ran fun man)
@@ -273,7 +272,6 @@ replaceRange :: QueryFunctionDescription -> Domain -> QueryFunctionDescription
 replaceRange (SQD dom f ran fun man) r = (SQD dom f r fun man)
 replaceRange (UQD dom f qfd ran fun man) r = (UQD dom f (replaceRange qfd r) r fun man)
 replaceRange (BQD dom f qfd1 qfd2 ran fun man) r = case f of
-  (BinaryCombinator FilterF) -> (BQD dom f (replaceRange qfd1 r) qfd2 r fun man)
   (BinaryCombinator ComposeF) -> (BQD dom f (replaceRange qfd1 r) qfd2 r fun man)
   otherwise -> (BQD dom f (replaceRange qfd1 r) (replaceRange qfd2 r) r fun man)
 replaceRange (MQD dom f qfds ran fun man) r = (MQD dom f (flip replaceRange r <$> qfds) ran fun man)
@@ -473,6 +471,13 @@ makeComposition left right = BQD
   (range right)
   (and (functional left) (functional right))
   (or (mandatory left) (mandatory right))
+
+composeOverMaybe :: Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription -> Maybe QueryFunctionDescription
+composeOverMaybe (Just left) (Just right) = Just $ makeComposition left right
+composeOverMaybe Nothing (Just right) = Just right
+composeOverMaybe (Just left) Nothing = Just left
+composeOverMaybe _ _ = Nothing
+
 
 -- | This function is partial, because it only handles a pure composition.
 -- | While preserving right-association, it adds the extraTerm to the right of the expression:

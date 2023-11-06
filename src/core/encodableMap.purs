@@ -97,6 +97,7 @@ keys (EncodableMap mp) = Map.keys mp
 instance semigroupEncodableMap :: (Ord k, Semigroup v) => Semigroup (EncodableMap k v) where
   append (EncodableMap map1) (EncodableMap map2)= EncodableMap (unionWith append map1 map2)
 
+-- | Add the value to the map for each key.
 addAll :: forall key value. Ord key => value -> EncodableMap key value -> Array key -> EncodableMap key value
 addAll value = foldr (\key map -> insert key value map)
 

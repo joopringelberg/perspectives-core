@@ -28,6 +28,7 @@
 module Perspectives.Query.UnsafeCompiler where
 
 import Control.Alt (map, void, (<|>))
+import Control.Alternative (guard)
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Trans.Class (lift)
@@ -53,7 +54,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, makeBoolean, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (decodeDate, parseBool, parseInt)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -294,10 +295,12 @@ compileFunction (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) = if isValueDoma
     isValueDomain (VDOM _ _) = true
     isValueDomain _ = false
 
-compileFunction (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) = do
+compileFunction (UQD _ FilterF criterium _ _ _) = do 
   (criterium' :: String ~~> String) <- (compileFunction criterium)
-  (source' :: String ~~> String) <- compileFunction source
-  pure $ Combinators.filter source' (makeBoolean $ unsafeCoerce criterium')
+  pure \r -> do
+    passes <- criterium' r
+    guard (passes == "true")
+    pure r
 
 compileFunction (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) = do
   if (typeTimeOnly f1)

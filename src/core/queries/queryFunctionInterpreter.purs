@@ -45,7 +45,7 @@ import Data.List.NonEmpty (fromList, singleton, tail)
 import Data.List.Types (List, NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (for, maximum, minimum, traverse)
+import Data.Traversable (maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
@@ -143,6 +143,14 @@ interpretUQD (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = ArrayT do
   result <- lift $ not_ (Value <<< toString <$> r)
   pure $ [consOnMainPath (V "NotF" (Value $ show result)) a]
 
+interpretUQD (UQD _ FilterF criterium _ _ _) a = ArrayT do
+  (r :: Array DependencyPath) <- runArrayT $ interpret criterium a
+  case head r of 
+    Just l -> unsafePartial $ case l.head of
+      (V _ (Value "true")) -> pure $ [appendPaths a l]
+      (V _ (Value "false")) -> pure []
+    _ -> pure []
+
 -----------------------------------------------------------
 -- BQD
 -----------------------------------------------------------
@@ -152,24 +160,6 @@ interpretBQD (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (DataTypeGetter Ide
 interpretBQD (BQD _ (BinaryCombinator ComposeF) f1@(SQD _ (DataTypeGetter IdentityF) _ _ _) f2 _ _ _) a = interpret f2 a
 interpretBQD (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) a =
   (interpret f1 >=> interpret f2) a
-interpretBQD (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) a = ArrayT do
-  (values :: Array DependencyPath) <- runArrayT $ interpret source a
-  -- Each result contains just a single DependencyPath, or is empty.
-  -- The main path of that result is the main path of the value path (v).
-  -- All paths resulting from the criterium are added as supporting paths to the result.
-  -- NOTICE that every result has at least a single supporting path.
-  (results :: Array (Array DependencyPath)) <- for values (\v -> do
-    -- The DescriptionCompiler only allows functional criteria, so r is either empty or
-    -- contains a single result.
-    (r :: Array DependencyPath) <- runArrayT $ interpret criterium v
-    case head r of
-      Just l -> unsafePartial $ case l.head of
-        (V _ (Value "true")) -> pure $ [appendPaths v l]
-        (V _ (Value "false")) -> pure []
-      -- interpret no criterium result as false.
-      otherwise -> pure []
-    )
-  pure $ join results
 interpretBQD (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = ArrayT $ do
   (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   f2r <- runArrayT $ interpret f2 a

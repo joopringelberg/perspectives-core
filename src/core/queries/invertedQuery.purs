@@ -33,19 +33,20 @@ module Perspectives.InvertedQuery where
 import Prelude
 
 import Data.Array (cons, delete, null, union, elemIndex)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Map (Map, lookup) as MAP
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, over, unwrap)
+import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), isContextDomain, isRoleDomain, range)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), RoleInContext(..), isContextDomain, isRoleDomain, range)
 import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
@@ -204,6 +205,19 @@ backwardsQueryResultsInContext (InvertedQuery{description}) = (isContextDomain $
 
 shouldResultInPerspectiveObject :: InvertedQuery -> Boolean
 shouldResultInPerspectiveObject (InvertedQuery{users}) = not $ null users
+
+startsWithFilter :: InvertedQuery -> Boolean
+startsWithFilter (InvertedQuery{description}) = startsWithFilter' description
+  where
+    -- | True iff the first backwards step is a FilterF operation.
+    startsWithFilter' :: QueryWithAKink -> Boolean
+    startsWithFilter' (ZQ Nothing _) = false
+    startsWithFilter' (ZQ fd _) = case fd of
+      Just (UQD _ FilterF _ _ _ _) -> true
+      Just (BQD _ (BinaryCombinator ComposeF) first _ _ _ _) -> case first of
+        (UQD _ FilterF _ _ _ _) -> true
+        _ -> false
+      _ -> false
 
 -----------------------------------------------------------
 -- UserPropsAndVerbs

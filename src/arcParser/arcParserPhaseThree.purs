@@ -47,8 +47,7 @@ import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>))
-import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup) as EM
-import Perspectives.Data.EncodableMap (addAll)
+import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup, keys, addAll) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
@@ -82,7 +81,7 @@ import Perspectives.Representation.Class.Role (Role(..), allProperties, displayN
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
@@ -658,14 +657,14 @@ handlePostponedStateQualifiedParts = do
                     Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
                 case transition of
                   AST.Entry _ -> pure $ sr
-                    { automaticOnEntry = addAll
+                    { automaticOnEntry = EM.addAll
                         automaticAction                   -- value
                         automaticOnEntry                  -- EM.EncodableMap key value
                         qualifiedUsers                    -- Array Key
                     , query = query'
                     , object = mobjectQfd}
                   AST.Exit _ -> pure $ sr
-                    { automaticOnExit = addAll automaticAction automaticOnExit qualifiedUsers
+                    { automaticOnExit = EM.addAll automaticAction automaticOnExit qualifiedUsers
                     , query = query'
                     , object = mobjectQfd})
               stateId)
@@ -739,12 +738,12 @@ handlePostponedStateQualifiedParts = do
                       Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
                   case transition of
                     AST.Entry _ -> pure $ sr
-                      { notifyOnEntry = addAll notification notifyOnEntry qualifiedUsers
+                      { notifyOnEntry = EM.addAll notification notifyOnEntry qualifiedUsers
                       , query = query'
                       , object = mobjectQfd
                       }
                     AST.Exit _ -> pure $ sr
-                      { notifyOnExit = addAll notification notifyOnExit qualifiedUsers
+                      { notifyOnExit = EM.addAll notification notifyOnExit qualifiedUsers
                       , query = query'
                       , object = mobjectQfd
                       })
@@ -855,7 +854,9 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> Array StateSpec -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd stateSpecs = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
-            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = addAll rv roleVerbs stateSpecs}))
+            -- Add the roleverbs from the RoleVerbE to the map of roleverbs in the perspective, for each of the states (the keys in the map).
+            -- Note that the states can apply to the object of the perspective, or to its subject, or to the current context of the lexical position.
+            (\(Perspective pr@{roleVerbs}) -> Perspective pr {roleVerbs = EM.addAll rv roleVerbs stateSpecs}))
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.P (AST.PropertyVerbE{subject, object, state, propertyVerbs, propsOrView, start, end})) = do
@@ -906,6 +907,8 @@ handlePostponedStateQualifiedParts = do
             objectQfd
             object
             start
+            -- Add the propertyVerbs from the PropertyVerbE to the propertyVerbs of the perspective, for each of the states (the keys in the map).
+            -- Note that the states can apply to the object of the perspective, or to its subject, or to the current context of the lexical position.
             \(Perspective pr@{propertyVerbs:pverbs}) -> Perspective $ pr {propertyVerbs = (foldr
               (\stateId pverbsMap -> case EM.lookup stateId pverbsMap of
                 Nothing -> EM.insert stateId [propertyVerbs'] pverbsMap
@@ -1458,7 +1461,7 @@ invertPerspectiveObjects = do
           -- DomeinFile we keep in PhaseTwoState.
           sPerProp <- lift2 $ statesPerProperty p
           runReaderT
-            (setInvertedQueries [roleType] sPerProp ((roleStates p) `union` (automaticStates p) `union` (actionStates p)) object selfOnly)
+            (setInvertedQueries [roleType] sPerProp ((roleStates p) `union` (automaticStates p) `union` (actionStates p) `union` (stateSpec2StateIdentifier <$> (fromFoldable $ EM.keys propertyVerbs))) object selfOnly)
             (unsafePartial createModificationSummary p)
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties
@@ -1488,9 +1491,8 @@ computeCurrentContextFromRoleIdentification roleIdentification pos = do
   expandedCompiledObject <- traverseQfd (\qfd -> case qfd of 
     SQD dom (RolGetter (CR r)) ran _ _ -> lift2 $ (getRole >=> getCalculation) (CR r)
     other -> pure other) compiledObject
-  -- First simplify by reducing `filter source criterium` to `source` and removing WithFrame:
+  -- First simplify by removing WithFrame:
   reducedObject <- pure $ unwrap $ traverseQfd (\qfd -> case qfd of 
-    (BQD _ (BinaryCombinator FilterF) source criterium _ _ _) -> Identity.Identity source
     (UQD _ WithFrame qfd1 _ _ _) -> Identity.Identity qfd1
     other -> Identity.Identity other) expandedCompiledObject
   (contextCalculations :: (Array QueryFunctionDescription)) <- completeInversions reducedObject

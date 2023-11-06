@@ -34,9 +34,9 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 import Prelude
 
 import Control.Monad.Reader (ReaderT, lift)
-import Data.Array (concat, cons, elemIndex, foldMap, fromFoldable, intersect, length, nub, null)
+import Data.Array (cons, elemIndex, foldMap, fromFoldable, intersect, length, null)
 import Data.Foldable (for_)
-import Data.Map (Map, filterKeys, values, singleton)
+import Data.Map (Map, filterKeys, singleton)
 import Data.Map (lookup) as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
@@ -80,10 +80,11 @@ setInvertedQueriesForUserAndRole :: Partial =>
   Array RoleType ->
   ADT RoleInContext ->
   Map PropertyType (Array StateIdentifier) ->
+  Array StateIdentifier ->
   QueryWithAKink ->
   Boolean ->
   WithModificationSummary Boolean
-setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context, role})) statesPerProperty qWithAkink selfOnly = do
+setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context, role})) statesPerProperty roleStates qWithAkink selfOnly = do
   -- These are the properties that are on this role;
   (propsOfRole :: Array PropertyType) <- lift3 $ RL.allLocallyRepresentedProperties (ST role)
   -- select from among them the ones we want in this perspective (as represented in statesPerProperty).
@@ -98,7 +99,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
         storeInvertedQuery
           (ZQ (Just backwards') Nothing)
           users
-          s
+          roleStates
           statesPerProperty
           selfOnly
       CP _ -> do
@@ -112,7 +113,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
           storeInvertedQuery 
             (ZQ (Just backwards') forward) 
             users  
-            s
+            roleStates
             (singleton prop s)
             selfOnly
   (adtOfBinding :: ADT RoleInContext) <- (lift3 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
@@ -120,7 +121,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
   -- on this level, and the states in that map.
   mapBelowThisLevel <- pure (filterKeys (isNothing <<< (flip elemIndex) propertiesOnThisLevel) statesPerProperty)
   queryWithBindersStep@(ZQ backwards' _) <- lift3 $ addBindersStep adtOfBinding qWithAkink
-  bindingCarriesProperty <- setInvertedQueriesForUserAndRole (fromJust backwards') users adtOfBinding mapBelowThisLevel queryWithBindersStep selfOnly
+  bindingCarriesProperty <- setInvertedQueriesForUserAndRole (fromJust backwards') users adtOfBinding mapBelowThisLevel roleStates queryWithBindersStep selfOnly
 
   -- After processing the binding telescope:
   if (bindingCarriesProperty || length propertiesOnThisLevel > 0)
@@ -133,7 +134,7 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
       storeInvertedQuery
         queryWithBindersStep
         users
-        (nub $ concat $ fromFoldable $ values statesPerProperty)
+        roleStates
         statesPerProperty
         selfOnly
       pure true
@@ -164,22 +165,22 @@ setInvertedQueriesForUserAndRole backwards users (ST ric@(RoleInContext{context,
           (bool2threeValued man)) <$> bw
       pure $ ZQ backwards' Nothing
 
-setInvertedQueriesForUserAndRole backwards users (PROD terms) props invertedQ selfOnly = do
+setInvertedQueriesForUserAndRole backwards users (PROD terms) props roleStates invertedQ selfOnly = do
   x <- traverse
-    (\t -> setInvertedQueriesForUserAndRole backwards users t props invertedQ selfOnly)
+    (\t -> setInvertedQueriesForUserAndRole backwards users t props roleStates invertedQ selfOnly)
     terms
   if null x
     then pure false
     else pure $ ala Conj foldMap x
 
-setInvertedQueriesForUserAndRole backwards users (SUM terms) props invertedQ selfOnly = do
+setInvertedQueriesForUserAndRole backwards users (SUM terms) props roleStates invertedQ selfOnly = do
   x <- traverse
-    (\t -> setInvertedQueriesForUserAndRole backwards users t props invertedQ selfOnly)
+    (\t -> setInvertedQueriesForUserAndRole backwards users t props roleStates invertedQ selfOnly)
     terms
   pure $ ala Disj foldMap x
 
 -- This handles the EMPTY and UNIVERSAL case.
-setInvertedQueriesForUserAndRole backwards users _ props invertedQ selfOnly = pure false
+setInvertedQueriesForUserAndRole backwards users _ props roleStates invertedQ selfOnly = pure false
 
 lift3 :: forall a. MonadPerspectives a -> WithModificationSummary a
 lift3 = lift <<< lift <<< lift

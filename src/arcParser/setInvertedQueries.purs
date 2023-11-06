@@ -74,6 +74,7 @@ setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
               users
               role
               statesPerProperty
+              roleStates
               qwk
               selfOnly
         _, _, _ -> pure unit
