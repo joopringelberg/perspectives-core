@@ -579,7 +579,7 @@ domain model://perspectives.domains#CouchdbManagement
     public Visitor at extern >> PublicUrl = sys:Me
       perspective on extern
         props (Description, IsLibrary, VersionToInstall, DomeinFileName) verbs (Consult)
-      -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepuliceerd worden?
+      -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepubliceerd worden?
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
