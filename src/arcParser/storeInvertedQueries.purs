@@ -100,9 +100,10 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
           (Just filter)
       _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly Nothing
     (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly Nothing
+    (Just b@(MQD _ _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly Nothing
     otherwise -> lift $ throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
--- | The function is partial, because we just handle the SQD case.
+-- | The function is partial, because we just handle the SQD and MQD cases.
 -- | The first argument is the first step of the backward path of the second argument (but, in the case the backwards part holds a filter, it may have been changed).
 -- | This is not a recursive function! It merely adds the QueryWithAKink to a Context, Role or Property type.
 -- | Modifies the DomeinFile in PhaseTwoState.
@@ -324,17 +325,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             (allLeavesInADT (roleRange qfd))
       CR _ -> lift $ throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
-    -- ExternalCoreRoleGetter is the inversion of a role individual step, such as sys:Me,
-    -- and there are no other query steps that invert to it.
-    -- This inversion should be stored with the type of the role individual. 
-    -- However, by definition, no instances of such a context individual will be created beyond the original
-    -- one that is created at setup of a model. In other words, we have nothing to gain by setting up a new-instance-detection
-    -- system at that type!
-    -- Therefore we simply ignore this step.
-    -- NOTICE: the inversion is useful, as it will be part of backwards queries - we just don't store the inverted query of such
-    -- a query that is kinked at this step.
-    QF.ExternalCoreRoleGetter f -> pure unit
-
     -- We could omit the first backwards step, as in runtime we have the context of a role instance at hand.
     -- However, we handle that situation by `handlebackwardsQuery` and that function expects a RoleInstance.
     QF.DataTypeGetter QF.ContextF -> do
@@ -368,18 +358,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 enumeratedRoles})
           dfr
           (allLeavesInADT $ unsafePartial roleDomain qfd) -- qfd is the original backwards path.
-
-    -- ExternalCoreContextGetter is the inversion of a context individual step, such as sys:TheWorld,
-    -- and there are no other query steps that invert to it.
-    -- This inversion should be stored with the type of the context individual. 
-    -- However, by definition, no instances of such a context individual will be created beyond the original
-    -- one that is created at setup of a model. In other words, we have nothing to gain by setting up a new-instance-detection
-    -- system at that type!
-    -- Therefore we simply ignore this step.
-    -- NOTICE: the inversion is useful, as it will be part of backwards queries - we just don't store the inverted query of such
-    -- a query that is kinked at this step.
-    QF.ExternalCoreContextGetter f -> pure unit
-
 
     -- The query would be added to roleInvertedQueries of the context. Such inverse queries are run when a new
     -- instance of the role type is added to the context (or when it is removed). But the external role never changes,
@@ -456,6 +434,30 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       modifiesRoleInstancesOf
       _id
     }
+
+setPathForStep (MQD _ qf _ _ _ _) qWithAK users states statesPerProperty selfOnly mfilter = 
+  case qf of
+    -- ExternalCoreRoleGetter is the inversion of a role individual step, such as sys:Me,
+    -- and there are no other query steps that invert to it.
+    -- This inversion should be stored with the type of the role individual. 
+    -- However, by definition, no instances of such a context individual will be created beyond the original
+    -- one that is created at setup of a model. In other words, we have nothing to gain by setting up a new-instance-detection
+    -- system at that type!
+    -- Therefore we simply ignore this step.
+    -- NOTICE: the inversion is useful, as it will be part of backwards queries - we just don't store the inverted query of such
+    -- a query that is kinked at this step.
+    QF.ExternalCoreRoleGetter f -> pure unit
+
+    -- ExternalCoreContextGetter is the inversion of a context individual step, such as sys:TheWorld,
+    -- and there are no other query steps that invert to it.
+    -- This inversion should be stored with the type of the context individual. 
+    -- However, by definition, no instances of such a context individual will be created beyond the original
+    -- one that is created at setup of a model. In other words, we have nothing to gain by setting up a new-instance-detection
+    -- system at that type!
+    -- Therefore we simply ignore this step.
+    -- NOTICE: the inversion is useful, as it will be part of backwards queries - we just don't store the inverted query of such
+    -- a query that is kinked at this step.
+    QF.ExternalCoreContextGetter f -> pure unit
 
 ------------------------------------------------------------------------------------------
 ---- REMOVE FIRST BACKWARDS STEP

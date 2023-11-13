@@ -122,14 +122,6 @@ compileFunction (SQD _ (DataTypeGetter IndexedRoleName) _ _ _) = pure $ unsafeCo
 
 compileFunction (SQD _ (DataTypeGetter ContextF) _ _ _) = pure $ unsafeCoerce context
 
-compileFunction (SQD _ (ExternalCoreContextGetter functionName) ran _ _) = do
-  (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
-  pure $ unsafeCoerce f [ctype ran]
-  where
-    ctype :: Domain -> String
-    ctype d = unsafePartial $ case domain2contextType d of
-      ST (ContextType ct) -> ct
-
 compileFunction (SQD _ (DataTypeGetter IdentityF) _ _ _) = pure $ (pure <<< identity)
 
 compileFunction (SQD dom (DataTypeGetter ModelNameF) _ _ _) = case dom of
@@ -171,6 +163,14 @@ compileFunction (SQD dom (PublicRole individual) _ _ _) = pure $ unsafeCoerce (\
 compileFunction (SQD dom (PublicContext individual) _ _ _) = pure $ unsafeCoerce (\x -> (pure $ unwrap individual :: MonadPerspectivesQuery String))
 
 compileFunction (SQD dom (Value2Role _) _ _ _) = pure $ unsafeCoerce (\x -> pure x :: MPQ String)
+
+compileFunction (MQD _ (ExternalCoreContextGetter functionName) args ran _ _) = do
+  (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName
+  pure $ unsafeCoerce f [ctype ran]
+  where
+    ctype :: Domain -> String
+    ctype d = unsafePartial $ case domain2contextType d of
+      ST (ContextType ct) -> ct
 
 compileFunction (MQD dom (ExternalCoreRoleGetter functionName) args _ _ _) = do
   (f :: HiddenFunction) <- pure $ unsafeCoerce $ unsafePartial $ fromJust $ lookupHiddenFunction functionName

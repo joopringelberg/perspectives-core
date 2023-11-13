@@ -24,18 +24,19 @@ module Perspectives.Query.Kinked where
 
 import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, elemIndex, foldr, intercalate, snoc, unsnoc)
+import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, makeComposition, range, replaceDomain, roleInContext2Role)
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
@@ -107,7 +108,7 @@ invert = invert_ >=> pure <<< catMaybes <<< map h
 -- | are inversed wrt the orinal query.
 invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
 -- NOTE moeten we hier niet iets met de args?
-invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
+invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = pure $ [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") args dom Unknown Unknown] Nothing]
  
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
 
@@ -266,14 +267,21 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
 
 -- Get all instances of the type of the domain. 
 invert_ (SQD dom (RoleIndividual rid) ran fun man) = case dom of 
-  CDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
-  RDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") dom Unknown Unknown] Nothing]
+  -- Find all context instances whose type is one of the ContextTypes in CDOM adt. 
+  -- NOTE: WE ARBITRARILY TAKE THE FIRST SUCH TYPE.
+  
+  CDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") 
+    [SQD dom (ContextTypeConstant $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) ContextKind True True] dom Unknown Unknown] Nothing]
+  RDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") 
+    [SQD dom (RoleTypeConstant $ ENR $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) RoleKind True True] dom Unknown Unknown] Nothing]
   _ -> pure []
 
 -- Get all instances of the type of the domain. 
 invert_ (SQD dom (ContextIndividual rid) ran fun man) = case dom of 
-  CDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") dom Unknown Unknown] Nothing]
-  RDOM adt -> pure [ZQ_ [SQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") dom Unknown Unknown] Nothing]
+  CDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") 
+    [SQD dom (ContextTypeConstant $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) ContextKind True True] dom Unknown Unknown] Nothing]
+  RDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") 
+    [SQD dom (RoleTypeConstant $ ENR $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) RoleKind True True] dom Unknown Unknown] Nothing]
   _ -> pure []
 
 invert_ (SQD dom f ran _ _) = do
