@@ -118,6 +118,7 @@ domain model://perspectives.domains#System
   case SocialEnvironment
     indexed sys:MySocialEnvironment
     -- As we share SocialEnvironment over installations, this will happen only in the first installation.
+    -- SocialEnvironment is created on condition of there being an instance of PerspectivesUsers.
     aspect sys:RootContext
     state InitMe = not exists Me 
       on entry
@@ -145,7 +146,9 @@ domain model://perspectives.domains#System
         props (FirstName, LastName) verbs (Consult)
     user Initializer = sys:Me
       perspective on Me
-        only (Fill)
+        only (Create, Fill)
+      perspective on Persons
+        only (Create, Fill)
   
   -- PDRDEPENDENCY
   case PerspectivesSystem
