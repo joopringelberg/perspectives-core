@@ -46,6 +46,7 @@ import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalN
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
+import Perspectives.ModelDependencies (perspectivesUsers)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Representation.Action (Action)
@@ -228,6 +229,18 @@ bottom_ r = do
   case mbinding of
     Nothing -> pure r
     Just b -> bottom_ b
+
+-- | The TheWorld$PerspectivesUsers bottom in the chain, or nothing
+perspectivesUsersRole_ :: RoleInstance -> MP (Maybe RoleInstance)
+perspectivesUsersRole_ r = do
+  EnumeratedRoleType rt <- roleType_ r
+  if rt == perspectivesUsers
+    then pure $ Just r
+    else do 
+      (mbinding :: Maybe RoleInstance) <- binding_ r
+      case mbinding of
+        Nothing -> pure Nothing
+        Just b -> perspectivesUsersRole_ b
 
 -- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
 -- | type (filledType) that are filled with it. The type of filledType (EnumeratedRoleType) may

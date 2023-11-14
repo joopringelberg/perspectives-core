@@ -73,7 +73,7 @@ newtype Transaction = Transaction (TransactionRecord
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
   -- A Map from any RoleInstance to its most deeply nested filler.
-  , userRoleBottoms :: MAP.Map RoleInstance RoleInstance
+  , userRoleBottoms :: MAP.Map RoleInstance (Array RoleInstance)
   ))
 
 type TransactionRecord f =

@@ -101,6 +101,7 @@ domain model://perspectives.domains#System
       on entry
         do for Initializer
           create role PerspectivesUsers
+    -- PDRDEPENDENCY
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
       -- Having a PublicKey is a proxy for having an installation.
@@ -115,6 +116,7 @@ domain model://perspectives.domains#System
         only (Create)
   
   -- MySocialEnvironment is the same on all of my devices.
+    -- PDRDEPENDENCY
   case SocialEnvironment
     indexed sys:MySocialEnvironment
     -- As we share SocialEnvironment over installations, this will happen only in the first installation.
@@ -130,7 +132,8 @@ domain model://perspectives.domains#System
     -- to be a peer with whom one wants to synchronize. Require PerspectivesSystem$Users otherwise.
     -- Using Persons rather than TheWorld$PerspectivesUsers or TheWorld$NonPerspectivesUsers creates a layer of indirection
     -- that allows us to switch rather painlessly from NonPerspectivesuser to PerspectivesUsers.
-    -- Persons will be synchronized between peers.
+    -- Persons will be synchronized between peers because they will have a perspective on properties of sys:Identifiable
+    -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
     user Me filledBy PerspectivesUsers
       perspective on Persons
@@ -192,7 +195,6 @@ domain model://perspectives.domains#System
           do for User
             -- User has a sufficient perspective on itself to do this.
             bind_ sys:MySocialEnvironment >> Me >> binding >> binder Persons >>= first to origin
-      -- A user is never a Persons instance in his own SocialEnvironment (it is Me in that context). CURRENTLY, IT IS A PERSONS, TOO!
       -- Each peer User instance that is reconstructed by me, enters this state. 
       -- Each peer should be a Persons instance in MY social environment.
       state NotInSocialEnvironment = not binding >> binder Persons >> context >>= first == sys:MySocialEnvironment
@@ -208,11 +210,6 @@ domain model://perspectives.domains#System
       -- PDRDEPENDENCY
       property Id (String)
       -- property Id = callExternal util:RoleIdentifier() returns String
-
-      -- An installation that introduced a natural person as a NonPerspectivesUsers instance, will have created its own Persons instance.
-      -- Only the PerspectivesUsers instance is unique and shared by all installations.
-      -- These are all PerspectivesSystem$User instances that represent the current user (across different devices).
-      property SystemIdentities = binding >> binder Persons >> binder User
 
       -- PDRDEPENDENCY
       indexed sys:Me
@@ -293,10 +290,6 @@ domain model://perspectives.domains#System
 
     -- Note that some of these may be NonPerspectivesUsers.
     user Contacts = SocialEnvironment >> binding >> context >> Persons
-
-    -- The User role of each of the Systems I run.
-    -- Synchronization depends on this collection.
-    user SystemIdentities = User >> binding >> binding >> binder Persons >> binder User
 
     -- PDRDEPENDENCY
     user Installer

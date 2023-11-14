@@ -11,6 +11,18 @@ module Perspectives.ModelDependencies  where
 -- SYSTEM
 ------------------------------------------------------------------------------------
 
+perspectivesUsers :: String
+perspectivesUsers = "model://perspectives.domains#System$TheWorld$PerspectivesUsers" 
+
+socialEnvironment :: String
+socialEnvironment = "model://perspectives.domains#System$SocialEnvironment" 
+
+socialEnvironmentPersons :: String
+socialEnvironmentPersons = "model://perspectives.domains#System$SocialEnvironment$Persons" 
+
+systemIdentityValues :: String
+systemIdentityValues = "model://perspectives.domains#System$TheWorld$SystemIdentities" 
+
 systemModelName :: String
 systemModelName = "model://perspectives.domains#System"
 
