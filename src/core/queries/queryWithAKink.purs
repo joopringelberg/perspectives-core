@@ -27,6 +27,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Newtype (unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
@@ -41,6 +42,7 @@ import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
@@ -271,17 +273,21 @@ invert_ (SQD dom (RoleIndividual rid) ran fun man) = case dom of
   -- NOTE: WE ARBITRARILY TAKE THE FIRST SUCH TYPE.
   
   CDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") 
-    [SQD dom (ContextTypeConstant $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) ContextKind True True] dom Unknown Unknown] Nothing]
+    [SQD dom (Constant PString (unwrap $ unsafePartial $ fromJust $ head $ allLeavesInADT adt)) (VDOM PString Nothing) True True]
+    dom Unknown Unknown] Nothing]
   RDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") 
-    [SQD dom (RoleTypeConstant $ ENR $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) RoleKind True True] dom Unknown Unknown] Nothing]
+    [SQD dom (Constant PString (unwrap $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt)) (VDOM PString Nothing) True True]
+    dom Unknown Unknown] Nothing]
   _ -> pure []
 
 -- Get all instances of the type of the domain. 
 invert_ (SQD dom (ContextIndividual rid) ran fun man) = case dom of 
   CDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") 
-    [SQD dom (ContextTypeConstant $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) ContextKind True True] dom Unknown Unknown] Nothing]
+    [SQD dom (Constant PString (unwrap $ unsafePartial $ fromJust $ head $ allLeavesInADT adt)) (VDOM PString Nothing) True True]
+    dom Unknown Unknown] Nothing]
   RDOM adt -> pure [ZQ_ [MQD ran (ExternalCoreRoleGetter "model://perspectives.domains#Couchdb$RoleInstances") 
-    [SQD dom (RoleTypeConstant $ ENR $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt) RoleKind True True] dom Unknown Unknown] Nothing]
+    [SQD dom (Constant PString (unwrap $ roleInContext2Role $ unsafePartial $ fromJust $ head $ allLeavesInADT adt)) (VDOM PString Nothing) True True]
+    dom Unknown Unknown] Nothing]
   _ -> pure []
 
 invert_ (SQD dom f ran _ _) = do
