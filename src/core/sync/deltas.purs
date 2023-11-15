@@ -170,7 +170,7 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 -- | Otherwise return an empty array.
 computeUserRoleBottoms :: RoleInstance -> MonadPerspectives (Array (Tuple RoleInstance (Array RoleInstance)))
 computeUserRoleBottoms rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= if _ 
-  then pure $ [Tuple rid []]
+  then pure $ [Tuple rid [rid]]
   else perspectivesUsersRole_ rid >>= case _ of 
     Nothing -> pure []
     Just r -> singleton <<< Tuple rid <$> otherSystemIdentities r
