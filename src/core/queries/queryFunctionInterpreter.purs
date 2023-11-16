@@ -211,6 +211,12 @@ interpretBQD (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBo
                 , supportingPaths: []
                 }]
 
+interpretBQD (BQD _(BinaryCombinator OrElseF) f1 f2 ran fun man) a = ArrayT do
+  fr1 <- runArrayT (interpret f1 a)
+  if null fr1
+    then runArrayT (interpret f2 a)
+    else pure fr1
+
 -- The compiler only allows f1 and f2 if they're functional.
 interpretBQD (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = ArrayT do
   -- Both are singleton arrays, or empty.
