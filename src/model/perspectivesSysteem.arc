@@ -56,8 +56,8 @@ domain model://perspectives.domains#System
     on entry
       do for sys:PerspectivesSystem$Installer
         letA
-          -- When a Person is used to fill a user role, SocialEnvironment will be shared with peers. MISSING PERSPECTIVE
-          mysocialenvironment <- create context SocialEnvironment
+          -- When a Person is used to fill a user role, SocialEnvironment will be shared with peers.
+          mysocialenvironment <- create context SocialEnvironment named "TheSocialEnvironment"
           -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
           indexedsocialenvironment <- create role IndexedContexts in sys:MySystem
         in 
@@ -90,8 +90,8 @@ domain model://perspectives.domains#System
     property AuthorizedDomain (String)
 
   user Identifiable
-      property LastName (mandatory, relational, String)
-      property FirstName (mandatory, relational, String)
+      property LastName (mandatory, String)
+      property FirstName (mandatory, String)
 
   -- TheWorld is shared by everyone. It is identified by def:#TheWorld.
   case TheWorld
@@ -124,8 +124,8 @@ domain model://perspectives.domains#System
     aspect sys:RootContext
     state InitMe = not exists Me 
       on entry
-        do for Initializer
-          -- Initializer has a sufficient perspective, but Me is never shared anyway.
+        do for SystemUser
+          -- SystemUser has a sufficient perspective, but Me is never shared anyway.
           bind sys:TheWorld >> PerspectivesUsers >>= first to Me
           bind sys:TheWorld >> PerspectivesUsers >>= first to Persons
     -- To fill other user roles: require Persons as user role filler if there is no need to consider a natural person
@@ -136,22 +136,25 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
     user Me filledBy PerspectivesUsers
-      perspective on Persons
-        all roleverbs
-        props (FirstName, LastName) verbs (SetPropertyValue, Consult)
+      property MyIdentity (File)
+    user SystemUser = sys:Me
       perspective on Me
-        props (FirstName, LastName, PublicKey) verbs (Consult)
+        only (Create, Fill)
+        props (FirstName, LastName, PublicKey, MyIdentity) verbs (Consult)
+        props (MyIdentity) verbs (SetPropertyValue)
         action ExportForAnotherInstallation
-          callEffect ser:SerialiseFor( [role model://perspectives.domains#System$SocialEnvironment$Me], context >> extern ) 
-      -- Me uses this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
+          letA
+            text <- callExternal ser:SerialiseFor( [role model://perspectives.domains#System$SocialEnvironment$SystemUser], context >> extern ) returns String
+          in
+            create file ("identity_of_" + LastName + ".json") as "text/json" in MyIdentity for origin
+              text
+      perspective on Persons
+        only (Create, Fill)
+        props (FirstName, LastName) verbs (SetPropertyValue, Consult)
+      -- Use this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
       -- that previously was filled by a NonPerspectivesUsers instance.
       perspective on sys:TheWorld >> PerspectivesUsers
         props (FirstName, LastName) verbs (Consult)
-    user Initializer = sys:Me
-      perspective on Me
-        only (Create, Fill)
-      perspective on Persons
-        only (Create, Fill)
   
   -- PDRDEPENDENCY
   case PerspectivesSystem
@@ -195,13 +198,6 @@ domain model://perspectives.domains#System
           do for User
             -- User has a sufficient perspective on itself to do this.
             bind_ sys:MySocialEnvironment >> Me >> binding >> binder Persons >>= first to origin
-      -- Each peer User instance that is reconstructed by me, enters this state. 
-      -- Each peer should be a Persons instance in MY social environment.
-      state NotInSocialEnvironment = not binding >> binder Persons >> context >>= first == sys:MySocialEnvironment
-        on entry
-          do for User
-            -- MISSING PERSPECTIVE
-            bind origin >> binder Persons >> binder PerspectivesUsers to Persons in sys:MySocialEnvironment
 
       -- PDRDEPENDENCY
       property Channel = (binder Initiator union binder ConnectedPartner) >> context >> extern >> ChannelDatabaseName
