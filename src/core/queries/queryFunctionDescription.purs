@@ -45,7 +45,7 @@ import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
 import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT(..), equalsOrGeneralisesADT)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
@@ -327,6 +327,11 @@ data Domain =
   | ContextKind
   | RoleKind
 
+equalsOrGeneralizesDomain :: Domain -> Domain -> Boolean
+equalsOrGeneralizesDomain (RDOM adt1) (RDOM adt2) = equalsOrGeneralisesADT adt1 adt2
+equalsOrGeneralizesDomain (CDOM adt1) (CDOM adt2) = equalsOrGeneralisesADT adt1 adt2
+equalsOrGeneralizesDomain d1 d2 = d1 == d2
+
 type Range = Domain
 
 derive instance genericDomain :: Generic Domain _
@@ -480,7 +485,7 @@ composeOverMaybe _ _ = Nothing
 
 
 -- | This function is partial, because it only handles a pure composition.
--- | While preserving right-association, it adds the extraTerm to the right of the expression:
+-- | While preserving right-association, it adds the extraTerm (second parameter) to the right of the expression:
 -- | (a >> b) extraTerm becomes (a >> (b >> extraTerm))
 addTermOnRight :: Partial => QueryFunctionDescription -> QueryFunctionDescription -> QueryFunctionDescription
 addTermOnRight left@(BQD _ (BinaryCombinator ComposeF) left' right' _ _ _) extraTerm = case right' of 

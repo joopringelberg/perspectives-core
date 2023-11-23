@@ -36,7 +36,7 @@ import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, makeComposition, range, replaceDomain, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, equalsOrGeneralizesDomain, makeComposition, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT, allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -161,18 +161,22 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       (ZQ_ left_inverted_steps mLeft_forward) <- lefts
       (ZQ_ right_inverted_steps mRight_forward) <- rights
       -- The range of mLeft_forward must equal the domain of mRight_forward.
-      guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
-        Just ran, Just domn -> ran == domn
-        -- If the forward of the left part is Nothing, left has been inverted entirely and 
-        -- may be combined with any inversion of right.
-        Nothing, _ -> true
+      -- guard $ case range <$> mLeft_forward, domain <$> mRight_forward of
+      --   Just ran, Just domn -> ran == domn
+      --   -- If the forward of the left part is Nothing, left has been inverted entirely and 
+      --   -- may be combined with any inversion of right.
+      --   Nothing, _ -> true
+      --   _, _ -> false
+      guard $ case range <$> head right_inverted_steps, domain <$> head left_inverted_steps of
+        Just ranRight, Just domLeft -> ranRight `equalsOrGeneralizesDomain` domLeft
+        -- NOTE that as the backwards part cannot be empty, the next case may not occur.
         _, _ -> false
       -- This is where we invert the order of the steps.
       -- That's obvious if both left and right were single steps.
       -- Remember we have right-assoicativity: s1 >> (s2 >> s3).
       -- So when right has multiple steps, we receive them from the recursive call in reverse order: [s3, s2].
       -- We must then add the left step to the end of those steps: [s3, s2] <> [s1].
-      pure $ ZQ_ (right_inverted_steps <> left_inverted_steps) -- v4.value0 <> v3.value0
+      pure $ ZQ_ (right_inverted_steps <> left_inverted_steps)
                   (mLeft_forward `composeOverMaybe` mRight_forward)
     
     hasFilter :: QueryFunctionDescription -> Boolean
@@ -267,7 +271,8 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
     roleHasProperty :: ADT RoleInContext -> MP Boolean
     roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)
 
--- Get all instances of the type of the domain. 
+-- The individual takes us to an instance of the range (`ran`), whatever the domain (`dom`) is. RoleIndividual is a constant function.
+-- Its inversion takes us to all instances of the domain.
 invert_ (SQD dom (RoleIndividual rid) ran fun man) = case dom of 
   -- Find all context instances whose type is one of the ContextTypes in CDOM adt. 
   -- NOTE: WE ARBITRARILY TAKE THE FIRST SUCH TYPE.
