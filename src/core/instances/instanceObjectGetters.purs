@@ -77,7 +77,7 @@ getEnumeratedRoleInstances rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >
 
 getEnumeratedRoleInstances_ :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getEnumeratedRoleInstances_ rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c >>= flip context_rolInContext_ rn) >>=
-  handlePerspectContextError' "getEnumeratedRoleInstances" []
+  handlePerspectContextError' "getEnumeratedRoleInstances_" []
     \instances -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure instances
 
 getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)

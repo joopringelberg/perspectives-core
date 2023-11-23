@@ -24,9 +24,9 @@ module Perspectives.Parsing.Arc.PhaseThree.StoreInvertedQueries where
 
 import Control.Monad.Except (lift)
 import Control.Monad.Reader (ReaderT, ask)
-import Data.Array (foldl, union, concat, fromFoldable)
+import Data.Array (concat, foldl, fromFoldable, head, union)
 import Data.Map (Map, values) as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (insert, lookup)
@@ -38,7 +38,7 @@ import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDo
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, backwards, forwards)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleType, makeComposition, mandatory, range, roleDomain, roleInContext2Role, roleRange)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, domain2roleType, makeComposition, mandatory, range, roleDomain, roleInContext2Role, roleRange)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
@@ -78,7 +78,7 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
   case backward of
     -- Think of this as: {first source step} << filter criterium << {last criterium step} (NOTICE the inverse composition step <<)
     Just (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _) -> case qfd2 of
-      -- qfd1 is the inverted criterium. 
+      -- qfd1 is the last step of the INVERTED criterium; 'criterium' in FilterF is the ORIGINAL criterium. 
       (BQD _ (BinaryCombinator ComposeF) filter@(UQD _ FilterF criterium _ _ _) source _ _ _) -> do 
         -- Drop the filter. Store  {first source step} << {last criterium step}
         unsafePartial $ setPathForStep 
@@ -189,7 +189,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
           -- Add the FillerF step to the criterium of the FilterF step;
           -- Prepend the modified filter to the backwards part.
           Just filter -> preprendToCriterium 
-            qWithAK 
+            oneStepLess
             (\ran' dom' man' -> SQD ran' (QF.DataTypeGetter FillerF) dom' True man')
             filter
         in 
@@ -229,12 +229,13 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     QF.DataTypeGetter QF.FillerF -> do
       keysForRole <- lift $ compiletimeIndexForFillerQueries qfd
       modifyDF \dfr@{enumeratedRoles} -> let
+        oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
         description = case mfilter of 
           -- We remove the first step of the backwards path, because we apply it (runtime) not to the filled
           -- but to the filler. We skip the fills step because we can: we don't have to compute the filler from the 
           -- filled, because it is already in the Delta.
           -- We add the inverted query to the **FILLED** role, not the filler role.
-          Nothing -> case removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing) of
+          Nothing -> case oneStepLess of
             -- If backwards of oneStepLess is Nothing, the backwards step of qWithAK (== qfd) consisted of just
             -- a single step and that was FillerF.
             -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
@@ -242,8 +243,18 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             -- where the domain and range are the range of the backward step.
             ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
             x -> x
-          -- If there is a filter, don't remove the first backwards step but prepend the filter to it.
-          Just filter -> ZQ ((makeComposition filter) <$> backwards qWithAK) (forwards qWithAK)
+          -- Add the FilledF step to the criterium of the FilterF step;
+          -- Prepend the modified filter to the backwards part.
+          Just filter -> preprendToCriterium 
+            oneStepLess
+            -- NOTICE. The domain, being an ADT, may have multiple RoleInContext combinations. But we can only use one of these
+            -- as parameters of FilledF. We arbitrarily choose the first.
+            (\ran' dom' man' -> 
+              let 
+                RoleInContext{context, role} = unsafePartial fromJust $ head $ allLeavesInADT (domain2roleInContext dom')
+              in
+                SQD ran' (FilledF role context) dom' True man')
+            filter
         in case dom of
           (RDOM EMPTY) -> dfr
           _ -> foldl
@@ -291,7 +302,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
           -- Add the context step to the criterium of the FilterF step;
           -- Prepend the modified filter to the backwards part.
           Just filter -> preprendToCriterium 
-            qWithAK 
+            oneStepLess 
             (\ran' dom' man' -> SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
             filter
         in case description of
