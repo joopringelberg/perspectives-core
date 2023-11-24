@@ -9,14 +9,14 @@ exports.validate_doc_update = (function (newDoc, oldDoc, userCtx, secObj)
         return true; // a server admin
     }
 
-    // see if the user a database admin specified by name
+    // see if the user is a database admin specified by name
     if(secObj && secObj.admins && secObj.admins.names) {
         if(secObj.admins.names.indexOf(userCtx.name) !== -1) {
             return true; // database admin
         }
     }
 
-    // see if the user a database admin specified by role
+    // see if the user is a database admin specified by role
     if(secObj && secObj.admins && secObj.admins.roles) {
         var db_roles = secObj.admins.roles;
         for(var idx = 0; idx < userCtx.roles.length; idx++) {
@@ -28,7 +28,7 @@ exports.validate_doc_update = (function (newDoc, oldDoc, userCtx, secObj)
     }
 
     return false; // default to no admin
-}
+    }
 
   if (userCtx.roles.indexOf("$$DATABASENAME$$") != -1) 
   {

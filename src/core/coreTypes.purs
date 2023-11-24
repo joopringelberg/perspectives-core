@@ -22,12 +22,75 @@
 
 
 module Perspectives.CoreTypes
-
+  ( (###=)
+  , (###>)
+  , (###>>)
+  , (##=)
+  , (##>)
+  , (##>>)
+  , ArrayWithoutDoubles(..)
+  , Assumption
+  , AssumptionRegister
+  , AssumptionTracking
+  , BrokerService
+  , ContextInstances
+  , ContextPropertyValueGetter
+  , DomeinCache
+  , InformedAssumption(..)
+  , JustInTimeModelLoad(..)
+  , MP
+  , MPQ
+  , MPT
+  , MonadPerspectives
+  , MonadPerspectivesQuery
+  , MonadPerspectivesTransaction
+  , ObjectsGetter
+  , OrderedDelta(..)
+  , PerspectivesExtraState
+  , PerspectivesState
+  , PropertyValueGetter
+  , RepeatingTransaction(..)
+  , ResourceToBeStored(..)
+  , RolInstances
+  , RoleGetter
+  , RuntimeOptions
+  , StateEvaluation(..)
+  , TrackingObjectsGetter
+  , TypeLevelGetter
+  , TypeLevelResults
+  , Updater
+  , WithAssumptions
+  , addPublicResource
+  , assumption
+  , class Cacheable
+  , class Persistent
+  , dbLocalName
+  , resourceToBeStored
+  , evalMonadPerspectivesQuery
+  , evalMonadPerspectivesQueryToMaybeObject
+  , execMonadPerspectivesQuery
+  , forceArray
+  , forceTypeArray
+  , liftToInstanceLevel
+  , removeInternally
+  , representInternally
+  , retrieveInternally
+  , runMonadPerspectivesQuery
+  , runMonadPerspectivesQueryToObject
+  , runTypeLevelToArray
+  , runTypeLevelToMaybeObject
+  , runTypeLevelToObject
+  , theCache
+  , type (##>)
+  , type (~~>)
+  , type (~~~>)
+  )
   where
 
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Reader (ReaderT, lift)
 import Control.Monad.Writer (WriterT, runWriterT)
-import Data.Array (foldMap, foldl, foldr, head, union)
+import Data.Array (cons, foldMap, foldl, foldr, head, union)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable)
 import Data.Generic.Rep (class Generic)
@@ -38,13 +101,17 @@ import Data.Nullable (Nullable)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, Fiber, throwError)
-import Effect.Aff.AVar (AVar)
+import Effect.Aff.AVar (AVar, empty)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
+import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object)
 import Foreign.Object as F
-import LRUCache (Cache)
+import LRUCache (Cache, defaultGetOptions, delete, get, set)
 import Perspectives.AMQP.Stomp (ConnectAndSubscriptionParameters, StompClient)
 import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
@@ -52,10 +119,12 @@ import Perspectives.Instances.Environment (Environment)
 import Perspectives.Persistence.Types (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Repetition (Duration)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId, EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
+import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
+import Perspectives.ResourceIdentifiers.Parser (pouchdbDatabaseName)
 import Perspectives.Sync.Transaction (Transaction, StorageScheme)
-import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, ($), (<<<), (<>), (>>=))
+import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, unit, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -111,8 +180,11 @@ type PerspectivesExtraState =
 
   -- We want to check on locally stored roles filled with these roles.
   , publicRolesJustLoaded :: Array RoleInstance
-
+ 
   , runtimeOptions :: RuntimeOptions
+
+  -- We treat the entities as Foreign here and force them to be instances of i in Persistent when we store them into the database.
+  , entitiesToBeStored :: Array ResourceToBeStored
 
   )
 
@@ -398,3 +470,98 @@ instance eqOrderedDelta :: Eq OrderedDelta where
 
 instance ordOrderedDelta :: Ord OrderedDelta where
   compare (OrderedDelta _ i) (OrderedDelta _ j) = compare i j
+
+-----------------------------------------------------------
+-- CLASS CACHEABLE
+-----------------------------------------------------------
+class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i, i -> v where
+  theCache :: MonadPerspectives (Cache (AVar v))
+  -- | Create an empty AVar that will be filled by the PerspectEntiteit.
+  representInternally :: i -> MonadPerspectives (AVar v)
+  retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
+  removeInternally :: i -> MonadPerspectives (Maybe (AVar v))
+
+-----------------------------------------------------------
+-- CLASS PERSISTENT
+-----------------------------------------------------------
+class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
+  -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
+  dbLocalName :: i -> MP String
+  addPublicResource :: i -> MonadPerspectives Unit
+  resourceToBeStored :: v -> ResourceToBeStored
+
+data ResourceToBeStored = 
+  Ctxt ContextInstance |
+  Rle RoleInstance |
+  Dfile DomeinFileId
+
+instance Eq ResourceToBeStored where
+  eq (Ctxt c1) (Ctxt c2) = eq c1 c2
+  eq (Rle c1) (Rle c2) = eq c1 c2
+  eq (Dfile c1) (Dfile c2) = eq c1 c2
+  eq _ _ = false
+
+instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
+  theCache = gets _.domeinCache
+  representInternally c = do
+    av <- liftAff empty
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
+
+instance cacheablePerspectContext :: Cacheable PerspectContext ContextInstance where
+  -- identifier = _._id <<< unwrap
+  theCache = gets _.contextInstances
+  representInternally c = do
+    av <- liftAff empty
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
+
+instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
+  theCache = gets _.rolInstances
+  representInternally c = do
+    av <- liftAff empty
+    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
+    pure av
+  retrieveInternally i = lookup theCache (unwrap i)
+  removeInternally i = remove theCache (unwrap i)
+
+lookup :: forall a.
+  MonadPerspectives (Cache a) ->
+  String ->
+  MonadPerspectives (Maybe a)
+lookup g k = do
+  dc <- g
+  -- pure $ peek dc k
+  liftEffect $ get k defaultGetOptions dc
+
+remove :: forall a.
+  MonadPerspectives (Cache a) ->
+  String ->
+  MonadPerspectives (Maybe a)
+remove g k = do
+  (dc :: (Cache a)) <- g
+  -- ma <- pure $ peek dc k
+  ma <- liftEffect $ get k defaultGetOptions dc
+  -- _ <- pure $ (delete dc k)
+  _ <- liftEffect $ delete k dc
+  pure ma
+
+instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
+  dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
+  addPublicResource _ = pure unit
+  resourceToBeStored df = Dfile $ identifier df
+
+instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
+  dbLocalName (ContextInstance id) = pouchdbDatabaseName id
+  addPublicResource _ = pure unit
+  resourceToBeStored ct = Ctxt $ identifier ct
+
+instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
+  dbLocalName (RoleInstance id) = pouchdbDatabaseName id
+  addPublicResource rid = modify \s -> s {publicRolesJustLoaded = cons rid s.publicRolesJustLoaded}
+  resourceToBeStored rl = Rle $ identifier rl
+

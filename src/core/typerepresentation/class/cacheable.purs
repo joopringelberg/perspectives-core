@@ -32,23 +32,15 @@ module Perspectives.Representation.Class.Cacheable
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Except (throwError)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
-import Effect.Aff.AVar (AVar, isEmpty, empty, put, read, status, take)
+import Effect.Aff.AVar (AVar, isEmpty, put, read, status, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import LRUCache (Cache, set)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (class Cacheable, MonadPerspectives, representInternally, retrieveInternally)
 import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, rev)
-import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.PerspectivesState (lookup, remove)
-import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ViewType(..), DomeinFileId)
 
 -- | Members of class Cacheable provide functionality to cache and retrieve their representation.
@@ -56,13 +48,6 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 
 type Identifier = String
 type Namespace = String
-
-class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i, i -> v where
-  theCache :: MonadPerspectives (Cache (AVar v))
-  -- | Create an empty AVar that will be filled by the PerspectEntiteit.
-  representInternally :: i -> MonadPerspectives (AVar v)
-  retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
-  removeInternally :: i -> MonadPerspectives (Maybe (AVar v))
 
 -- | Handles all cases:
 -- | * when an entity had not been cached before;
@@ -142,30 +127,4 @@ setRevision id r = do
 -----------------------------------------------------------
 -- INSTANCES
 -----------------------------------------------------------
-instance cacheablePerspectContext :: Cacheable PerspectContext ContextInstance where
-  -- identifier = _._id <<< unwrap
-  theCache = gets _.contextInstances
-  representInternally c = do
-    av <- liftAff empty
-    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
-    pure av
-  retrieveInternally i = lookup theCache (unwrap i)
-  removeInternally i = remove theCache (unwrap i)
 
-instance cacheablePerspectRol :: Cacheable PerspectRol RoleInstance where
-  theCache = gets _.rolInstances
-  representInternally c = do
-    av <- liftAff empty
-    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
-    pure av
-  retrieveInternally i = lookup theCache (unwrap i)
-  removeInternally i = remove theCache (unwrap i)
-
-instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
-  theCache = gets _.domeinCache
-  representInternally c = do
-    av <- liftAff empty
-    _ <- theCache >>= (liftEffect <<< (set (unwrap c) av Nothing))
-    pure av
-  retrieveInternally i = lookup theCache (unwrap i)
-  removeInternally i = remove theCache (unwrap i)

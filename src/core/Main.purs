@@ -47,7 +47,7 @@ import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
-import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
+import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), ResourceToBeStored(..), RuntimeOptions, MonadPerspectives, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -63,12 +63,12 @@ import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, U
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
-import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, saveCachedEntiteit)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), DomeinFileId, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
@@ -119,6 +119,9 @@ runPDR usr rawPouchdbUser callback = void $ runAff handler do
 
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
+
+      -- Fork aff to save to the database
+      void $ forkAff $ forkDatabasePersistence state
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -253,6 +256,20 @@ runPDR usr rawPouchdbUser callback = void $ runAff handler do
     handler (Right _) = do
       logPerspectivesError $ Custom $ "Started the PDR for: " <> usr
       callback true
+
+forkDatabasePersistence :: AVar PerspectivesState -> Aff Unit 
+forkDatabasePersistence state = do
+  delay (Milliseconds 10000.0)
+  runPerspectivesWithState 
+    do
+      (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
+      modify \s -> s {entitiesToBeStored = []}
+      for_ toBeSaved \(rs :: ResourceToBeStored) -> case rs of 
+        Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance)
+        Rle r -> void $ saveCachedEntiteit (r :: RoleInstance)
+        Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId) 
+    state
+  forkDatabasePersistence state
 
 forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
 forkJustInTimeModelLoader modelToLoadAVar state = run

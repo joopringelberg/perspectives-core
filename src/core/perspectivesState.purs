@@ -67,6 +67,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , typeToStorage: Map.empty
   , publicRolesJustLoaded: []
   , runtimeOptions
+  , entitiesToBeStored: []
   }
 
 defaultRuntimeOptions :: RuntimeOptions

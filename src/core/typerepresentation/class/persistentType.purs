@@ -22,7 +22,6 @@
 
 module Perspectives.Representation.Class.PersistentType
   ( module Perspectives.Representation.Class.PersistentType
-  , module Perspectives.Representation.Class.Cacheable
   , module Perspectives.Couchdb.Revision
   , module Perspectives.Representation.TypeIdentifiers) where
 
@@ -33,13 +32,12 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Effect.Exception (error)
 import Foreign.Object (insert, lookup) as FO
-import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, retrieveInternally)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty)

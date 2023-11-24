@@ -34,10 +34,7 @@
 -- | correct version, and an inner one that is always one step behind.
 
 module Perspectives.Persistent
-  ( class Persistent
-  , dbLocalName
-  , addPublicResource
-  , entitiesDatabaseName
+  ( entitiesDatabaseName
   , entityExists
   , fetchEntiteit
   , getDomeinFile
@@ -47,6 +44,7 @@ module Perspectives.Persistent
   , modelDatabaseName
   , postDatabaseName
   , removeEntiteit
+  , saveCachedEntiteit
   , saveEntiteit
   , saveEntiteit_
   , tryFetchEntiteit
@@ -60,9 +58,9 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Except (catchError, lift, throwError)
-import Data.Array (cons)
+import Data.Array (cons, elemIndex)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -70,37 +68,20 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Class (class Decode, class Encode)
 import Foreign.Generic.Class (class GenericEncode)
 import Persistence.Attachment (class Attachment)
-import Perspectives.CoreTypes (MP, MonadPerspectives)
+import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.Class.Cacheable (class Cacheable, class Revision, Revision_, cacheEntity, changeRevision, removeInternally, representInternally, retrieveInternally, rev, setRevision, tryTakeEntiteitFromCache)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.Class.Cacheable (class Revision, Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache, tryTakeEntiteitFromCache)
+import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Perspectives.ResourceIdentifiers (isInPublicScheme, pouchdbDatabaseName, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
-
-class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
-  -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
-  dbLocalName :: i -> MP String
-  addPublicResource :: i -> MonadPerspectives Unit
-
-instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
-  dbLocalName (ContextInstance id) = pouchdbDatabaseName id
-  addPublicResource _ = pure unit
-
-instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
-  dbLocalName (RoleInstance id) = pouchdbDatabaseName id
-  addPublicResource rid = modify \s -> s {publicRolesJustLoaded = cons rid s.publicRolesJustLoaded}
-
-instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId where
-  dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
-  addPublicResource _ = pure unit
+import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
 
 getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -213,15 +194,56 @@ tryFetchEntiteit id = do
   -- catchError (Just <$> getDocument dbName (couchdbResourceIdentifier $ unwrap id))
   --   \e -> pure Nothing
 
+-- | Saves a previously cached entity.
+-- | NOTE: the entity may not be saved immediately, due to the scheme of periodic saving.
 saveEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
-saveEntiteit id = saveEntiteit' id Nothing
+saveEntiteit id = saveEntiteit__ id Nothing
 
--- | Save the given entity to the database and puts it, with a correct (new) revision,
+-- | Saves the given entity to the database and puts it, with a correct (new) revision,
 -- | in the cache, assuming the current revision of the entiteit equals that in the database.
+-- | NOTE: the entity may not be saved immediately, due to the scheme of periodic saving.
 saveEntiteit_ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
-saveEntiteit_ entId entiteit = saveEntiteit' entId (Just entiteit)
+saveEntiteit_ entId entiteit = saveEntiteit__ entId (Just entiteit)
+
+-- | Ensures that the entity is in cache and schedules it for saving to the database.
+saveEntiteit__ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
+saveEntiteit__ entId mentiteit = do
+  case mentiteit of 
+    -- In this case, we might have an entity in cache. As we want to return the entity,
+    -- try to retrieve it. If not present, fails with an error.
+    Nothing -> do
+      a <- readEntiteitFromCache entId 
+      modify \s@{entitiesToBeStored} -> if isJust $ elemIndex (resourceToBeStored a) entitiesToBeStored
+        then s
+        else s { entitiesToBeStored = cons (resourceToBeStored a) entitiesToBeStored}
+      -- The version might be updated in the caching process.
+      pure a
+    Just a -> do
+    -- In this case, we want to replace the entity in cache with the one passed in as the second argument
+    -- and schedule it to be saved to the database.
+      a' <- cacheEntity entId a
+      -- Now add to the items to be saved.
+      modify \s@{entitiesToBeStored} -> if isJust $ elemIndex (resourceToBeStored a) entitiesToBeStored
+        then s
+        else s { entitiesToBeStored = cons (resourceToBeStored a) entitiesToBeStored}
+      -- The version might be updated in the caching process.
+      liftAff $ read a'
+
+-- | Assumes the entity a has been cached. 
+saveCachedEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
+saveCachedEntiteit entId = do 
+  entiteit <- takeEntiteitFromCache entId
+  {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap $ identifier entiteit)
+  (rev :: Revision_) <- addDocument database entiteit documentName
+  
+  -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
+  -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
+  entiteit' <- pure (changeRevision rev entiteit)
+  void $ cacheEntity (identifier entiteit) entiteit'
+  pure entiteit'
 
 -- | Save an Entiteit and set its new _rev parameter in the cache.
+-- | The Entiteit passed in on the second parameter overrides the version in the cache, if any.
 saveEntiteit' :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $ \_ -> do
   mentityFromCache <- tryTakeEntiteitFromCache entId

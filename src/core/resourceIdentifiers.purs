@@ -24,24 +24,21 @@ module Perspectives.ResourceIdentifiers  where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.Error.Class (throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
 import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), maybe)
-import Data.String (drop)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Class (liftEffect)
-import Effect.Exception (error)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
 import Perspectives.Cuid2 (cuid2)
-import Perspectives.Identifiers (isUrl, modelUri2ModelUrl)
+import Perspectives.Identifiers (isUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
+import Perspectives.ResourceIdentifiers.Parser (DecomposedResourceIdentifier(..), Guid, ResourceIdentifier, parseResourceIdentifier, resourceIdentifierRegEx, pouchdbDatabaseName_)
 import Perspectives.Sync.Transaction (StorageScheme(..), Url, DbName) as TRANS
 
 {------------------------------------------------------------
@@ -122,73 +119,6 @@ classes Persistent and Cacheable.
 ------------------------------------------------------------}
 
 
------------------------------------------------------------
--- DECOMPOSING RESOURCE IDENTIFIERS
--- In this section we have functions to split a string that represents a ResourceIdentifier
--- into constituent parts according to the scheme of the identifier (default, local or remote).
------------------------------------------------------------
-type ResourceIdentifier = String
-type Guid = String
-type LocalModelName = String
-
--- | EXAMPLES:
--- | def:0083caf8_6c12_4905_a7ce_1b10a40f0ad8
--- | loc:secretdatabase#0083caf8_6c12_4905_a7ce_1b10a40f0ad8
--- | rem:https://perspectives.domains/cw_perspectives_domains/#0083caf8_6c12_4905_a7ce_1b10a40f0ad8
--- | model://perspectives.domains#System
-data DecomposedResourceIdentifier = 
-    Default TRANS.DbName Guid 
-  | Local TRANS.DbName Guid 
-  | Remote TRANS.Url Guid
-  | Public TRANS.Url Guid
-  | Model TRANS.DbName LocalModelName
-
--- | Match a string of word characters, separated by ":" from an arbitrary string.
-resourceIdentifierRegEx :: Regex
-resourceIdentifierRegEx = unsafeRegex "^(\\w+):(.*)$" noFlags
-
--- TODO: replace the first part of the match by a regex that captures Couchdb database names;
--- replace the second part by a regex that captures a GUID.
--- Match an arbitrary string built from word characters, separated by "#" from a
--- string built from word characters, digits and underscore.
-locRegex :: Regex
-locRegex = unsafeRegex "^(\\w+)#([_\\w\\d]+)$" noFlags
-
-parseResourceIdentifier :: forall f. ResourceIdentifier -> MonadPouchdb f DecomposedResourceIdentifier
-parseResourceIdentifier resId = 
-  case match resourceIdentifierRegEx resId of 
-    Nothing -> throwError (error $ "Cannot parse this resource identifier: " <> resId)
-    Just matches -> case index matches 1, index matches 2 of 
-      Just (Just scheme), Just (Just rest) -> case scheme of 
-        -- def:#guid
-        "def" -> do
-          sysId <- getSystemIdentifier
-          pure $ Default (sysId <> "_entities") (drop 1 rest)
-        -- loc:dbname#guid
-        "loc" -> case match locRegex rest of
-          Nothing -> throwError (error $ "Cannot parse this as a Local resource identifier: " <> resId) 
-          Just locMatches -> case index locMatches 1, index locMatches 2 of 
-            Just (Just dbName), Just (Just g) -> pure $ Local dbName g
-            _, _ -> throwError (error $ "Cannot parse this as a Local resource identifier: " <> resId)
-        -- rem:url#guid
-        "rem" -> case match publicResourceUrlRegex rest of
-          Nothing -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
-          Just remMatches -> case index remMatches 1, index remMatches 2 of 
-            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") g
-            _, _ -> throwError (error $ "Cannot parse this as a Remote resource identifier: " <> resId)
-        "pub" -> case match publicResourceUrlRegex rest of
-          Nothing -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
-          Just remMatches -> case index remMatches 1, index remMatches 2 of 
-            Just (Just url), Just (Just g) -> pure $ Remote (url <> "/") g
-            _, _ -> throwError (error $ "Cannot parse this as a Public resource identifier: " <> resId)
-        "model" -> do
-          sysId <- getSystemIdentifier
-          {documentName} <- pure $ unsafePartial modelUri2ModelUrl resId
-          pure $ Model (sysId <> "_models") documentName
-        -- "model" -> getSystemIdentifier >>= \sysId -> pure $ Model (sysId <> "_models") (unsafePartial fromJust $ stripPrefix (Pattern "//") (rest <> ".json"))
-        -- rest is nu //perspectives.domains#System. Haal '//' eraf, maak er een Local van met default database voor modellen.
-        _ -> throwError (error $ "Unknown resource identifier scheme: " <> resId)
-      _, _ -> throwError (error $ "Cannot parse this resource identifier: " <> resId)
 
 -----------------------------------------------------------
 -- THE LOCAL IDENTIFIER OF A RESOURCE IDENTIFIER
@@ -203,22 +133,6 @@ guid_ (Local _ g) = g
 guid_ (Remote _ g) = g
 guid_ (Public _ g) = g
 guid_ (Model _ g) = g
-
------------------------------------------------------------
--- THE DATABASE PART (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO READ FROM
------------------------------------------------------------
--- | Returns an identifier that is understood by Pouchdb in the sense that
--- | it creates a database accessor object from it, either locally or remote.
--- | This database can be read from.
-pouchdbDatabaseName :: ResourceIdentifier -> MonadPerspectives TRANS.DbName
-pouchdbDatabaseName = parseResourceIdentifier >=> pure <<< pouchdbDatabaseName_
-
-pouchdbDatabaseName_ :: DecomposedResourceIdentifier -> TRANS.DbName
-pouchdbDatabaseName_ (Default dbName _) = dbName
-pouchdbDatabaseName_ (Local dbName _) = dbName
-pouchdbDatabaseName_ (Remote dbName _) = dbName
-pouchdbDatabaseName_ (Public dbName _) = dbName
-pouchdbDatabaseName_ (Model dbName _) = dbName
 
 -----------------------------------------------------------
 -- THE DATABASE LOCATION (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO READ FROM
@@ -356,21 +270,6 @@ takeGuid s = case match discardStorageRegex s of
   Just matches -> case index matches 1 of
     Just (Just g) -> g
     _ -> s
-
------------------------------------------------------------
--- TEST THE SHAPE OF A PUBLIC RESOURCE URL
------------------------------------------------------------
--- | A pattern to match https://{authority}/cw_{databasename}/{SegmentedIdentifier} exactly.
--- | It is very permissive, allowing any character in the authority except the forward slash.
--- | The model name must start on an upper case alphabetic character.
--- | index 1 is the authority (scheme plus domain name).
--- | index 2 is the database name.
--- | index 3 is the resource name.
-publicResourceUrlPattern :: String
-publicResourceUrlPattern = "^(https://[^/]+/cw_[^/]+)/#(.+)$"
-
-publicResourceUrlRegex :: Regex
-publicResourceUrlRegex = unsafeRegex publicResourceUrlPattern noFlags
 
 -----------------------------------------------------------
 -- TEST THE SHAPE OF A PUBLIC RESOURCE IDENTIFIER

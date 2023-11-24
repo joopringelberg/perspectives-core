@@ -22,9 +22,9 @@
 
 module Perspectives.ContextRolAccessors where
 
-import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.CoreTypes (class Persistent, MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistent (class Persistent, getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (pure, (>=>), (<<<))
 
