@@ -22,10 +22,11 @@
   "main": "dist/perspectives-core.js",
   "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
-    "build": "webpack",
-    "watch": "webpack --watch",
+    "buildProduction": "webpack --env target=production",
+    "buildDevelopment": "webpack --env target=development",
     "symlinks": "./createPerspectivesLinks.sh",
-    "docs": "./gendocs.sh"
+    "docs": "./gendocs.sh",
+    "stats": "webpack --json > stats.json"
   },
   "devDependencies": {
     "webpack": "^5.71.0",
