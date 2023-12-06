@@ -85,7 +85,7 @@ import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePath
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit, updateRevision)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -390,7 +390,8 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
     
     initSystem :: MonadPerspectivesTransaction Unit
     initSystem = do
-      -- Create the system instance
+      lift $ saveMarkedResources
+      -- Create the system instance      
       sysId <- lift getSystemIdentifier
       cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId
       r <- runExceptT $ constructEmptyContext 

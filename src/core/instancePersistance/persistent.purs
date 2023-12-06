@@ -47,6 +47,7 @@ module Perspectives.Persistent
   , saveCachedEntiteit
   , saveEntiteit
   , saveEntiteit_
+  , saveMarkedResources
   , tryFetchEntiteit
   , tryGetPerspectEntiteit
   , tryRemoveEntiteit
@@ -56,9 +57,10 @@ module Perspectives.Persistent
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (modify)
+import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
+import Data.Foldable (for_)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
@@ -70,14 +72,14 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign.Generic.Class (class GenericEncode)
 import Persistence.Attachment (class Attachment)
-import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
+import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.Class.Cacheable (class Revision, Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache, tryTakeEntiteitFromCache)
+import Perspectives.Representation.Class.Cacheable (class Revision, Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
@@ -229,6 +231,15 @@ saveEntiteit__ entId mentiteit = do
       -- The version might be updated in the caching process.
       liftAff $ read a'
 
+saveMarkedResources :: MonadPerspectives Unit
+saveMarkedResources = do
+  (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
+  modify \s -> s {entitiesToBeStored = []}
+  for_ toBeSaved \(rs :: ResourceToBeStored) -> case rs of 
+    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance)
+    Rle r -> void $ saveCachedEntiteit (r :: RoleInstance)
+    Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId) 
+
 -- | Assumes the entity a has been cached. 
 saveCachedEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
 saveCachedEntiteit entId = do 
@@ -240,26 +251,6 @@ saveCachedEntiteit entId = do
   -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
   void $ cacheEntity (identifier entiteit) entiteit'
-  pure entiteit'
-
--- | Save an Entiteit and set its new _rev parameter in the cache.
--- | The Entiteit passed in on the second parameter overrides the version in the cache, if any.
-saveEntiteit' :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
-saveEntiteit' entId mentiteit = ensureAuthentication (Resource $ unwrap entId) $ \_ -> do
-  mentityFromCache <- tryTakeEntiteitFromCache entId
-  entiteit <- case mentiteit of
-    Nothing -> case mentityFromCache of
-      Nothing -> throwError $ error ("saveEntiteit' needs either an entity as parameter, or a locally stored resource for " <>  unwrap entId)
-      Just e -> pure e
-    Just e -> pure e
-
-  {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
-  (rev :: Revision_) <- addDocument database entiteit documentName
-  
-  -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
-  -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
-  entiteit' <- pure (changeRevision rev entiteit)
-  void $ cacheEntity entId entiteit'
   pure entiteit'
 
 -- | Updates the revision in cache (no change to the version in database).
