@@ -28,7 +28,6 @@ import Data.Maybe (Maybe)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -89,10 +88,11 @@ data FunctionName =
 
 
 derive instance genericFunctionName :: Generic FunctionName _
+-- We need Encode and Decode instances of FunctionName for Calculation, which goes into the DomeinFile.
 instance encodeFunctionName :: Encode FunctionName where
-  encode = genericEncode defaultOptions
+  encode = writeImpl
 instance decodeFunctionName :: Decode FunctionName where
-  decode = genericDecode defaultOptions
+  decode = readImpl
 
 instance eqFunctionName :: Eq FunctionName where eq = genericEq
 derive instance ordFunctionName :: Ord FunctionName
@@ -307,13 +307,7 @@ instance showQueryFunction :: Show QueryFunction where
 instance eqQueryFunction :: Eq QueryFunction where
   eq x = genericEq x
 
-instance encodeQueryFunction :: Encode QueryFunction where
-  encode q = genericEncode defaultOptions q
-  -- encode = writeImpl
-
-instance decodeQueryFunction :: Decode QueryFunction where
-  decode = genericDecode defaultOptions
-  -- decode = readImpl
+-- We don't need encode and decode instances of QueryFunction.
 
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl f = writeImpl( genericSumToVariant f)
