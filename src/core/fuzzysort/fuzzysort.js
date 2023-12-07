@@ -6,5 +6,12 @@ const fuzzy = require("fuzzysort");
 // fuzzysort.go('mr', ['Monitor.cpp', 'MeshRenderer.cpp'])
 exports.matchStringsImpl = function(target, alternatives)
 {
-  return fuzzy.go( target, alternatives );
+  if (target == "")
+  {
+    return alternatives.map( function (s) {return {target: s}});
+  }
+  else
+  {
+    return fuzzy.go( target, alternatives );
+  }
 };
