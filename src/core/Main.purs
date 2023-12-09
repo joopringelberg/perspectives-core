@@ -512,7 +512,9 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
               (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
             case r of 
               Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) *> pure false
-              Right success -> pure success
+              Right success -> do 
+                saveMarkedResources
+                pure success
           ) 
           state
   where
