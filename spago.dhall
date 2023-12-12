@@ -57,7 +57,6 @@ to generate this file without the comments in this block.
   , "node-process"
   , "now"
   , "nullable"
-  , "numbers"
   , "ordered-collections"
   , "parsing"
   , "partial"

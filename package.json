@@ -26,7 +26,7 @@
     "buildDevelopment": "webpack --env target=development",
     "symlinks": "./createPerspectivesLinks.sh",
     "docs": "./gendocs.sh",
-    "stats": "webpack --json > stats.json"
+    "stats": "webpack --env target=production --json > stats.json"
   },
   "devDependencies": {
     "webpack": "^5.71.0",

@@ -115,7 +115,6 @@ in  upstream
       , "prelude"
       , "avar-monadask"
       , "affjax"
-      , "argonaut"
       , "foreign-generic"
       , "simple-json"
       , "b64"
