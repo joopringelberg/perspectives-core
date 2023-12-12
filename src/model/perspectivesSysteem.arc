@@ -47,7 +47,7 @@ domain model://perspectives.domains#System
         -- For that reason, it is removed from the source that is included in the DomeinFile.
 
         -- Add the perspectives.domains repository as BaseRepository:
-        bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
+        -- bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
 
         bind_ theworld >> extern to indexedworld
         IndexedContexts$Name = sys:TheWorld >> indexedName for indexedworld
@@ -226,7 +226,7 @@ domain model://perspectives.domains#System
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
       perspective on ModelsInUse
-        only (Remove)
+        only (Remove, Create, CreateAndFill)
         props (ModelName, Description, Version, Patch, Build) verbs (Consult)
         props (InstalledPatch, InstalledBuild, UpdateOnBuild) verbs (SetPropertyValue)
       perspective on ModelsToUpdate

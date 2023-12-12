@@ -84,8 +84,8 @@ domain model://perspectives.domains#CouchdbManagement
       screen "Couchdb Server Administration"
         row
           table CouchdbServers
-            -- No restriction on properties, but no role verbs allowed.
-            only ()
+            -- No restriction on properties, but the Create and CreateAndFill verbs are omitted.
+            only (Remove)
 
       
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
@@ -101,7 +101,7 @@ domain model://perspectives.domains#CouchdbManagement
 
       -- Add credentials to Perspectives State (not to the Couchdb_).
       -- This means that the PDR can now authenticate on behalf of the Admin with Couchdb_.
-      state AddCredentials = (exists Url) and exists AdminPassword
+      state AddCredentials = ((exists Url) and exists AdminPassword) and exists AdminUserName
         on entry
           do for Manager
             callEffect cdb:AddCredentials( Url, AdminUserName, AdminPassword )
@@ -253,10 +253,11 @@ domain model://perspectives.domains#CouchdbManagement
 
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
+    -- TODO: als omkering van filtered queries volledig is, beperk dan het perspectief van Visitor tot PublicRepositories.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
       perspective on External
         props (Name) verbs (Consult)
-      perspective on PublicRepositories
+      perspective on Repositories
         props (Repositories$NameSpace, IsPublic) verbs (Consult)
       
       -- Perspective on Admin in order to be able to sign up as an Account.
@@ -267,7 +268,7 @@ domain model://perspectives.domains#CouchdbManagement
         row
           form "This server" External
         row 
-          table "Public Repositories" PublicRepositories
+          table "Repositories" Repositories
             props (Repositories$NameSpace) verbs (Consult)
 
 
@@ -692,7 +693,7 @@ domain model://perspectives.domains#CouchdbManagement
       on exit
         do for Author
           -- Delete the DomeinFile.
-          callEffect p:RemoveFromRepository( VersionedModelManifest$External$ModelURI )
+          callEffect p:RemoveFromRepository( VersionedModelManifest$External$VersionedModelURI )
 
       state ReadyToCompile = (exists External$Version) and (exists ArcSource)
       

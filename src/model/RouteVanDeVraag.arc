@@ -49,17 +49,19 @@ domain model://joopringelberg.nl#Route
     -- TODO: voeg pattern toe
     property Postcode (String)
     property Plaats (String)
+    
+    view LocatieView (Straat, Huisnummer, Postcode, Plaats)
 
-  -- NOTA BENE. Verplaats naar System.
-  user Persoon filledBy psys:User
-    -- psys:User$FirstName
-    -- psys:User$LastName
-    aspect Locatie
-    property Geslacht (String)
-      enumeration ("Man", "Vrouw", "Anders")
-    property Mail (Email)
-    -- TODO: voeg pattern toe
-    property BSN (Number)
+  -- NOTA BENE. We gebruiken nu SocialEnvironment$Persons. Daar ontbreken diverse properties aan.
+  -- user Persoon filledBy psys:User
+  --   -- psys:User$FirstName
+  --   -- psys:User$LastName
+  --   aspect Locatie
+  --   property Geslacht (String)
+  --     enumeration ("Man", "Vrouw", "Anders")
+  --   property Mail (Email)
+  --   -- TODO: voeg pattern toe
+  --   property BSN (Number)
 
   thing FinancieringsBasis
 
@@ -86,20 +88,21 @@ domain model://joopringelberg.nl#Route
         props (Voornaam, Achternaam) verbs (Consult)
       perspective on MijnIntakes
         props (Voornaam, Achternaam) verbs (Consult)
-      perspective on MijnVoorzieningen
+      perspective on MijnWerkgever
         props (Naam) verbs (Consult)
       perspective on MijnPlekken
         props (Naam) verbs (Consult)
 
-    context MijnRoute = Betrokkene >> fills Route$Deelnemer >> context >> extern
+    -- TODO: maak 'functional' operationeel voor berekende rollen.
+    context MijnRoute (functional) = Betrokkene >> binding >> fills Route$Deelnemer >> context >> extern
 
-    context MijnCaseLoad = Betrokkene >> fills Route$Ondersteuner >> context >> extern
+    context MijnCaseLoad = Betrokkene >> fills Medewerker >> fills Route$Ondersteuner >> context >> extern
 
-    context MijnIntakes = Betrokkene >> fills Route$Ambassadeur >> context >> extern
+    context MijnIntakes = Betrokkene >> fills Medewerker >> fills Route$Ambassadeur >> context >> extern
 
-    context MijnPlekken = Betrokkene >> fills Verantwoordelijke >> context >> extern
+    context MijnPlekken = Betrokkene >> fills Medewerker >> fills Organisator >> context >> extern
 
-    context MijnVoorzieningen = (MijnRoute union MijnCaseLoad union MijnIntakes) fills Routes >> context >> extern
+    context MijnWerkgever (functional) = Betrokkene >> fills Werknemers >> context >> extern
 
   -- De organisatie is de overkoepeling van Locaties, met medewerkers enzovoort.
   party Organisatie
@@ -107,36 +110,28 @@ domain model://joopringelberg.nl#Route
       property Naam (String)
       aspect Locatie
     
-    -- Dit zijn personen die niet ook een gebruiker van Perspectives zijn.
-    user NietGebruikers
-      aspect Persoon
+    user Medewerkers filledBy sys:PerspectivesSystem$User
+      perspective on Routes
+        props (Voornaam, Achternaam) verbs (Consult)
 
-    -- NOTA BENE. Vul een Werknemers instantie met een NietGebruikers instantie als de betreffende werknemer geen Perspectives gebruiker is.
-    -- Het zou mooi zijn als CreateAndFill daar ook op werkt.
-    -- Alternatief: maak een Action.
-    user Werknemers filledBy Persoon
+    user Vrijwilligers filledBy sys:SocialEnvironment$Persons
 
-    user Vrijwilligers filledBy Persoon
-
-    user Coordinator filledBy Persoon
+    user RegisseurOrganisatie filledBy Medewerkers
       perspective on Locaties
         only (CreateAndFill, Remove)
         props (Naam) verbs (SetPropertyValue)
-      perspective on Werknemers
+      perspective on Medewerkers
         only (CreateAndFill, Remove)
-        -- TODO maak een view voor Persoon en laat Coordinator die geheel onderhouden.
         props (Voornaam, Achternaam)
       perspective on Vrijwilligers
         only (CreateAndFill, Remove)
-        -- TODO maak een view voor Persoon en laat Coordinator die geheel onderhouden.
         props (Voornaam, Achternaam)
-      
 
     context Routes (relational) filledBy Route
 
     context Locaties filledBy Locatie
 
-  -- Een Locatie biedt Bijeenkomsten van een bepaald type.
+  -- Een Locatie biedt Dagdelen van een bepaald type.
   case Locatie
     extern 
       property Naam (String)
@@ -145,12 +140,69 @@ domain model://joopringelberg.nl#Route
     context Organisatie = extern >> fills Locaties >> context
 
     user Verantwoordelijke filledBy Organisatie$Werknemer
-      perspective on Bijeenkomsten
+      perspective on Plekken
+        only (CreateAndFill, Remove)
+        props (Naam) verbs (SetPropertyValue)
+      perspective on extern
+        props (Naam) verbs (Consult)
+        view LocatieView (Consult)
+    
+    thing Plekken filledBy Plek
+
+-- Een Plek is een bepaald type activiteit voor deelnemers.
+  case Plek
+    external
+      property Naam (String)
+      property Omschrijving (String)
+    
+    user Organisator filledBy Medewerker
+      perspective on Dagdelen
         only (CreateAndFill, Remove)
         props (Vanaf, Tot) verbs (SetPropertyValue)
-        props (AantalDeelnemers) verbs (Consult)
+      perspective on Locatie
+        props (Naam) props (Consult)
+        view LocatieView (Consult)
+
     
-    thing Bijeenkomsten filledBy Bijeenkomst
+    context Dagdelen filledBy Dagdeel
+
+    context Locatie (functioneel) = extern >> fills Plekken >> context >> extern
+    
+  -- Een Dagdeel vindt plaats in het kader van een Plek.
+  activity Dagdeel
+    external
+      property Vanaf (DateTime)
+      property Tot (DateTime)
+      property AantalDeelnemers = context >> Deelnames >>= count
+    user Initiator = extern >> fills Dagdelen >> context >> Organisator
+      perspective on Leider
+      perspective on Vrijwilliger
+      perspective on Aanwezigen
+        props (Voornaam, Achternaam) verbs (Consult)
+
+    user Leider filledBy Organisatie$Werknemer
+      -- Nodig voor de action Registreer.
+      perspective on Aanwezigen
+        only (CreateAndFill)
+        props (Voornaam, Achternaam) verbs (Consult)
+
+      -- Let op. Hier ontstaat een hele grote tabel. Liever wil je hier een veld met autocomplete. Dat is een nieuwe widget.
+      perspective on PotentiëleDeelnemers
+        action Registreer
+          bind origin to Aanwezigen
+
+    user Vrijwilligers (relational) filledBy Organisatie$Vrijwilliger
+
+    user Aanwezigen (relational) filledBy Deelnemer
+      perspective on Leider
+      perspective on Vrijwilligers
+      perspective on extern
+      perspective on Locatie
+        props (Naam) verbs (Consult)
+
+    context Locatie = extern >> fills Dagdelen >> context >> extern
+
+    user PotentiëleDeelnemers = Locatie >> Organisatie >> Routes >> Deelnemer
 
   -- Een route is de persoonlijke weg die een deelnemer af wil leggen.
   case Route
@@ -161,13 +213,13 @@ domain model://joopringelberg.nl#Route
       property Achternaam = context >> Deelnemer >> LastName
       property Organisatie = fills Routes >> context >> extern
     
-    user Deelnemer filledBy Persoon
+    user Deelnemer filledBy sys:SocialEnvironment$Persons
       property Noodtelefoon (String)
-      perspective on Bijeenkomsten
+      perspective on Dagdelen
 
-    user Ambassadeur filledBy Organisatie$Werknemer
+    user Ambassadeur filledBy Organisatie$Medewerkers
 
-    user Ondersteuner filledBy Organisatie$Werknemer
+    user Ondersteuner filledBy Organisatie$Medewerkers
 
     thing Financiering filledBy FinancieringsBasis
 
@@ -177,48 +229,8 @@ domain model://joopringelberg.nl#Route
       property Startvraag (String)
       property VraagVerheldering (String)
 
-    context Bijeenkomsten = Deelnemer >> fills Deelname$Deelnemer >> context >> extern >> fills Deelnames >> context >> extern
+    context Dagdelen = Deelnemer >> fills Deelname$Deelnemer >> context >> extern >> fills Deelnames >> context >> extern
 
     thing Evaluaties (relational)
       property Datum (DateTime)
       property Verslag (String)
-
-  -- Een workshop is een bepaald type activiteit voor deelnemers.
-  case Workshop
-  -- Een Bijeenkomst vindt plaats in het kader van een Workshop.
-  activity Bijeenkomst
-    external
-      property Vanaf (DateTime)
-      property Tot (DateTime)
-      property AantalDeelnemers = context >> Deelnames >>= count
-    user Initiator = extern >> fills Bijeenkomsten >> context >> Verantwoordelijke
-      perspective on Leider
-      perspective on Vrijwilliger
-      perspective on Deelnames
-        props (Voornaam, Achternaam, Vraag) verbs (Consult)
-    user Leider filledBy Organisatie$Werknemer
-      -- Nodig voor de action Registreer.
-      perspective on Deelnames >> binding >> context >> Deelnemer
-        only (CreateAndFill)
-      perspective on Deelnames
-        only (CreateAndFill, Remove)
-        props (Voornaam, Achternaam, Vraag) verbs (Consult)
-
-      -- Let op. Hier ontstaat een hele grote tabel. Liever wil je hier een veld met autocomplete. Dat is een nieuwe widget.
-      perspective on PotentiëleDeelnemers
-        action Registreer
-          letA
-            deelname <- create context Deelnames -- bound to ? -- moet erachter
-          in
-            bind origin to Deelnemer in deelname
-    user Vrijwilligers (relational) filledBy Organisatie$Vrijwilliger
-
-    user Bezoeker (relational) filledBy Deelnemer
-      perspective on Leider
-      perspective on Vrijwilligers
-      perspective on extern
-      perspective on Locatie
-
-    context Locatie = extern >> fills Bijeenkomsten >> context 
-
-    user PotentiëleDeelnemers = Locatie >> Organisatie >> Routes >> Deelnemer
