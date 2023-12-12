@@ -38,7 +38,6 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile, DomeinFileRecord, defaultDomeinFileRecord)
-import Perspectives.Identifiers (Namespace)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
@@ -249,7 +248,7 @@ findPerspective subject object = do
 -- insertPerspective :: forall m. Monad m => Perspective -> PhaseTwo' Unit m
 -- insertPerspective perspective@(Perspective{subject, object}) = void $ lift $ modify \r@{perspectives} -> r {perspectives = MAP.insert (Tuple (roletype2string subject) object) perspective perspectives}
 
-withDomeinFile :: forall a. Namespace -> DomeinFile -> PhaseThree a -> PhaseThree a
+withDomeinFile :: forall a. DomeinFileId -> DomeinFile -> PhaseThree a -> PhaseThree a
 withDomeinFile ns df mpa = do
   void $ lift2 $ storeDomeinFileInCache ns df
   r <- mpa

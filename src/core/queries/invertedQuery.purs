@@ -39,8 +39,6 @@ import Data.Map (Map, lookup) as MAP
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -49,6 +47,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
 -- INVERTEDQUERY
@@ -76,11 +75,8 @@ instance showInvertedQuery :: Show InvertedQuery where
 instance eqInvertedQuery :: Eq InvertedQuery where
   eq = genericEq
 
-instance encodeInvertedQuery :: Encode InvertedQuery where
-  encode = genericEncode defaultOptions
-
-instance decodeInvertedQuery :: Decode InvertedQuery where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign InvertedQuery
+derive newtype instance ReadForeign InvertedQuery
 
 instance prettyPrintInvertedQuery :: PrettyPrint InvertedQuery where
   prettyPrint' t (InvertedQuery{description, users, states, statesPerProperty}) =
@@ -226,12 +222,6 @@ newtype UserPropsAndVerbs = UserPropsAndVerbs {user :: RoleType, properties :: R
 
 derive instance genericUserProps :: Generic UserPropsAndVerbs _
 
-instance encodeUserProps :: Encode UserPropsAndVerbs where
-  encode = genericEncode defaultOptions
-
-instance decodeUserProps :: Decode UserPropsAndVerbs where
-  decode = genericDecode defaultOptions
-
 -----------------------------------------------------------
 -- RELEVANTPROPERTIES
 -----------------------------------------------------------
@@ -239,12 +229,6 @@ instance decodeUserProps :: Decode UserPropsAndVerbs where
 data RelevantProperties = All | Properties (Array PropertyType)
 
 derive instance genericRelevantProperties :: Generic RelevantProperties _
-
-instance encodeRelevantProperties :: Encode RelevantProperties where
-  encode = genericEncode defaultOptions
-
-instance decodeRelevantProperties :: Decode RelevantProperties where
-  decode = genericDecode defaultOptions
 
 instance showRelevantProperties :: Show RelevantProperties where
   show = genericShow
@@ -288,8 +272,11 @@ instance prettyPrintQueryWithAKink :: PrettyPrint QueryWithAKink where
 instance eqQueryWithAKink :: Eq QueryWithAKink where
   eq = genericEq
 
-instance encodeQueryWithAKink :: Encode QueryWithAKink where
-  encode = genericEncode defaultOptions
+instance WriteForeign QueryWithAKink where
+  writeImpl (ZQ bw fw) = 
+    writeImpl {constructor: "ZQ", bw, fw}
 
-instance decodeQueryWithAKink :: Decode QueryWithAKink where
-  decode = genericDecode defaultOptions
+instance ReadForeign QueryWithAKink where
+  readImpl f = do 
+    {bw, fw} :: {bw :: Maybe QueryFunctionDescription, fw :: Maybe QueryFunctionDescription} <- read' f
+    pure $ ZQ bw fw

@@ -30,12 +30,11 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
 import Prelude (class Eq, class Ord, class Show, compare, eq)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- OUTGOINGTRANSACTION
@@ -53,11 +52,8 @@ derive instance newtypeOutgoingTransaction :: Newtype OutgoingTransaction _
 instance showOutgoingTransaction :: Show OutgoingTransaction where
   show = genericShow
 
-instance encodeOutgoingTransaction :: Encode OutgoingTransaction where
-  encode = genericEncode defaultOptions
-
-instance decodeTransactie :: Decode OutgoingTransaction where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign OutgoingTransaction
+derive newtype instance ReadForeign OutgoingTransaction
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
 instance revisionOutgoingTransaction :: Revision OutgoingTransaction where

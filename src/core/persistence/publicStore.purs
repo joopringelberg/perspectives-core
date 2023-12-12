@@ -26,18 +26,21 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
+import Foreign (unsafeToForeign)
 import Perspectives.Identifiers (Namespace, modelUri2InstancesStore)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 data PublicStore = NAMESPACESTORE
 
 derive instance  Generic PublicStore _
 instance Show PublicStore where show = genericShow
 derive instance Eq PublicStore
-instance Encode PublicStore where
-  encode = genericEncode defaultOptions
-instance Decode PublicStore where
-  decode = genericDecode defaultOptions
+
+instance WriteForeign PublicStore where
+  writeImpl _ = unsafeToForeign "NAMESPACESTORE"
+
+instance ReadForeign PublicStore where
+  readImpl _ = pure NAMESPACESTORE
 
 -- | Given a public store symbolic name, maps it to an URL.
 -- | The special case NAMESPACESTORE maps a model URI of the form 

@@ -50,7 +50,6 @@ import Prelude
 
 import Control.Coroutine (Producer, transform, ($~))
 import Control.Coroutine.Aff (Emitter, Step(..), produce')
-import Control.Monad.Except (runExcept)
 import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -59,10 +58,9 @@ import Data.Newtype (class Newtype)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn4, runEffectFn1, runEffectFn2, runEffectFn4)
-import Foreign (Foreign, MultipleErrors, readString)
-import Foreign.Class (class Decode, decode)
+import Foreign (Foreign, MultipleErrors)
 import Perspectives.Persistence.Types (MonadPouchdb)
-import Simple.JSON (readJSON')
+import Simple.JSON (class ReadForeign, read, read')
 
 -----------------------------------------------------------
 -- FEEDURL, QUERYPARAMS
@@ -150,12 +148,12 @@ type ChangeProducer f docType = Producer (DecodedCouchdbChange docType) (MonadPo
 type DecodedCouchdbChange docType = Either MultipleErrors (CouchdbChange docType)
 
 -- | A producer of `CouchdbChange`s.
-changeProducer :: forall f docType. Decode docType => EventSource -> ChangeProducer f docType
+changeProducer :: forall f docType. ReadForeign docType => EventSource -> ChangeProducer f docType
 changeProducer eventSource = (foreignValueProducer eventSource) $~ (forever (transform decodeCouchdbChange'))
   where
     -- | The Foreign value is the encoded value of a CouchdbChange instance.
     decodeCouchdbChange' :: Foreign -> DecodedCouchdbChange docType
-    decodeCouchdbChange' f = runExcept (decode f)
+    decodeCouchdbChange' f = read f
 
 -----------------------------------------------------------
 -- DOCPRODUCER
@@ -165,11 +163,11 @@ type DocProducer f docType = Producer (Either MultipleErrors (Tuple String (Mayb
 
 -- | A producer of Maybe documents, returning Nothing if the document is deleted
 -- | or if no documents are included in the changes (because they were not asked).
-docProducer :: forall f docType. Decode docType => EventSource -> DocProducer f docType
+docProducer :: forall f docType. ReadForeign docType => EventSource -> DocProducer f docType
 docProducer eventSource = (foreignValueProducer eventSource) $~ (forever (transform decodeDoc))
   where
     decodeDoc :: Foreign -> Either MultipleErrors (Tuple String (Maybe docType))
-    decodeDoc f = case runExcept $ decode f of
+    decodeDoc f = case read f of
       Left e -> Left e
       Right (CouchdbChange{id, doc}) -> do
         Right $ Tuple id doc
@@ -224,17 +222,17 @@ instance showCouchdbChange :: Show docType => Show (CouchdbChange docType) where
   -- show (CouchdbChange{id}) = "CouchdbChange: " <> id
   show (CouchdbChange{id, deleted}) = "CouchdbChange: " <> id <> " (deleted=" <> show deleted <> ")"
 
-instance decodeCouchdbChange :: Decode docType => Decode (CouchdbChange docType) where
+instance decodeCouchdbChange :: ReadForeign docType => ReadForeign (CouchdbChange docType) where
   -- decode = genericDecode defaultOptions
-  decode f = do
-    s <- readString f
-    inter <- readJSON' s
+  readImpl f = do
+    inter <- read' f
     doc <- case inter.doc of
       Nothing -> pure Nothing
       Just (fdoc :: Foreign) -> case inter.deleted of
-        Nothing -> decode fdoc
-        Just false -> decode fdoc
+        Nothing -> read' fdoc
+        Just false -> read' fdoc
         -- A deleted document is not produced in full. It just has an _id, _rev
         -- and _deleted field.
         otherwise -> pure Nothing
     pure $ CouchdbChange $ inter {doc = doc}
+

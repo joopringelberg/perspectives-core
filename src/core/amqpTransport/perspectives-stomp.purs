@@ -61,11 +61,10 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn2, EffectFn4, EffectFn5, runEffectFn1, runEffectFn2, runEffectFn4, runEffectFn5)
 import Foreign (ForeignError(..), MultipleErrors)
-import Foreign.Class (class Decode)
-import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.Persistence.Types (MonadPouchdb)
+import Simple.JSON (class ReadForeign, readJSON')
 
 -----------------------------------------------------------
 -- STOMPURL
@@ -140,11 +139,11 @@ type StructuredMessage f =
   { body :: f
   , ack :: AcknowledgeFunction}
 
-messageProducer :: forall t f p. Decode t => StompClient -> ConnectAndSubscriptionParameters p -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadPouchdb f) Unit
+messageProducer :: forall t f p. ReadForeign t => StompClient -> ConnectAndSubscriptionParameters p -> Producer (Either MultipleErrors (StructuredMessage t)) (MonadPouchdb f) Unit
 messageProducer stompClient params = (messageProducer' stompClient params) $~ (forever (transform decodeMessage))
   where
     decodeMessage :: Message -> Either MultipleErrors (StructuredMessage t)
-    decodeMessage {body, ack} = case runExcept $ decodeJSON body of
+    decodeMessage {body, ack} = case runExcept $ readJSON' body of
       Left e -> case body of
             "noConnection" -> Left $ singleton $ ForeignError "noConnection"
             "connection" -> Left $ singleton $ ForeignError "connection"

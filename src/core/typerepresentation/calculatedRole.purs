@@ -23,11 +23,9 @@
 module Perspectives.Representation.CalculatedRole where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Foreign.Object (Object)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Data.EncodableMap (EncodableMap, empty)
@@ -39,6 +37,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), RoleKind, ViewType)
 import Prelude (class Eq, class Show, (<<<), (==), ($))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- CALCULATEDROLE
@@ -46,7 +45,7 @@ import Prelude (class Eq, class Show, (<<<), (==), ($))
 newtype CalculatedRole = CalculatedRole CalculatedRoleRecord
 
 type CalculatedRoleRecord =
-  { _id :: CalculatedRoleType
+  { id :: CalculatedRoleType
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
@@ -62,7 +61,7 @@ type CalculatedRoleRecord =
 
 defaultCalculatedRole :: String -> String -> RoleKind -> String -> ArcPosition -> CalculatedRole
 defaultCalculatedRole qname dname kindOfRole context pos = CalculatedRole
-  { _id: CalculatedRoleType qname
+  { id: CalculatedRoleType qname
   , _rev: Nothing
   , displayName: dname
   , kindOfRole: kindOfRole
@@ -85,20 +84,17 @@ instance showCalculatedRole :: Show CalculatedRole where
   show = genericShow
 
 instance eqCalculatedRole :: Eq CalculatedRole where
-  eq (CalculatedRole {_id : id1}) (CalculatedRole {_id : id2}) = id1 == id2
+  eq (CalculatedRole {id : id1}) (CalculatedRole {id : id2}) = id1 == id2
 
 derive instance newtypeCalculatedRole :: Newtype CalculatedRole _
 
-instance encodeCalculatedRole :: Encode CalculatedRole where
-  encode = genericEncode defaultOptions
-
-instance decodeCalculatedRole :: Decode CalculatedRole where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign CalculatedRole
+derive newtype instance WriteForeign CalculatedRole
 
 instance revisionCalculatedRole :: Revision CalculatedRole where
   rev = _._rev <<< unwrap
   changeRevision s = over CalculatedRole (\vr -> vr {_rev = s})
 
 instance identifiableCalculatedRole :: Identifiable CalculatedRole CalculatedRoleType where
-  identifier (CalculatedRole{_id}) = _id
+  identifier (CalculatedRole{id}) = id
   displayName (CalculatedRole{displayName:d}) = d

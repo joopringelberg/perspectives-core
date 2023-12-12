@@ -4,12 +4,12 @@
 exports.roleView = (function (doc)
 {
   // a proxy for being a role:
-  if (doc.contents.universeRoleDelta)
+  if (doc.universeRoleDelta)
   {
-    doc.contents.allTypes.forEach(
+    doc.allTypes.forEach(
       function(typeId)
       {
-        emit(typeId, doc.contents._id);
+        emit(typeId, doc.id);
       }
     );
   }
@@ -19,15 +19,15 @@ exports.roleView = (function (doc)
 
 exports.pendingInvitations = (function(doc)
 {
-  if (doc.contents.properties["model://perspectives.domains#System$Invitation$External$Message"])
+  if (doc.properties["model://perspectives.domains#System$Invitation$External$Message"])
   {
-    emit(doc.contents._id, doc.contents._id);
+    emit(doc.id, doc.id);
   }
 }).toString();
 
 exports.contextView = (function (doc)
 {
-  emit(doc.contents.pspType, doc.contents._id);
+  emit(doc.pspType, doc.id);
 }).toString();
 
 // We want to filter the result on two criteria:
@@ -42,12 +42,12 @@ exports.roleFromContextView = (function (doc)
       return s.substring( s.lastIndexOf("#") + 1 );
     }
    // a proxy for being a role:
-   if (doc.contents.universeRoleDelta)
+   if (doc.universeRoleDelta)
    {
-     doc.contents.allTypes.forEach(
+     doc.allTypes.forEach(
        function(typeId)
        {
-         emit([typeId, takeGuid( doc.contents.context )], doc.contents._id);
+         emit([typeId, takeGuid( doc.context )], doc.id);
        }
      );
    }
@@ -55,15 +55,15 @@ exports.roleFromContextView = (function (doc)
 
 exports.roleSpecialisations = (function( doc )
  {
-   var eroles = doc.contents.enumeratedRoles;
+   var eroles = doc.enumeratedRoles;
    Object.values( eroles ).forEach(
      function(erole)
      {
-      var aspects = erole.contents.roleAspects;
+      var aspects = erole.roleAspects;
       aspects.forEach(
         function( aspectRoleInContext )
         {
-          emit( aspectRoleInContext.role, erole.contents._id );
+          emit( aspectRoleInContext.role, erole.id );
         }
       );
      }
@@ -72,14 +72,14 @@ exports.roleSpecialisations = (function( doc )
 
  exports.contextSpecialisations = (function( doc )
  {
-   Object.values( doc.contents.contexts ).forEach(
+   Object.values( doc.contexts ).forEach(
      function(context)
      {
-      var aspects = context.contents.contextAspects;
+      var aspects = context.contextAspects;
       aspects.forEach(
         function( aspectContext )
         {
-          emit( aspectContext, context.contents._id );
+          emit( aspectContext, context.id );
         }
       );
      }
@@ -89,9 +89,9 @@ exports.roleSpecialisations = (function( doc )
  exports.credentials = (function (doc)
  {
     // Only PerspectRol instances have an isMe field. roleAliases
-    if (doc.contents.isMe && doc.contents.allTypes.find( t => t == "model://perspectives.domains#System$WithCredentials"))
+    if (doc.isMe && doc.allTypes.find( t => t == "model://perspectives.domains#System$WithCredentials"))
     {
-      emit(doc.contents._id, doc.contents._id);
+      emit(doc.id, doc.id);
     }
  }).toString();
 
@@ -99,8 +99,8 @@ exports.roleSpecialisations = (function( doc )
 exports.filledRoles = (function(doc)
   {
     // a proxy for being a role:
-    if (doc.contents.universeRoleDelta)
+    if (doc.universeRoleDelta)
     {
-      emit(doc.contents.binding, doc.contents._id);
+      emit(doc.binding, doc.id);
     }
   }).toString();

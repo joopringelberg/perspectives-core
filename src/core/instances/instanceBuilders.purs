@@ -190,7 +190,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId (RolSeria
       contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId) 
       rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
       -- SYNCHRONISATION by UniverseRoleDelta
-      (PerspectRol r@{_id:roleInstance}) <- case mRoleId of
+      (PerspectRol r@{id:roleInstance}) <- case mRoleId of
         Nothing -> do
           rolInstanceId <- createResourceIdentifier (RType roleType)
           constructEmptyRole contextInstanceId roleType (getNextRolIndex rolInstances) (RoleInstance rolInstanceId)

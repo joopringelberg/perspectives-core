@@ -27,30 +27,25 @@ import Data.Either (Either(..))
 import Data.String.Regex (Regex, flags, regex, source)
 import Data.String.Regex.Flags (RegexFlags(..), RegexFlagsRec)
 import Foreign (ForeignError(..), fail)
-import Foreign.Class (class Decode, class Encode, encode, decode)
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 newtype RegExP = RegExP Regex
 instance showRegExP :: Show RegExP where show (RegExP r) = show r
 instance eqRegExP :: Eq RegExP where eq (RegExP r1) (RegExP r2) = eq (show r1) (show r2)
 instance ordRegExP :: Ord RegExP where compare (RegExP r1) (RegExP r2) = compare (show r1) (show r2)
-instance encodeRegExP :: Encode RegExP where
-  encode (RegExP r) = let
+
+type RegExPRecord = {source :: String, flags :: RegexFlagsRec}
+
+instance writeForeignRegExp :: WriteForeign RegExP where
+  writeImpl (RegExP r) = let
     (RegexFlags flagsRecord) = flags r
     in
     writeImpl ({ source: (source r), flags: flagsRecord} :: RegExPRecord)
-instance decodeRegExP :: Decode RegExP where
-  decode f = do
+
+instance readForeignRegExp :: ReadForeign RegExP where
+  readImpl f = do
     ({source, flags} :: RegExPRecord) <- read' f
     parseResult <- pure (regex source (RegexFlags flags))
     case parseResult of
       Left e -> fail (ForeignError ("could not construct regex from source '" <> source <> "' and flags '" <> show flags <> "'. "))
       Right r -> pure $ RegExP r
-
-type RegExPRecord = {source :: String, flags :: RegexFlagsRec}
-
-instance writeForeignRegExp :: WriteForeign RegExP where
-  writeImpl = encode
-
-instance readForeignRegExp :: ReadForeign RegExP where
-  readImpl = decode

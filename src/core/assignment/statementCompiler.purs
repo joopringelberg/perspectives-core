@@ -408,7 +408,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           else do
             -- EnumeratedRoles in the model with (end)matching name.
             (enumeratedRoles :: Object EnumeratedRole) <- getsDF _.enumeratedRoles
-            (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{_id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
+            (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
             -- EnumeratedRoles that can bind `bindings`. Notice that we must apply restrictions found on Aspects as well.
             (candidates :: Array EnumeratedRole) <- (filterA 
               (lift <<< lift <<< (roleAspectsADT >=> bindingOfADT >=> greaterThanOrEqualTo bindings))
@@ -417,7 +417,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
               Nothing -> if null nameMatches
                 then throwError $ UnknownRole start ident
                 else throwError $ LocalRoleDoesNotBind start end ident bindings
-              (Just (EnumeratedRole {_id:candidate})) | length candidates == 1 -> pure $ Just candidate
+              (Just (EnumeratedRole {id:candidate})) | length candidates == 1 -> pure $ Just candidate
               otherwise -> throwError $ NotUniquelyIdentifying start ident (identifier_ <$> candidates)
 
         -- Compiles the Step and inverts it as well.

@@ -37,8 +37,6 @@ import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Foreign.Class (class Decode, class Encode, encode, decode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
@@ -51,6 +49,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Semigroup, class Show, bind, pure, ($), (&&), (<>), (>))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -96,16 +95,12 @@ instance showTransactie :: Show Transaction where
   show = genericShow
 
 -- Only used in Tests
-instance encodeTransactie :: Encode Transaction where
-  encode (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = encode (Transaction'{author, timeStamp, deltas, changedDomeinFiles})
+instance WriteForeign Transaction where
+  writeImpl (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = writeImpl {author, timeStamp, deltas, changedDomeinFiles}
 
-instance encodeTransactie' :: Encode Transaction' where
-  encode = genericEncode defaultOptions
-
--- Only used in Tests
-instance decodeTransactie :: Decode Transaction where
-  decode f = do
-    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- decode f
+instance ReadForeign Transaction where
+  readImpl f = do
+    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- read' f
     pure $ Transaction
       { author
       , timeStamp
@@ -124,8 +119,7 @@ instance decodeTransactie :: Decode Transaction where
       , userRoleBottoms: empty
       }
 
-instance decodeTransactie' :: Decode Transaction' where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign Transaction'
 
 instance semiGroupTransactie :: Semigroup Transaction where
   append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms})

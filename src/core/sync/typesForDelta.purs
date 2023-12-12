@@ -30,8 +30,7 @@ import Data.Map (Map)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign (unsafeToForeign)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl(..))
@@ -39,6 +38,7 @@ import Perspectives.Instances.ObjectGetters (context', publicUrl)
 import Perspectives.Persistent (getPerspectContext, saveEntiteit)
 import Perspectives.Query.UnsafeCompiler (getPublicUrl)
 import Perspectives.Representation.Class.Cacheable (cacheEntity)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType(..), RoleType)
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, stripNonPublicIdentifiers)
@@ -47,6 +47,7 @@ import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Transaction (StorageScheme)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Ord, class Show, Unit, bind, discard, map, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- GENERIC
@@ -75,10 +76,8 @@ instance showUniverseContextDelta :: Show UniverseContextDelta where
 instance eqUniverseContextDelta :: Eq UniverseContextDelta where
   eq (UniverseContextDelta {id: i1, contextType: c1, deltaType: d1}) (UniverseContextDelta {id: i2, contextType: c2, deltaType: d2}) = i1 == i2 && c1 == c2 && d1 == d2
 
-instance encodeUniverseContextDelta :: Encode UniverseContextDelta where
-  encode = genericEncode defaultOptions
-instance decodeUniverseContextDelta :: Decode UniverseContextDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign UniverseContextDelta
+derive newtype instance ReadForeign UniverseContextDelta
 
 derive instance Ord UniverseContextDelta
 
@@ -106,10 +105,8 @@ instance showUniverseContextDeltaType :: Show UniverseContextDeltaType where
 instance eqUniverseContextDeltaType :: Eq UniverseContextDeltaType where
   eq = genericEq
 
-instance encodeUniverseContextDeltaType :: Encode UniverseContextDeltaType where
-  encode = genericEncode defaultOptions
-instance decodeUniverseContextDeltaType :: Decode UniverseContextDeltaType where
-  decode = genericDecode defaultOptions
+instance WriteForeign UniverseContextDeltaType where writeImpl = unsafeToForeign <<< show
+instance ReadForeign UniverseContextDeltaType where readImpl = enumReadForeign
 
 instance prettyPrintUniverseContextDelta :: PrettyPrint UniverseContextDelta where
   prettyPrint' t (UniverseContextDelta r) = "UniverseContextDelta " <> prettyPrint' (t <> "  ") r
@@ -145,10 +142,8 @@ instance showUniverseRoleDelta :: Show UniverseRoleDelta where
 instance eqUniverseRoleDelta :: Eq UniverseRoleDelta where
   eq (UniverseRoleDelta {id:i1, roleType:r1, roleInstances:ri1, deltaType:d1}) (UniverseRoleDelta {id:i2, roleType:r2, roleInstances:ri2, deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && d1 == d2
 
-instance encodeUniverseRoleDelta :: Encode UniverseRoleDelta where
-  encode = genericEncode defaultOptions
-instance decodeUniverseRoleDelta :: Decode UniverseRoleDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign UniverseRoleDelta
+derive newtype instance ReadForeign UniverseRoleDelta
 
 instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
   prettyPrint' t (UniverseRoleDelta r) = "UniverseRoleDelta " <> prettyPrint' (t <> "  ") r
@@ -182,10 +177,9 @@ instance showUniverseRoleDeltaType :: Show UniverseRoleDeltaType where
 instance eqUniverseRoleDeltaType :: Eq UniverseRoleDeltaType where
   eq = genericEq
 
-instance encodeUniverseRoleDeltaType :: Encode UniverseRoleDeltaType where
-  encode = genericEncode defaultOptions
-instance decodeUniverseRoleDeltaType :: Decode UniverseRoleDeltaType where
-  decode = genericDecode defaultOptions
+instance WriteForeign UniverseRoleDeltaType where writeImpl = unsafeToForeign <<< show
+instance ReadForeign UniverseRoleDeltaType where readImpl = enumReadForeign
+
 instance prettyPrintUniverseRoleDeltaType :: PrettyPrint UniverseRoleDeltaType where
   prettyPrint' t = show
 
@@ -212,10 +206,8 @@ instance showContextDelta :: Show ContextDelta where
 instance eqContextDelta :: Eq ContextDelta where
   eq (ContextDelta {contextInstance:i1, roleType:r1, roleInstance:ri1, {-destinationContext: dc1,-} deltaType:d1}) (ContextDelta {contextInstance:i2, roleType:r2, roleInstance:ri2, {-destinationContext: dc2,-} deltaType:d2}) = i1 == i2 && r1 == r2 && ri1 == ri2 && {-dc1 == dc2 &&-} d1 == d2
 
-instance encodeContextDelta :: Encode ContextDelta where
-  encode = genericEncode defaultOptions
-instance decodeContextDelta :: Decode ContextDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign ContextDelta
+derive newtype instance ReadForeign ContextDelta
 
 instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
   prettyPrint' t (ContextDelta r) = "ContextDelta " <> prettyPrint' (t <> "  ") r
@@ -262,10 +254,9 @@ instance showContextDeltaType :: Show ContextDeltaType where
 instance eqContextDeltaType :: Eq ContextDeltaType where
   eq = genericEq
 
-instance encodeContextDeltaType :: Encode ContextDeltaType where
-  encode = genericEncode defaultOptions
-instance decodeContextDeltaType :: Decode ContextDeltaType where
-  decode = genericDecode defaultOptions
+instance WriteForeign ContextDeltaType where writeImpl = unsafeToForeign <<< show
+instance ReadForeign ContextDeltaType where readImpl = enumReadForeign
+
 instance prettyPrintContextDeltaType :: PrettyPrint ContextDeltaType where
   prettyPrint' t = show
 
@@ -294,10 +285,8 @@ instance showRoleDelta :: Show RoleBindingDelta where
 instance eqRoleDelta :: Eq RoleBindingDelta where
   eq (RoleBindingDelta {filled:i1, filler:b1, oldFiller:ob1, deltaType:d1}) (RoleBindingDelta {filled:i2, filler:b2, oldFiller:ob2, deltaType:d2}) = i1 == i2 && b1 == b2 && ob1 == ob2 && d1 == d2
 
-instance encodeRoleDelta :: Encode RoleBindingDelta where
-  encode = genericEncode defaultOptions
-instance decodeRoleDelta :: Decode RoleBindingDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign RoleBindingDelta
+derive newtype instance ReadForeign RoleBindingDelta
 
 instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
   prettyPrint' t (RoleBindingDelta r) = "RoleBindingDelta " <> prettyPrint' (t <> "  ") r
@@ -342,12 +331,11 @@ instance showRoleBindingDeltaType :: Show RoleBindingDeltaType where
 instance eqRoleBindingDeltaType :: Eq RoleBindingDeltaType where
   eq = genericEq
 
-instance encodeRoleBindingDeltaType :: Encode RoleBindingDeltaType where
-  encode = genericEncode defaultOptions
-instance decodeRoleBindingDeltaType :: Decode RoleBindingDeltaType where
-  decode = genericDecode defaultOptions
 instance prettyPrintRoleBindingDeltaType :: PrettyPrint RoleBindingDeltaType where
   prettyPrint' t = show
+
+instance WriteForeign RoleBindingDeltaType where writeImpl = unsafeToForeign <<< show
+instance ReadForeign RoleBindingDeltaType where readImpl = enumReadForeign
 
 derive instance Ord RoleBindingDeltaType
 
@@ -371,10 +359,8 @@ instance showPropertyDelta :: Show RolePropertyDelta where
 instance eqPropertyDelta :: Eq RolePropertyDelta where
   eq (RolePropertyDelta {id:i1, property:p1, values:v1, deltaType:d1}) (RolePropertyDelta {id:i2, property:p2, values:v2, deltaType:d2}) = i1 == i2 && p1 == p2 && v1 == v2 && d1 == d2
 
-instance encodePropertyDelta :: Encode RolePropertyDelta where
-  encode = genericEncode defaultOptions
-instance decodePropertyDelta :: Decode RolePropertyDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign RolePropertyDelta
+derive newtype instance ReadForeign RolePropertyDelta
 
 instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
   prettyPrint' t (RolePropertyDelta r) = "RolePropertyDelta " <> prettyPrint' (t <> "  ") r
@@ -405,10 +391,8 @@ derive instance eqRolePropertyDeltaType :: Eq RolePropertyDeltaType
 instance showRolePropertyDeltaType :: Show RolePropertyDeltaType where
   show = genericShow
 
-instance encodeRolePropertyDeltaType :: Encode RolePropertyDeltaType where
-  encode = genericEncode defaultOptions
-instance decodeRolePropertyDeltaType :: Decode RolePropertyDeltaType where
-  decode = genericDecode defaultOptions
+instance WriteForeign RolePropertyDeltaType where writeImpl = unsafeToForeign <<< show
+instance ReadForeign RolePropertyDeltaType where readImpl = enumReadForeign
 
 instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType where
   prettyPrint' t = show

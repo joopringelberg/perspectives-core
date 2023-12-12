@@ -61,11 +61,11 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<*), (<$>), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
-import Text.Parsing.Parser.String (char, satisfy)
+import Text.Parsing.Parser.String (char, eof, satisfy)
 
 -- | SEMI-BNF NOTATION
 -- | We use a syntax to describe the grammar of the Perspectives Language that is derived from BNF:
@@ -110,7 +110,8 @@ contextE = withPos do
   -- | ook hier geldt: als op de volgende regel en geïndenteerd, dan moet de deelparser slagen en het hele blok consumeren.
   isIndented' <- isIndented
   isNextLine' <- isNextLine
-  contextParts <- if isIndented' && isNextLine'
+  isEndOfFile <- isEof
+  contextParts <- if isIndented' && isNextLine' && not isEndOfFile
     then inSubContext uname
       (getCurrentContext >>= \subContext ->
         withArcParserState (ContextState subContext Nothing)
@@ -165,6 +166,9 @@ contextE = withPos do
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos, public: mpublicStore}
 
   where
+
+    isEof :: IP Boolean
+    isEof = eof *> pure true <|> pure false
 
     -- Remove the Calculation, a Screen (if any)
     enumeratedPublicDuplicate :: ContextPart -> ContextPart

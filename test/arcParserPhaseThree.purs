@@ -38,7 +38,7 @@ import Perspectives.Representation.Perspective (StateSpec(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), propertytype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), propertytype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..))
 import Perspectives.Representation.View (View(..))
 import Perspectives.Types.ObjectGetters (lookForUnqualifiedPropertyType_)
@@ -50,9 +50,9 @@ import Text.Parsing.Parser (ParseError)
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
-  void $ storeDomeinFileInCache ns df
+  void $ storeDomeinFileInCache (DomeinFileId ns) df
   r <- mpa
-  removeDomeinFileFromCache ns
+  removeDomeinFileFromCache (DomeinFileId ns)
   pure r
 
 theSuite :: Free TestF Unit

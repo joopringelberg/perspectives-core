@@ -258,7 +258,7 @@ checkSynchronization = do
   -- For all EnumeratedProperties, project the UserGraph and construct its subGraphs.
   -- Warn the modeller if there are more than one.
   {contexts, enumeratedRoles} <- lift $ gets _.dfr
-  for_ enumeratedRoles \r@(EnumeratedRole{_id:roleId, properties}) -> do
+  for_ enumeratedRoles \r@(EnumeratedRole{id:roleId, properties}) -> do
     allLocalProps <- lift $ lift $ allLocallyRepresentedProperties (ST roleId)
     for_ allLocalProps \propType -> case propType of
       ENP propId -> do
@@ -268,7 +268,7 @@ checkSynchronization = do
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (PropertySynchronizationIncomplete propId source destinations)
       otherwise -> pure unit
     pure unit
-  for_ contexts \c@(Context{_id, roleInvertedQueries}) -> do
+  for_ contexts \c@(Context{id, roleInvertedQueries}) -> do
     -- All roles, including Aspect roles, but without the External Role.
     allLocalRoles <- lift $ lift $ allRoles (contextADT c)
     for_ (cons (ENR $ externalRole c) allLocalRoles) \roleType -> case roleType of
@@ -279,7 +279,7 @@ checkSynchronization = do
           none | null none -> pure unit
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleSynchronizationIncomplete roleId source destinations)
         -- CHECK INVERTED QUERIES FOR 'BINDING' AND 'BINDER' OPERATORS
-        projectedGraph' <- unsafePartial projectForRoleBindingDeltas roleId _id
+        projectedGraph' <- unsafePartial projectForRoleBindingDeltas roleId id
         case checkAllStartpoints projectedGraph' of
           none | null none -> pure unit
           failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleBindingSynchronizationIncomplete roleId source destinations)

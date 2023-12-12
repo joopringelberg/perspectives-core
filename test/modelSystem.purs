@@ -77,9 +77,9 @@ theSuite = suiteSkip  "Model:System" do
         binderContextType <- pure $ ContextType "model:System$PerspectivesSystem"
         roleIds <- runMonadPerspectivesTransaction $ createAndAddRoleInstance binder "model:User$test"
           (RolSerialization{ id: Nothing, properties: PropertySerialization empty, binding: Just descriptionId})
-        role@(PerspectRol{_id}) <- getPerspectRol (unsafePartial $ fromJust $ head (catMaybes roleIds))
+        role@(PerspectRol{id}) <- getPerspectRol (unsafePartial $ fromJust $ head (catMaybes roleIds))
         b <- getPerspectRol (RoleInstance descriptionId)
-        void $ (addRol_gevuldeRollen b binderContextType binder _id) >>= cacheEntity (RoleInstance descriptionId)
+        void $ (addRol_gevuldeRollen b binderContextType binder id) >>= cacheEntity (RoleInstance descriptionId)
         void $ saveEntiteit (RoleInstance descriptionId)
 
         -- Check if model:TestBotActie is in perspect_models

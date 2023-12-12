@@ -24,14 +24,16 @@ module Perspectives.Repetition where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds(..))
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
+import Foreign (F)
+import Partial.Unsafe (unsafePartial)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -- | Types Duration and DurationComponent have been copied from module Data.Interval.Duration,
--- | because they need to be instances of Encode and Decode.
 data Duration = 
   Millisecond Number 
   | Second Number 
@@ -42,8 +44,23 @@ data Duration =
 derive instance genericDuration :: Generic Duration _
 instance showDuration :: Show Duration where show = genericShow
 instance eqDuration :: Eq Duration where eq = genericEq
-instance encodeDuration :: Encode Duration where encode = genericEncode defaultOptions
-instance decodeDuration :: Decode Duration where decode = genericDecode defaultOptions
+
+instance WriteForeign Duration where
+  writeImpl (Millisecond n) = writeImpl {constructor: "Millisecond", n}
+  writeImpl (Second n) = writeImpl {constructor: "Second", n}
+  writeImpl (Minute n) = writeImpl {constructor: "Minute", n}
+  writeImpl (Hour n) = writeImpl {constructor: "Hour", n}
+  writeImpl (Day n) = writeImpl {constructor: "Day", n}
+
+instance ReadForeign Duration where
+  readImpl f = do 
+    {constructor, n} :: {constructor :: String, n :: Number} <- read' f
+    unsafePartial case constructor of 
+      "Millisecond" -> pure $ Millisecond n
+      "Second" -> pure $ Second n
+      "Minute" -> pure $ Minute n
+      "Hour" -> pure $ Hour n
+      "Day" -> pure $ Day n
 
 data Repeater = 
   Never
@@ -53,8 +70,18 @@ data Repeater =
 derive instance genericRepeater :: Generic Repeater _
 instance showRepeater :: Show Repeater where show = genericShow
 instance eqRepeater :: Eq Repeater where eq = genericEq
-instance encodeRepeater :: Encode Repeater where encode = genericEncode defaultOptions
-instance decodeRepeater :: Decode Repeater where decode = genericDecode defaultOptions
+
+instance WriteForeign Repeater where
+  writeImpl Never = writeImpl "Never"
+  writeImpl (Forever d) = writeImpl {forever: d}
+  writeImpl (RepeatFor i d) = writeImpl {i, d}
+
+instance ReadForeign Repeater where
+  readImpl f = const Never <$> ((read' f) :: F String)
+    <|>
+    Forever <<< _.forever <$> ((read' f) :: F {forever :: Duration})
+    <|>
+    (\{i, d} -> RepeatFor i d) <$> ((read' f) :: F {i :: Int, d :: Duration})
 
 fromDuration :: Duration -> Milliseconds
 fromDuration (Millisecond n) = Milliseconds n

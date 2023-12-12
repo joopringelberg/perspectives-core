@@ -34,7 +34,6 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, empty, insert, lookup)
 import Foreign.Object (filter) as OBJ
 import Partial.Unsafe (unsafePartial)
@@ -63,6 +62,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.Types.ObjectGetters (isPublicRole)
 import Prelude (Unit, bind, discard, eq, flip, map, not, notEq, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Simple.JSON (writeJSON)
 
 -- | Splits the transaction in versions specific for each peer and sends them.
 -- | If a public roles are involved, will return their TransactionForPeer instances.
@@ -115,7 +115,7 @@ sendTransactieToUserUsingAMQP userId t = do
       case mstompClient of
         Just stompClient -> do
           saveTransactionInOutgoingPost userId messageId t
-          liftEffect $ sendToTopic stompClient userId messageId (encodeJSON t)
+          liftEffect $ sendToTopic stompClient userId messageId (writeJSON t)
         otherwise -> saveTransactionInOutgoingPost userId messageId t
     else saveTransactionInOutgoingPost userId messageId t
 

@@ -28,8 +28,6 @@ import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
 import Data.Show.Generic (genericShow)
 import Foreign (unsafeToForeign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -48,14 +46,6 @@ instance showThreeValuedLogic :: Show ThreeValuedLogic where
 
 instance eqThreeValuedLogic :: Eq ThreeValuedLogic where
   eq = genericEq
-
-instance encodeThreeValuedLogic :: Encode ThreeValuedLogic where
-  encode = genericEncode defaultOptions
-  -- encode = write
-
-instance decodeThreeValuedLogic :: Decode ThreeValuedLogic where
-  decode = genericDecode defaultOptions
-  -- decode = readImpl
 
 derive instance ordThreeValuedLogic :: Ord ThreeValuedLogic
 

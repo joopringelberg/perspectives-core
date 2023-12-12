@@ -24,7 +24,8 @@ module Perspectives.Representation.InstanceIdentifiers where
 
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
-import Foreign.Class (class Decode, class Encode)
+
+
 import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, compare, show, (<>), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
@@ -32,8 +33,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 newtype ContextInstance = ContextInstance String
 derive instance newtypeContextInstance :: Newtype ContextInstance _
 derive instance genericRepContextInstance :: Generic ContextInstance _
-derive newtype instance encodeContextInstance :: Encode ContextInstance
-derive newtype instance decodeContextInstance :: Decode ContextInstance
+
 derive newtype instance writeForeignContextInstance :: WriteForeign ContextInstance
 derive newtype instance readForeignContextInstance :: ReadForeign ContextInstance
 instance showContextInstance :: Show ContextInstance where
@@ -49,8 +49,7 @@ instance prettyPrintContextInstance :: PrettyPrint ContextInstance where
 newtype RoleInstance = RoleInstance String
 derive instance newtypeRoleInstance :: Newtype RoleInstance _
 derive instance genericRepRoleInstance :: Generic RoleInstance _
-derive newtype instance encodeRoleInstance :: Encode RoleInstance
-derive newtype instance decodeRoleInstance :: Decode RoleInstance
+
 derive newtype instance writeForeignRoleInstance :: WriteForeign RoleInstance
 derive newtype instance readForeignRoleInstance :: ReadForeign RoleInstance
 instance showRoleInstance :: Show RoleInstance where
@@ -65,8 +64,9 @@ instance prettyPrintRoleInstance :: PrettyPrint RoleInstance where
 newtype Value = Value String
 derive instance newtypeValue :: Newtype Value _
 derive instance genericRepValue :: Generic Value _
-derive newtype instance encodeValue :: Encode Value
-derive newtype instance decodeValue :: Decode Value
+
+derive newtype instance WriteForeign Value
+derive newtype instance ReadForeign Value
 instance showValue :: Show Value where
   show x = show (unwrap x)
 instance eqValue :: Eq Value where

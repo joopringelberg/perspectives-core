@@ -77,20 +77,20 @@ recompileModelsAtUrl modelsDb manifestsDb = do
     _ -> pure unit
   where
     recompileModelAtUrl :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-    recompileModelAtUrl model@(UninterpretedDomeinFile{_id, _rev, contents}) =
+    recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _rev, arc}) =
       do
-        log ("Recompiling " <> contents._id)
-        r <- lift $ loadAndCompileArcFile_ contents.arc
+        log ("Recompiling " <> namespace)
+        r <- lift $ loadAndCompileArcFile_ arc
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right df@(DomeinFile dfr) -> lift $ lift do
-            log $  "Recompiled '" <> contents._id <> "' succesfully (" <> _id <> ")!"
+            log $  "Recompiled '" <> namespace <> "' succesfully (" <> namespace <> ")!"
             -- storeDomeinFileInCouchdbPreservingAttachments df
-            mattachment <- getAttachment modelsDb _id "screens.js"
-            _rev' <- addDocument modelsDb (setRevision _rev df) _id
+            mattachment <- getAttachment modelsDb namespace "screens.js"
+            _rev' <- addDocument modelsDb (setRevision _rev df) namespace
             case mattachment of 
               Nothing -> pure unit
-              Just attachment -> void $ addAttachment modelsDb _id _rev' "screens.js" attachment (MediaType "text/exmascript")
+              Just attachment -> void $ addAttachment modelsDb namespace _rev' "screens.js" attachment (MediaType "text/exmascript")
         pure model
     getVersionedDomeinFileName :: String -> MonadPerspectivesTransaction (Maybe String)
     getVersionedDomeinFileName rid = do 
@@ -101,15 +101,17 @@ recompileModelsAtUrl modelsDb manifestsDb = do
 
 
 recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-recompileModel model@(UninterpretedDomeinFile{_rev, contents}) =
+recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
   do
-    log ("Recompiling " <> contents._id)
-    r <- lift $ loadAndCompileArcFile_ contents.arc
+    log ("Recompiling " <> namespace)
+    r <- lift $ loadAndCompileArcFile_ arc
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
       Right df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) -> lift $ lift do
-        log $  "Recompiled '" <> contents._id <> "' succesfully!"
-        storeDomeinFileInCouchdbPreservingAttachments df
+        log $  "Recompiled '" <> namespace <> "' succesfully!"
+        -- We have to add the _id here manually.
+        df' <- pure $ DomeinFile drf { _id = _id}
+        storeDomeinFileInCouchdbPreservingAttachments df'
 
         -- Distribute the SeparateInvertedQueries over the other domains.
         forWithIndex_ invertedQueriesInOtherDomains
@@ -154,8 +156,8 @@ executeInTopologicalOrder :: forall m. MonadThrow MultiplePerspectivesErrors m =
   (UninterpretedDomeinFile -> m UninterpretedDomeinFile) ->
   m Boolean
 executeInTopologicalOrder toSort action = TOP.executeInTopologicalOrder
-  (\(UninterpretedDomeinFile{contents}) -> contents._id)
-  (\(UninterpretedDomeinFile{contents}) -> difference contents.referredModels [contents._id])
+  (\(UninterpretedDomeinFile{namespace}) -> namespace)
+  (\(UninterpretedDomeinFile{namespace, referredModels}) -> difference referredModels [namespace])
   toSort
   action
     >>=
@@ -164,11 +166,9 @@ executeInTopologicalOrder toSort action = TOP.executeInTopologicalOrder
 newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   { _rev :: String
   , _id :: String
-  , contents ::
-    { referredModels :: Array String
-    , arc :: String
-    , _id :: String
-    }
+  , namespace :: String
+  , referredModels :: Array String
+  , arc :: String
   }
 
 instance readForeignUninterpretedDomeinFile :: ReadForeign UninterpretedDomeinFile where
@@ -176,7 +176,7 @@ instance readForeignUninterpretedDomeinFile :: ReadForeign UninterpretedDomeinFi
 
 derive instance genericUninterpretedDomeinFile :: Generic UninterpretedDomeinFile _
 instance showUninterpretedDomeinFiles :: Show UninterpretedDomeinFile where
-  show (UninterpretedDomeinFile {contents}) = contents._id <> " <- " <> show contents.referredModels
+  show (UninterpretedDomeinFile {namespace, referredModels}) = namespace <> " <- " <> show referredModels
 
 instance Eq UninterpretedDomeinFile where
-  eq (UninterpretedDomeinFile {contents:c1}) (UninterpretedDomeinFile {contents:c2}) = c1._id == c2._id
+  eq (UninterpretedDomeinFile {namespace:id1}) (UninterpretedDomeinFile {namespace:id2}) = id1 == id2

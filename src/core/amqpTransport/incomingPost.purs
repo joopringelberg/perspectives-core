@@ -34,7 +34,6 @@ import Data.Traversable (traverse)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (ForeignError(..), MultipleErrors)
-import Foreign.Generic (encodeJSON)
 import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClient, messageProducer, sendToTopic)
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
@@ -53,6 +52,7 @@ import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
 import Prelude (Unit, bind, pure, show, unit, void, ($), (>=>), (>>=), discard, (*>), (<>), (>>>), map, (<$>), (<<<))
+import Simple.JSON (writeJSON)
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
@@ -116,7 +116,7 @@ incomingPost = do
         Just stompClient -> do
           (transactions :: Array OutgoingTransaction) <- sort <<< nub <$> traverse (getDocument_ postDB) waitingTransactions
           -- We do not delete here; only when we receive the receipt.
-          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (encodeJSON transaction)
+          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (writeJSON transaction)
         _ -> pure unit
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.

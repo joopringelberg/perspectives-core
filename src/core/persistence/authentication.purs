@@ -33,20 +33,18 @@ import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (catchJust)
-import Data.Argonaut (fromObject)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.Tuple (Tuple(..))
 import Effect.Aff (Error, error, throwError)
 import Effect.Aff.Class (liftAff)
-import Foreign.Object (fromFoldable, insert, lookup)
+import Foreign.Object (insert, lookup)
 import Perspectives.Couchdb (onAccepted_)
 import Perspectives.ErrorLogging (logError)
 import Perspectives.Identifiers (url2Authority)
 import Perspectives.Persistence.Types (Credential(..), MonadPouchdb, Password, Url, UserName)
 import Perspectives.ResourceIdentifiers (databaseLocation)
-import Unsafe.Coerce (unsafeCoerce)
+import Simple.JSON (writeJSON)
 
 -----------------------------------------------------------
 -- AUTHENTICATION
@@ -81,8 +79,11 @@ requestAuthentication authSource = do
       case mcredential of 
         Just (Credential username password) -> do
           (rq :: (AJ.Request String)) <- defaultPerspectRequest
-          res <- liftAff $ AJ.request $ rq {method = Left POST, url = (authority <> "_session"), content = Just $ RequestBody.json 
-            (fromObject (fromFoldable [Tuple "name" (unsafeCoerce username), Tuple "password" (unsafeCoerce password)]))}
+          res <- liftAff $ AJ.request $ rq 
+            { method = Left POST
+            , url = (authority <> "_session")
+            , content = Just $ RequestBody.string (writeJSON {name: username, password: password})
+            }
           onAccepted_
             (\response _ -> throwError (error $ "Failure in requestAuthentication. " <> "HTTP statuscode " <> show response.status))
             res

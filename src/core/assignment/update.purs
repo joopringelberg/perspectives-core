@@ -45,7 +45,6 @@ import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
-import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
@@ -53,8 +52,7 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Generic (Foreign, encodeJSON)
-import Foreign.Generic.Class (class GenericEncode)
+import Foreign (Foreign)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
@@ -90,6 +88,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, indexedContextName, indexedRoleName, isUnlinked_, propertyAliases)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
+import Simple.JSON (class WriteForeign, writeJSON)
 
 -----------------------------------------------------------
 -- UPDATE A CONTEXT (SET THE PREFERRED USER ROLE TYPE)
@@ -147,7 +146,7 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
 
   where
     f :: PerspectRol -> PerspectContext -> Boolean -> MonadPerspectivesTransaction Unit
-    f (PerspectRol r@{_id, universeRoleDelta, isMe}) pe unlinked = do
+    f (PerspectRol r@{id, universeRoleDelta, isMe}) pe unlinked = do
       changedContext <- if not unlinked
         -- Add the new instance only when the role type is enumerated in the context; hence not for unlinked role types.
         then lift (modifyContext_rolInContext pe rolName (flip snoc roleId))
@@ -176,18 +175,18 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
         Just d -> pure d
         _ -> pure $ SignedDelta
           { author: stripNonPublicIdentifiers author
-          , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ ContextDelta
+          , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ ContextDelta
             { contextInstance : contextId
             , contextType: context_pspType pe
             , roleType: rolName
             , deltaType: AddRoleInstancesToContext
-            , roleInstance: _id
+            , roleInstance: id
             , destinationContext: Nothing
             , destinationContextType: Nothing
             , subject
             } }
       addDelta $ DeltaInTransaction {users, delta}
-      lift $ cacheAndSave _id $ PerspectRol r { contextDelta = delta }
+      lift $ cacheAndSave id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
       (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
@@ -218,7 +217,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
           { users
           , delta: SignedDelta
             { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextId
               , contextType: context_pspType pe
               , roleInstances: (SerializableNonEmptyArray rolInstances)
@@ -341,7 +340,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       }
                     pure $ SignedDelta
                       { author: stripNonPublicIdentifiers author
-                      , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+                      , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
@@ -417,7 +416,7 @@ removeProperty rids propertyName values = case ARR.head rids of
             author <- getAuthor
             signedDelta <- pure $ SignedDelta
               { author: stripNonPublicIdentifiers author
-              , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+              , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
             (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -461,7 +460,7 @@ deleteProperty rids propertyName = case ARR.head rids of
               author <- getAuthor
               signedDelta <- pure $ SignedDelta
                 { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
               (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -561,12 +560,12 @@ saveFile r property arrayBuf mimeType = do
             }
           signedDelta <- pure $ SignedDelta
                 { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
           addDelta (DeltaInTransaction 
             { users
             , delta: SignedDelta
               { author: stripNonPublicIdentifiers author
-              , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta} })
+              , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta} })
           setProperty [rid] replacementProperty [Value usedVal]
           pure usedVal
         _ -> throwError (error ("Could not save file in the database"))
@@ -576,10 +575,10 @@ saveFile r property arrayBuf mimeType = do
 -- CACHEANDSAVE
 -----------------------------------------------------------
 -- Save the entity in cache and in couchdb.
-cacheAndSave :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives Unit
+cacheAndSave :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> a -> MonadPerspectives Unit
 cacheAndSave rid rol = void $ cacheAndSave_ rid rol
 
-cacheAndSave_ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
+cacheAndSave_ :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> a -> MonadPerspectives a
 cacheAndSave_ rid rol = do
   void $ cacheEntity rid rol
   Instances.saveEntiteit rid

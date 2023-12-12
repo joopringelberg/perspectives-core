@@ -25,8 +25,8 @@ module Perspectives.Parsing.Arc.Position where
 import Prelude
 
 import Data.Generic.Rep (class Generic)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Newtype (class Newtype)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- | `Position` represents the position of the parser in the input.
 -- |
@@ -37,6 +37,10 @@ newtype ArcPosition = ArcPosition
   , column :: Int
   }
 
+derive instance Newtype ArcPosition _
+derive newtype instance WriteForeign ArcPosition
+derive newtype instance ReadForeign ArcPosition
+
 derive instance genericArcPosition :: Generic ArcPosition _
 instance showArcPosition :: Show ArcPosition where
   show (ArcPosition {line, column}) = "line " <> show line <> ", column " <> show column
@@ -45,11 +49,6 @@ instance showArcPosition :: Show ArcPosition where
 -- | occur, we make all instances of ArcPosition equal to each other.
 instance eqArcPosition :: Eq ArcPosition where eq a b = true
 instance ordArcPosition :: Ord ArcPosition where compare a b = EQ
-
-instance decodeArcPosition :: Decode ArcPosition where
-  decode = genericDecode defaultOptions
-instance encodeArcPosition :: Encode ArcPosition where
-  encode = genericEncode defaultOptions
 
 arcParserStartPosition :: ArcPosition
 arcParserStartPosition = ArcPosition{line: 1, column: 1}

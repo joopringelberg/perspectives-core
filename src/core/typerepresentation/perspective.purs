@@ -32,9 +32,8 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
@@ -42,8 +41,8 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, allPropertyVerbs, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, flip, ($), (&&), (<#>), (<$>), (<>), (||), (>))
-import Simple.JSON (class WriteForeign, write)
+import Prelude (class Eq, class Ord, class Show, bind, flip, pure, ($), (&&), (<#>), (<$>), (<>), (>), (||))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
 
 -----------------------------------------------------------
 -- PERSPECTIVE
@@ -82,11 +81,11 @@ derive instance eqPerspective :: Eq Perspective
 
 derive instance newtypePerspective :: Newtype Perspective _
 
-instance encodePerspective :: Encode Perspective where
-  encode = genericEncode defaultOptions
+instance WriteForeign Perspective where
+  writeImpl (Perspective r) = writeImpl r
 
-instance decodePerspective :: Decode Perspective where
-  decode = genericDecode defaultOptions
+instance ReadForeign Perspective where
+  readImpl f = Perspective <$> read' f
 
 data StateSpec =
   ContextState StateIdentifier
@@ -96,9 +95,21 @@ data StateSpec =
 derive instance genericStateSpec :: Generic StateSpec _
 instance showStateSpec :: Show StateSpec where show = genericShow
 derive instance eqStateSpec :: Eq StateSpec
-instance encodeStateSpec :: Encode StateSpec where encode = genericEncode defaultOptions
-instance decodeStateSpec :: Decode StateSpec where decode = genericDecode defaultOptions
+
 instance ordStateSpec :: Ord StateSpec where compare = genericCompare
+
+instance WriteForeign StateSpec where
+  writeImpl (ContextState stateIdentifier) = writeImpl { constructor: "ContextState", stateIdentifier}
+  writeImpl (SubjectState stateIdentifier) = writeImpl { constructor: "SubjectState", stateIdentifier}
+  writeImpl (ObjectState stateIdentifier) = writeImpl { constructor: "ObjectState", stateIdentifier}
+
+instance ReadForeign StateSpec where
+  readImpl f = do 
+    {constructor, stateIdentifier} :: {constructor :: String, stateIdentifier :: StateIdentifier} <- read' f
+    unsafePartial case constructor of 
+      "ContextState" -> pure $ ContextState stateIdentifier
+      "SubjectState" -> pure $ SubjectState stateIdentifier
+      "ObjectState" -> pure $ ObjectState stateIdentifier
 
 stateSpec2StateIdentifier :: StateSpec -> StateIdentifier
 stateSpec2StateIdentifier (ContextState s) = s
@@ -161,11 +172,14 @@ data PropertyVerbs = PropertyVerbs (ExplicitSet PropertyType) (ExplicitSet Prope
 derive instance genericPropertyVerbs :: Generic PropertyVerbs _
 instance showPropertyVerbs :: Show PropertyVerbs where show = genericShow
 derive instance eqPropertyVerbs :: Eq PropertyVerbs
-instance encodePropertyVerbs :: Encode PropertyVerbs where encode = genericEncode defaultOptions
-instance decodePropertyVerbs :: Decode PropertyVerbs where decode = genericDecode defaultOptions
 
 instance writeForeignPropertyVerbs :: WriteForeign PropertyVerbs where
   writeImpl (PropertyVerbs props verbs) = write { properties: write props, verbs: write verbs}
+
+instance ReadForeign PropertyVerbs where
+  readImpl f = do 
+    {properties, verbs} :: {properties :: ExplicitSet PropertyType, verbs :: ExplicitSet PropertyVerb} <- read' f
+    pure $ PropertyVerbs properties verbs
 
 -- Pair each PropertyType will all PropertyVerbs available for it.
 expandPropertyVerbs :: Array PropertyType -> PropertyVerbs -> Array (Tuple PropertyType (Array PropertyVerb))

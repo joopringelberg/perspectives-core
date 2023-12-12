@@ -11,14 +11,13 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Effect.Aff (Aff, throwError, error)
-import Effect.Class.Console (log, logShow)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.DomeinFile (DomeinFileRecord)
 import Perspectives.Identifiers (typeUri2typeNameSpace_)
 import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription, Range, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Action (Action, AutomaticAction)
+import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -27,8 +26,8 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.Perspective (StateSpec)
 import Perspectives.Representation.Range (Range) as Range
 import Perspectives.Representation.State (State(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType)
+import Perspectives.Representation.Verbs (PropertyVerb)
 import Test.Unit (Test)
 
 failure :: forall a. String -> Aff a
@@ -90,11 +89,11 @@ ensureCRole roleName {calculatedRoles} = case lookup roleName calculatedRoles of
 ---- ROLEHASPROPERTY
 --------------------------------------------------------------------------------
 ensureEnumeratedRoleHasProperty :: String -> EnumeratedRole -> Aff PropertyType
-ensureEnumeratedRoleHasProperty name (EnumeratedRole{_id, properties}) = case find
+ensureEnumeratedRoleHasProperty name (EnumeratedRole{id, properties}) = case find
   (case _ of
     ENP (EnumeratedPropertyType n) -> n == name
     CP (CalculatedPropertyType n) -> n == name) properties of
-  Nothing -> failure ("Role '" <> show _id <> "' has no property '" <> name <> "'.")
+  Nothing -> failure ("Role '" <> show id <> "' has no property '" <> name <> "'.")
   Just r -> pure r
 
 enumeratedPropertyIsFunctional :: Boolean -> EnumeratedProperty -> Aff Unit

@@ -28,7 +28,6 @@ import Data.Array (delete, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List (List(..))
-import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (empty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
@@ -42,7 +41,6 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Prelude (bind, discard, pure, show, ($), (<<<))
 import Text.Parsing.Parser (ParseError(..))
 
@@ -70,10 +68,10 @@ loadAndCompileArcFile_ text = catchError
         (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- lift $ lift $ runPhaseTwo_' (traverseDomain ctxt) defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left e
-          (Right (DomeinFile dr'@{_id})) -> do
+          (Right (DomeinFile dr'@{id})) -> do
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing (but not the model we're compiling!).
-            for_ (delete (DomeinFileId _id) state.referredModels) (lift <<< retrieveDomeinFile <<< unwrap)
+            for_ (delete id state.referredModels) (lift <<< retrieveDomeinFile)
             (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e
@@ -84,10 +82,10 @@ loadAndCompileArcFile_ text = catchError
                   then do
                     -- Remove the self-referral and add the source.
                     df <- pure $ DomeinFile correctedDFR
-                      { referredModels = delete (DomeinFileId _id) refModels
+                      { referredModels = delete id refModels
                       , arc = text
                       }
-                    -- void $ lift $ storeDomeinFileInCache _id df
+                    -- void $ lift $ storeDomeinFileInCache id df
                     pure $ Right df
                   else pure $ Left typeCheckErrors
   \e -> pure $ Left [Custom (show e)]

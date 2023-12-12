@@ -37,7 +37,7 @@ import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, foldMap, fromFoldable, head, length, null, uncons)
 import Data.Either (Either(..))
 import Data.Map (Map, empty, singleton)
-import Data.Maybe (Maybe(..), fromJust, isJust) 
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Foreign.Object (keys, lookup)
@@ -62,7 +62,7 @@ import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -118,11 +118,11 @@ makeRoleGetter currentDomain@(CDOM contextAdt) rt@(ENR et) = do
 -- | Saves it in the DomainCache.
 -- | Returns the range of the calculation.
 compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT RoleInContext)
-compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole, pos}) = withFrame do
-  loops <- isBeingCalculated (Role _id)
+compileAndSaveRole dom step (CalculatedRole cr@{id, kindOfRole, pos}) = withFrame do
+  loops <- isBeingCalculated (Role id)
   if loops
-    then throwError $ (RecursiveDefinition $ loopErrorMessage (Role _id) pos pos) 
-    else withCurrentCalculation (Role _id)
+    then throwError $ (RecursiveDefinition $ loopErrorMessage (Role id) pos pos) 
+    else withCurrentCalculation (Role id)
       do
         expressionWithEnvironment <- pure $ addContextualBindingsToExpression
           [ makeIdentityStep "currentcontext" (startOf step)
@@ -131,7 +131,7 @@ compileAndSaveRole dom step (CalculatedRole cr@{_id, kindOfRole, pos}) = withFra
           step
         compiledExpression <- compileExpression dom expressionWithEnvironment
         -- Save the result in DomeinCache.
-        lift2 $ void $ modifyCalculatedRoleInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedRole cr {calculation = Q compiledExpression})
+        lift2 $ void $ modifyCalculatedRoleInDomeinFile (DomeinFileId $ unsafePartial fromJust $ typeUri2ModelUri (unwrap id)) (CalculatedRole cr {calculation = Q compiledExpression})
         pure $ unsafePartial $ domain2roleType $ range compiledExpression
 
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
@@ -143,7 +143,7 @@ qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args r@(RDO
   enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
   computedTypeADT <- catchError
     (ST <$> qualifyLocalEnumeratedRoleName pos (unwrap computedType) (keys enumeratedRoles))
-    (\_ -> lift $ lift $ getEnumeratedRole computedType >>= \(EnumeratedRole{_id}) -> pure $ ST _id)
+    (\_ -> lift $ lift $ getEnumeratedRole computedType >>= \(EnumeratedRole{id}) -> pure $ ST id)
   case computedTypeADT of
     ST qComputedType | computedType == qComputedType -> pure qfd
     _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args r isF isM)
@@ -178,7 +178,7 @@ qualifyLocalCalculatedRoleName pos ident roleIdentifiers = CalculatedRoleType <$
 
 qualifyLocalRoleName_ :: ArcPosition -> String -> Array String -> PhaseThree String
 qualifyLocalRoleName_ pos ident roleIdentifiers = do
-  (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
+  (candidates :: Array String) <- pure $ filter (\id -> id `endsWithSegments` ident) roleIdentifiers
   case head candidates of
     Nothing -> throwError $ UnknownRole pos ident
     (Just qname) | length candidates == 1 -> pure qname
@@ -189,7 +189,7 @@ qualifyLocalContextName pos ident roleIdentifiers = ContextType <$> (qualifyLoca
 
 qualifyLocalContextName_ :: ArcPosition -> String -> Array String -> PhaseThree String
 qualifyLocalContextName_ pos ident roleIdentifiers = do
-  (candidates :: Array String) <- pure $ filter (\_id -> _id `endsWithSegments` ident) roleIdentifiers
+  (candidates :: Array String) <- pure $ filter (\id -> id `endsWithSegments` ident) roleIdentifiers
   case head candidates of
     Nothing -> throwError $ UnknownContext pos ident
     (Just qname) | length candidates == 1 -> pure qname
@@ -218,11 +218,11 @@ makePropertyGetter currentDomain pt = do
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
 compileAndSaveProperty :: Domain -> Step -> CalculatedProperty -> Boolean -> PhaseThree QT.Range
-compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) considerFunctional = withFrame do
-  loops <- isBeingCalculated (Prop _id)
+compileAndSaveProperty dom step (CalculatedProperty cp@{id, role, pos}) considerFunctional = withFrame do
+  loops <- isBeingCalculated (Prop id)
   if loops
-    then throwError $ (RecursiveDefinition $ loopErrorMessage (Prop _id) pos pos) 
-    else withCurrentCalculation (Prop _id)
+    then throwError $ (RecursiveDefinition $ loopErrorMessage (Prop id) pos pos) 
+    else withCurrentCalculation (Prop id)
       do
       -- We add the role as the variable "currentobject"
       kindOfRole <- unsafePartial $ roleKind role
@@ -239,7 +239,7 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{_id, role, pos}) conside
         then pure $ setCardinality compiledExpression True
         else pure compiledExpression
       -- Save the result in DomeinCache.
-      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (unsafePartial fromJust $ typeUri2ModelUri (unwrap _id)) (CalculatedProperty cp {calculation = Q compiledExpression'})
+      lift2 $ void $ modifyCalculatedPropertyInDomeinFile (DomeinFileId $ unsafePartial fromJust $ typeUri2ModelUri (unwrap id)) (CalculatedProperty cp {calculation = Q compiledExpression'})
       pure $ range compiledExpression'
       where
         roleKind :: Partial => EnumeratedRoleType -> PhaseThree RTI.RoleKind
@@ -377,8 +377,8 @@ compileSimpleStep currentDomain s@(Filler pos membeddingContext) = do
             then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter FillerF context) (RDOM $ replaceContext adtOfBinding (ContextType context)) True False
             -- Try to qualify the name within the Domain.
             else do
-              {namespace} <- lift $ gets _.dfr
-              (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context namespace
+              {id} <- lift $ gets _.dfr
+              (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context id
               case head qnames of
                 Nothing -> throwError $ UnknownContext pos context
                 (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.DataTypeGetterWithParameter FillerF (unwrap qn)) (RDOM $ replaceContext adtOfBinding qn) True False
@@ -392,8 +392,8 @@ compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
         then pure $ EnumeratedRoleType binderName
         -- Try to qualify the name within the Domain.
         else do
-          {namespace} <- lift $ gets _.dfr
-          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain binderName namespace
+          {id} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain binderName id
           case head qnames of
             Nothing -> throwError $ UnknownRole pos binderName
             (Just qn) | length qnames == 1 -> pure qn
@@ -408,8 +408,8 @@ compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
           then pure $ SQD currentDomain (QF.FilledF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder (ContextType context) ) False False
           -- Try to qualify the name within the Domain.
           else do
-            {namespace} <- lift $ gets _.dfr
-            (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context namespace
+            {id} <- lift $ gets _.dfr
+            (qnames :: Array ContextType) <- lift2 $ runArrayT $ qualifyContextInDomain context id
             case head qnames of
               Nothing -> throwError $ UnknownContext pos context
               (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.FilledF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder qn) False False
@@ -430,7 +430,7 @@ compileSimpleStep currentDomain s@(TypeOfContext pos) = do
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain s@(RoleTypeIndividual pos typeName) = do
-  nameSpace <- getsDF _.namespace
+  nameSpace <- getsDF _.id
   typeCandidates <- lift $ lift (nameSpace ###= qualifyRoleInDomain typeName )
   case length typeCandidates, head typeCandidates of 
     0, _ -> throwError $ UnknownRole pos typeName
@@ -438,7 +438,7 @@ compileSimpleStep currentDomain s@(RoleTypeIndividual pos typeName) = do
     _, _ -> throwError $ NotUniquelyIdentifying pos typeName (map roletype2string typeCandidates)
 
 compileSimpleStep currentDomain s@(ContextTypeIndividual pos typeName) = do
-  nameSpace <- getsDF _.namespace
+  nameSpace <- getsDF _.id
   typeCandidates <- lift $ lift (nameSpace ###= qualifyContextInDomain typeName )
   case length typeCandidates, head typeCandidates of 
     0, _ -> throwError $ UnknownContext pos typeName
@@ -459,8 +459,8 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
         then pure $ EnumeratedRoleType roleName
         -- Try to qualify the name within the Domain.
         else do
-          {namespace} <- lift $ gets _.dfr
-          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain roleName namespace
+          {id} <- lift $ gets _.dfr
+          (qnames :: Array EnumeratedRoleType) <- lift2 $ runArrayT $ qualifyEnumeratedRoleInDomain roleName id
           case head qnames of
             Nothing -> throwError $ UnknownRole pos roleName
             (Just qn) | length qnames == 1 -> pure qn
@@ -500,7 +500,7 @@ compileSimpleStep currentDomain s@(IsInState pos stateName) = do
             Just _ -> [(qualifyWith ns stateName)] ) namespaces
           case length allMatchingStateNames of
             -- Otherwise we'll have to find state names whose suffix equals the stateName.
-            0 -> case (filter (\_id -> _id `endsWithSegments` stateName) (keys states)) of
+            0 -> case (filter (\id -> id `endsWithSegments` stateName) (keys states)) of
               none | length none == 0 -> throwError $ UnknownState pos stateName
               single | length single == 1 -> pure $ StateIdentifier $ unsafePartial $ fromJust (head single)
               multiple -> throwError $ NotUniquelyIdentifying pos stateName (keys states)

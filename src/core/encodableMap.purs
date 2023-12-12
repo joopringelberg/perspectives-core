@@ -46,9 +46,9 @@ import Data.Set (Set)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Foreign (Foreign, unsafeFromForeign)
-import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 
 newtype EncodableMap k v = EncodableMap (Map.Map k v)
@@ -57,11 +57,12 @@ derive instance newtypeEncodableMap :: Newtype (EncodableMap k v) _
 instance showEncodableMap :: (Show k, Show v) => Show (EncodableMap k v) where show (EncodableMap m) = show m
 instance eqEncodableMap :: (Eq k, Eq v) => Eq (EncodableMap k v) where eq (EncodableMap m1) (EncodableMap m2) = eq m1 m2
 
-instance encodeEncodableMap :: (Encode k, Encode v) => Encode (EncodableMap k v) where
-  encode (EncodableMap m) = encode ((\(Tuple k v) -> [encode k, encode v]) <$> (Map.toUnfoldable m :: Array (Tuple k v)))
-instance decodeEncodableMap :: (Ord k, Decode k, Decode v) => Decode (EncodableMap k v) where
-  decode f = EncodableMap <<< Map.fromFoldable <$> (traverse
-    (\pair -> Tuple <$> (unsafePartial $ decode $ head pair) <*> (unsafePartial $ decode (head $ tail pair)))
+instance (WriteForeign k, WriteForeign v) => WriteForeign (EncodableMap k v) where
+  writeImpl (EncodableMap m) = writeImpl ((\(Tuple k v) -> [writeImpl k, writeImpl v]) <$> (Map.toUnfoldable m :: Array (Tuple k v)))
+
+instance (Ord k, ReadForeign k, ReadForeign v) => ReadForeign (EncodableMap k v) where
+  readImpl f = EncodableMap <<< Map.fromFoldable <$> (traverse
+    (\pair -> Tuple <$> (unsafePartial $ readImpl $ head pair) <*> (unsafePartial $ readImpl (head $ tail pair)))
     (unsafeFromForeign f :: Array (Array Foreign)))
 
 instance prettyPrintEncodableMap :: (Show k, Show v) => PrettyPrint (EncodableMap k v) where

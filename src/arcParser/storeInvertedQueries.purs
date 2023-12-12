@@ -390,7 +390,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       Map.Map EnumeratedRoleType (ExplicitSet EnumeratedPropertyType) ->
       EnumeratedRoleType ->
       EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{_id, onPropertyDelta}) inverseQuery modifiesPropertiesOf eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQueryToPropertyIndexedByRole (InvertedQuery
+    addPathToProperty (EnumeratedProperty propRecord@{id, onPropertyDelta}) inverseQuery modifiesPropertiesOf eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQueryToPropertyIndexedByRole (InvertedQuery
       { description: inverseQuery
       , backwardsCompiled: Nothing
       , forwardsCompiled: Nothing
@@ -402,48 +402,48 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       eroleType
       onPropertyDelta
       modifiesPropertiesOf
-      _id
+      id
     }
 
     addPathToFilledInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFilledInvertedQueries (EnumeratedRole rolRecord@{_id, filledInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {filledInvertedQueries =
+    addPathToFilledInvertedQueries (EnumeratedRole rolRecord@{id, filledInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {filledInvertedQueries =
       addInvertedQueryIndexedByTripleKeys
         (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
         keys
         filledInvertedQueries
         modifiesRoleBindingOf
-        _id
+        id
         }
 
     addPathToFillerInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFillerInvertedQueries (EnumeratedRole rolRecord@{_id, fillerInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {fillerInvertedQueries =
+    addPathToFillerInvertedQueries (EnumeratedRole rolRecord@{id, fillerInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {fillerInvertedQueries =
       addInvertedQueryIndexedByTripleKeys
         (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
         keys
         fillerInvertedQueries
         modifiesRoleBindingOf
-        _id}
+        id}
 
     -- Add an inverted query to the set of inverted queries (contextInvertedQueries) on an EnumeratedRole type,
     -- for the `context` step and therefore indexed by ContextType.
     addPathToContextInvertedQueries :: EnumeratedRole -> QueryWithAKink -> Array RoleInContext -> ContextType -> EnumeratedRole
-    addPathToContextInvertedQueries (EnumeratedRole rolRecord@{_id, contextInvertedQueries}) inverseQuery modifiesRoleInstancesOf embeddingContext = EnumeratedRole rolRecord {contextInvertedQueries = addInvertedQueryIndexedByContext
+    addPathToContextInvertedQueries (EnumeratedRole rolRecord@{id, contextInvertedQueries}) inverseQuery modifiesRoleInstancesOf embeddingContext = EnumeratedRole rolRecord {contextInvertedQueries = addInvertedQueryIndexedByContext
       (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
       embeddingContext
       contextInvertedQueries
       modifiesRoleInstancesOf
-      _id
+      id
       }
 
     -- Add an inverted query to the set of inverted queries on a Context type,
     -- for the `role` step (and therefore indexed by EnumeratedRoleType).
     addPathToRoleInvertedQueries :: Context -> QueryWithAKink -> Array RoleInContext -> EnumeratedRoleType -> Context
-    addPathToRoleInvertedQueries (Context contextRecord@{_id, roleInvertedQueries}) inverseQuery modifiesRoleInstancesOf eRoleType = Context contextRecord {roleInvertedQueries = addInvertedQueryIndexedByRole
+    addPathToRoleInvertedQueries (Context contextRecord@{id, roleInvertedQueries}) inverseQuery modifiesRoleInstancesOf eRoleType = Context contextRecord {roleInvertedQueries = addInvertedQueryIndexedByRole
       (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
       eRoleType
       roleInvertedQueries
       modifiesRoleInstancesOf
-      _id
+      id
     }
 
 setPathForStep (MQD _ qf _ _ _ _) qWithAK users states statesPerProperty selfOnly mfilter = 

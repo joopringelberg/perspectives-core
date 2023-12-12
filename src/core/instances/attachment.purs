@@ -27,7 +27,7 @@ import Prelude
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Foreign (F, Foreign, readNullOrUndefined)
-import Foreign.Generic (class Decode, class Encode)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- CLASS ATTACHMENT
@@ -47,8 +47,8 @@ newtype Attachments = Attachments Foreign
 derive instance Newtype Attachments _
 instance Show Attachments where show _ = ""
 instance Eq Attachments where eq _ _ = true
-instance Encode Attachments where encode (Attachments f) = f
-instance Decode Attachments where decode f = pure (Attachments f)
+derive newtype instance WriteForeign Attachments
+derive newtype instance ReadForeign Attachments
 
 foreign import getAttachmentsImpl :: Foreign -> Foreign
 

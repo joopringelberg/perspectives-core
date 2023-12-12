@@ -43,7 +43,6 @@ import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
 import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
-import Foreign.Generic (encodeJSON)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
@@ -73,7 +72,7 @@ import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
-import Perspectives.Representation.Class.PersistentType (getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -89,7 +88,7 @@ import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUse
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
-import Simple.JSON (unsafeStringify, read)
+import Simple.JSON (read, unsafeStringify, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -200,7 +199,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ TypeErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ TypeErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right (EnumeratedRole{context:filledContextType}) ->do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles filledContextType (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
             filledContextType -> (try $ getContext (ContextType filledContextType)) >>=
               case _ of
@@ -208,7 +207,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                   logPerspectivesError $ ContextErrorBoundary "Api.GetRoleBinders" (show err)
                   sendResponse (Error corrId (show $ ContextErrorBoundary "Api.GetRoleBinders" (show err))) setter
                 Right _ -> do
-                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
+                  void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ (unwrap fillerType)))
                   registerSupportedEffect corrId setter (getFilledRoles (ContextType filledContextType) (EnumeratedRoleType predicate)) (RoleInstance subject) onlyOnce
     Api.GetRol -> do
       (f :: RoleGetter) <- (getRoleFunction predicate)
@@ -306,7 +305,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- {request: "matchContextName", subject: name}
     Api.MatchContextName -> do
       matches <- matchIndexedContextNames subject
-      sendResponse (Result corrId [encodeJSON matches]) setter
+      sendResponse (Result corrId [writeJSON matches]) setter
     Api.GetCouchdbUrl -> do
       url <- gets \s -> maybe "" identity s.couchdbUrl
       sendResponse (Result corrId [url]) setter
@@ -434,7 +433,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           -- now bind it in the role instance.
           void $ setFirstBinding (RoleInstance subject) (RoleInstance $ buitenRol id) Nothing
           lift $ sendResponse (Result corrId [buitenRol id]) setter
-    Api.ImportTransaction -> case unwrap $ runExceptT $ decode contextDescription of
+    Api.ImportTransaction -> case read contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) TransactionForPeer) -> sendResponse (Error corrId (show e)) setter
       (Right tfp@(TransactionForPeer _)) -> do
         (runMonadPerspectivesTransaction'
@@ -451,7 +450,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         runMonadPerspectivesTransaction' false authoringRole do
           result <- runExceptT $ traverse
             (\ctxt@(ContextSerialization{ctype}) -> do
-              void $ lift $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ ctype)
+              void $ lift $ lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ ctype)
               constructContext Nothing ctxt)
             ctxts
           case result of
@@ -556,7 +555,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             logPerspectivesError $ RolErrorBoundary "Api.CheckBinding" (show err)
             sendResponse (Error corrId (show $ RolErrorBoundary "Api.CheckBinding" (show err))) setter
           Right (PerspectRol{pspType}) -> do
-            void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ (unwrap pspType)))
+            void $ runMonadPerspectivesTransaction' false authoringRole (lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ (unwrap pspType)))
             ok <- checkBinding typeOfRoleToBindTo (RoleInstance object)
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
@@ -715,7 +714,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right cd@(ContextSerialization {ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do
-          void $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ ctype)
+          void $ lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ ctype)
           ctxt <- runExceptT $ constructContext mroleType cd
           case ctxt of
             (Left messages) -> lift $ sendResponse (Error corrId (show messages)) setter

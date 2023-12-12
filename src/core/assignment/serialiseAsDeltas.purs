@@ -45,7 +45,6 @@ import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Class (encode)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
@@ -68,7 +67,7 @@ import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
-import Simple.JSON (unsafeStringify)
+import Simple.JSON (unsafeStringify, write)
 
 serialisedAsDeltasFor :: ContextInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 serialisedAsDeltasFor cid userId = do
@@ -93,7 +92,7 @@ serialisedAsDeltasForUserType cid userType = do
     , timeStamp
     , deltas: _.delta <<< unwrap <$> deltas
   }
-  pure $ Value $ unsafeStringify $ encode tfp
+  pure $ Value $ unsafeStringify $ write tfp
   where
     -- | Execute a value in MonadPerspectivesTransaction, discard the result and return the transaction.
     execMonadPerspectivesTransaction :: forall o.

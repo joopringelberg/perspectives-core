@@ -23,19 +23,18 @@
 module Perspectives.Representation.QueryFunction where
 
 import Control.Monad.Error.Class (throwError)
-import Data.Either (Either(..))
 import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe)
 import Foreign (ForeignError(..))
-import Foreign.Class (class Decode, class Encode)
+
+
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Ord, class Show, Ordering(..), bind, compare, eq, flip, pure, show, ($), (&&), (<$>), (<*>), (<>))
-import Simple.JSON (class ReadForeign, class WriteForeign, read, readImpl, readJSON', writeImpl, writeJSON)
-import Unsafe.Coerce (unsafeCoerce)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl, writeJSON)
 
 type VariableName = String
 ---------------------------------------------------------------------------------------
@@ -85,11 +84,10 @@ data FunctionName =
 
   | FirstF
 
--- We need Encode and Decode instances of FunctionName for Calculation, which goes into the DomeinFile.
-instance encodeFunctionName :: Encode FunctionName where
-  encode = writeImpl
-instance decodeFunctionName :: Decode FunctionName where
-  decode = readImpl
+
+
+
+
 
 instance eqFunctionName :: Eq FunctionName where 
   eq ContextF ContextF = true
@@ -184,48 +182,49 @@ instance writeForeignFunctionName :: WriteForeign FunctionName where
   writeImpl a = writeImpl (show a)
 
 instance readForeignFunctionName :: ReadForeign FunctionName where
-  readImpl f = case read f of 
-    Right "context" -> pure ContextF
-    Right "binding" -> pure FillerF
-    Right "external" -> pure ExternalRoleF -- TODO klopt dit met de parser?
-    Right "indexedContext" -> pure IndexedContextName
-    Right "indexedRole" -> pure IndexedRoleName
-    Right "identity" -> pure IdentityF
-    Right "Namespace" -> pure ModelNameF
-    Right "sequence" -> pure SequenceF
-    Right "not" -> pure NotF
-    Right "exists" -> pure ExistsF
-    Right "filledBy" -> pure FilledByF
-    Right "fills" -> pure FillsF
-    Right "compose" -> pure ComposeF
-    Right "composeSequence" -> pure ComposeSequenceF
-    Right "union" -> pure UnionF
-    Right "intersection" -> pure IntersectionF
-    Right "otherwise" -> pure OrElseF
-    Right "GetRoleInstancesForContextFromDatabaseF" -> pure GetRoleInstancesForContextFromDatabaseF
-    Right "=" -> pure EqualsF
-    Right "/=" -> pure NotEqualsF
-    Right "<" -> pure LessThanF
-    Right "<=" -> pure LessThanEqualF
-    Right ">" -> pure GreaterThanF
-    Right ">=" -> pure GreaterThanEqualF
-    Right "+" -> pure AddF
-    Right "-" -> pure SubtractF
-    Right "/" -> pure DivideF
-    Right "*" -> pure MultiplyF
-    Right "and" -> pure AndF
-    Right "or" -> pure OrF
-    Right "count" -> pure CountF
-    Right "minimum" -> pure MinimumF
-    Right "maximum" -> pure MaximumF
-    Right "available" -> pure AvailableF
-    Right "TypeOfContextF" -> pure TypeOfContextF
-    Right "RoleTypesF" -> pure RoleTypesF
-    Right "SpecialisesRoleTypeF" -> pure SpecialisesRoleTypeF
-    Right "IsInStateF" -> pure IsInStateF
-    Right "first" -> pure FirstF
-    Left errs -> throwError errs
-    Right x -> throwError $ singleton (ForeignError "readForeign FunctionName: Unknown FunctionName")
+  readImpl f = do 
+    x <- read' f
+    case x of 
+      "context" -> pure ContextF
+      "binding" -> pure FillerF
+      "external" -> pure ExternalRoleF -- TODO klopt dit met de parser?
+      "indexedContext" -> pure IndexedContextName
+      "indexedRole" -> pure IndexedRoleName
+      "identity" -> pure IdentityF
+      "Namespace" -> pure ModelNameF
+      "sequence" -> pure SequenceF
+      "not" -> pure NotF
+      "exists" -> pure ExistsF
+      "filledBy" -> pure FilledByF
+      "fills" -> pure FillsF
+      "compose" -> pure ComposeF
+      "composeSequence" -> pure ComposeSequenceF
+      "union" -> pure UnionF
+      "intersection" -> pure IntersectionF
+      "otherwise" -> pure OrElseF
+      "GetRoleInstancesForContextFromDatabaseF" -> pure GetRoleInstancesForContextFromDatabaseF
+      "=" -> pure EqualsF
+      "/=" -> pure NotEqualsF
+      "<" -> pure LessThanF
+      "<=" -> pure LessThanEqualF
+      ">" -> pure GreaterThanF
+      ">=" -> pure GreaterThanEqualF
+      "+" -> pure AddF
+      "-" -> pure SubtractF
+      "/" -> pure DivideF
+      "*" -> pure MultiplyF
+      "and" -> pure AndF
+      "or" -> pure OrF
+      "count" -> pure CountF
+      "minimum" -> pure MinimumF
+      "maximum" -> pure MaximumF
+      "available" -> pure AvailableF
+      "TypeOfContextF" -> pure TypeOfContextF
+      "RoleTypesF" -> pure RoleTypesF
+      "SpecialisesRoleTypeF" -> pure SpecialisesRoleTypeF
+      "IsInStateF" -> pure IsInStateF
+      "first" -> pure FirstF
+      f -> throwError $ singleton (ForeignError $ "readForeign FunctionName: Unknown FunctionName: " <> f)
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -517,12 +516,12 @@ instance eqQueryFunction :: Eq QueryFunction where
 instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   -- writeImpl f = writeImpl( genericSumToVariant f)
   -- writeImpl a = unsafeToForeign (writeJSON (genericSumToVariant a))
-  writeImpl (DataTypeGetter functionName) = writeImpl {constructor: "DataTypeGetter", arg1: functionName, arg2: ""}
-  writeImpl (DataTypeGetterWithParameter functionName string) = writeImpl {constructor: "DataTypeGetterWithParameter", arg1: functionName, arg2: string}
-  writeImpl (RegExMatch regExP) = writeImpl {constructor: "RegExMatch", arg1: regExP, arg2: ""}
-  writeImpl (PropertyGetter propertyType) = writeImpl {constructor: "PropertyGetter", arg1: propertyType, arg2: ""}
-  writeImpl (Value2Role propertyType) = writeImpl {constructor: "Value2Role", arg1: propertyType, arg2: ""}
-  writeImpl (RolGetter roleType) = writeImpl {constructor: "RolGetter", arg1: roleType, arg2: ""}
+  writeImpl (DataTypeGetter functionName) = writeImpl {constructor: "DataTypeGetter", arg1: writeJSON functionName, arg2: ""}
+  writeImpl (DataTypeGetterWithParameter functionName string) = writeImpl {constructor: "DataTypeGetterWithParameter", arg1: writeJSON functionName, arg2: string}
+  writeImpl (RegExMatch regExP) = writeImpl {constructor: "RegExMatch", arg1: writeJSON regExP, arg2: ""}
+  writeImpl (PropertyGetter propertyType) = writeImpl {constructor: "PropertyGetter", arg1: writeJSON propertyType, arg2: ""}
+  writeImpl (Value2Role propertyType) = writeImpl {constructor: "Value2Role", arg1: writeJSON propertyType, arg2: ""}
+  writeImpl (RolGetter roleType) = writeImpl {constructor: "RolGetter", arg1: writeJSON roleType, arg2: ""}
   -- 'External': call a Purescript function here.
   writeImpl (ExternalCoreRoleGetter string) = writeImpl {constructor: "ExternalCoreRoleGetter", arg1: string, arg2: ""}
   writeImpl (ExternalCorePropertyGetter string) = writeImpl {constructor: "ExternalCorePropertyGetter", arg1: string, arg2: ""}
@@ -533,44 +532,44 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (VariableLookup variableName) = writeImpl {constructor: "VariableLookup", arg1: variableName, arg2: ""}
   writeImpl (BindVariable variableName) = writeImpl {constructor: "BindVariable", arg1: variableName, arg2: ""}
   writeImpl (BindResultFromCreatingAssignment variableName) = writeImpl {constructor: "BindResultFromCreatingAssignment", arg1: variableName, arg2: ""}
-  writeImpl (AssignmentOperator functionName) = writeImpl {constructor: "AssignmentOperator", arg1: functionName, arg2: ""}
+  writeImpl (AssignmentOperator functionName) = writeImpl {constructor: "AssignmentOperator", arg1: writeJSON functionName, arg2: ""}
   writeImpl WithFrame = writeImpl {constructor: "WithFrame", arg1: "", arg2: ""}
 
   writeImpl FilterF = writeImpl {constructor: "FilterF", arg1: "", arg2: ""}
 
-  writeImpl (TypeGetter functionName) = writeImpl {constructor: "TypeGetter", arg1: functionName, arg2: ""}
-  writeImpl (RoleTypeConstant roleType) = writeImpl {constructor: "RoleTypeConstant", arg1: roleType, arg2: ""}
-  writeImpl (ContextTypeConstant contextType) = writeImpl {constructor: "ContextTypeConstant", arg1: contextType, arg2: ""}
+  writeImpl (TypeGetter functionName) = writeImpl {constructor: "TypeGetter", arg1: writeJSON functionName, arg2: ""}
+  writeImpl (RoleTypeConstant roleType) = writeImpl {constructor: "RoleTypeConstant", arg1: writeJSON roleType, arg2: ""}
+  writeImpl (ContextTypeConstant contextType) = writeImpl {constructor: "ContextTypeConstant", arg1: writeJSON contextType, arg2: ""}
 
-  writeImpl (UnaryCombinator functionName) = writeImpl {constructor: "UnaryCombinator", arg1: functionName, arg2: ""}
-  -- writeImpl (NaryCombinator functionName) = writeImpl {constructor: "NaryCombinator", arg1: functionName, arg2: ""} (Array QueryFunction)
-  writeImpl (BinaryCombinator functionName) = writeImpl {constructor: "BinaryCombinator", arg1: functionName, arg2: ""}
-  writeImpl (Constant range string) = writeImpl {constructor: "Constant", arg1: range, arg2: string}
-  writeImpl (RoleIndividual roleInstance) = writeImpl {constructor: "RoleIndividual", arg1: roleInstance, arg2: ""}
-  writeImpl (ContextIndividual contextInstance) = writeImpl {constructor: "ContextIndividual", arg1: contextInstance, arg2: ""}
+  writeImpl (UnaryCombinator functionName) = writeImpl {constructor: "UnaryCombinator", arg1: writeJSON functionName, arg2: ""}
+  -- writeImpl (NaryCombinator functionName) = writeImpl {constructor: "NaryCombinator", arg1: writeJSON functionName, arg2: ""} (Array QueryFunction)
+  writeImpl (BinaryCombinator functionName) = writeImpl {constructor: "BinaryCombinator", arg1: writeJSON functionName, arg2: ""}
+  writeImpl (Constant range string) = writeImpl {constructor: "Constant", arg1: writeJSON range, arg2: string}
+  writeImpl (RoleIndividual roleInstance) = writeImpl {constructor: "RoleIndividual", arg1: writeJSON roleInstance, arg2: ""}
+  writeImpl (ContextIndividual contextInstance) = writeImpl {constructor: "ContextIndividual", arg1: writeJSON contextInstance, arg2: ""}
 
-  writeImpl (PublicContext contextInstance) = writeImpl {constructor: "PublicContext", arg1: contextInstance, arg2: ""}
-  writeImpl (PublicRole roleInstance) = writeImpl {constructor: "PublicRole", arg1: roleInstance, arg2: ""}
+  writeImpl (PublicContext contextInstance) = writeImpl {constructor: "PublicContext", arg1: writeJSON contextInstance, arg2: ""}
+  writeImpl (PublicRole roleInstance) = writeImpl {constructor: "PublicRole", arg1: writeJSON roleInstance, arg2: ""}
 
-  writeImpl (CreateContext contextType roleType) = writeImpl {constructor: "CreateContext", arg1: contextType, arg2: roleType}
-  writeImpl (CreateRootContext contextType) = writeImpl {constructor: "CreateRootContext", arg1: contextType, arg2: ""}
-  writeImpl (CreateContext_ contextType) = writeImpl {constructor: "CreateContext_", arg1: contextType, arg2: ""}
-  writeImpl (CreateRole enumeratedRoleType) = writeImpl {constructor: "CreateRole", arg1: enumeratedRoleType, arg2: ""}
-  writeImpl (Bind enumeratedRoleType) = writeImpl {constructor: "Bind", arg1: enumeratedRoleType, arg2: ""}
+  writeImpl (CreateContext contextType roleType) = writeImpl {constructor: "CreateContext", arg1: writeJSON contextType, arg2: writeJSON roleType}
+  writeImpl (CreateRootContext contextType) = writeImpl {constructor: "CreateRootContext", arg1: writeJSON contextType, arg2: ""}
+  writeImpl (CreateContext_ contextType) = writeImpl {constructor: "CreateContext_", arg1: writeJSON contextType, arg2: ""}
+  writeImpl (CreateRole enumeratedRoleType) = writeImpl {constructor: "CreateRole", arg1: writeJSON enumeratedRoleType, arg2: ""}
+  writeImpl (Bind enumeratedRoleType) = writeImpl {constructor: "Bind", arg1: writeJSON enumeratedRoleType, arg2: ""}
   writeImpl Bind_ = writeImpl {constructor: "Bind_", arg1: "", arg2: ""}
   writeImpl (Unbind mEnumeratedRoleType) = writeImpl {constructor: "Unbind", arg1: writeJSON mEnumeratedRoleType, arg2: ""}
   writeImpl Unbind_ = writeImpl {constructor: "Unbind_", arg1: "", arg2: ""}
-  writeImpl (DeleteRole enumeratedRoleType) = writeImpl {constructor: "DeleteRole", arg1: enumeratedRoleType, arg2: ""}
-  writeImpl (DeleteContext roleType) = writeImpl {constructor: "DeleteContext", arg1: roleType, arg2: ""}
-  writeImpl (DeleteProperty enumeratedPropertyType) = writeImpl {constructor: "DeleteProperty", arg1: enumeratedPropertyType, arg2: ""}
+  writeImpl (DeleteRole enumeratedRoleType) = writeImpl {constructor: "DeleteRole", arg1: writeJSON enumeratedRoleType, arg2: ""}
+  writeImpl (DeleteContext roleType) = writeImpl {constructor: "DeleteContext", arg1: writeJSON roleType, arg2: ""}
+  writeImpl (DeleteProperty enumeratedPropertyType) = writeImpl {constructor: "DeleteProperty", arg1: writeJSON enumeratedPropertyType, arg2: ""}
   writeImpl Move = writeImpl {constructor: "Move", arg1: "", arg2: ""}
   writeImpl RemoveRole = writeImpl {constructor: "RemoveRole", arg1: "", arg2: ""}
   writeImpl RemoveContext = writeImpl {constructor: "RemoveContext", arg1: "", arg2: ""}
-  writeImpl (AddPropertyValue enumeratedPropertyType) = writeImpl {constructor: "AddPropertyValue", arg1: enumeratedPropertyType, arg2: ""}
-  writeImpl (RemovePropertyValue enumeratedPropertyType) = writeImpl {constructor: "RemovePropertyValue", arg1: enumeratedPropertyType, arg2: ""}
-  writeImpl (SetPropertyValue enumeratedPropertyType) = writeImpl {constructor: "SetPropertyValue", arg1: enumeratedPropertyType, arg2: ""}
+  writeImpl (AddPropertyValue enumeratedPropertyType) = writeImpl {constructor: "AddPropertyValue", arg1: writeJSON enumeratedPropertyType, arg2: ""}
+  writeImpl (RemovePropertyValue enumeratedPropertyType) = writeImpl {constructor: "RemovePropertyValue", arg1: writeJSON enumeratedPropertyType, arg2: ""}
+  writeImpl (SetPropertyValue enumeratedPropertyType) = writeImpl {constructor: "SetPropertyValue", arg1: writeJSON enumeratedPropertyType, arg2: ""}
   -- CreateFileF mimmeType property
-  writeImpl (CreateFileF string enumeratedPropertyType) = writeImpl {constructor: "CreateFileF", arg1: string, arg2: enumeratedPropertyType}
+  writeImpl (CreateFileF string enumeratedPropertyType) = writeImpl {constructor: "CreateFileF", arg1: string, arg2: writeJSON enumeratedPropertyType}
   writeImpl (ExternalEffectFullFunction string) = writeImpl {constructor: "ExternalEffectFullFunction", arg1: string, arg2: ""}
   writeImpl (ExternalDestructiveFunction string) = writeImpl {constructor: "ExternalDestructiveFunction", arg1: string, arg2: ""}
   writeImpl (ForeignEffectFullFunction string) = writeImpl {constructor: "ForeignEffectFullFunction", arg1: string, arg2: ""}
@@ -579,7 +578,7 @@ instance writeForeignQueryFunction :: WriteForeign QueryFunction where
   writeImpl (TypeTimeOnlyEnumeratedRoleF string) = writeImpl {constructor: "TypeTimeOnlyEnumeratedRoleF", arg1: string, arg2: ""}
   writeImpl (TypeTimeOnlyCalculatedRoleF string) = writeImpl {constructor: "TypeTimeOnlyCalculatedRoleF", arg1: string, arg2: ""}
 
-  writeImpl (FilledF enumeratedRoleType contextType) = writeImpl {constructor: "FilledF", arg1: enumeratedRoleType, arg2: contextType}
+  writeImpl (FilledF enumeratedRoleType contextType) = writeImpl {constructor: "FilledF", arg1: writeJSON enumeratedRoleType, arg2: writeJSON contextType}
 
 type QueryFunctionSerialised = 
   { constructor :: String
@@ -590,7 +589,7 @@ type QueryFunctionSerialised =
 instance readForeignQueryFunction :: ReadForeign QueryFunction where
   -- readImpl f = map variantToGenericSum (readImpl f)
   readImpl f = do 
-    x ::QueryFunctionSerialised <- unsafeCoerce f
+    x ::QueryFunctionSerialised <- read' f
     case x.constructor, x.arg1, x.arg2 of
       "DataTypeGetter", fname, _ -> DataTypeGetter <$> readJSON' fname
       "DataTypeGetterWithParameter", fname, s -> flip DataTypeGetterWithParameter s <$> readJSON' fname

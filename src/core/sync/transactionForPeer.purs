@@ -31,13 +31,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Prelude (class Ord, class Show, class Eq, compare, show, ($), (<>), (&&), eq)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- TRANSACTIE
@@ -55,11 +54,8 @@ derive instance newtypeTransactionForPeer :: Newtype TransactionForPeer _
 instance showTransactionForPeer :: Show TransactionForPeer where
   show = genericShow
 
-instance encodeTransactionForPeer :: Encode TransactionForPeer where
-  encode = genericEncode defaultOptions
-
-instance decodeTransactie :: Decode TransactionForPeer where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign TransactionForPeer
+derive newtype instance WriteForeign TransactionForPeer
 
 instance Attachment TransactionForPeer where 
   getAttachments _ = Nothing

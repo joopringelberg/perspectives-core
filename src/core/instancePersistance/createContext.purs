@@ -5,7 +5,6 @@ import Control.Monad.Writer (lift)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Foreign.Generic (encodeJSON)
 import Foreign.Object (isEmpty)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (getAuthor, getSubject, setProperty)
@@ -28,6 +27,7 @@ import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
+import Simple.JSON (writeJSON)
 
 
 -- | Constructs an empty context, caches it.
@@ -51,13 +51,14 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   subject <- lift $ getSubject
   contextInstance <- pure
     (PerspectContext defaultContextRecord
-      { _id = contextInstanceId
+      { _id = unwrap contextInstanceId
+      , id = contextInstanceId
       , displayName  = localName
       , pspType = pspType
       , buitenRol = externalRole
       , universeContextDelta = SignedDelta
         { author: stripNonPublicIdentifiers author
-        , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseContextDelta
+        , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseContextDelta
             { id: contextInstanceId
             , contextType: pspType
             , deltaType: ConstructEmptyContext
@@ -68,14 +69,15 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
   _ <- lift $ lift $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
-      { _id = externalRole
+      { _id = unwrap externalRole
+      , id = externalRole
       , pspType = externalRoleType pspType
       , context = contextInstanceId
       , binding = Nothing
       , universeRoleDelta =
           SignedDelta
             { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextInstanceId
               , contextType: pspType
               , roleInstances: (SNEA.singleton externalRole)

@@ -25,8 +25,6 @@ module Perspectives.Representation.Assignment where
 import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Instances.Environment (Environment)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType)
@@ -58,18 +56,8 @@ instance eqAssignmentStatement :: Eq AssignmentStatement where
 
 type ConstructorRep = {tag :: String, dat :: Array String}
 
-instance encodeLetWithAssignment :: Encode LetWithAssignment where
-  encode = genericEncode defaultOptions
-instance decodeLetWithAssignment :: Decode LetWithAssignment where
-  decode = genericDecode defaultOptions
 derive instance genericRepLetWithAssignment :: Generic LetWithAssignment _
 instance showLetWithAssignment :: Show LetWithAssignment where
   show x = genericShow x
 instance eqLetWithAssignment :: Eq LetWithAssignment where
   eq x = genericEq x
-
-instance encodeAssignmentStatement :: Encode AssignmentStatement where
-  encode = genericEncode defaultOptions
-
-instance decodeAssignmentStatement :: Decode AssignmentStatement where
-  decode = genericDecode defaultOptions

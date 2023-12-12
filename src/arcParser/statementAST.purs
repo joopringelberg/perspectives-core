@@ -31,8 +31,6 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -111,19 +109,11 @@ endOfAssignment (ExternalDestructiveEffect{end}) = end
 derive instance genericStatements :: Generic Statements _
 instance showStatements :: Show Statements where show = genericShow
 instance eqStatements :: Eq Statements where eq = genericEq
-instance encodeStatements :: Encode Statements where
-  encode = genericEncode defaultOptions
-instance decodeStatements :: Decode Statements where
-  decode = genericDecode defaultOptions
 
 derive instance genericLetStep :: Generic LetStep _
 instance showLetStep :: Show LetStep where show = genericShow
 instance eqLetStep :: Eq LetStep where eq u1 u2 = genericEq u1 u2
 derive instance ordLetStap :: Ord LetStep
-instance encodeLetStep :: Encode LetStep where
-  encode q = genericEncode defaultOptions q
-instance decodeLetStep :: Decode LetStep where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintLetStep :: PrettyPrint LetStep where
   prettyPrint' t (LetStep {bindings, assignments}) = "LetStep\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> bindings) <> "\n" <> t <> "in\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> assignments)
 
@@ -131,10 +121,6 @@ derive instance genericLetABinding :: Generic LetABinding _
 instance showLetABinding :: Show LetABinding where show = genericShow
 instance eqLetABinding :: Eq LetABinding where eq = genericEq
 derive instance ordLetABinding :: Ord LetABinding
-instance encodeLetABinding :: Encode LetABinding where
-  encode q = genericEncode defaultOptions q
-instance decodeLetABinding :: Decode LetABinding where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintLetABinding :: PrettyPrint LetABinding where
   prettyPrint' t (Expr e) = "Expr " <> prettyPrint' t e
   prettyPrint' t (Stat varname s) = "Stat " <> varname <> " " <> prettyPrint' t s
@@ -143,10 +129,6 @@ derive instance genericAssignment :: Generic Assignment _
 instance showAssignment :: Show Assignment where show = genericShow
 instance eqAssignment :: Eq Assignment where eq = genericEq
 derive instance ordAssignment :: Ord Assignment
-instance encodeAssignment :: Encode Assignment where
-  encode q = genericEncode defaultOptions q
-instance decodeAssignment :: Decode Assignment where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintAssignment :: PrettyPrint Assignment where
   prettyPrint' t (RemoveRole {roleExpression}) = "Remove role " <> prettyPrint' t roleExpression
   prettyPrint' t (RemoveContext {roleExpression}) = "Remove context" <> prettyPrint' t roleExpression
@@ -176,10 +158,6 @@ derive instance genericAssignmentOperator :: Generic AssignmentOperator _
 instance showAssignmentOperator :: Show AssignmentOperator where show = genericShow
 instance eqAssignmentOperator :: Eq AssignmentOperator where eq = genericEq
 derive instance ordAssignmentOperator :: Ord AssignmentOperator
-instance encodeAssignmentOperator :: Encode AssignmentOperator where
-  encode = genericEncode defaultOptions
-instance decodeAssignmentOperator :: Decode AssignmentOperator where
-  decode = genericDecode defaultOptions
 instance prettyPrintAssignmentOperator :: PrettyPrint AssignmentOperator where
   prettyPrint' _ (Set _) = "Set"
   prettyPrint' _ (AddTo _) = "AddTo"

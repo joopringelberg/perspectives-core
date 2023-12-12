@@ -24,17 +24,17 @@ module Perspectives.Representation.Action where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), domain, functional, range)
 import Perspectives.Repetition (Duration, Repeater)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic as THREE
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 data AutomaticAction = 
   ContextAction (TimeFacets 
@@ -60,16 +60,29 @@ effectOfAction (RoleAction action) = action.effect
 derive instance genericAutomaticAction :: Generic AutomaticAction _
 instance showAutomaticAction :: Show AutomaticAction where show = genericShow
 instance eqAutomaticAction :: Eq AutomaticAction where eq = genericEq
-instance encodeAutomaticAction :: Encode AutomaticAction where encode = genericEncode defaultOptions
-instance decodeAutomaticAction :: Decode AutomaticAction where decode = genericDecode defaultOptions
+
+instance WriteForeign AutomaticAction where
+  writeImpl (ContextAction r) = writeImpl { constructor: "ContextAction", r}
+  writeImpl (RoleAction r) = writeImpl { constructor: "RoleAction", r}
+
+instance ReadForeign AutomaticAction where
+  readImpl f = 
+    do 
+      {r} :: {r :: TimeFacets ( effect :: QueryFunctionDescription )} <- read' f
+      pure $ ContextAction r
+    <|>
+    do 
+      {r} :: {r :: TimeFacets ( effect :: QueryFunctionDescription, currentContextCalculation :: QueryFunctionDescription )} <- read' f
+      pure $ RoleAction r
 
 newtype Action = Action QueryFunctionDescription
 derive instance genericAction :: Generic Action _
 derive instance newtypeAction :: Newtype Action _
 instance showAction :: Show Action where show = genericShow
 instance eqAction :: Eq Action where eq = genericEq
-instance encodeAction :: Encode Action where encode = genericEncode defaultOptions
-instance decodeAction :: Decode Action where decode = genericDecode defaultOptions
+
+derive newtype instance WriteForeign Action
+derive newtype instance ReadForeign Action
 
 instance Semigroup Action where
   append (Action qfd1) (Action qfd2)= Action $ makeSequence qfd1 qfd2

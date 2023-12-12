@@ -47,7 +47,7 @@ import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (binding, roleAspects)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType)
 import Perspectives.Types.ObjectGetters (isMandatory_, isRelational_)
 
 -- Modify EnumeratedRoles by inferring the following from their aspects:
@@ -56,22 +56,22 @@ import Perspectives.Types.ObjectGetters (isMandatory_, isRelational_)
 --    * Add the restrictions on fillers from Aspects to that of the role.
 inferFromAspectRoles :: PhaseThree Unit
 inferFromAspectRoles = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (inferFromAspectRoles' df)
   where
     inferFromAspectRoles' :: DomeinFileRecord -> PhaseThree Unit
-    inferFromAspectRoles' df@{_id, namespace, enumeratedRoles} = do
+    inferFromAspectRoles' df@{id, namespace, enumeratedRoles} = do
       -- We have to execute in topological order, so aspects are handled before they are applied.
       enumeratedRoles' <- executeInTopologicalOrder
         identifier_
         -- Only count aspects defined in this namespace as dependencies for the sorting!
         (filter (flip startsWithSegments namespace) <<< (map (unwrap <<< roleInContext2Role) <<< _.roleAspects <<< unwrap))
         (values enumeratedRoles)
-        (inferCardinality >=> inferMandatoriness >=> inferBinding >=> lift <<< lift <<< modifyEnumeratedRoleInDomeinFile namespace)
-      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit (DomeinFileId _id)
+        (inferCardinality >=> inferMandatoriness >=> inferBinding >=> lift <<< lift <<< modifyEnumeratedRoleInDomeinFile id)
+      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit id
       modifyDF \_ -> dfr'
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole

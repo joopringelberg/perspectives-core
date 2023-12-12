@@ -35,7 +35,6 @@ module Perspectives.Instances.CreateRole where
 import Control.Monad.Writer (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Foreign.Generic (encodeJSON)
 import Perspectives.Assignment.Update (getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (defaultRolRecord)
@@ -52,6 +51,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, void, ($))
+import Simple.JSON (writeJSON)
 
 -- | `localName` should be the local name of the roleType.
 -- | The role instance is cached.
@@ -67,7 +67,8 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
   allTypes <- lift (roleType ###= roleAspectsClosure)
   contextType <- lift $ contextType_ contextInstance
   role <- pure (PerspectRol defaultRolRecord
-    { _id = rolInstanceId
+    { _id = unwrap rolInstanceId
+    , id = rolInstanceId
     , pspType = roleType
     , allTypes = allTypes
     , context = contextInstance
@@ -75,7 +76,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
     , universeRoleDelta =
         SignedDelta
           { author: stripNonPublicIdentifiers author
-          , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+          , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
             { id: contextInstance
             , contextType
             , roleInstances: (SNEA.singleton rolInstanceId)

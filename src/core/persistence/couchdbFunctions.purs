@@ -45,8 +45,6 @@ import Affjax.ResponseFormat as ResponseFormat
 import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (runExcept)
-import Data.Argonaut (fromObject, fromString, fromArray, Json)
 import Data.Array (difference, find, union)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -60,10 +58,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Foreign (MultipleErrors)
-import Foreign.Class (class Decode, decode)
-import Foreign.Generic (decodeJSON, defaultOptions, genericDecode)
-import Foreign.JSON (parseJSON)
-import Foreign.Object (fromFoldable, singleton)
+import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
 import Perspectives.Couchdb.Revision (class Revision)
@@ -71,7 +66,7 @@ import Perspectives.Identifiers (deconstructUserName, endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
 import Perspectives.Persistence.State (getCouchdbCredentials, getSystemIdentifier)
 import Perspectives.Persistence.Types (Credential(..), DatabaseName, MonadPouchdb, Url)
-import Simple.JSON (writeJSON)
+import Simple.JSON (class ReadForeign, class WriteForeign, E, readJSON, writeJSON)
 
 -- | This module contains functions to write and read documents on Couchdb endpoints that Pouchdb prohibits:
 -- | _security, _replicator.
@@ -121,7 +116,7 @@ ensureSecurityDocument base db = do
     [StatusCode 200]
     "ensureSecurityDocument"
     \response -> do
-      (x :: Either MultipleErrors SecurityDocument) <- pure $ runExcept ((parseJSON >=> decode) response.body)
+      (x :: Either MultipleErrors SecurityDocument) <- pure $ readJSON response.body
       case x of
         (Left e) -> do
           throwError $ error ("ensureSecurityDocument: error in decoding result: " <> show e)
@@ -177,6 +172,7 @@ newtype UserDocument = UserDocument
   , _rev :: Maybe String
   , name :: String
   , password_scheme :: String
+  , password :: String
   , iterations :: Int
   , derived_key :: String
   , salt :: String
@@ -188,13 +184,12 @@ derive instance Generic UserDocument _
 
 derive instance Newtype UserDocument _
 
-instance Decode UserDocument where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
 instance Revision UserDocument where
   rev = _._rev <<< unwrap
   changeRevision _ d = d
 
+derive newtype instance ReadForeign UserDocument
+derive newtype instance WriteForeign UserDocument
 -----------------------------------------------------------
 -- CREATE USER
 -----------------------------------------------------------
@@ -206,13 +201,14 @@ type Password = String
 createUser :: forall f. Url -> User -> Password -> Array Role -> MonadPouchdb f Unit
 createUser base user password roles = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
-  (content :: Json) <- pure (fromObject (fromFoldable
-    [ Tuple "_id" (fromString $ "org.couchdb.user:" <> user2couchdbuser user)
-    , Tuple "name" (fromString $ user2couchdbuser user)
-    , Tuple "password" (fromString password)
-    , Tuple "roles" (fromArray (fromString <$> roles))
-    , Tuple "type" (fromString "user")]))
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user ), content = Just $ RequestBody.json content}
+  (content :: String) <- pure (writeJSON
+    { _id: "org.couchdb.user:" <> user2couchdbuser user
+    , name: user2couchdbuser user
+    , password
+    , roles
+    , type: "user"
+    })
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user ), content = Just $ RequestBody.string content}
   onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
 type Role = String
@@ -263,25 +259,29 @@ deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> use
 setPassword :: forall f. Url -> User -> Password -> MonadPouchdb f Unit
 setPassword base user password = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
-  (res :: (Either AJ.Error (Response Json))) <- liftAff $ AJ.request $ rq
+  (res :: (Either AJ.Error (Response String))) <- liftAff $ AJ.request $ rq
     { method = Left GET
     , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user)
-    , responseFormat = ResponseFormat.json
+    , responseFormat = ResponseFormat.string
     }
   onAccepted
     res
     [StatusCode 200]
     "setPassword"
     \response -> do
-        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.json (changePassword response.body password)}
-        onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
+        case changePassword response.body password of
+          Left e -> throwError $ error ("setPassword: cannot construct UserDocument with new password (" <> show e <> ").")
+          Right userDoc -> do 
+            res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.string userDoc}
+            onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
 
-foreign import changePassword :: Json -> String -> Json
+changePassword :: String -> Password -> E String
+changePassword r password = (\(UserDocument doc) -> writeJSON (doc {password = password})) <$> readJSON r
 
 -----------------------------------------------------------
 -- GET DOCUMENT FROM URL (COPIED FROM Perspectives.Couchdb.Databases)
 -----------------------------------------------------------
-getDocumentFromUrl :: forall d f. Revision d => Decode d => String -> MonadPouchdb f d
+getDocumentFromUrl :: forall d f. Revision d => ReadForeign d => String -> MonadPouchdb f d
 getDocumentFromUrl url = ensureAuthentication (Url url) \_ -> do
   rq <- defaultPerspectRequest
   res <- liftAff $ AJ.request $ rq {url = url}
@@ -290,7 +290,7 @@ getDocumentFromUrl url = ensureAuthentication (Url url) \_ -> do
     [StatusCode 200]
     "getDocumentFromUrl"
     \response -> do
-      (x :: Either MultipleErrors d) <- pure $ runExcept ((parseJSON >=> decode) response.body)
+      (x :: Either MultipleErrors d) <- pure $ readJSON response.body
       case x of
         (Left e) -> throwError $ error ("getDocumentFromUrl: error in decoding result: " <> show e)
         (Right doc) -> pure doc
@@ -338,7 +338,7 @@ type Revision_ = Maybe String
 version :: forall m. MonadError Error m => Array ResponseHeader -> m Revision_
 version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
   Nothing -> throwError $ error ("Perspectives.Instances.version: retrieveDocumentVersion: couchdb returns no ETag header holding a document version number")
-  (Just h) -> case runExcept $ decodeJSON (value h) of
+  (Just h) -> case readJSON (value h) of
     Left _ -> pure Nothing
     Right v -> pure $ Just v
 

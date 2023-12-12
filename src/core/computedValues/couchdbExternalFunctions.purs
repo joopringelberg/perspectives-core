@@ -49,7 +49,7 @@ import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
-import Foreign.Generic (Foreign, encodeJSON)
+import Foreign (Foreign)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -104,6 +104,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Simple.JSON (writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 modelsDatabaseName :: MonadPerspectives String
@@ -133,7 +134,7 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
 pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = ArrayT do
   -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)]
-  (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/pendingInvitations" (Nothing :: Maybe Unit)
+  (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/pendingInvitations" (Nothing :: Maybe String)
 
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
@@ -226,7 +227,7 @@ isInitialLoad = true
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   unversionedModelname <- pure $ unversionedModelUri modelname
-  x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall unversionedModelname
+  x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall (DomeinFileId unversionedModelname)
   {patch, build} <- case x of 
     Nothing -> pure {patch: "0", build: "0"}
     Just {versionedModelManifest} -> lift $ getPatchAndBuild versionedModelManifest
@@ -244,7 +245,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   versionedModelName <- pure (unversionedModelname <> (maybe "" ((<>) "@") version))
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl versionedModelName
   df@(DomeinFile
-  { _id
+  { id
   -- , indexedRoles
   -- , indexedContexts
   , referredModels
@@ -254,8 +255,8 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
-  lift $ void $ cacheEntity (DomeinFileId _id) (changeRevision Nothing df)
-  revision <- lift $ saveCachedDomeinFile (DomeinFileId _id)  >>= pure <<< rev
+  lift $ void $ cacheEntity id (changeRevision Nothing df)
+  revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
   -- Copy the attachment
   lift $ addA repositoryUrl documentName revision
@@ -311,7 +312,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
         }
       signedDelta <- pure $ SignedDelta
         { author: stripNonPublicIdentifiers author
-        , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+        , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
 
       -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
       (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)

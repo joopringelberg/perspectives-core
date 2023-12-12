@@ -33,8 +33,6 @@ module Perspectives.Representation.SideEffect where
 import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment, LetStep)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Prelude (class Eq, class Show)
@@ -42,10 +40,7 @@ import Prelude (class Eq, class Show)
 data SideEffect = A (Array Assignment) | L LetStep | EF QueryFunctionDescription
 
 derive instance genericRepSideEffect :: Generic SideEffect _
-instance encodeSideEffect :: Encode SideEffect where
-  encode = genericEncode defaultOptions
-instance decodeSideEffect :: Decode SideEffect where
-  decode = genericDecode defaultOptions
+
 instance showSideEffect :: Show SideEffect where
   show = genericShow
 instance eqSideEffect :: Eq SideEffect where

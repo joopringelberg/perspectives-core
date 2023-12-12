@@ -26,7 +26,7 @@
 -- | Each newtype is an instance of several Type Classes:
 -- |  * Generic
 -- |  * Newtype
--- |  * Encode
+-- |  * WriteForeign
 -- |  * ReadForeign
 -- |  * Show
 -- |  * Eq.
@@ -46,8 +46,6 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Foreign (unsafeToForeign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Utilities (class PrettyPrint)
@@ -56,8 +54,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
 derive instance genericRepContextType :: Generic ContextType _
-derive newtype instance encodeContextType :: Encode ContextType
-derive newtype instance decodeContextType :: Decode ContextType
+
 instance showContextType :: Show ContextType where
   show i = "ContextType " <> (unwrap i)
 instance eqContextType :: Eq ContextType where
@@ -71,8 +68,7 @@ derive instance ordContextType :: Ord ContextType
 newtype EnumeratedRoleType = EnumeratedRoleType String
 derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
 derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
-derive newtype instance encodeEnumeratedRolType :: Encode EnumeratedRoleType
-derive newtype instance decodeEnumeratedRolType :: Decode EnumeratedRoleType
+
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
   -- show i = "EnumeratedRoleType " <> (unwrap i)
   show = genericShow
@@ -88,8 +84,7 @@ derive newtype instance readForeignEnumeratedRoleType :: ReadForeign EnumeratedR
 newtype CalculatedRoleType = CalculatedRoleType String
 derive instance newtypeComputedRolType :: Newtype CalculatedRoleType _
 derive instance genericRepComputedRolType :: Generic CalculatedRoleType _
-derive newtype instance encodeComputedRolType :: Encode CalculatedRoleType
-derive newtype instance decodeCalculatedRoleType :: Decode CalculatedRoleType
+
 instance showComputedRolType :: Show CalculatedRoleType where
   show i = "CalculatedRoleType " <> (unwrap i)
 instance eqComputedRolType :: Eq CalculatedRoleType where
@@ -103,10 +98,6 @@ derive newtype instance readForeignCalculatedRoleType :: ReadForeign CalculatedR
 
 data RoleType = ENR EnumeratedRoleType | CR CalculatedRoleType
 derive instance genericRepRoleType :: Generic RoleType _
-instance encodeRoleType :: Encode RoleType where
-  encode = genericEncode defaultOptions
-instance decodeRoleType :: Decode RoleType where
-  decode = genericDecode defaultOptions
 instance showRoleType :: Show RoleType where
   show (ENR r) = "ENR " <>  show r
   show (CR r) = "CR " <> show r
@@ -124,14 +115,12 @@ instance writeForeignRoleType :: WriteForeign RoleType where
 instance readForeightRoleType :: ReadForeign RoleType where
   readImpl f = map variantToGenericSum (readImpl f)
 
-
 -- | We have rare occasions where we want to lose the difference between
 -- | CalculatedRoletype and EnumeratedRoleType.
 newtype RoleType_ = RoleType_ String
 derive instance newtypeRoleType_ :: Newtype RoleType_ _
 derive instance genericRepRoleType_ :: Generic RoleType_ _
-derive newtype instance encodeRoleType_ :: Encode RoleType_
-derive newtype instance decodeRoleType_ :: Decode RoleType_
+
 instance showRoleType_ :: Show RoleType_ where
   show i = "RoleType_ " <> (unwrap i)
 instance eqRoleType_ :: Eq RoleType_ where
@@ -151,10 +140,6 @@ roletype2string (CR s) = unwrap s
 -- | RoleKind codes the 'role' of the role in the context. Is it an external rol, a bot role, etc.
 data RoleKind = RoleInContext | ContextRole | ExternalRole | UserRole | Public
 derive instance genericRepRoleKind :: Generic RoleKind _
-instance encodeRoleKind :: Encode RoleKind where
-  encode = genericEncode defaultOptions
-instance decodeRoleKind :: Decode RoleKind where
-  decode = genericDecode defaultOptions
 instance showRoleKind :: Show RoleKind where
   show = genericShow
 instance eqRoleKind :: Eq RoleKind where
@@ -164,12 +149,9 @@ instance writeForeignRoleKind :: WriteForeign RoleKind where
 instance readForeignRoleKind :: ReadForeign RoleKind where
   readImpl = enumReadForeign
 
-
 newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
 derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
-derive newtype instance encodeEnumeratedPropertyType :: Encode EnumeratedPropertyType
-derive newtype instance decodeEnumeratedPropertyType :: Decode EnumeratedPropertyType
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
   show i = "EnumeratedPropertyType " <> (unwrap i)
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
@@ -181,12 +163,9 @@ instance prettyPrintEnumeratedPropertyType :: PrettyPrint EnumeratedPropertyType
 derive newtype instance writeForeignEnumeratedPropertyType :: WriteForeign EnumeratedPropertyType
 derive newtype instance readForeignEnumeratedPropertyType :: ReadForeign EnumeratedPropertyType
 
-
 newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
 derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
-derive newtype instance encodeCalculatedPropertyType :: Encode CalculatedPropertyType
-derive newtype instance decodeCalculatedPropertyType :: Decode CalculatedPropertyType
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
   show i = "CalculatedPropertyType " <> (unwrap i)
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
@@ -208,10 +187,6 @@ propertytype2string (ENP s) = unwrap s
 propertytype2string (CP s) = unwrap s
 
 derive instance genericRepPropertyType :: Generic PropertyType _
-instance encodePropertyType :: Encode PropertyType where
-  encode = genericEncode defaultOptions
-instance decodePropertyType :: Decode PropertyType where
-  decode = genericDecode defaultOptions
 instance showPropertyType :: Show PropertyType where
   show (ENP r) = show r
   show (CP r) = show r
@@ -230,8 +205,6 @@ instance readForeightPropertyType :: ReadForeign PropertyType where
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _
 derive instance genericRepViewType :: Generic ViewType _
-derive newtype instance encodeViewType :: Encode ViewType
-derive newtype instance decodeViewType :: Decode ViewType
 instance showViewType :: Show ViewType where
   show i = "ViewType " <> (unwrap i)
 instance eqViewType :: Eq ViewType where
@@ -246,8 +219,6 @@ derive newtype instance readForeignViewType :: ReadForeign ViewType
 newtype PerspectiveType = PerspectiveType String
 derive instance newtypePerspectiveType :: Newtype PerspectiveType _
 derive instance genericRepPerspectiveType :: Generic PerspectiveType _
-derive newtype instance encodePerspectiveType :: Encode PerspectiveType
-derive newtype instance decodePerspectiveType :: Decode PerspectiveType
 instance showPerspectiveType :: Show PerspectiveType where
   show i = "PerspectiveType " <> (unwrap i)
 instance eqPerspectiveType :: Eq PerspectiveType where
@@ -262,8 +233,6 @@ derive newtype instance readForeignPerspectiveType :: ReadForeign PerspectiveTyp
 newtype ActionIdentifier = ActionIdentifier String
 derive instance newtypeActionIdentifier :: Newtype ActionIdentifier _
 derive instance genericRepActionIdentifier :: Generic ActionIdentifier _
-derive newtype instance encodeActionIdentifier :: Encode ActionIdentifier
-derive newtype instance decodeActionIdentifier :: Decode ActionIdentifier
 instance showActionIdentifier :: Show ActionIdentifier where
   show i = "ActionIdentifier " <> (unwrap i)
 instance eqActionIdentifier :: Eq ActionIdentifier where
@@ -278,8 +247,6 @@ derive newtype instance readForeignActionIdentifier :: ReadForeign ActionIdentif
 newtype StateIdentifier = StateIdentifier String
 derive instance newtypeStateIdentifier :: Newtype StateIdentifier _
 derive instance genericRepStateIdentifier :: Generic StateIdentifier _
-derive newtype instance encodeStateIdentifier :: Encode StateIdentifier
-derive newtype instance decodeStateIdentifier :: Decode StateIdentifier
 instance showStateIdentifier :: Show StateIdentifier where
   show i = "StateIdentifier " <> (unwrap i)
 instance eqStateIdentifier :: Eq StateIdentifier where
@@ -293,7 +260,6 @@ derive newtype instance readForeignStateIdentifier :: ReadForeign StateIdentifie
 instance semiGroupStateIdentifier :: Semigroup StateIdentifier where
   append (StateIdentifier s1) (StateIdentifier s2) = if s1 == "" then StateIdentifier s2 else StateIdentifier (s1 <> "$" <> s2)
 
-
 externalRoleType :: ContextType -> EnumeratedRoleType
 externalRoleType (ContextType ct) = EnumeratedRoleType (ct <> "$External")
 
@@ -303,8 +269,7 @@ externalRoleType_ ct = ct <> "$External"
 newtype DomeinFileId = DomeinFileId String
 derive instance newtypeDomeinFileId :: Newtype DomeinFileId _
 derive instance genericRepDomeinFileId :: Generic DomeinFileId _
-derive newtype instance encodeDomeinFileId :: Encode DomeinFileId
-derive newtype instance decodeDomeinFileId :: Decode DomeinFileId
+
 instance showDomeinFileId :: Show DomeinFileId where
   show = unwrap
 instance eqDomeinFileId :: Eq DomeinFileId where
@@ -313,6 +278,8 @@ instance ordDomeinFileId :: Ord DomeinFileId where
   compare (DomeinFileId a) (DomeinFileId b) = compare a b
 instance prettyPrintDomeinFileId :: PrettyPrint DomeinFileId where
   prettyPrint' t (DomeinFileId n) = n
+derive newtype instance ReadForeign DomeinFileId
+derive newtype instance WriteForeign DomeinFileId
 
 data ResourceType = CType ContextType | RType EnumeratedRoleType
 derive instance Generic ResourceType _

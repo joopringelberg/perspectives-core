@@ -34,7 +34,6 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Now (nowDateTime)
-import Foreign.Generic (encode)
 import LRUCache (size)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
@@ -43,6 +42,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
+import Simple.JSON (write)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | This module gives access to various `devices` with `sensors` that can be read to yield a value.
@@ -77,7 +77,7 @@ currentDate :: Partial => SensorFunction
 currentDate device sensor = case device, sensor of
   "clock", "now" ->do 
     dt <- liftEffect (unsafeCoerce nowDateTime)
-    pure $ unsafeCoerce $ encode (SerializableDateTime dt)
+    pure $ unsafeCoerce $ write (SerializableDateTime dt)
 
 cacheSize :: Partial => SensorFunction
 cacheSize device sensor = show <$> case device, sensor of 

@@ -29,8 +29,6 @@ import Data.Foldable (intercalate)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.QueryFunction (FunctionName) as QF
@@ -113,10 +111,10 @@ derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
 derive instance ordStep :: Ord Step
-instance encodeStep :: Encode Step where
-  encode = genericEncode defaultOptions
-instance decodeStep :: Decode Step where
-  decode = genericDecode defaultOptions
+
+
+
+
 instance prettyPrintStep :: PrettyPrint Step where
   prettyPrint' t (Simple s) = prettyPrint' t s
   prettyPrint' t (Binary s) = prettyPrint' t s
@@ -128,10 +126,6 @@ derive instance genericSimpleStep :: Generic SimpleStep _
 instance showSimpleStep :: Show SimpleStep where show = genericShow
 instance eqSimpleStep :: Eq SimpleStep where eq = genericEq
 derive instance ordSimpleStep :: Ord SimpleStep
-instance encodeSimpleStep :: Encode SimpleStep where
-  encode = genericEncode defaultOptions
-instance decodeSimpleStep :: Decode SimpleStep where
-  decode = genericDecode defaultOptions
 instance prettyPrintSimpleStep :: PrettyPrint SimpleStep where
   prettyPrint' t (ArcIdentifier _ s) = "ArcIdentifier " <> s
   
@@ -166,10 +160,6 @@ derive instance genericBinaryStep :: Generic BinaryStep _
 instance showBinaryStep :: Show BinaryStep where show = genericShow
 instance eqBinaryStep :: Eq BinaryStep where eq s1 s2 = genericEq s1 s2
 derive instance ordBinaryStap :: Ord BinaryStep
-instance encodeBinaryStep :: Encode BinaryStep where
-  encode q = genericEncode defaultOptions q
-instance decodeBinaryStep :: Decode BinaryStep where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintBinaryStep :: PrettyPrint BinaryStep where
   prettyPrint' t (BinaryStep {operator, left, right}) = prettyPrint' t operator <> "\n" <> t <> (prettyPrint' (t <> "  ") left) <> "\n" <> t <> (prettyPrint' (t <> "  ") right)
 
@@ -177,10 +167,6 @@ derive instance genericUnaryStep :: Generic UnaryStep _
 instance showUnaryStep :: Show UnaryStep where show = genericShow
 instance eqUnaryStep :: Eq UnaryStep where eq u1 u2 = genericEq u1 u2
 derive instance ordUnaryStap :: Ord UnaryStep
-instance encodeUnaryStep :: Encode UnaryStep where
-  encode q = genericEncode defaultOptions q
-instance decodeUnaryStep :: Decode UnaryStep where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
   prettyPrint' t (LogicalNot _ s) = "LogicalNot " <> prettyPrint' t s
   prettyPrint' t (Exists _ s) = "Exists " <> prettyPrint' t s
@@ -192,10 +178,6 @@ derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
 instance eqPureLetStep :: Eq PureLetStep where eq u1 u2 = genericEq u1 u2
 derive instance ordPureLetStep :: Ord PureLetStep
-instance encodePureLetStep :: Encode PureLetStep where
-  encode q = genericEncode defaultOptions q
-instance decodePureLetStep :: Decode PureLetStep where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintPureLetStep :: PrettyPrint PureLetStep where
   prettyPrint' t (PureLetStep {bindings, body}) = "LetStep\n" <> intercalate (t <> "\n") (prettyPrint' (t <> "  ") <$> bindings) <> "\n" <> t <> "in\n" <> (prettyPrint' (t <> "  ") body)
 
@@ -203,10 +185,6 @@ derive instance genericVarBinding :: Generic VarBinding _
 instance showVarBinding :: Show VarBinding where show = genericShow
 instance eqVarBinding :: Eq VarBinding where eq = genericEq
 derive instance ordVarBinding :: Ord VarBinding
-instance encodeVarBinding :: Encode VarBinding where
-  encode q = genericEncode defaultOptions q
-instance decodeVarBinding :: Decode VarBinding where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintVarBinding :: PrettyPrint VarBinding where
   prettyPrint' t (VarBinding name s) = name <> " = " <> prettyPrint' t s
 
@@ -214,10 +192,6 @@ derive instance genericOperator :: Generic Operator _
 instance showOperator :: Show Operator where show = genericShow
 instance eqOperator :: Eq Operator where eq = genericEq
 derive instance ordOperator :: Ord Operator
-instance encodeOperator :: Encode Operator where
-  encode = genericEncode defaultOptions
-instance decodeOperator :: Decode Operator where
-  decode = genericDecode defaultOptions
 instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (Compose _) = "Compose"
   prettyPrint' t (Equals _) = "Equals"
@@ -244,9 +218,5 @@ derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s
 instance eqComputationStep :: Eq ComputationStep where eq c1 c2 = genericEq c1 c2
 derive instance ordComputationStep :: Ord ComputationStep
-instance encodeComputationStep :: Encode ComputationStep where
-  encode q = genericEncode defaultOptions q
-instance decodeComputationStep :: Decode ComputationStep where
-  decode q = genericDecode defaultOptions q
 instance prettyPrintComputationStep :: PrettyPrint ComputationStep where
   prettyPrint' t (ComputationStep{functionName, arguments, computedType}) = "Computation\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> " ") <$> arguments) <> "\n" <> t <> computedType

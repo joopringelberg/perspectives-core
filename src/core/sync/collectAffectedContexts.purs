@@ -66,7 +66,7 @@ import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole, InvertedQueryMap)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (StateFulObject(..))
@@ -750,7 +750,7 @@ aisInPropertyDelta id property replacementProperty eroleType = do
     -- Either compile the InvertedQuery or take the compilation from the DomeinFile in cache, if it had been compiled before.
     compileDescriptions' :: EnumeratedPropertyType -> MonadPerspectives (Object (Array InvertedQuery))
     compileDescriptions' rt@(EnumeratedPropertyType ert) =  do
-      modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ert)
+      modelName <- pure $ (DomeinFileId $ unsafePartial $ fromJust $ typeUri2ModelUri ert)
       (try $ retrieveDomeinFile modelName) >>=
         handleDomeinFileError' "aisInPropertyDelta" empty
           \(df :: DomeinFile) -> case preview (onPropertyDelta rt) df of
@@ -807,7 +807,7 @@ compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
 -- | stores the result in cache.
 compileContextInvertedQueries :: EnumeratedRoleType -> MonadPerspectives (Object (Array InvertedQuery))
 compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
-  modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ert)
+  modelName <- pure $ (DomeinFileId $ unsafePartial $ fromJust $ typeUri2ModelUri ert)
   (try $ retrieveDomeinFile modelName) >>=
     handleDomeinFileError' "compileDescriptions_" empty
     \(df :: DomeinFile) -> do
@@ -830,7 +830,7 @@ compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
 -- | stores the result in cache.
 compileRoleInvertedQueries :: ContextType -> MonadPerspectives (Object (Array InvertedQuery))
 compileRoleInvertedQueries ct@(ContextType ctxtType) = do
-  modelName <- pure $ (unsafePartial $ fromJust $ typeUri2ModelUri ctxtType)
+  modelName <- pure $ (DomeinFileId $ unsafePartial $ fromJust $ typeUri2ModelUri ctxtType)
   (try $ retrieveDomeinFile modelName) >>=
     handleDomeinFileError' "compileDescriptions_" empty
     \(df :: DomeinFile) -> do

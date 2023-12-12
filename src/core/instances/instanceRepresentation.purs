@@ -26,18 +26,17 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap, over)
 import Data.Show.Generic (genericShow)
-import Foreign (Foreign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object) as F
 import Persistence.Attachment (class Attachment, Attachments)
-import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
+import Perspectives.Persistence.Types (PouchbdDocumentFields)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta)
-import Prelude (class Eq, class Show, bind, eq, pure, (<<<), (==))
+import Prelude (class Eq, class Show, eq, (<<<), (==))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- PERSPECTCONTEXT TYPE CLASS
@@ -59,9 +58,8 @@ instance perspectContextPerspectContextClass :: PerspectContextClass PerspectCon
 -----------------------------------------------------------
 newtype PerspectContext = PerspectContext ContextRecord
 
-type ContextRecord =
-  { _id :: ContextInstance
-  , _rev :: Revision_
+type ContextRecord = PouchbdDocumentFields
+  ( id :: ContextInstance
   , displayName :: String
   , pspType :: ContextType
   , buitenRol :: RoleInstance
@@ -71,31 +69,23 @@ type ContextRecord =
   , universeContextDelta :: SignedDelta
   , states :: Array StateIdentifier
   , publicUrl :: Maybe PublicUrl
-  }
+  )
 
 derive instance genericRepPerspectContext :: Generic PerspectContext _
 
 instance showPerspectContext :: Show PerspectContext where
   show = genericShow
 
-instance encodePerspectContext :: Encode PerspectContext where
-  encode = genericEncode defaultOptions
-
-instance decodePerspectContext :: Decode PerspectContext where
-  decode (json :: Foreign) = do
-    -- Get the value of the _rev member of the raw json representation (the "outer _rev").
-    rev <- getRev json
-    a <- genericDecode defaultOptions json
-    -- Set the value of the _rev member of the ContextRecord (the "inner _rev").
-    pure (changeRevision rev a)
-
+derive newtype instance WriteForeign PerspectContext
+derive newtype instance ReadForeign PerspectContext
+ 
 instance eqPerspectContext :: Eq PerspectContext where
-  eq (PerspectContext {_id : id1}) (PerspectContext {_id : id2}) = id1 == id2
+  eq (PerspectContext {id : id1}) (PerspectContext {id : id2}) = id1 == id2
 
 derive instance newtypePerspectContext :: Newtype PerspectContext _
 
 instance identifiablePerspectContext :: Identifiable PerspectContext ContextInstance where
-  identifier (PerspectContext{_id}) = _id
+  identifier (PerspectContext{id}) = id
   displayName (PerspectContext{displayName:d}) = d
 
 instance revisionPerspectContext :: Revision PerspectContext where
@@ -112,13 +102,12 @@ instance Attachment PerspectContext where
 newtype PerspectRol = PerspectRol RolRecord
 
 -- TODO. #17 Represent the closure of aspects directly on the type.
-type RolRecord =
-  { _id :: RoleInstance
+type RolRecord = PouchbdDocumentFields
+  ( id :: RoleInstance
   , pspType :: EnumeratedRoleType
   , allTypes :: Array EnumeratedRoleType
   , context :: ContextInstance
   -- While the fields above occur in every role, those below do not.
-  , _rev :: Revision_
   , binding :: Filler
   -- The four fields below could also be modeled as Maybe values.
   , properties :: F.Object (Array Value)
@@ -135,7 +124,7 @@ type RolRecord =
   , roleAliases :: F.Object String
   , contextAliases :: F.Object String
   , attachments :: Maybe Attachments
-  }
+  )
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _
 
@@ -143,27 +132,20 @@ instance showPerspectRol :: Show PerspectRol where
   show = genericShow
 
 instance eqPerspectRol :: Eq PerspectRol where
-  eq (PerspectRol{_id: id1}) (PerspectRol{_id: id2}) = eq id1 id2
+  eq (PerspectRol{id: id1}) (PerspectRol{id: id2}) = eq id1 id2
 
 derive instance newtypePerspectRol :: Newtype PerspectRol _
 
-instance encodePerspectRol :: Encode PerspectRol where
-  encode = genericEncode defaultOptions
-
-instance decodePerspectRol :: Decode PerspectRol where
-  -- decode = genericDecode defaultOptions
-  decode (json :: Foreign) = do
-    rev <- getRev json
-    a <- genericDecode defaultOptions json
-    pure (changeRevision rev a)
+derive newtype instance WriteForeign PerspectRol
+derive newtype instance ReadForeign PerspectRol
 
 instance revisionPerspectRol :: Revision PerspectRol where
   rev = _._rev <<< unwrap
   changeRevision s = over PerspectRol (\vr -> vr {_rev = s})
 
 instance identifiablePerspectRol :: Identifiable PerspectRol RoleInstance where
-  identifier (PerspectRol{_id}) = _id
-  displayName (PerspectRol{_id}) = unwrap _id
+  identifier (PerspectRol{id}) = id
+  displayName (PerspectRol{id}) = unwrap id
 
 instance Attachment PerspectRol where
   setAttachment (PerspectRol r) ma = PerspectRol (r {attachments = ma})

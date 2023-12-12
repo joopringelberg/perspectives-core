@@ -24,19 +24,18 @@ module Perspectives.Representation.ScreenDefinition where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe)
 import Data.Show.Generic (genericShow)
-import Data.Maybe (Maybe(..))
-import Foreign (Foreign)
-import Foreign.Class (class Decode, class Encode, encode, decode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign (Foreign, F)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
-import Simple.JSON (class WriteForeign, write)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
 
 -- | These types are part of a DomeinFile.
 -- | Runtime, we generate a simpler structure from them, that has an automatic WriteForeign instance.
@@ -96,7 +95,6 @@ newtype FormDef = FormDef WidgetCommonFieldsDef
 newtype TableDef' = TableDef' (WidgetCommonFieldsDefWithoutPerspective ())
 newtype FormDef' = FormDef' (WidgetCommonFieldsDefWithoutPerspective ())
 
-
 -----------------------------------------------------------
 -- GENERIC INSTANCES
 -----------------------------------------------------------
@@ -148,17 +146,10 @@ instance writeForeignScreenElementDef :: WriteForeign ScreenElementDef where
 instance writeForeignTabDef :: WriteForeign TabDef where
   writeImpl (TabDef widgetCommonFields) = write widgetCommonFields
 
-instance writeForeignRowDef :: WriteForeign RowDef where
-  writeImpl (RowDef screenElements) = write screenElements
-
-instance writeForeignColumnDef :: WriteForeign ColumnDef where
-  writeImpl (ColumnDef screenElements) = write screenElements
-
-instance writeForeignTableDef :: WriteForeign TableDef where
-  writeImpl (TableDef r) = writeWidgetCommonFields r
-
-instance writeForeignFormDef :: WriteForeign FormDef where
-  writeImpl (FormDef r) = writeWidgetCommonFields r
+derive newtype instance WriteForeign RowDef
+derive newtype instance WriteForeign ColumnDef
+derive newtype instance WriteForeign TableDef
+derive newtype instance WriteForeign FormDef
 
 -- | Serialise just the title and perspective field, for the client side.
 writeWidgetCommonFields :: WidgetCommonFieldsDef -> Foreign
@@ -166,41 +157,34 @@ writeWidgetCommonFields {title, perspective} = write
   { title: write title
   , perspective: write perspective}
 
------------------------------------------------------------
--- ENCODE INSTANCES
------------------------------------------------------------
-instance encodeScreenDefinition :: Encode ScreenDefinition where encode = genericEncode $ defaultOptions
-instance encodeScreenElementDef :: Encode ScreenElementDef where encode = genericEncode $ defaultOptions
-instance encodeTabDef :: Encode TabDef where encode x = genericEncode defaultOptions x
-instance encodeRowDef :: Encode RowDef where encode x = genericEncode defaultOptions x
-instance encodeColumnDef :: Encode ColumnDef where encode x = genericEncode defaultOptions x
-instance encodeTableDef' :: Encode TableDef' where encode = genericEncode $ defaultOptions
-instance encodeTableDef :: Encode TableDef where
-  encode (TableDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) = encode
-    (TableDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole})
-instance encodeFormDef' :: Encode FormDef' where encode = genericEncode $ defaultOptions
-instance encodeFormDef :: Encode FormDef where
-  encode (FormDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) = encode
-    (FormDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole})
+instance WriteForeign ScreenKey where
+  writeImpl (ScreenKey ct rt) = writeImpl {ct, rt}
 
 -----------------------------------------------------------
--- DECODE INSTANCES
+-- READFOREIGN INSTANCES
 -----------------------------------------------------------
-instance decodeScreenDefinition :: Decode ScreenDefinition where decode = genericDecode $ defaultOptions
-instance decodeScreenElementDef :: Decode ScreenElementDef where decode = genericDecode $ defaultOptions
-instance decodeTabDef :: Decode TabDef where decode x = genericDecode defaultOptions x
-instance decodeRowDef :: Decode RowDef where decode x = genericDecode defaultOptions x
-instance decodeColumnDef :: Decode ColumnDef where decode x = genericDecode defaultOptions x
-instance decodeTableDef' :: Decode TableDef' where decode = genericDecode $ defaultOptions
-instance decodeTableDef :: Decode TableDef where
-  decode f = do
-    (TableDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) <- decode f
-    pure $ TableDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole, perspective: Nothing}
-instance decodeFormDef' :: Decode FormDef' where decode = genericDecode $ defaultOptions
-instance decodeFormDef :: Decode FormDef where
-  decode f = do
-    (FormDef' {title, perspectiveId, propertyVerbs, roleVerbs, userRole}) <- decode f
-    pure $ FormDef {title, perspectiveId, propertyVerbs, roleVerbs, userRole, perspective: Nothing}
+derive newtype instance ReadForeign ScreenDefinition 
+
+instance ReadForeign ScreenElementDef where
+  readImpl f = 
+    RowElementD <<< _.row <$> ((read' f) :: F {row :: RowDef})
+    <|>
+    ColumnElementD <<< _.col <$> ((read' f) :: F {col :: ColumnDef})
+    <|>
+    TableElementD <<< _.table <$> ((read' f) :: F {table :: TableDef})
+    <|>
+    FormElementD <<< _.form <$> ((read' f) :: F {form :: FormDef})
+
+instance ReadForeign ScreenKey where
+  readImpl f = do 
+    {ct, rt} :: {ct :: ContextType, rt :: RoleType} <- read' f
+    pure $ ScreenKey ct rt
+
+derive newtype instance ReadForeign RowDef
+derive newtype instance ReadForeign ColumnDef
+derive newtype instance ReadForeign TableDef
+derive newtype instance ReadForeign FormDef
+derive newtype instance ReadForeign TabDef
 
 -------------------------------------------------------------------------------
 ---- SCREENKEY
@@ -209,8 +193,7 @@ data ScreenKey = ScreenKey ContextType RoleType
 derive instance genericScreenKey :: Generic ScreenKey _
 instance showScreenKey :: Show ScreenKey where show = genericShow
 instance eqScreenKey :: Eq ScreenKey where eq = genericEq
-instance encodeScreenKey :: Encode ScreenKey where encode = genericEncode $ defaultOptions
-instance decodeScreenKey :: Decode ScreenKey where decode = genericDecode $ defaultOptions
+
 derive instance ordScreenKey :: Ord ScreenKey
 
 type ScreenMap = EncodableMap ScreenKey ScreenDefinition

@@ -84,9 +84,9 @@ uploadToRepository domeinFileName_ arcSource_ _ = case head domeinFileName_, hea
     r <- loadAndCompileArcFile_ arcSource
     case r of
       Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      Right df@(DomeinFile {_id, namespace}) -> do
-        -- lift $ void $ storeDomeinFileInCache _id df
-        -- lift $ void $ CDB.uploadToRepository (DomeinFileId _id)
+      Right df@(DomeinFile {id, namespace}) -> do
+        -- lift $ void $ storeDomeinFileInCache id df
+        -- lift $ void $ CDB.uploadToRepository (DomeinFileId id)
         lift $ void $ CDB.uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
   _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
 

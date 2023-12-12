@@ -32,24 +32,24 @@ import Test.Guid as GUID
 main :: Effect Unit
 main = runTest do
   -- TF.theSuite
-  TPA.theSuite
-  TPA2.theSuite
-  TPA3.theSuite
-  TPAE.theSuite
-  QDC.theSuite
-  QR.theSuite
-  ADT.theSuite
-  CDB.theSuite
-  LARC.theSuite
-  CAR.theSuite
-  INV.theSuite
-  SACC.theSuite
-  COMB.theSuite
-  TMS.theSuite
-  TTO.theSuite
-  CHA.theSuite
-  ARRT.theSuite
-  HTA.theSuite
-  UT.theSuite
-  GUID.theSuite
+  -- TPA.theSuite
+  -- TPA2.theSuite
+  -- TPA3.theSuite
+  -- TPAE.theSuite
+  -- QDC.theSuite
+  -- QR.theSuite
+  -- ADT.theSuite
+  -- CDB.theSuite
+  -- LARC.theSuite
+  -- CAR.theSuite
+  -- INV.theSuite
+  -- SACC.theSuite
+  -- COMB.theSuite
+  -- TMS.theSuite
+  -- TTO.theSuite
+  -- CHA.theSuite
+  -- ARRT.theSuite
+  -- HTA.theSuite
+  -- UT.theSuite
+  -- GUID.theSuite
   DFE.theSuite

@@ -23,11 +23,9 @@
 module Perspectives.Representation.EnumeratedProperty where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Foreign.Object (Object, empty)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -37,6 +35,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- ENUMERATEDPROPERTY
@@ -44,7 +43,7 @@ import Prelude (class Eq, class Show, (<<<), (==))
 newtype EnumeratedProperty = EnumeratedProperty EnumeratedPropertyRecord
 
 type EnumeratedPropertyRecord =
-  { _id :: EnumeratedPropertyType
+  { id :: EnumeratedPropertyType
   , _rev :: Revision_
   , displayName :: String
 
@@ -63,7 +62,7 @@ type EnumeratedPropertyRecord =
 
 defaultEnumeratedProperty :: String -> String -> String -> Range -> ArcPosition -> EnumeratedProperty
 defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
-  { _id: EnumeratedPropertyType id
+  { id: EnumeratedPropertyType id
   , _rev: Nothing
   , displayName: dn
   , role: EnumeratedRoleType role
@@ -81,20 +80,18 @@ instance showEnumeratedProperty :: Show EnumeratedProperty where
   show = genericShow
 
 instance eqEnumeratedProperty :: Eq EnumeratedProperty where
-  eq (EnumeratedProperty {_id : id1}) (EnumeratedProperty {_id : id2}) = id1 == id2
+  eq (EnumeratedProperty {id : id1}) (EnumeratedProperty {id : id2}) = id1 == id2
 
 derive instance newtypeEnumeratedProperty :: Newtype EnumeratedProperty _
 
-instance decodeEnumeratedProperty :: Decode EnumeratedProperty where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign EnumeratedProperty
 
-instance encodeEnumeratedProperty :: Encode EnumeratedProperty where
-  encode = genericEncode defaultOptions
+derive newtype instance WriteForeign EnumeratedProperty
 
 instance revisionEnumeratedProperty :: Revision EnumeratedProperty where
   rev = _._rev <<< unwrap
   changeRevision s = over EnumeratedProperty (\vr -> vr {_rev = s})
 
 instance identifiableEnumeratedProperty :: Identifiable EnumeratedProperty EnumeratedPropertyType where
-  identifier (EnumeratedProperty{_id}) = _id
+  identifier (EnumeratedProperty{id}) = id
   displayName (EnumeratedProperty{displayName:d}) = d

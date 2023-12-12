@@ -24,15 +24,14 @@ module Perspectives.Sync.DeltaInTransaction where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- | `users` will not always be model:System$PerspectivesSystem$User instances.
 newtype DeltaInTransaction = DeltaInTransaction {users :: Array RoleInstance, delta :: SignedDelta}
@@ -42,11 +41,8 @@ derive instance genericRepDeltaInTransaction :: Generic DeltaInTransaction _
 instance showDeltaInTransaction :: Show DeltaInTransaction where
   show = genericShow
 
-instance encodeDeltaInTransaction :: Encode DeltaInTransaction where
-  encode = genericEncode defaultOptions
-
-instance decodeDeltaInTransaction :: Decode DeltaInTransaction where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign DeltaInTransaction
+derive newtype instance ReadForeign DeltaInTransaction
 
 instance eqDeltaInTransaction :: Eq DeltaInTransaction where
   eq = genericEq

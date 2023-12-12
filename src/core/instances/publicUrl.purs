@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Foreign.Generic (class Decode, class Encode, defaultOptions, genericDecode, genericEncode)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 data PublicUrl = NONE | URL String
 
@@ -12,9 +12,17 @@ derive instance Generic PublicUrl _
 
 instance Show PublicUrl where show = genericShow
 
-instance Encode PublicUrl where encode = genericEncode defaultOptions
+instance WriteForeign PublicUrl where
+  writeImpl NONE = writeImpl {url: "none"}
+  writeImpl (URL s) = writeImpl {url: s}
 
-instance Decode PublicUrl where decode = genericDecode defaultOptions
+instance ReadForeign PublicUrl where
+  readImpl f = do
+    {url} :: {url :: String} <- read' f
+    case url of 
+      "none" -> pure NONE
+      _ -> pure $ URL url
+
 
 instance Eq PublicUrl where 
   eq NONE NONE = true

@@ -35,6 +35,7 @@ import Effect.Aff (Aff)
 import Effect.Aff.AVar (new)
 import Foreign (Foreign, MultipleErrors)
 import Foreign.Object (Object, empty, singleton)
+import Perspectives.Couchdb.Revision (Revision_)
 import Simple.JSON (read, readImpl, readJSON', write, E)
 
 -----------------------------------------------------------
@@ -54,6 +55,14 @@ type AttachmentName = String
 type ViewName = String
 type DatabaseName = String
 
+-----------------------------------------------------------
+-- POUCHDBDOCUMENTFIELDS
+-----------------------------------------------------------
+type PouchbdDocumentFields f = 
+  { _id :: String
+  , _rev :: Revision_
+  | f
+  }
 -----------------------------------------------------------
 -- POUCHDBSTATE
 -----------------------------------------------------------

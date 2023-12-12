@@ -61,7 +61,6 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
 import Data.Foldable (for_)
-import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
@@ -70,7 +69,6 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Aff.AVar (AVar, kill, put, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Generic.Class (class GenericEncode)
 import Persistence.Attachment (class Attachment)
 import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
 import Perspectives.DomeinFile (DomeinFile)
@@ -84,6 +82,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
+import Simple.JSON (class WriteForeign)
 
 getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 getPerspectEntiteit id =
@@ -198,17 +197,17 @@ tryFetchEntiteit id = do
 
 -- | Saves a previously cached entity.
 -- | NOTE: the entity may not be saved immediately, due to the scheme of periodic saving.
-saveEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
+saveEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> MonadPerspectives a
 saveEntiteit id = saveEntiteit__ id Nothing
 
 -- | Saves the given entity to the database and puts it, with a correct (new) revision,
 -- | in the cache, assuming the current revision of the entiteit equals that in the database.
 -- | NOTE: the entity may not be saved immediately, due to the scheme of periodic saving.
-saveEntiteit_ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> a -> MonadPerspectives a
+saveEntiteit_ :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> a -> MonadPerspectives a
 saveEntiteit_ entId entiteit = saveEntiteit__ entId (Just entiteit)
 
 -- | Ensures that the entity is in cache and schedules it for saving to the database.
-saveEntiteit__ :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> Maybe a -> MonadPerspectives a
+saveEntiteit__ :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit__ entId mentiteit = do
   case mentiteit of 
     -- In this case, we might have an entity in cache. As we want to return the entity,
@@ -232,16 +231,16 @@ saveEntiteit__ entId mentiteit = do
       liftAff $ read a'
 
 saveMarkedResources :: MonadPerspectives Unit
-saveMarkedResources = do
+saveMarkedResources = do 
   (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
   modify \s -> s {entitiesToBeStored = []}
   for_ toBeSaved \(rs :: ResourceToBeStored) -> case rs of 
-    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance)
+    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance) 
     Rle r -> void $ saveCachedEntiteit (r :: RoleInstance)
     Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId) 
 
 -- | Assumes the entity a has been cached. 
-saveCachedEntiteit :: forall a i r. Attachment a => GenericEncode r => Generic a r => Persistent a i => i -> MonadPerspectives a
+saveCachedEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> MonadPerspectives a
 saveCachedEntiteit entId = do 
   entiteit <- takeEntiteitFromCache entId
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap $ identifier entiteit)

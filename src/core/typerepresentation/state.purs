@@ -24,20 +24,21 @@ module Perspectives.Representation.State where
 
 import Prelude
 
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap, empty)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription)
 import Perspectives.Representation.Action (AutomaticAction, TimeFacets)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.Sentence (Sentence)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 newtype State = State StateRecord
 
@@ -71,8 +72,39 @@ data StateDependentPerspective =
 derive instance genericStateDependentPerspective :: Generic StateDependentPerspective _
 instance showStateDependentPerspective :: Show StateDependentPerspective where show = genericShow
 instance eqStateDependentPerspective :: Eq StateDependentPerspective where eq = genericEq
-instance encodeStateDependentPerspective :: Encode StateDependentPerspective where encode = genericEncode defaultOptions
-instance decodeStateDependentPerspective :: Decode StateDependentPerspective where decode = genericDecode defaultOptions
+
+
+
+type StateDependentPerspective_ = 
+  { constructor :: String
+  , currentContextCalculation :: Maybe QueryFunctionDescription
+  , properties :: Array PropertyType
+  , selfOnly :: Boolean    
+  , isSelfPerspective :: Boolean
+  }
+instance WriteForeign StateDependentPerspective where
+  writeImpl (ContextPerspective {properties, selfOnly, isSelfPerspective}) = writeImpl 
+    ({ constructor: "ContextPerspective"
+    , currentContextCalculation: Nothing
+    , properties
+    , selfOnly
+    , isSelfPerspective
+    } :: StateDependentPerspective_)
+  writeImpl (RolePerspective {properties, selfOnly, isSelfPerspective, currentContextCalculation}) = writeImpl 
+    { constructor: "ContextPerspective"
+    , currentContextCalculation: Just currentContextCalculation
+    , properties
+    , selfOnly
+    , isSelfPerspective
+    }
+
+instance ReadForeign StateDependentPerspective where
+  readImpl f = do
+    {constructor, properties, currentContextCalculation, selfOnly, isSelfPerspective} :: StateDependentPerspective_ <- read' f
+    unsafePartial case constructor of
+      "ContextPerspective" -> pure $ ContextPerspective {properties, selfOnly, isSelfPerspective}
+      "RolePerspective" -> 
+        pure $ RolePerspective {properties, selfOnly, isSelfPerspective, currentContextCalculation: unsafePartial fromJust currentContextCalculation}
 
 constructState :: StateIdentifier -> Calculation -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State
@@ -92,15 +124,17 @@ derive instance newtypeState :: Newtype State _
 derive instance genericState :: Generic State _
 instance showState :: Show State where show = genericShow
 instance eqState :: Eq State where eq = genericEq
-instance encodeState :: Encode State where encode = genericEncode defaultOptions
-instance decodeState :: Decode State where decode = genericDecode defaultOptions
+
+
+derive newtype instance WriteForeign State
+derive newtype instance ReadForeign State
 
 data NotificationLevel = Alert
 derive instance genericNotificationLevel :: Generic NotificationLevel _
 instance showNotificationLevel :: Show NotificationLevel where show = genericShow
 instance eqNotificationLevel :: Eq NotificationLevel where eq = genericEq
-instance encodeNotificationLevel :: Encode NotificationLevel where encode = genericEncode defaultOptions
-instance decodeNotificationLevel :: Decode NotificationLevel where decode = genericDecode defaultOptions
+
+
 
 instance identifiableState :: Identifiable State StateIdentifier where
   identifier (State{id}) = id
@@ -115,8 +149,21 @@ data StateFulObject = Cnt ContextType | Orole EnumeratedRoleType | Srole Enumera
 derive instance genericStateFulObject :: Generic StateFulObject _
 instance showStateFulObject :: Show StateFulObject where show = genericShow
 instance eqStateFulObject :: Eq StateFulObject where eq = genericEq
-instance encodeStateFulObject :: Encode StateFulObject where encode = genericEncode defaultOptions
-instance decodeStateFulObject :: Decode StateFulObject where decode = genericDecode defaultOptions
+
+
+
+instance WriteForeign StateFulObject where
+  writeImpl (Cnt typ) = writeImpl { constructor: "Cnt", typ}
+  writeImpl (Orole typ) = writeImpl { constructor: "Orole", typ}
+  writeImpl (Srole typ) = writeImpl { constructor: "Srole", typ}
+
+instance ReadForeign StateFulObject where
+  readImpl f = do 
+    {constructor, typ} :: {constructor :: String, typ :: String}<- read' f
+    unsafePartial case constructor of 
+      "Cnt" -> pure $ Cnt $ ContextType typ
+      "Orole" -> pure $ Orole $ EnumeratedRoleType typ
+      "Srole" -> pure $ Srole $ EnumeratedRoleType typ
 
 data Notification = 
   ContextNotification (TimeFacets (sentence :: Sentence) )
@@ -126,5 +173,19 @@ data Notification =
 derive instance genericNotification :: Generic Notification _
 instance showNotification :: Show Notification where show = genericShow
 instance eqNotification :: Eq Notification where eq = genericEq
-instance encodeNotification :: Encode Notification where encode = genericEncode defaultOptions
-instance decodeNotification :: Decode Notification where decode = genericDecode defaultOptions
+
+
+
+instance WriteForeign Notification where
+  writeImpl (ContextNotification r) = writeImpl { constructor: "ContextNotification", r}
+  writeImpl (RoleNotification r) = writeImpl { constructor: "RoleNotification", r}
+
+instance ReadForeign Notification where  
+  readImpl f = 
+    do 
+      {r} :: {r :: TimeFacets ( sentence :: Sentence )} <- read' f
+      pure $ ContextNotification r
+    <|>
+    do 
+      {r} :: {r :: TimeFacets ( sentence :: Sentence, currentContextCalculation :: QueryFunctionDescription )} <- read' f
+      pure $ RoleNotification r

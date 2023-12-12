@@ -24,25 +24,23 @@ module Perspectives.DomeinFile
 
   where
 
-import Control.Monad.State (State, execState, modify)
+import Control.Monad.State (State, execState, modify) 
 import Data.Array (cons)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (for_)
-import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep (class Generic) 
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
-import Foreign (Foreign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Persistence.Attachment (class Attachment)
-import Perspectives.Couchdb.Revision (class Revision, Revision_, changeRevision, getRev)
+import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
 import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.InvertedQuery (InvertedQuery)
+import Perspectives.Persistence.Types (PouchbdDocumentFields)
 import Perspectives.Representation.Action (AutomaticAction)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -55,13 +53,13 @@ import Perspectives.Representation.State (State(..), Notification) as PEState
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedRoleType, RoleType, StateIdentifier(..))
 import Perspectives.Representation.UserGraph (UserGraph(..))
 import Perspectives.Representation.View (View)
-import Prelude (class Eq, class Show, Unit, bind, pure, unit, void, ($), (<<<))
+import Prelude (class Eq, class Show, Unit, bind, eq, pure, unit, void, ($), (<$>), (<<<))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl, writeJSON)
 
 newtype DomeinFile = DomeinFile DomeinFileRecord
 
-type DomeinFileRecord =
-  { _rev :: Revision_
-  , _id :: String
+type DomeinFileRecord = PouchbdDocumentFields
+  ( id :: DomeinFileId
   , namespace :: String
   , contexts :: Object Context
   , enumeratedRoles :: Object EnumeratedRole
@@ -78,30 +76,24 @@ type DomeinFileRecord =
   , upstreamAutomaticEffects :: Object (Array UpstreamAutomaticEffect)
   , userGraph :: UserGraph
   , screens :: EncodableMap ScreenKey ScreenDefinition
-  }
+  )
 
 derive instance genericDomeinFile :: Generic DomeinFile _
 
 derive instance newtypeDomeinFile :: Newtype DomeinFile _
 
-instance encodeDomeinFile :: Encode DomeinFile where
-  encode = genericEncode $ defaultOptions --{unwrapSingleConstructors = true}
-
-instance decodeDomeinFile :: Decode DomeinFile where
-  decode (json :: Foreign) = do
-    rev <- getRev json
-    a <- genericDecode defaultOptions json
-    pure (changeRevision rev a)
+derive newtype instance WriteForeign DomeinFile
+derive newtype instance ReadForeign DomeinFile
 
 instance showDomeinFile :: Show DomeinFile where
   show = genericShow
 
 instance eqDomeinFile :: Eq DomeinFile where
-  eq = genericEq
+  eq (DomeinFile {id:id1}) (DomeinFile {id:id2}) = eq id1 id2
 
 instance identifiableDomeinFile :: Identifiable DomeinFile DomeinFileId where
-  identifier (DomeinFile{_id}) = DomeinFileId _id
-  displayName (DomeinFile{_id}) = _id
+  identifier (DomeinFile{id}) = id
+  displayName (DomeinFile{namespace}) = namespace
 
 instance revisionDomeinFile :: Revision DomeinFile where
   rev = _._rev <<< unwrap
@@ -125,8 +117,8 @@ newtype UpstreamStateNotification = UpstreamStateNotification
 derive instance Generic UpstreamStateNotification _
 instance Show UpstreamStateNotification where show = genericShow
 instance Eq UpstreamStateNotification where eq = genericEq
-instance Encode  UpstreamStateNotification where encode = genericEncode defaultOptions
-instance Decode  UpstreamStateNotification where decode = genericDecode defaultOptions
+derive newtype instance WriteForeign UpstreamStateNotification
+derive newtype instance ReadForeign UpstreamStateNotification
 
 -------------------------------------------------------------------------------
 ---- UPSTREAMAUTOMATICEFFECT
@@ -141,8 +133,8 @@ newtype UpstreamAutomaticEffect = UpstreamAutomaticEffect
 derive instance Generic UpstreamAutomaticEffect _
 instance Show UpstreamAutomaticEffect where show = genericShow
 instance Eq UpstreamAutomaticEffect where eq = genericEq
-instance Encode  UpstreamAutomaticEffect where encode = genericEncode defaultOptions
-instance Decode  UpstreamAutomaticEffect where decode = genericDecode defaultOptions
+derive newtype instance WriteForeign UpstreamAutomaticEffect
+derive newtype instance ReadForeign UpstreamAutomaticEffect
 
 -------------------------------------------------------------------------------
 ---- INVERTEDQUERYCOLLECTION
@@ -167,11 +159,22 @@ instance showSeparateInvertedQuery :: Show SeparateInvertedQuery where
 
 derive instance eqSeparateInvertedQuery :: Eq SeparateInvertedQuery
 
-instance encodeSeparateInvertedQuery :: Encode SeparateInvertedQuery where
-  encode = genericEncode defaultOptions
+instance WriteForeign SeparateInvertedQuery where
+  writeImpl (RoleInvertedQuery key typeName invertedQuery) = writeImpl { constructor: "RoleInvertedQuery", key: writeJSON key, typeName, invertedQuery}
+  writeImpl (ContextInvertedQuery key typeName invertedQuery) = writeImpl { constructor: "ContextInvertedQuery", key: writeJSON key, typeName, invertedQuery}
+  writeImpl (FillerInvertedQuery key typeName invertedQuery) = writeImpl { constructor: "FillerInvertedQuery", key: writeJSON key, typeName, invertedQuery}
+  writeImpl (FilledInvertedQuery key typeName invertedQuery) = writeImpl { constructor: "FilledInvertedQuery", key: writeJSON key, typeName, invertedQuery}
+  writeImpl (OnPropertyDelta key typeName invertedQuery) = writeImpl { constructor: "OnPropertyDelta", key: writeJSON key, typeName, invertedQuery}
 
-instance decodeSeparateInvertedQuery :: Decode SeparateInvertedQuery where
-  decode = genericDecode defaultOptions
+instance ReadForeign SeparateInvertedQuery where
+  readImpl f = do
+    {constructor, key, typeName, invertedQuery} :: {constructor :: String, key :: String, typeName :: TypeName, invertedQuery :: InvertedQuery } <- read' f
+    unsafePartial case constructor of 
+      "RoleInvertedQuery" ->  (\k -> RoleInvertedQuery k typeName invertedQuery) <$> readJSON' key
+      "ContextInvertedQuery" ->  (\k -> ContextInvertedQuery k typeName invertedQuery) <$> readJSON' key
+      "FillerInvertedQuery" ->  (\k -> FillerInvertedQuery k typeName invertedQuery) <$> readJSON' key
+      "FilledInvertedQuery" ->  (\k -> FilledInvertedQuery k typeName invertedQuery) <$> readJSON' key
+      "OnPropertyDelta" ->  (\k -> OnPropertyDelta k typeName invertedQuery) <$> readJSON' key
 
 addInvertedQueryForDomain :: TypeName -> InvertedQuery -> (TypeName -> InvertedQuery -> SeparateInvertedQuery) -> DomeinFileRecord -> DomeinFileRecord
 addInvertedQueryForDomain typeName iq collectionConstructor dfr@{invertedQueriesInOtherDomains} = case typeUri2ModelUri typeName of
@@ -189,6 +192,7 @@ defaultDomeinFileRecord :: DomeinFileRecord
 defaultDomeinFileRecord =
   { _rev: Nothing
   , _id: ""
+  , id: DomeinFileId ""
   , namespace: ""
   , contexts: empty
   , enumeratedRoles: empty
@@ -219,18 +223,18 @@ indexedContexts :: DomeinFile -> Object ContextType
 indexedContexts (DomeinFile{contexts}) = execState indexedContexts_ empty
   where
     indexedContexts_ :: State (Object ContextType) Unit
-    indexedContexts_ = for_ contexts \(Context{_id, indexedContext}) -> case indexedContext of
+    indexedContexts_ = for_ contexts \(Context{id, indexedContext}) -> case indexedContext of
       Nothing -> pure unit
-      Just i -> void $ modify \table -> insert (unwrap i) _id table
+      Just i -> void $ modify \table -> insert (unwrap i) id table
 
 -- | Returns a table with indexed names as key and ContextType as value.
 indexedRoles :: DomeinFile -> Object EnumeratedRoleType
 indexedRoles (DomeinFile{enumeratedRoles}) = execState indexedRoles_ empty
   where
     indexedRoles_ :: State (Object EnumeratedRoleType) Unit
-    indexedRoles_ = for_ enumeratedRoles \(EnumeratedRole{_id, indexedRole}) -> case indexedRole of
+    indexedRoles_ = for_ enumeratedRoles \(EnumeratedRole{id, indexedRole}) -> case indexedRole of
       Nothing -> pure unit
-      Just i -> void $ modify \table -> insert (unwrap i) _id table
+      Just i -> void $ modify \table -> insert (unwrap i) id table
 
 addUpstreamNotification :: UpstreamStateNotification -> StateIdentifier -> DomeinFileRecord -> DomeinFileRecord
 addUpstreamNotification notification (StateIdentifier s) dfr@{upstreamStateNotifications} = let 

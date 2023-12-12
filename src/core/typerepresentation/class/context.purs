@@ -55,12 +55,12 @@ instance contextContextClass :: ContextClass Context where
   defaultPrototype = _.defaultPrototype <<< unwrap
   roleInContext = _.rolInContext <<< unwrap
   contextRole = _.contextRol <<< unwrap
-  externalRole (Context{_id}) = externalRoleType _id
+  externalRole (Context{id}) = externalRoleType id
   userRole = _.gebruikerRol <<< unwrap
   nestedContexts = _.nestedContexts <<< unwrap
   position = _.pos <<< unwrap
   roles r = roleInContext r <> contextRole r <> userRole r
-  contextADT = ST <<< _._id <<< unwrap
+  contextADT = ST <<< _.id <<< unwrap
   contextAspectsADT c@(Context{contextAspects}) = let
     aspects = ST <$> contextAspects in
       if null aspects

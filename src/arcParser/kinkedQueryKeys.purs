@@ -39,8 +39,6 @@ import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..))
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Data.EncodableMap (EncodableMap(..), insert, lookup)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
 
@@ -69,8 +67,6 @@ derive instance genericKinkedQueryKey :: Generic KinkedQueryKey _
 instance eqKinkedQueryKey :: Eq KinkedQueryKey where eq = genericEq
 instance ordKinkedQueryKey :: Ord KinkedQueryKey where compare = genericCompare
 instance showKinkedQueryKey :: Show KinkedQueryKey where show = genericShow
-instance encodeKinkedQueryKey :: Encode KinkedQueryKey where encode = genericEncode defaultOptions
-instance decodeKinkedQueryKey :: Decode KinkedQueryKey where decode = genericDecode defaultOptions
 
 -----------------------------------------------------------
 -- KINKEDQUERYMAP

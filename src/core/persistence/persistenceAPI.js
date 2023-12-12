@@ -6,29 +6,6 @@
 var PouchDB = require('pouchdb-browser').default;
 // var PouchDB = require('pouchdb');
 
-// TODO. Zodra we een encoding toepassen waarbij _rev, _id en _attachments bewaard blijven, is deze functie overbodig.
-exports.addNameAndVersionHack = function( doc, name, rev, attachments)
-{
-  doc._id = name;
-  if ( rev == "")
-  {
-    delete doc._rev;
-  }
-  else
-  {
-    doc._rev = rev;
-  }
-  if ( attachments == "")
-  {
-    delete doc._attachments;
-  }
-  else
-  {
-    doc._attachments = attachments;
-  }
-  return doc;
-}
-
 function convertPouchError( originalE )
 {
   // Pouchdb returns an object in case of promise rejection.

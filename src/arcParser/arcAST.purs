@@ -31,14 +31,15 @@ import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign (unsafeToForeign)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Statements)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Repetition (Duration, Repeater)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
@@ -46,6 +47,7 @@ import Perspectives.Representation.Sentence (Sentence)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl, writeJSON)
 
 --------------------------------------------------------------------------------
 ---- CONTEXT
@@ -142,6 +144,38 @@ data PropertyFacet =
   | TotalDigits Int
   | FractionDigits Int
 
+instance WriteForeign PropertyFacet where
+  writeImpl pf = case pf of
+    (MinLength i) -> writeImpl { constructor: "MinLength", args: writeJSON i}
+    (MaxLength i) -> writeImpl { constructor: "MaxLength", args: writeJSON i}
+    (Pattern regExp s) -> writeImpl {constructor: "Pattern", args: writeJSON {regExp, s}}
+    WhiteSpace wsr -> writeImpl {constructor: "WhiteSpace", args: writeJSON wsr}
+    Enumeration ss -> writeImpl {constructor: "Enumeration", args: writeJSON ss}
+    MaxInclusive s -> writeImpl {constructor: "MaxInclusive", args: writeJSON s}
+    MinInclusive s -> writeImpl {constructor: "MinInclusive", args: writeJSON s}
+    MaxExclusive s -> writeImpl {constructor: "MaxExclusive", args: writeJSON s}
+    MinExclusive s -> writeImpl {constructor: "MinExclusive", args: writeJSON s}
+    TotalDigits i -> writeImpl {constructor: "TotalDigits", args: writeJSON i}
+    FractionDigits i -> writeImpl {constructor: "FractionDigits", args: writeJSON i}
+
+instance ReadForeign PropertyFacet where
+  readImpl f = do
+    {constructor, args} :: {constructor :: String, args :: String} <- read' f
+    unsafePartial case constructor of 
+      "MinLength" -> MinLength <$> readJSON' args
+      "MaxLength" -> MaxLength <$> readJSON' args
+      "Pattern" -> do
+        {regExp, s} :: {regExp :: RegExP, s :: String} <- readJSON' args
+        pure $ Pattern regExp s
+      "WhiteSpace" -> WhiteSpace <$> readJSON' args
+      "Enumeration" -> Enumeration <$> readJSON' args
+      "MaxInclusive" -> MaxInclusive <$> readJSON' args
+      "MinInclusive" -> MinInclusive <$> readJSON' args
+      "MaxExclusive" -> MaxExclusive <$> readJSON' args
+      "MinExclusive" -> MinExclusive <$> readJSON' args
+      "TotalDigits" -> TotalDigits <$> readJSON' args
+      "FractionDigits" -> FractionDigits <$> readJSON' args
+
 data WhiteSpaceRegime =
   -- No normalization is done, the value is not changed (this is the behavior required by [XML 1.0 (Second Edition)] for element content)
   Preserve
@@ -149,6 +183,9 @@ data WhiteSpaceRegime =
   | Replace
   -- After the processing implied by replace, contiguous sequences of #x20's are collapsed to a single #x20, and leading and trailing #x20's are removed.
   | Collapse
+
+instance WriteForeign WhiteSpaceRegime where writeImpl = unsafeToForeign <<< show
+instance ReadForeign WhiteSpaceRegime where readImpl = enumReadForeign
 --------------------------------------------------------------------------------
 ---- STATEQUALIFIEDPART
 --------------------------------------------------------------------------------
@@ -429,17 +466,9 @@ instance showPropertyElement :: Show PropertyPart where show = genericShow
 
 derive instance genericPropertyFacet :: Generic PropertyFacet _
 instance showPropertyFacet :: Show PropertyFacet where show = genericShow
-instance decodePropertyFacet :: Decode PropertyFacet where
-  decode = genericDecode defaultOptions
-instance encodePropertyFacet :: Encode PropertyFacet where
-  encode = genericEncode defaultOptions
 
 derive instance genericWhiteSpaceRegime :: Generic WhiteSpaceRegime _
 instance showWhiteSpaceRegime :: Show WhiteSpaceRegime where show = genericShow
-instance decodeWhiteSpaceRegime :: Decode WhiteSpaceRegime where
-  decode = genericDecode defaultOptions
-instance encodeWhiteSpaceRegime :: Encode WhiteSpaceRegime where
-  encode = genericEncode defaultOptions
 
 derive instance genericPropOrView :: Generic PropsOrView _
 instance showPropOrView :: Show PropsOrView where show = genericShow

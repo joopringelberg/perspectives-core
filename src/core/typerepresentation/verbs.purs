@@ -25,14 +25,14 @@ module Perspectives.Representation.Verbs where
 import Data.Ordering
 
 import Data.Array (difference, elemIndex, intersect, null)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (isJust, isNothing)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
-import Prelude (class Eq, class Ord, class Semigroup, class Show, compare, not, show, ($), (<>), (<<<))
-import Simple.JSON (class WriteForeign, write)
+import Data.Show.Generic (genericShow)
+import Foreign (unsafeToForeign)
+import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
+import Prelude (class Eq, class Ord, class Semigroup, class Show, bind, compare, not, pure, show, ($), (<<<), (<>))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
 
 -----------------------------------------------------------
 -- ROLEVERB
@@ -51,14 +51,14 @@ data RoleVerb =
 derive instance genericRepRoleVerb :: Generic RoleVerb _
 instance writeForeignRoleVerb :: WriteForeign RoleVerb where
   writeImpl = write <<< show
-instance encodeRoleVerb :: Encode RoleVerb where
-  encode = genericEncode defaultOptions
-instance decodeRoleVerb :: Decode RoleVerb where
-  decode = genericDecode defaultOptions
+
 instance showRoleVerb :: Show RoleVerb where
   show = genericShow
 instance eqRoleVerb :: Eq RoleVerb where
   eq = genericEq
+
+instance ReadForeign RoleVerb where
+  readImpl = enumReadForeign
 
 -----------------------------------------------------------
 -- PROPERTYVERB
@@ -71,13 +71,12 @@ data PropertyVerb =
   | AddPropertyValue      -- Add a single value.
   | SetPropertyValue      -- Replace all values.
 
-instance writeForeignPropertyVerb :: WriteForeign PropertyVerb where writeImpl = write <<< show
+instance writeForeignPropertyVerb :: WriteForeign PropertyVerb where writeImpl = unsafeToForeign <<< show
+
+instance ReadForeign PropertyVerb where readImpl = enumReadForeign
 
 derive instance genericRepPropertyVerb :: Generic PropertyVerb _
-instance encodePropertyVerb :: Encode PropertyVerb where
-  encode = genericEncode defaultOptions
-instance decodePropertyVerb :: Decode PropertyVerb where
-  decode = genericDecode defaultOptions
+
 instance showPropertyVerb :: Show PropertyVerb where
   show = genericShow
 instance eqPropertyVerb :: Eq PropertyVerb where
@@ -94,10 +93,25 @@ allPropertyVerbs = [Consult, RemovePropertyValue, DeleteProperty, AddPropertyVal
 data RoleVerbList = All | Including (Array RoleVerb) | Excluding (Array RoleVerb)
 
 derive instance genericRoleVerbList :: Generic RoleVerbList _
-instance encodeRoleVerbList :: Encode RoleVerbList where encode = genericEncode defaultOptions
-instance decodeRoleVerbList :: Decode RoleVerbList where decode = genericDecode defaultOptions
+
 instance showRoleVerbList :: Show RoleVerbList where show = genericShow
 derive instance eqRoleVerbList :: Eq RoleVerbList
+
+type RoleVerbList_ = { constructor :: String, roleVerbs :: Array RoleVerb}
+
+instance WriteForeign RoleVerbList where
+  writeImpl All = writeImpl ({constructor: "All", roleVerbs: []} :: RoleVerbList_)
+  writeImpl (Including roleVerbs) = writeImpl {constructor: "Including", roleVerbs}
+  writeImpl (Excluding roleVerbs) = writeImpl {constructor: "Excluding", roleVerbs}
+
+instance ReadForeign RoleVerbList where
+  readImpl f = do 
+    ({constructor, roleVerbs} :: RoleVerbList_) <- read' f
+    case constructor of
+      "All" -> pure All
+      "Including" -> pure $ Including roleVerbs
+      "Excluding" -> pure $ Excluding roleVerbs
+      _ -> pure All
 
 instance ordRoleVerbList :: Ord RoleVerbList where
   compare All _ = GT

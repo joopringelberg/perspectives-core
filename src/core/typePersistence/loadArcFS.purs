@@ -44,7 +44,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId)
  
 import Prelude (bind, pure, show, ($), (*>), (<>))
 import Text.Parsing.Parser (ParseError(..))
@@ -80,7 +80,7 @@ loadAndCompileArcFile_ filePath = catchError
         (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- {-pure $ unwrap $-} lift $ runPhaseTwo_' (traverseDomain ctxt) defaultDomeinFileRecord empty empty Nil
         case result of
           (Left e) -> pure $ Left e
-          (Right (DomeinFile dr'@{_id})) -> do
+          (Right (DomeinFile dr'@{id})) -> do
             -- log (show dr')
             dr'' <- pure dr' {referredModels = state.referredModels}
             -- logShow state.referredModels
@@ -91,12 +91,12 @@ loadAndCompileArcFile_ filePath = catchError
               (Right correctedDFR@{referredModels}) -> do
                 -- Remove the self-referral and add the source.
                 pure $ Right $ DomeinFile correctedDFR
-                  { referredModels = delete (DomeinFileId _id) referredModels
+                  { referredModels = delete id referredModels
                   , arc = text
                   }
   \e -> pure $ Left [Custom (show e)]
 
-type Persister = String -> DomeinFile -> MonadPerspectives MultiplePerspectivesErrors
+type Persister = DomeinFileId -> DomeinFile -> MonadPerspectives MultiplePerspectivesErrors
 
 type ArcPath = String
 type CrlPath = String
@@ -108,7 +108,7 @@ loadAndPersistArcFile loadCRL persist fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
   case r of
     Left m -> pure m
-    Right df@(DomeinFile {_id}) -> persist _id df *> pure []
+    Right df@(DomeinFile {id}) -> persist id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.

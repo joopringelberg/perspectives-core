@@ -58,7 +58,7 @@ import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (State(..), StateFulObject(..), constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
 import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
@@ -67,10 +67,10 @@ import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), 
 traverseDomain :: ContextE -> PhaseTwo DomeinFile
 traverseDomain c = do
   -- Traverse the model parse tree and construct a DomeinFileRecord in PhaseTwoState.
-  (Context {_id:namespace}) <- traverseContextE c "domain"
+  (Context {id:namespace}) <- traverseContextE c "domain"
   domeinFileRecord <- getDF
   pure $ DomeinFile (domeinFileRecord 
-    { _id = unwrap namespace
+    { id = DomeinFileId $ unwrap namespace
     , namespace = unwrap namespace
     })
 
@@ -122,9 +122,9 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       role <- traverseRoleE r (modelName id)
       context' <- pure (role `insertRoleInto` contextUnderConstruction)
       case role of 
-        E (EnumeratedRole {_id, roleAspects}) -> do
+        E (EnumeratedRole {id, roleAspects}) -> do
           case context' of 
-            Context cr@{roleAliases} -> pure $ Context $ cr { roleAliases = foldl (\als (RoleInContext{role:role'}) -> insert (unwrap role') _id als) roleAliases roleAspects }
+            Context cr@{roleAliases} -> pure $ Context $ cr { roleAliases = foldl (\als (RoleInContext{role:role'}) -> insert (unwrap role') id als) roleAliases roleAspects }
         _ -> pure context'
 
     -- Prefixes are handled earlier, so this can be a no-op
@@ -142,9 +142,9 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
-    handleParts c@(Context contextUnderConstruction@({_id})) (STATE s@(StateE{id:stateId, subStates})) = do
-      state@(State{id:ident}) <- traverseStateE (Cnt _id) s
-      substates <- for subStates (traverseStateE (Cnt _id))
+    handleParts c@(Context contextUnderConstruction@({id})) (STATE s@(StateE{id:stateId, subStates})) = do
+      state@(State{id:ident}) <- traverseStateE (Cnt id) s
+      substates <- for subStates (traverseStateE (Cnt id))
       modifyDF (\domeinFile -> addStatesToDomeinFile (cons state (ARR.fromFoldable substates)) domeinFile)
       -- If this state is the context root state, we could register it as such with the context.
       -- However, if not, we should register it with its parent and that need not be available.
@@ -166,35 +166,35 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
     handleParts c (CSQP _) = pure c
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
-    addContextToDomeinFile c@(Context{_id: (ContextType ident)}) domeinFile = LN.over
+    addContextToDomeinFile c@(Context{id: (ContextType ident)}) domeinFile = LN.over
       (prop (SProxy :: SProxy "contexts"))
       (insert ident c)
       domeinFile
 
     -- Insert a sub-Context type into a Context type.
     insertInto :: Context -> Context -> Context
-    insertInto (Context{_id}) (Context cr@{nestedContexts}) = Context $ cr {nestedContexts = cons _id nestedContexts}
+    insertInto (Context{id}) (Context cr@{nestedContexts}) = Context $ cr {nestedContexts = cons id nestedContexts}
 
     -- Insert a Role type into a Context type.
     insertRoleInto :: Role -> Context -> Context
-    insertRoleInto (E (EnumeratedRole {_id, kindOfRole})) c = case kindOfRole, c of
-      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR _id) rolInContext}
-      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR _id) contextRol}
+    insertRoleInto (E (EnumeratedRole {id, kindOfRole})) c = case kindOfRole, c of
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR id) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR id) contextRol}
       TI.ExternalRole, ctxt -> ctxt
       -- We may have added the user before, on handling his BotRole.
-      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
-        Nothing -> cons (ENR _id) gebruikerRol
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR id) gebruikerRol of
+        Nothing -> cons (ENR id) gebruikerRol
         (Just _) -> gebruikerRol}
       -- This is the Enumerated variant of the public role:
-      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR _id) gebruikerRol of
-        Nothing -> cons (ENR _id) gebruikerRol
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR id) gebruikerRol of
+        Nothing -> cons (ENR id) gebruikerRol
         (Just _) -> gebruikerRol}
 
-    insertRoleInto (C (CalculatedRole {_id, kindOfRole})) c = case kindOfRole, c of
-      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR _id) rolInContext}
-      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR _id) contextRol}
-      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
-      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR _id) gebruikerRol}
+    insertRoleInto (C (CalculatedRole {id, kindOfRole})) c = case kindOfRole, c of
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR id) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR id) contextRol}
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR id) gebruikerRol}
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR id) gebruikerRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 
@@ -220,7 +220,7 @@ traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, declaredAsPrivate, po
   traverseEnumeratedRoleE_ role roleParts
 
 traverseEnumeratedRoleE_ :: EnumeratedRole -> List RolePart -> PhaseTwo Role
-traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = do
+traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
   role' <- foldM (unsafePartial $ handleParts (unwrap rn)) role roleParts
   modifyDF (\domeinFile -> addRoleToDomeinFile (E role') domeinFile)
   pure (E role')
@@ -309,10 +309,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
       pure (EnumeratedRole $ roleUnderConstruction {indexedRole = Just (RoleInstance expandedIndexedName)})
 
     -- ROLESTATE
-    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{_id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId, subStates})) = do
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId, subStates})) = do
       stateKind <- pure (case kind of
-        TI.UserRole -> Srole _id
-        _ -> Orole _id)
+        TI.UserRole -> Srole id
+        _ -> Orole id)
       state@(State{id:ident}) <- traverseStateE stateKind s
       substates <- for subStates (traverseStateE stateKind)
       modifyDF (\domeinFile -> addStatesToDomeinFile (cons state (ARR.fromFoldable substates)) domeinFile)
@@ -356,8 +356,8 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{_id:rn, kindOfRole}) roleParts = d
 
     -- Insert a Property type into a Role type.
     insertPropertyInto :: Property.Property -> EnumeratedRole -> EnumeratedRole
-    insertPropertyInto (Property.E (EnumeratedProperty {_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP _id) properties}
-    insertPropertyInto (Property.C (CalculatedProperty{_id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP _id) properties}
+    insertPropertyInto (Property.E (EnumeratedProperty {id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (ENP id) properties}
+    insertPropertyInto (Property.C (CalculatedProperty{id})) (EnumeratedRole rr@{properties}) = EnumeratedRole $ rr {properties = cons (CP id) properties}
 
 traverseStateE :: StateFulObject -> StateE -> PhaseTwo State
 traverseStateE stateFulObect (StateE {id, condition, stateParts, subStates}) = do
@@ -401,7 +401,7 @@ traverseViewE (ViewE {id, viewParts, pos}) rtype = do
   viewName <- pure (roletype2string rtype <> "$" <> id)
   (expandedPropertyReferences :: Array PropertyType) <- traverse qualifyProperty (ARR.fromFoldable viewParts)
   view <- pure $ VIEW.View
-    { _id: ViewType viewName
+    { id: ViewType viewName
     , _rev: Nothing
     , displayName: id
     , propertyReferences: expandedPropertyReferences
@@ -419,13 +419,13 @@ traverseViewE (ViewE {id, viewParts, pos}) rtype = do
       pure $ ENP $ EnumeratedPropertyType expandedPname
 
 addRoleToDomeinFile :: Role -> DomeinFileRecord -> DomeinFileRecord
-addRoleToDomeinFile (E r@(EnumeratedRole{_id})) domeinFile = LN.over
+addRoleToDomeinFile (E r@(EnumeratedRole{id})) domeinFile = LN.over
   (prop (SProxy :: SProxy "enumeratedRoles"))
-  (insert (unwrap _id) r)
+  (insert (unwrap id) r)
   domeinFile
-addRoleToDomeinFile (C r@(CalculatedRole{_id})) domeinFile = LN.over
+addRoleToDomeinFile (C r@(CalculatedRole{id})) domeinFile = LN.over
   (prop (SProxy :: SProxy "calculatedRoles"))
-  (insert (unwrap _id) r)
+  (insert (unwrap id) r)
   domeinFile
 
 -- | Traverse a RoleE that results in an CalculatedRole.
@@ -438,7 +438,7 @@ traverseCalculatedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   pure role'
 
 traverseCalculatedRoleE_ :: CalculatedRole -> List RolePart -> PhaseTwo Role
-traverseCalculatedRoleE_ role@(CalculatedRole{_id:roleName, kindOfRole}) roleParts = do
+traverseCalculatedRoleE_ role@(CalculatedRole{id:roleName, kindOfRole}) roleParts = do
   role' <- foldM (handleParts) role roleParts
   modifyDF (\domeinFile -> addRoleToDomeinFile (C role') domeinFile)
   pure (C role')
@@ -530,5 +530,5 @@ traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do
 
 addPropertyToDomeinFile :: Property.Property -> DomeinFileRecord -> DomeinFileRecord
 addPropertyToDomeinFile property df@{enumeratedProperties, calculatedProperties} = case property of
-  (Property.E r@(EnumeratedProperty{_id})) -> df {enumeratedProperties = insert (unwrap _id) r enumeratedProperties}
-  (Property.C r@(CalculatedProperty{_id})) -> df {calculatedProperties = insert (unwrap _id) r calculatedProperties}
+  (Property.E r@(EnumeratedProperty{id})) -> df {enumeratedProperties = insert (unwrap id) r enumeratedProperties}
+  (Property.C r@(CalculatedProperty{id})) -> df {calculatedProperties = insert (unwrap id) r calculatedProperties}

@@ -26,8 +26,6 @@ import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 import Foreign (unsafeToForeign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Prelude (class Eq, class Ord, class Show, show, (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign)
@@ -43,14 +41,8 @@ derive instance genericRange :: Generic Range _
 instance eqRange :: Eq Range where eq = genericEq
 derive instance ordRange :: Ord Range
 
-instance encodeRange :: Encode Range where
-  encode = genericEncode defaultOptions
-
 instance writeForeignRange :: WriteForeign Range where
   writeImpl = unsafeToForeign <<< show
-
-instance decodeRange :: Decode Range where
-  decode = genericDecode defaultOptions
 
 instance readForeignRange :: ReadForeign Range where
   readImpl = enumReadForeign

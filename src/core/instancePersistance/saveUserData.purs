@@ -55,7 +55,6 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, for_, traverse)
 import Data.TraversableWithIndex (forWithIndex)
-import Foreign.Generic (encodeJSON)
 import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
@@ -73,7 +72,7 @@ import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextTyp
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
-import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
@@ -88,6 +87,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Simple.JSON (writeJSON)
  
 
 -- | Add the role instance to the end of the roles to exit.
@@ -165,7 +165,7 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
         { users: nub $ users1 <> users2
         , delta: SignedDelta
             { author: stripNonPublicIdentifiers me
-            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id
               , contextType
               , roleType: externalRoleType contextType
@@ -222,7 +222,7 @@ handleRoleOnContextRemoval roleId = (lift $ try $ (getPerspectRol roleId)) >>= h
 -- | is affected when the role instance is removed.
 -- STATE EVALUATION and computing peers with a perspective on the instance.
 statesAndPeersForRoleInstanceToRemove :: PerspectRol -> MonadPerspectivesTransaction (Array RoleInstance)
-statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, context, pspType:roleType, binding, filledRoles}) = do
+statesAndPeersForRoleInstanceToRemove (PerspectRol{id:roleId, context, pspType:roleType, binding, filledRoles}) = do
   -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from adding Deltas to the transaction
   -- for the continuation of the path beyond the given role instance.
   users1 <- usersWithPerspectiveOnRoleInstance roleType roleId context false
@@ -256,7 +256,7 @@ statesAndPeersForRoleInstanceToRemove (PerspectRol{_id:roleId, context, pspType:
 -- | SYNCHRONISATION. Compute a RemoveRoleInstance UniverseRoleDelta 
 -- | (but not for external roles: a delta is generated on exiting the context).
 synchroniseRoleRemoval :: PerspectRol -> Array RoleInstance -> MonadPerspectivesTransaction Unit
-synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contextId}) users = if isExternalRole (unwrap roleId)
+synchroniseRoleRemoval (PerspectRol{id:roleId, pspType:roleType, context:contextId}) users = if isExternalRole (unwrap roleId)
   then pure unit
   else do
     contextWillBeRemoved <- gets (_.untouchableContexts <<< unwrap) >>= pure <<< isJust <<< elemIndex contextId
@@ -271,7 +271,7 @@ synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contex
           { users
           , delta: SignedDelta
             { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id: contextId
               , contextType
               , roleInstances: (SerializableNonEmptyArray (singleton roleId))
@@ -283,7 +283,7 @@ synchroniseRoleRemoval (PerspectRol{_id:roleId, pspType:roleType, context:contex
 -- | QUERY UPDATES. Add correlation identifiers to the current transaction for
 -- | each request that needs to be updated when the role instance is removed.
 queryUpdatesForRoleRemoval :: PerspectRol -> MonadPerspectivesTransaction Unit
-queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
+queryUpdatesForRoleRemoval role@(PerspectRol{id:roleId, pspType:roleType, context:contextId}) = do
   cType <- lift (contextId ##>> contextType)
   (lift $ findRoleRequests contextId roleType) >>= addCorrelationIdentifiersToTransactie
   if rol_isMe role
@@ -297,7 +297,7 @@ queryUpdatesForRoleRemoval role@(PerspectRol{_id:roleId, pspType:roleType, conte
 -- | PERSISTENCE. Remove the role instance from context.
 -- | Logs an error if the role doesn't exist but does not break.
 removeRoleInstanceFromContext :: PerspectRol -> MonadPerspectives Unit
-removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, context:contextId}) = do
+removeRoleInstanceFromContext role@(PerspectRol{id:roleId, pspType:roleType, context:contextId}) = do
   (try $ getPerspectContext contextId) >>=
     handlePerspectContextError "removeRoleInstance"
       \(pe :: PerspectContext) -> do
@@ -321,7 +321,7 @@ removeRoleInstanceFromContext role@(PerspectRol{_id:roleId, pspType:roleType, co
 -- | PERSISTENCE. Remove the incoming links on both the incoming and outgoing
 -- | binding relations.
 severeBindingLinks :: PerspectRol -> MonadPerspectives Unit
-severeBindingLinks (PerspectRol{_id:roleId, pspType:roleType, binding, filledRoles}) = do
+severeBindingLinks (PerspectRol{id:roleId, pspType:roleType, binding, filledRoles}) = do
   -- Severe the binding links of the incoming FILLS relation:
   case binding of
     Nothing -> pure unit
@@ -431,7 +431,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             signedDelta <-  case msignedDelta of
               Nothing -> pure $ SignedDelta
                 { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
 
             -- SYNCHRONISATION
@@ -449,7 +449,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
     loadModel :: EnumeratedRoleType -> MonadPerspectivesTransaction Unit
     loadModel fillerType = case (typeUri2ModelUri $ unwrap fillerType) of
       Nothing -> pure unit
-      Just modelUri -> lift $ void $ retrieveDomeinFile modelUri
+      Just modelUri -> lift $ void $ retrieveDomeinFile (DomeinFileId modelUri)
 
 -- | If the type of the role has kind UserRole and is not the `me` role for its context,
 -- | we add a new user to the context. This user should have access to
@@ -526,7 +526,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit
             signedDelta <- case msignedDelta of
               Nothing ->  pure $ SignedDelta
                 { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ encodeJSON $ stripResourceSchemes $ delta}
+                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
               Just signedDelta -> pure signedDelta
             handleNewPeer filled
             addDelta (DeltaInTransaction { users, delta: signedDelta})

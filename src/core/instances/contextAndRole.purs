@@ -55,13 +55,13 @@ import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>
 -- CONTEXT
 
 context_id :: PerspectContext -> ContextInstance
-context_id (PerspectContext{_id})= _id
+context_id (PerspectContext{id})= id
 
 context_Namespace :: PerspectContext -> Namespace
-context_Namespace (PerspectContext{_id}) = unsafePartial $ fromJust $ typeUri2typeNameSpace (NT.unwrap _id)
+context_Namespace (PerspectContext{id}) = unsafePartial $ fromJust $ typeUri2typeNameSpace (NT.unwrap id)
 
 changeContext_id :: ContextInstance -> PerspectContext -> PerspectContext
-changeContext_id id (PerspectContext cr) = PerspectContext $ cr {_id = id}
+changeContext_id id (PerspectContext cr) = PerspectContext $ cr {id = id}
 
 context_rev :: PerspectContext -> Maybe String
 context_rev (PerspectContext{_rev}) = _rev
@@ -176,7 +176,8 @@ popContext_state (PerspectContext cr) stateId = PerspectContext cr { states = Ar
 
 defaultContextRecord :: ContextRecord
 defaultContextRecord =
-  { _id: ContextInstance ""
+  { _id: ""
+  , id: ContextInstance ""
   , _rev: Nothing
   , displayName: ""
   , pspType: ContextType ""
@@ -191,7 +192,8 @@ defaultContextRecord =
 
 defaultRolRecord :: RolRecord
 defaultRolRecord =
-  { _id: RoleInstance ""
+  { _id: ""
+  , id: RoleInstance ""
   , pspType: EnumeratedRoleType ""
   , allTypes: []
   , context: ContextInstance ""
@@ -223,7 +225,7 @@ change_context_publicUrl (PerspectContext cr) murl = PerspectContext cr {publicU
 -- ROL
 
 rol_id :: PerspectRol -> RoleInstance
-rol_id (PerspectRol{_id}) = _id
+rol_id (PerspectRol{id}) = id
 
 rol_rev :: PerspectRol -> Maybe String
 rol_rev (PerspectRol{_rev}) = _rev

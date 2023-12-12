@@ -22,19 +22,15 @@
 
 module Perspectives.Sync.DateTime where
 
-import Control.Monad.Error.Class (throwError)
 import Data.DateTime (DateTime(..), Time(..), day, month, year)
 import Data.DateTime.Instant (fromDateTime, instant, toDateTime, unInstant)
-import Data.List.NonEmpty (singleton)
-import Data.Maybe (Maybe(..), fromJust)
-import Data.Number (fromString)
+import Data.Maybe (fromJust)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
-import Foreign (ForeignError(..))
-import Foreign.Class (class Decode, class Encode, decode, encode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Ord, class Show, class Eq, pure, show, ($), (<>), (>>=))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
 -- DATETIME
@@ -42,22 +38,19 @@ import Prelude (class Ord, class Show, class Eq, pure, show, ($), (<>), (>>=))
 -----------------------------------------------------------
 newtype SerializableDateTime = SerializableDateTime DateTime
 
-instance encodeSerializableDateTime :: Encode SerializableDateTime where
-  encode (SerializableDateTime d) = case unInstant (fromDateTime d) of
-    (Milliseconds n) -> encode (show n)
-
 instance showSerializableDateTime :: Show SerializableDateTime where
   -- show (SerializableDateTime d) = replace (Pattern " ") (Replacement "_") (show d)
-
   show (SerializableDateTime (DateTime d (Time hour minute second millisecond))) = replace (Pattern " ") (Replacement "_") ((show $ year d) <> (show $ month d) <> (show $ day d) <> "T" <> (show hour) <> (show minute) <> (show second) <> (show millisecond))
-
-instance decodeSerializableDateTime :: Decode SerializableDateTime where
-  decode d = decode d >>= \m -> case fromString m of
-    Nothing -> throwError (singleton $ ForeignError "Expected a string to convert to an int.")
-    Just n -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)
 
 instance prettyPrintSerializableDateTime :: PrettyPrint SerializableDateTime where
   prettyPrint' t = show
 
 derive instance eqSerializableDateTime :: Eq SerializableDateTime
 derive instance ordSerializableDateTime :: Ord SerializableDateTime
+
+instance WriteForeign SerializableDateTime where
+  writeImpl (SerializableDateTime d) = case unInstant (fromDateTime d) of
+    (Milliseconds n) -> writeImpl n
+
+instance ReadForeign SerializableDateTime where
+  readImpl d = read' d >>= \n -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)

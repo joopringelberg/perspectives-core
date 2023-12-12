@@ -25,16 +25,15 @@ module Perspectives.Representation.UserGraph where
 import Prelude
 
 import Data.Array (fromFoldable)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Map (keys, lookup)
 import Data.Maybe (isJust, maybe)
 import Data.Newtype (class Newtype)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -------------------------------------------------------------------------------
 ---- USER GRAPH REPRESENTATION
@@ -46,11 +45,8 @@ derive instance genericUserGraph :: Generic UserGraph _
 
 derive instance newtypeUserGraph :: Newtype UserGraph _
 
-instance encodeUserGraph :: Encode UserGraph where
-  encode = genericEncode defaultOptions --{unwrapSingleConstructors = true}
-
-instance decodeUserGraph :: Decode UserGraph where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign UserGraph
+derive newtype instance ReadForeign UserGraph
 
 instance showUserGraph :: Show UserGraph where
   show = genericShow
@@ -67,11 +63,8 @@ derive instance genericEdges :: Generic Edges _
 
 derive instance newtypeEdges :: Newtype Edges _
 
-instance encodeEdges :: Encode Edges where
-  encode = genericEncode defaultOptions --{unwrapSingleConstructors = true}
-
-instance decodeEdges :: Decode Edges where
-  decode = genericDecode defaultOptions
+derive newtype instance WriteForeign Edges
+derive newtype instance ReadForeign Edges
 
 instance showEdges :: Show Edges where
   show = genericShow

@@ -32,18 +32,19 @@ import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
 import Data.Array (foldl, foldr, snoc, uncons)
+import Data.Array.Partial (head, last)
 import Data.Either (Either(..))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
+import Data.List.NonEmpty (singleton)
 import Data.Maybe (Maybe(..))
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (foldMap, traverse)
-import Foreign (ForeignError(..), fail, unsafeFromForeign, unsafeToForeign)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Foreign (ForeignError(..), fail, unsafeToForeign)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Representation.ADT (ADT(..), equalsOrGeneralisesADT)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
@@ -51,7 +52,7 @@ import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write, writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', readImpl, write, writeImpl)
 
 -----------------------------------------------------------------------------------------
 ---- QUERYFUNCTIONDESCRIPTION
@@ -65,48 +66,59 @@ data QueryFunctionDescription =
   | BQD Domain QueryFunction QueryFunctionDescription QueryFunctionDescription Range ThreeValuedLogic ThreeValuedLogic
   | MQD Domain QueryFunction (Array QueryFunctionDescription) Range ThreeValuedLogic ThreeValuedLogic
 
+type QFD_ = 
+  { constructor :: String
+  , domain :: Domain
+  , function :: QueryFunction
+  , args :: Array QueryFunctionDescription
+  , range :: Domain
+  , isFunctional :: ThreeValuedLogic
+  , isMandatory :: ThreeValuedLogic}
+
 instance writeForeignQFD :: WriteForeign QueryFunctionDescription where
-  writeImpl (SQD dom qf ran fun man) = unsafeToForeign
-    { constructor: unsafeToForeign "SQD"
-    , domain: write dom
-    , function: write qf
-    , range: write ran
-    , isFunctional: write fun
-    , isMandatory: write man}
-  writeImpl (UQD dom qf arg ran fun man) = unsafeToForeign
-    { constructor: unsafeToForeign "UQD"
-    , domain: write dom
-    , function: write qf
-    , singleArg: write arg
-    , range: write ran
-    , isFunctional: write fun
-    , isMandatory: write man}
-  writeImpl (BQD dom qf arg1 arg2 ran fun man) = unsafeToForeign
-    { constructor: unsafeToForeign "BQD"
-    , domain: write dom
-    , function: write qf
-    , firstArg: write arg1
-    , secondArg: write arg2
-    , range: write ran
-    , isFunctional: write fun
-    , isMandatory: write man}
-  writeImpl (MQD dom qf args ran fun man) = unsafeToForeign
-    { constructor: unsafeToForeign "MQD"
-    , domain: write dom
-    , function: write qf
-    , arguments: write <$> args
-    , range: write ran
-    , isFunctional: write fun
-    , isMandatory: write man}
+  writeImpl (SQD dom qf ran fun man) = writeImpl
+    { constructor: "SQD"
+    , domain: dom
+    , function: qf
+    , args: [] :: Array QueryFunctionDescription
+    , range: ran
+    , isFunctional: fun
+    , isMandatory: man}
+  writeImpl (UQD dom qf arg ran fun man) = writeImpl
+    { constructor: "UQD"
+    , domain: dom
+    , function: qf
+    , args: [arg]
+    , range: ran
+    , isFunctional: fun
+    , isMandatory: man}
+  writeImpl (BQD dom qf arg1 arg2 ran fun man) = writeImpl
+    { constructor: "BQD"
+    , domain: dom
+    , function: qf
+    , args: [arg1, arg2]
+    , range: ran
+    , isFunctional: fun
+    , isMandatory: man}
+  writeImpl (MQD dom qf args ran fun man) = writeImpl
+    { constructor: "MQD"
+    , domain: dom
+    , function: qf
+    , args
+    , range: ran
+    , isFunctional: fun
+    , isMandatory: man}
 
 instance readForeignQFD :: ReadForeign QueryFunctionDescription where
-  readImpl f = case unsafeFromForeign f of
-    {constructor: "SQD", domain, function, range, isFunctional, isMandatory} -> SQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "UQD", domain, function, singleArg, range, isFunctional, isMandatory} -> UQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl singleArg) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "BQD", domain, function, firstArg, secondArg, range, isFunctional, isMandatory} -> BQD <$> (readImpl domain) <*> (readImpl function) <*> (readImpl firstArg) <*> (readImpl secondArg) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    {constructor: "MQD", domain, function, arguments, range, isFunctional, isMandatory} ->
-      MQD <$> (readImpl domain) <*> (readImpl function) <*> (traverse readImpl arguments) <*> (readImpl range) <*> (readImpl isFunctional) <*> (readImpl isMandatory)
-    otherwise -> fail $ ForeignError "Expected record with constructor SQD, UQD, BQD, or MQD"
+  readImpl f = do 
+    f' :: QFD_ <- read' f 
+    case f' of
+      {constructor: "SQD", domain, function, range, isFunctional, isMandatory} -> pure $ SQD domain function range isFunctional isMandatory
+      {constructor: "UQD", domain, function, args, range, isFunctional, isMandatory} -> pure $ UQD domain function (unsafePartial head args) range isFunctional isMandatory 
+      {constructor: "BQD", domain, function, args, range, isFunctional, isMandatory} -> pure $ BQD domain function (unsafePartial head args) (unsafePartial last args) range isFunctional isMandatory 
+      {constructor: "MQD", domain, function, args, range, isFunctional, isMandatory} ->
+        pure $ MQD domain function args range isFunctional isMandatory 
+      otherwise -> fail $ ForeignError "Expected record with constructor SQD, UQD, BQD, or MQD"
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
 
@@ -116,14 +128,6 @@ instance eqQueryFunctionDescription :: Eq QueryFunctionDescription where
   eq d1@(BQD _ _ _ _ _ _ _) d2@(BQD _ _ _ _ _ _ _) = genericEq d1 d2
   eq d1@(MQD _ _ _ _ _ _ ) d2@(MQD _ _ _ _ _ _) = genericEq d1 d2
   eq _ _ = false
-
-instance encodeQueryFunctionDescription :: Encode QueryFunctionDescription where
-  -- encode q = genericEncode defaultOptions q
-  encode = writeImpl
-
-instance decodeQueryFunctionDescription :: Decode QueryFunctionDescription where
-  -- decode q = genericDecode defaultOptions q
-  decode = readImpl
 
 instance showQueryFunctionDescription :: Show QueryFunctionDescription where
   show q = genericShow q
@@ -291,8 +295,8 @@ instance writeForeignRoleInContext :: WriteForeign RoleInContext where
   writeImpl (RoleInContext r) = writeImpl r
 instance readForeignRoleInContext :: ReadForeign RoleInContext where
   readImpl f = RoleInContext <$> readImpl f
-instance encodeRoleInContext :: Encode RoleInContext where encode = writeImpl
-instance decodeRoleInContext :: Decode RoleInContext where decode = readImpl
+
+
 instance ordRoleInContext :: Ord RoleInContext where compare = genericCompare
 instance prettyPrintRoleInContext :: PrettyPrint RoleInContext where
   prettyPrint' tab (RoleInContext r) = "PrettyPrint" <> show r
@@ -345,11 +349,11 @@ instance eqDomain :: Eq Domain where
 
 instance writeForeignDomain :: WriteForeign Domain where
   -- writeImpl (RDOM adt ct) = unsafeToForeign { rdom: write adt, ctype: write ct}
-  writeImpl (RDOM adt) = unsafeToForeign { rdom: write adt}
-  writeImpl (CDOM adt) = unsafeToForeign { cdom: write adt}
-  writeImpl (VDOM ran mprop) = unsafeToForeign { range: write ran, maybeproperty: write mprop}
-  writeImpl ContextKind = unsafeToForeign "ContextKind"
-  writeImpl RoleKind = unsafeToForeign "RoleKind"
+  writeImpl (RDOM adt) = writeImpl { rdom: write adt}
+  writeImpl (CDOM adt) = writeImpl { cdom: write adt}
+  writeImpl (VDOM ran mprop) = writeImpl { range: write ran, maybeproperty: write mprop}
+  writeImpl ContextKind = writeImpl "ContextKind"
+  writeImpl RoleKind = writeImpl "RoleKind"
 
 instance readForeignDomain :: ReadForeign Domain where
   readImpl f =
@@ -365,14 +369,6 @@ instance readForeignDomain :: ReadForeign Domain where
         "ContextKind" -> pure ContextKind
         "RoleKind" -> pure RoleKind
         otherwise ->  fail $ TypeMismatch "ContextKind, RoleKind" otherwise
-
-instance encodeDomain :: Encode Domain where
-  -- encode = writeImpl
-  encode = genericEncode defaultOptions
-
-instance decodeDomain :: Decode Domain where
-  -- decode = readImpl
-  decode = genericDecode defaultOptions
 
 instance ordDomain :: Ord Domain where compare = genericCompare
 
@@ -452,14 +448,25 @@ equalDomainKinds _ _ = false
 data Calculation = S Step Boolean | Q QueryFunctionDescription
 
 derive instance genericRepCalculation :: Generic Calculation _
-instance encodeCalculation :: Encode Calculation where
-  encode = genericEncode defaultOptions
-instance decodeCalculation :: Decode Calculation where
-  decode = genericDecode defaultOptions
+
+
+
+
 instance showCalculation :: Show Calculation where
   show = genericShow
 instance eqCalculation :: Eq Calculation where
   eq = genericEq
+
+instance WriteForeign Calculation where
+  writeImpl (S _ _) = unsafeToForeign "Impossible case in writeImpl Calculation: alternative S should never be serialised."
+  writeImpl (Q qfd) = writeImpl {constructor: "Q", qfd}
+
+instance ReadForeign Calculation where
+  readImpl f = do 
+    {constructor, qfd} :: {constructor :: String, qfd :: QueryFunctionDescription} <- read' f 
+    case constructor of 
+      "Q" -> pure (Q qfd)
+      x -> throwError (singleton $ ForeignError $ "Impossible case in readImpl Calculation: " <> x)
 
 -----------------------------------------------------------------------------------------
 ---- ADT CONTEXTTYPE TO ADT ROLEINCONTEXT

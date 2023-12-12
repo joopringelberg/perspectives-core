@@ -59,7 +59,7 @@ import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding) 
 import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (addAspectsToExternalRoles, contextualisePerspectives)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', throwError, withDomeinFile, withFrame)
@@ -88,7 +88,7 @@ import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..),
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), DomeinFileId(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
@@ -101,12 +101,12 @@ phaseThree ::
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
   MP (Either MultiplePerspectivesErrors DomeinFileRecord)
-phaseThree df@{_id} postponedParts screens = do
+phaseThree df@{id} postponedParts screens = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
-  void $ storeDomeinFileInCache _id (DomeinFile df)
+  void $ storeDomeinFileInCache id (DomeinFile df)
   result <- phaseThree_ df postponedParts screens 
-  removeDomeinFileFromCache _id
+  removeDomeinFileFromCache id
   pure result
 
 phaseThree_ ::
@@ -114,7 +114,7 @@ phaseThree_ ::
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
   MP (Either MultiplePerspectivesErrors DomeinFileRecord)
-phaseThree_ df@{_id, referredModels} postponedParts screens = do
+phaseThree_ df@{id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
@@ -145,7 +145,7 @@ phaseThree_ df@{_id, referredModels} postponedParts screens = do
     df
     indexedContexts
     indexedRoles
-    postponedParts
+    postponedParts 
   case ei of
     (Left e) -> pure $ Left e
     otherwise -> pure $ Right dfr
@@ -157,9 +157,9 @@ getDF _ = lift $ State.gets _.dfr
 -- | Switch RoleType for those aspect roles.
 checkAspectRoleReferences :: PhaseThree Unit
 checkAspectRoleReferences = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (checkAspectRoles' df)
   where
@@ -188,12 +188,12 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
   where
     qualifyBindings' :: DomeinFileRecord -> PhaseThree Unit
     qualifyBindings' {enumeratedRoles:eroles, calculatedRoles:croles, contexts} = for_ eroles
-      (\(EnumeratedRole rr@{_id, binding, pos}) -> do
+      (\(EnumeratedRole rr@{id, binding, pos}) -> do
         qbinding <- reduce (qualifyBinding pos) binding
         if binding == qbinding
           then pure unit
           else -- change the role in the domain
-            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
+            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
       where
         qualifyBinding :: ArcPosition -> QT.RoleInContext -> PhaseThree (ADT QT.RoleInContext)
         qualifyBinding pos (QT.RoleInContext{context,role}) = do
@@ -218,7 +218,7 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
                         then do
                           rl <- lift $ lift $ getRoleType (unwrap role) >>= getRole
                           case rl of
-                            E (EnumeratedRole{_id, context:lexicalContext}) -> do
+                            E (EnumeratedRole{id, context:lexicalContext}) -> do
                               qualifiedContext <- case context of
                                 -- No context was explicitly declared with the binding. We take the lexical context of the role.
                                 ContextType s | s == "" -> pure lexicalContext
@@ -228,7 +228,7 @@ qualifyBindings = (lift $ State.gets _.dfr) >>= qualifyBindings'
                                 ContextType contextName -> catchError
                                   (lift2 $ getContext context *> pure context)
                                   (\e -> throwError $ UnknownContext pos (unwrap context))
-                              pure $ ST $ QT.RoleInContext {context: qualifiedContext, role: _id}
+                              pure $ ST $ QT.RoleInContext {context: qualifiedContext, role: id}
                             C r -> case context of
                               ContextType empty | empty == "" -> lift2 $ roleADT r
                               ContextType contextName ->
@@ -274,12 +274,12 @@ requalifyBindingsToCalculatedRoles = (lift $ State.gets _.dfr) >>= qualifyBindin
   where
     qualifyBindings' :: DomeinFileRecord -> PhaseThree Unit
     qualifyBindings' {enumeratedRoles:eroles, calculatedRoles:croles} = for_ eroles
-      (\(EnumeratedRole rr@{_id, binding, pos}) -> do 
+      (\(EnumeratedRole rr@{id, binding, pos}) -> do 
         qbinding <- reduce (qualifyBinding pos) binding
         if binding == qbinding
           then pure unit
           else -- change the role in the domain
-            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap _id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
+            modifyDF (\df@{enumeratedRoles} -> df {enumeratedRoles = insert (unwrap id) (EnumeratedRole rr {binding = qbinding}) enumeratedRoles}))
       where
         qualifyBinding :: ArcPosition -> QT.RoleInContext -> PhaseThree (ADT QT.RoleInContext)
         qualifyBinding pos original@(QT.RoleInContext{context,role}) = case lookup (unwrap role) croles of
@@ -292,21 +292,21 @@ requalifyBindingsToCalculatedRoles = (lift $ State.gets _.dfr) >>= qualifyBindin
 -- | for this function to work correctly!
 qualifyPropertyReferences :: PhaseThree Unit
 qualifyPropertyReferences = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (qualifyPropertyReferences' df)
   where
     qualifyPropertyReferences' :: DomeinFileRecord -> PhaseThree Unit
-    qualifyPropertyReferences' df@{_id, views, calculatedProperties, enumeratedRoles} = do
+    qualifyPropertyReferences' df@{id, views, calculatedProperties, enumeratedRoles} = do
       qviews <- traverseWithIndex qualifyView views
       enumeratedRoles' <- traverse (unsafePartial qualifyAliases) enumeratedRoles
       modifyDF \dfr -> dfr {views = qviews, enumeratedRoles = enumeratedRoles'}
 
       where
         qualifyAliases :: Partial => EnumeratedRole -> PhaseThree EnumeratedRole
-        qualifyAliases (EnumeratedRole r@{_id:roletype, propertyAliases, pos}) = do
+        qualifyAliases (EnumeratedRole r@{id:roletype, propertyAliases, pos}) = do
           propertyAliases' <- for propertyAliases
             \(destination) -> do
               (ENP destination') <- qualifyProperty (ENR roletype) pos (ENP destination)
@@ -339,24 +339,24 @@ qualifyPropertyReferences = do
 -- | For an explanation, see https://joopringelberg.github.io/perspectives-documentation/Perspectives%20on%20bindings.pdf
 -- invertedQueriesForLocalRolesAndProperties :: PhaseThree Unit
 -- invertedQueriesForLocalRolesAndProperties = do
---   df@{_id} <- lift $ State.gets _.dfr
+--   df@{id} <- lift $ State.gets _.dfr
 --   withDomeinFile
---     _id
+--     id
 --     (DomeinFile df)
 --     (invertedQueriesForLocalRolesAndProperties' df)
 --   where
 --     invertedQueriesForLocalRolesAndProperties' :: DomeinFileRecord -> PhaseThree Unit
 --     invertedQueriesForLocalRolesAndProperties' {enumeratedRoles} = do
 --       for_ enumeratedRoles
---         \(EnumeratedRole {_id, context, mandatory, functional}) -> do
---           (userTypes :: Array RoleType) <- lift $ lift (context ###= unsafePartial localEnumeratedRolesWithPerspectiveOnRole (ENR _id))
+--         \(EnumeratedRole {id, context, mandatory, functional}) -> do
+--           (userTypes :: Array RoleType) <- lift $ lift (context ###= unsafePartial localEnumeratedRolesWithPerspectiveOnRole (ENR id))
 --           qwk <- pure $ ZQ
---             (Just (SQD (RDOM (ST _id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
+--             (Just (SQD (RDOM (ST id)) (QF.DataTypeGetter QF.ContextF) (CDOM (ST context)) True (bool2threeValued mandatory)))
 --             Nothing
 --           for_ userTypes \userType -> do
---             pv <- lift2 $ unsafePartial relevantPropertiesForObjectRole (ENR _id) userType
+--             pv <- lift2 $ unsafePartial relevantPropertiesForObjectRole (ENR id) userType
 --             -- Now add those verbs to the inverted query.
---             setInvertedQueriesForUserAndRole userType (ST _id) pv true qwk
+--             setInvertedQueriesForUserAndRole userType (ST id) pv true qwk
 
 -- | The calculation of a CalculatedRole, of a CalculatedProperty, the object of a Perspective
 -- | and the object and query of a state are all expressions.
@@ -364,20 +364,20 @@ qualifyPropertyReferences = do
 -- | All names are qualified in the process.
 compileCalculatedRoles :: PhaseThree Unit
 compileCalculatedRoles = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (compileCalculatedRoles' df)
   where
     compileCalculatedRoles' :: DomeinFileRecord -> PhaseThree Unit
-    compileCalculatedRoles' {_id,calculatedRoles, states, enumeratedRoles} = do
+    compileCalculatedRoles' {id,calculatedRoles, states, enumeratedRoles} = do
       traverse_ compileRolExpr (identifier <$> calculatedRoles)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile id
       modifyDF \dfr -> modifiedDomeinFile
       where
         compileRolExpr :: CalculatedRoleType -> PhaseThree Unit
@@ -391,20 +391,20 @@ compileCalculatedRoles = do
 
 compileCalculatedProperties :: PhaseThree Unit
 compileCalculatedProperties = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (compileCalculatedProperties' df)
   where
     compileCalculatedProperties' :: DomeinFileRecord -> PhaseThree Unit
-    compileCalculatedProperties' {_id, calculatedProperties, states, enumeratedRoles} = do
+    compileCalculatedProperties' {id, calculatedProperties, states, enumeratedRoles} = do
       traverse_ compilePropertyExpr (identifier <$> calculatedProperties)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile id
       modifyDF \dfr -> modifiedDomeinFile
       where
         compilePropertyExpr :: CalculatedPropertyType -> PhaseThree Unit
@@ -423,20 +423,20 @@ compileCalculatedProperties = do
 
 compilePublicUrls :: PhaseThree Unit
 compilePublicUrls = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (compilePublicUrls' df)
   where
     compilePublicUrls' :: DomeinFileRecord -> PhaseThree Unit
-    compilePublicUrls' {_id, enumeratedRoles} = do
+    compilePublicUrls' {id, enumeratedRoles} = do
       traverse_ compilePublicUrlExpr (identifier <$> enumeratedRoles)
       -- The objects of perspectives are compiled when we handle the postponedStateQualifiedParts.
       -- Get the DomeinFile out of cache and replace the one in PhaseTwoState with it.
       -- We will not have errors on trying to retrieve the DomeinFile here.
-      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile (DomeinFileId _id)
+      DomeinFile modifiedDomeinFile <- lift2 $ getDomeinFile id
       modifyDF \dfr -> modifiedDomeinFile
       where
         compilePublicUrlExpr :: EnumeratedRoleType -> PhaseThree Unit
@@ -457,15 +457,15 @@ compilePublicUrls = do
               -- Check.
               case range compiledExpression of
                 -- Save the result in DomeinCache.
-                VDOM PString _ -> lift2 $ void $ modifyEnumeratedRoleInDomeinFile _id (EnumeratedRole er {publicUrl = Just $ Q compiledExpression})
+                VDOM PString _ -> lift2 $ void $ modifyEnumeratedRoleInDomeinFile id (EnumeratedRole er {publicUrl = Just $ Q compiledExpression})
                 ran -> throwError (NotAStringDomain compiledExpression pos pos)
 
 
 handlePostponedStateQualifiedParts  :: PhaseThree Unit
 handlePostponedStateQualifiedParts = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     do
       postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
@@ -1185,7 +1185,7 @@ handlePostponedStateQualifiedParts = do
 
 isUpstreamModelState :: StateIdentifier -> PhaseThree Boolean
 isUpstreamModelState (StateIdentifier s) = do
-  thisModel <- State.gets (_._id <<< _.dfr)
+  thisModel <- State.gets (_.namespace <<< _.dfr)
   if s `startsWithSegments` thisModel
     then pure false
     else do
@@ -1277,15 +1277,15 @@ collectPropertyTypes (AST.View view) object start = do
 
 handleScreens :: LIST.List AST.ScreenE -> PhaseThree Unit
 handleScreens screenEs = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
-    (handleScreens' _id)
+    handleScreens'
   where
-    handleScreens' :: Namespace -> PhaseThree Unit
-    handleScreens' ns = do
+    handleScreens' :: PhaseThree Unit
+    handleScreens' = do
       screenDefs <- foldM screenDefinition EM.empty (fromFoldable screenEs)
       modifyDF \dfr -> dfr {screens = screenDefs}
 
@@ -1418,9 +1418,9 @@ handleScreens screenEs = do
 
 addUserRoleGraph :: PhaseThree Unit
 addUserRoleGraph = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     do
       ugraph <- buildUserGraph
@@ -1428,32 +1428,32 @@ addUserRoleGraph = do
 
 checkSynchronization :: PhaseThree Unit
 checkSynchronization = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     SYNC.checkSynchronization
 
 invertPerspectiveObjects :: PhaseThree Unit
 invertPerspectiveObjects = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
-    (addInvertedQueries' df _id)
+    (addInvertedQueries' df)
   where
-    addInvertedQueries' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
-    addInvertedQueries' {enumeratedRoles, calculatedRoles} ns = do
+    addInvertedQueries' :: DomeinFileRecord -> PhaseThree Unit
+    addInvertedQueries' {enumeratedRoles, calculatedRoles} = do
       traverse_ perspectivesInEnumeratedRole enumeratedRoles
       traverse_ perspectivesInCalculatedRole calculatedRoles
 
       where
         perspectivesInEnumeratedRole :: EnumeratedRole -> PhaseThree Unit
-        perspectivesInEnumeratedRole (EnumeratedRole{_id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (ENR _id))
+        perspectivesInEnumeratedRole (EnumeratedRole{id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (ENR id))
 
         perspectivesInCalculatedRole :: CalculatedRole -> PhaseThree Unit
-        perspectivesInCalculatedRole (CalculatedRole{_id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (CR _id))
+        perspectivesInCalculatedRole (CalculatedRole{id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (CR id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
         addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly}) = do
@@ -1533,10 +1533,10 @@ computeCurrentContext t pos = case t of
 -- | automatic action or notification.
 compileStateQueries :: PhaseThree Unit
 compileStateQueries = do
-  df@{_id} <- lift $ State.gets _.dfr
+  df@{id} <- lift $ State.gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
     (compileStateQueries' df)
   where

@@ -29,7 +29,7 @@ import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -38,9 +38,9 @@ import Text.Parsing.Parser (ParseError)
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
-  void $ storeDomeinFileInCache ns df
+  void $ storeDomeinFileInCache (DomeinFileId ns) df
   r <- mpa
-  removeDomeinFileFromCache ns
+  removeDomeinFileFromCache (DomeinFileId ns)
   pure r
 
 makeTest_ :: (String -> Aff Unit -> Free TestF Unit) ->

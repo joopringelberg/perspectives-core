@@ -30,8 +30,6 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Foreign.Object (Object, empty) as OBJ
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Data.EncodableMap (EncodableMap, empty, lookup, insert)
@@ -44,7 +42,8 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleKind, ViewType)
-import Prelude (class Eq, class Ord, class Show, (<<<), (==), ($))
+import Prelude (class Eq, class Ord, class Show, bind, pure, ($), (<$>), (<<<), (==))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
 -- ENUMERATEDROLE
@@ -52,7 +51,7 @@ import Prelude (class Eq, class Ord, class Show, (<<<), (==), ($))
 newtype EnumeratedRole = EnumeratedRole EnumeratedRoleRecord
 
 type EnumeratedRoleRecord =
-  { _id :: EnumeratedRoleType
+  { id :: EnumeratedRoleType
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
@@ -93,7 +92,7 @@ type EnumeratedRoleRecord =
 
 defaultEnumeratedRole :: String -> String -> RoleKind -> String -> Boolean -> ArcPosition -> EnumeratedRole
 defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = EnumeratedRole
-  { _id: EnumeratedRoleType qname
+  { id: EnumeratedRoleType qname
   , _rev: Nothing
   , displayName: dname
   , kindOfRole: kindOfRole
@@ -132,22 +131,21 @@ instance showEnumeratedRole :: Show EnumeratedRole where
   show = genericShow
 
 instance eqEnumeratedRole :: Eq EnumeratedRole where
-  eq (EnumeratedRole {_id : id1}) (EnumeratedRole {_id : id2}) = id1 == id2
+  eq (EnumeratedRole {id : id1}) (EnumeratedRole {id : id2}) = id1 == id2
 
 derive instance newtypeEnumeratedRole :: Newtype EnumeratedRole _
 
-instance encodeEnumeratedRole :: Encode EnumeratedRole where
-  encode = genericEncode defaultOptions
+derive newtype instance WriteForeign EnumeratedRole
 
-instance decodeEnumeratedRole :: Decode EnumeratedRole where
-  decode = genericDecode defaultOptions
+instance ReadForeign EnumeratedRole where
+  readImpl f = EnumeratedRole <$> read' f
 
 instance revisionEnumeratedRole :: Revision EnumeratedRole where
   rev = _._rev <<< unwrap
   changeRevision s = over EnumeratedRole (\vr -> vr {_rev = s})
 
 instance identifiableEnumeratedRole :: Identifiable EnumeratedRole EnumeratedRoleType where
-  identifier (EnumeratedRole{_id}) = _id
+  identifier (EnumeratedRole{id}) = id
   displayName (EnumeratedRole{displayName:d}) = d
 
 -----------------------------------------------------------
@@ -168,8 +166,13 @@ derive instance genericInvertedQueryKey :: Generic InvertedQueryKey _
 instance eqInvertedQueryKey :: Eq InvertedQueryKey where eq = genericEq
 instance ordInvertedQueryKey :: Ord InvertedQueryKey where compare = genericCompare
 instance showInvertedQueryKey :: Show InvertedQueryKey where show = genericShow
-instance encodeInvertedQueryKey :: Encode InvertedQueryKey where encode = genericEncode defaultOptions
-instance decodeInvertedQueryKey :: Decode InvertedQueryKey where decode = genericDecode defaultOptions
+
+instance WriteForeign InvertedQueryKey where
+  writeImpl (InvertedQueryKey ct1 ct2 ert) = writeImpl {ct1, ct2, ert}
+instance ReadForeign InvertedQueryKey where
+  readImpl f = do 
+    {ct1, ct2, ert} :: {ct1 :: ContextType, ct2 :: ContextType, ert :: EnumeratedRoleType} <- read' f
+    pure $ InvertedQueryKey ct1 ct2 ert
 
 type InvertedQueryMap = EncodableMap InvertedQueryKey (Array InvertedQuery)
 

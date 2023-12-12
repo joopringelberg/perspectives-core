@@ -26,7 +26,7 @@ module Perspectives.Instances.Values where
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (runExcept, runExceptT)
+import Control.Monad.Except (runExcept)
 import Data.DateTime (DateTime(..), Time(..), canonicalDate)
 import Data.DateTime.Instant (fromDateTime, unInstant)
 import Data.Either (Either(..), either, fromRight)
@@ -41,13 +41,12 @@ import Effect.Exception (Error, error, try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
 import Foreign (ForeignError, MultipleErrors, readInt, unsafeToForeign)
-import Foreign.Class (decode)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Prelude (bind, pure, show, ($), (<$>), (<*>), (<<<), (<>))
-import Simple.JSON (readJSON, writeJSON)
+import Simple.JSON (read, readJSON, writeJSON)
 
 -- TODO. We gebruiken hier Error, het javascript error type. Liever zou ik een
 -- PerspectivesRuntimeError type gebruiken. Maar dan moeten we MonadPerspectives aanpassen.
@@ -62,7 +61,7 @@ parseDate s = do
 
 -- | Decode a date from the Epoch format in which it is stored in Couchdb.
 decodeDate :: forall m. MonadError Error m => String -> m DateTime
-decodeDate s = case runExcept (decode $unsafeToForeign s) of
+decodeDate s = case (read $ unsafeToForeign s) of
   Left e -> throwError $ error "Not a date"
   Right (SerializableDateTime dt) -> pure dt
 
@@ -116,13 +115,13 @@ bool2Value :: Boolean -> Value
 bool2Value = Value <<< show
 
 value2Date' :: Value -> Either Error SerializableDateTime
-value2Date' (Value dt) = case unwrap $ runExceptT $ decode $ unsafeToForeign dt of
+value2Date' (Value dt) = case read $ unsafeToForeign dt of
   Left el -> Left $ error ("value2Date: not a date: " <> show el)
   Right d -> Right d
 
 -- | An UNSAFE operation!
 value2Date :: Value -> SerializableDateTime
-value2Date (Value dt) = fromRight (SerializableDateTime defaultDateTime) $ runExcept $ decode $ unsafeToForeign dt
+value2Date (Value dt) = fromRight (SerializableDateTime defaultDateTime) $ read $ unsafeToForeign dt
 
 
 date2Value :: SerializableDateTime -> Value

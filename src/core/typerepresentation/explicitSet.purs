@@ -28,10 +28,8 @@ import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, uncons
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Set (subset, fromFoldable)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Partial.Unsafe (unsafePartial)
-import Simple.JSON (class WriteForeign, write)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
 -- EXPLICITSET
@@ -51,11 +49,16 @@ instance showExplicitSet :: Show a => Show (ExplicitSet a) where
   show Empty = "Empty"
   show (PSet s) = "PSet " <> show s
 instance writeForeignExplicitSet :: WriteForeign a => WriteForeign (ExplicitSet a) where
-  writeImpl Universal = write "Universal"
-  writeImpl Empty = write "Empty"
-  writeImpl (PSet s) = write s
-instance encodeExplicitSet :: Encode a => Encode (ExplicitSet a) where encode = genericEncode defaultOptions
-instance decodeExplicitSet :: Decode a => Decode (ExplicitSet a) where decode = genericDecode defaultOptions
+  writeImpl Universal = writeImpl {constructor: "Universal", set: ([] :: Array a)}
+  writeImpl Empty = writeImpl {constructor: "Empty", set: ([] :: Array a)}
+  writeImpl (PSet s) = writeImpl {constructor: "PSet", set: s}
+instance ReadForeign a => ReadForeign (ExplicitSet a) where
+  readImpl f = do 
+    {constructor, set} :: {constructor :: String, set :: Array a} <- read' f
+    unsafePartial case constructor of 
+      "Universal" -> pure Universal
+      "Empty" -> pure Empty
+      "PSet" -> pure $ PSet set
 
 instance functorExplicitSet :: Functor ExplicitSet where
   map f Universal = Universal

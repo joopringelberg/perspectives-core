@@ -40,7 +40,6 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Generic (decodeJSON)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (authenticate)
@@ -63,7 +62,7 @@ import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryG
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity, rev)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
@@ -73,6 +72,7 @@ import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
 import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Simple.JSON (readJSON')
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
 -- Inspect the model version of an unknown type and establish whether the resident model is newer or older than
@@ -194,7 +194,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
           then do
             contextInstance <- pure
               (PerspectContext defaultContextRecord
-                { _id = id
+                { id = id
                 , displayName = unwrap id 
                 , pspType = contextType
                 , buitenRol = RoleInstance $ buitenRol $ unwrap id
@@ -211,7 +211,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
   log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType)
-  void $ lift $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ $ unwrap roleType)
+  void $ lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ $ unwrap roleType)
   case deltaType of
     ConstructEmptyRole -> do
       -- We have to check this case: a user is allowed to create himself.
@@ -273,7 +273,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           then do
             allTypes <- lift (roleType ###= roleAspectsClosure)
             role <- pure (PerspectRol defaultRolRecord
-                  { _id = rolInstanceId
+                  { id = rolInstanceId
                   , pspType = roleType
                   , allTypes = allTypes
                   , context = contextInstance
@@ -315,15 +315,15 @@ executeTransaction t@(TransactionForPeer{deltas}) = for_ deltas f
         executeDelta (Just stringifiedDelta) = do 
           storageSchemes <- lift $ gets _.typeToStorage
           catchError
-            (case runExcept $ decodeJSON stringifiedDelta of
+            (case runExcept $ readJSON' stringifiedDelta of
               Right d1 -> executeRolePropertyDelta (addResourceSchemes storageSchemes d1) s
-              Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+              Left _ -> case runExcept $ readJSON' stringifiedDelta of
                 Right d2 -> executeRoleBindingDelta (addResourceSchemes storageSchemes d2) s
-                Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                Left _ -> case runExcept $ readJSON' stringifiedDelta of
                   Right d3 -> executeContextDelta (addResourceSchemes storageSchemes d3) s
-                  Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                  Left _ -> case runExcept $ readJSON' stringifiedDelta of
                     Right d4 -> executeUniverseRoleDelta ((addResourceSchemes storageSchemes d4)) s
-                    Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                    Left _ -> case runExcept $ readJSON' stringifiedDelta of
                       Right d5 -> executeUniverseContextDelta (addResourceSchemes storageSchemes d5) s
                       Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
             (\e -> liftEffect $ log (show e))
@@ -341,15 +341,15 @@ expandDeltas t@(TransactionForPeer{deltas}) storageUrl = catMaybes <$> (for delt
       expandDelta' :: Maybe String -> MonadPerspectivesTransaction (Maybe Delta)
       expandDelta' Nothing = pure Nothing
       expandDelta' (Just stringifiedDelta) = do 
-        case runExcept $ decodeJSON stringifiedDelta of
+        case runExcept $ readJSON' stringifiedDelta of
           Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s <$> addPublicResourceScheme storageUrl d1))
-          Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+          Left _ -> case runExcept $ readJSON' stringifiedDelta of
             Right (d2 :: RoleBindingDelta) -> notWhenPublicSubject (unwrap d2) (lift $ (Just <<< RBD s <$> addPublicResourceScheme storageUrl d2))
-            Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+            Left _ -> case runExcept $ readJSON' stringifiedDelta of
               Right (d3 :: ContextDelta) -> notWhenPublicSubject (unwrap d3) (lift $ (Just <<< CDD s <$> addPublicResourceScheme storageUrl d3))
-              Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+              Left _ -> case runExcept $ readJSON' stringifiedDelta of
                 Right (d4 :: UniverseRoleDelta) -> notWhenPublicSubject (unwrap d4) (lift $ (Just <<< URD s <$> addPublicResourceScheme storageUrl d4))
-                Left _ -> case runExcept $ decodeJSON stringifiedDelta of
+                Left _ -> case runExcept $ readJSON' stringifiedDelta of
                   Right (d5 :: UniverseContextDelta) -> notWhenPublicSubject (unwrap d5) (lift $ (Just <<< UCD s <$> addPublicResourceScheme storageUrl d5))
                   Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta) *> pure Nothing
 

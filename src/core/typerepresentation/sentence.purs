@@ -23,21 +23,22 @@ module Perspectives.Representation.Sentence where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Perspectives.Query.QueryTypes (Calculation)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 newtype Sentence = Sentence (Array SentencePart)
 
 derive instance newtypeSentence :: Newtype Sentence _
 derive newtype instance showSentence :: Show Sentence
 derive newtype instance eqSentence :: Eq Sentence
-derive newtype instance encodeSentence :: Encode Sentence
-derive newtype instance decodeSentence :: Decode Sentence
+
+derive newtype instance ReadForeign Sentence
+derive newtype instance WriteForeign Sentence
 
 data SentencePart =
     HR String
@@ -46,5 +47,17 @@ data SentencePart =
 derive instance genericSentencePart :: Generic SentencePart _
 instance showSentencePart :: Show SentencePart where show = genericShow
 instance eqSentencePart :: Eq SentencePart where eq = genericEq
-instance encodeSentencePart :: Encode SentencePart where encode = genericEncode defaultOptions
-instance decodeSentencPart :: Decode SentencePart where decode = genericDecode defaultOptions
+
+instance WriteForeign SentencePart where
+  writeImpl (HR s) = writeImpl { constructor: "HR", s }
+  writeImpl (CP calculation) = writeImpl { constructor: "CP", calculation }
+
+instance ReadForeign SentencePart where
+  readImpl f = 
+    do
+      {constructor, s} :: {constructor :: String, s :: String} <- read' f
+      pure $ HR s
+    <|>
+    do
+      {constructor, calculation} :: {constructor :: String, calculation :: Calculation} <- read' f
+      pure $ CP calculation

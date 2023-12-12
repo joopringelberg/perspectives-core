@@ -81,7 +81,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
 -- CALCULATED ROLE INSTANCE
 -----------------------------------------------------------
 instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType where
-  typeOfRole r = CR (unwrap r)._id
+  typeOfRole r = CR (unwrap r).id
   kindOfRole r = (unwrap r).kindOfRole
   displayName r = (unwrap r).displayName
   roleAspects = rangeOfCalculatedRole >=> pure <<< commonLeavesInADT
@@ -112,7 +112,7 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 -- ENUMERATED ROLE INSTANCE
 -----------------------------------------------------------
 instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType where
-  typeOfRole r = ENR (unwrap r)._id
+  typeOfRole r = ENR (unwrap r).id
   kindOfRole r = (unwrap r).kindOfRole
   displayName r = (unwrap r).displayName
   roleAspects r = pure $ _.roleAspects $ unwrap r
@@ -362,7 +362,7 @@ contextOfRole (C c) = context c
 -- RDOM cases.
 -- | The same result as roleAspects, but not in MonadPerspectives.
 expansionOfRole :: Partial => Role -> Array EnumeratedRoleType
-expansionOfRole (E (EnumeratedRole {_id})) = [_id]
+expansionOfRole (E (EnumeratedRole {id})) = [id]
 expansionOfRole (C (CalculatedRole {calculation})) = roleInContext2Role <$> (commonLeavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd))
 
 -----------------------------------------------------------

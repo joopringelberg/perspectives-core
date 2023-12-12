@@ -13,6 +13,7 @@ import Effect.Class.Console (log, logShow)
 import Perspectives.Couchdb.Revision (changeRevision)
 import Perspectives.DomeinCache (removeDomeinFileFromCouchdb, retrieveDomeinFile)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadAndCompileArcFile, loadCompileAndCacheArcFile', loadCompileAndSaveArcFile, loadCompileAndSaveArcFile')
 import Test.Perspectives.Utils (clearUserDatabase, runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -35,7 +36,7 @@ theSuite = suite "Perspectives.loadArc" do
         logShow messages
         assert "The file could not be saved" false
     -- 2. Reload it from the database into the cache.
-    retrievedModel <- runP $ retrieveDomeinFile "model:ContextAndRole"
+    retrievedModel <- runP $ retrieveDomeinFile $ DomeinFileId "model:ContextAndRole"
     -- 3. Reload the file without caching or saving.
     r <- runP $ withSystem $ loadAndCompileArcFile "contextAndRole" testDirectory
     -- 4. Compare the model in cache with the model from the file.

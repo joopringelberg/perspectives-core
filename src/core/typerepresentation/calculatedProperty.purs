@@ -23,18 +23,17 @@
 module Perspectives.Representation.CalculatedProperty where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
+import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
-import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedRoleType(..))
 import Prelude (class Eq, class Show, (<<<), (==), ($))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- CALCULATEDPROPERTY
@@ -42,7 +41,7 @@ import Prelude (class Eq, class Show, (<<<), (==), ($))
 newtype CalculatedProperty = CalculatedProperty CalculatedPropertyRecord
 
 type CalculatedPropertyRecord =
-  { _id :: CalculatedPropertyType
+  { id :: CalculatedPropertyType
   , _rev :: Revision_
   , displayName :: String
 
@@ -55,7 +54,7 @@ type CalculatedPropertyRecord =
 
 defaultCalculatedProperty :: String -> String -> String -> ArcPosition -> CalculatedProperty
 defaultCalculatedProperty id dn role pos = CalculatedProperty
-  { _id: CalculatedPropertyType id
+  { id: CalculatedPropertyType id
   , _rev: Nothing
   , displayName: dn
   , calculation: S (Simple $ Identity $ ArcPosition{column: 0, line: 0}) false
@@ -68,20 +67,18 @@ instance showCalculatedProperty :: Show CalculatedProperty where
   show = genericShow
 
 instance eqCalculatedProperty :: Eq CalculatedProperty where
-  eq (CalculatedProperty {_id : id1}) (CalculatedProperty {_id : id2}) = id1 == id2
+  eq (CalculatedProperty {id : id1}) (CalculatedProperty {id : id2}) = id1 == id2
 
 derive instance newtypeCalculatedProperty :: Newtype CalculatedProperty _
 
-instance encodeCalculatedProperty :: Encode CalculatedProperty where
-  encode = genericEncode defaultOptions
+derive newtype instance WriteForeign CalculatedProperty
 
-instance decodeCalculatedProperty :: Decode CalculatedProperty where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign CalculatedProperty
 
 instance revisionCalculatedProperty :: Revision CalculatedProperty where
   rev = _._rev <<< unwrap
   changeRevision s = over CalculatedProperty (\vr -> vr {_rev = s})
 
 instance identifiableCalculatedProperty :: Identifiable CalculatedProperty CalculatedPropertyType where
-  identifier (CalculatedProperty{_id}) = _id
+  identifier (CalculatedProperty{id}) = id
   displayName (CalculatedProperty{displayName:d}) = d

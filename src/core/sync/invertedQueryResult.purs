@@ -24,13 +24,13 @@ module Perspectives.Sync.InvertedQueryResult where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
+import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
+import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
-import Foreign.Class (class Encode)
-import Foreign.Generic (defaultOptions, genericEncode)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Utilities (class PrettyPrint)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -- | Represents consequtively the query inversion results for
 -- |   * the State query for context state. These inversions are exclusively used to evaluate the states of a context instance.
@@ -44,12 +44,23 @@ derive instance genericInvertedQueryResult :: Generic InvertedQueryResult _
 instance showInvertedQueryResult :: Show InvertedQueryResult where
   show = genericShow
 
-instance encodeInvertedQueryResult :: Encode InvertedQueryResult where
-  encode = genericEncode defaultOptions
+instance WriteForeign InvertedQueryResult where
+  writeImpl (ContextStateQuery cis) = writeImpl {constructor: "ContextStateQuery", cis}
+  writeImpl (RoleStateQuery ris) = writeImpl {constructor: "RoleStateQuery", ris}
+
+instance ReadForeign InvertedQueryResult where
+  readImpl f = 
+    do
+      {cis} :: {constructor :: String, cis :: Array ContextInstance} <- read' f
+      pure $ ContextStateQuery cis
+    <|>
+    do
+      {ris} :: {constructor :: String, ris :: Array RoleInstance} <- read' f
+      pure $ RoleStateQuery ris
 
 instance eqInvertedQueryResult :: Eq InvertedQueryResult where
   eq = genericEq
-
+  
 instance prettyPrintInvertedQueryResult :: PrettyPrint InvertedQueryResult where
   prettyPrint' t (ContextStateQuery ci) = "ContextStateQuery " <> (show ci)
   prettyPrint' t (RoleStateQuery ri) = "RoleStateQuery " <> (show ri)

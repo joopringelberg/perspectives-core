@@ -24,13 +24,12 @@ module Perspectives.Sync.SignedDelta where
 
 import Prelude
 
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- | The author is the instance of sys:PerspectivesSystem$User who signed the delta.
 newtype SignedDelta = SignedDelta {author :: String, encryptedDelta :: String}
@@ -40,11 +39,8 @@ derive instance genericRepSignedDelta :: Generic SignedDelta _
 instance showSignedDelta :: Show SignedDelta where
   show = genericShow
 
-instance encodeSignedDelta :: Encode SignedDelta where
-  encode = genericEncode defaultOptions
-
-instance decodeSignedDelta :: Decode SignedDelta where
-  decode = genericDecode defaultOptions
+derive newtype instance ReadForeign SignedDelta
+derive newtype instance WriteForeign SignedDelta
 
 instance eqSignedDelta :: Eq SignedDelta where
   eq = genericEq

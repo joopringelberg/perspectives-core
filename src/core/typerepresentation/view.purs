@@ -23,15 +23,14 @@
 module Perspectives.Representation.View where
 
 import Data.Generic.Rep (class Generic)
-import Data.Show.Generic (genericShow)
 import Data.Newtype (class Newtype, over, unwrap)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
+import Data.Show.Generic (genericShow)
 import Perspectives.Couchdb.Revision (class Revision, Revision_)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, ViewType)
 import Prelude (class Eq, class Ord, class Show, compare, (<<<), (==))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- VIEW TYPE CLASS
@@ -50,7 +49,7 @@ instance calculatedPropertyViewClass :: ViewClass View where
 newtype View = View ViewRecord
 
 type ViewRecord =
-  { _id :: ViewType
+  { id :: ViewType
   , _rev :: Revision_
   , displayName :: String
 
@@ -62,16 +61,15 @@ type ViewRecord =
   }
 
 derive instance genericRepView :: Generic View _
-instance encodeView :: Encode View where
-  encode = genericEncode defaultOptions
-instance decodeView :: Decode View where
-  decode = genericDecode defaultOptions
+
+derive newtype instance ReadForeign View
+derive newtype instance WriteForeign View
 
 instance showView :: Show View where
   show = genericShow
 
 instance eqView :: Eq View where
-  eq (View {_id : id1}) (View {_id : id2}) = id1 == id2
+  eq (View {id : id1}) (View {id : id2}) = id1 == id2
 
 derive instance newtypeView :: Newtype View _
 
@@ -80,8 +78,8 @@ instance revisionView :: Revision View where
   changeRevision s = over View (\vr -> vr {_rev = s})
 
 instance identifiableView :: Identifiable View ViewType where
-  identifier (View{_id}) = _id
+  identifier (View{id}) = id
   displayName (View{displayName:d}) = d
 
 instance ordView :: Ord View where
-  compare (View{_id:id1}) (View{_id:id2}) = compare id1 id2
+  compare (View{id:id1}) (View{id:id2}) = compare id1 id2

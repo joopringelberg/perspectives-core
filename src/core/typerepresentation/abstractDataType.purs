@@ -45,8 +45,6 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
 import Data.Set (fromFoldable, subset)
 import Data.Traversable (traverse)
-import Foreign.Class (class Decode, class Encode)
-import Foreign.Generic (defaultOptions, genericDecode, genericEncode)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, map, pure, show, ($), (&&), (/=), (<$>), (<<<), (<>), (==), (>>>))
@@ -78,12 +76,6 @@ instance writeForeignADT :: WriteForeign a => WriteForeign (ADT a) where
 
 instance readForeightADT :: ReadForeign a => ReadForeign (ADT a) where
   readImpl f = map variantToGenericSum (readImpl f)
-
-instance encodeADT :: (Encode a) => Encode (ADT a) where
-  encode q = genericEncode defaultOptions q
-
-instance decodeADT :: (Decode a) => Decode (ADT a) where
-  decode q = genericDecode defaultOptions q
 
 derive instance ordADT :: Ord a => Ord (ADT a)
 

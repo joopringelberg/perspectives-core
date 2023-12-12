@@ -40,12 +40,12 @@ import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspect
 
 contextualisePerspectives :: PhaseThree Unit
 contextualisePerspectives = do
-  df@{_id} <- lift $ gets _.dfr
+  df@{id, namespace} <- lift $ gets _.dfr
   -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
   withDomeinFile
-    _id
+    id
     (DomeinFile df)
-    (contextualisePerspectives' df _id)
+    (contextualisePerspectives' df namespace) 
   where
     -- Notice that only EnumeratedRoles have Aspects (this includes external roles).
     contextualisePerspectives' :: DomeinFileRecord -> Namespace -> PhaseThree Unit
@@ -255,8 +255,8 @@ addAspectsToExternalRoles = do
   modifyDF \dfr -> dfr {enumeratedRoles = enumeratedRoles'}
   where
     addAspectToExternalRole :: OBJ.Object CONTEXT.Context -> EnumeratedRole -> EnumeratedRole
-    addAspectToExternalRole ctxts erole@(EnumeratedRole erecord@{_id}) = if isExternalRole (unwrap _id)
-      then case OBJ.lookup (deconstructBuitenRol (unwrap _id)) ctxts of
+    addAspectToExternalRole ctxts erole@(EnumeratedRole erecord@{id}) = if isExternalRole (unwrap id)
+      then case OBJ.lookup (deconstructBuitenRol (unwrap id)) ctxts of
         -- we can safely ignore this case: it is not going to happen.
         Nothing -> erole
         Just (CONTEXT.Context{contextAspects}) -> EnumeratedRole $ erecord {roleAspects = (\context@(ContextType aspect) -> QT.RoleInContext{context, role: EnumeratedRoleType $ buitenRol aspect}) <$> contextAspects}

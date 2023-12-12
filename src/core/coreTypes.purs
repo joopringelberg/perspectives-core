@@ -105,7 +105,6 @@ import Effect.Aff.AVar (AVar, empty)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Class (class Decode, class Encode)
 import Foreign.Object (Object)
 import Foreign.Object as F
 import LRUCache (Cache, defaultGetOptions, delete, get, set)
@@ -125,6 +124,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..
 import Perspectives.ResourceIdentifiers.Parser (pouchdbDatabaseName)
 import Perspectives.Sync.Transaction (Transaction, StorageScheme)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, unit, ($), (<<<), (<>), (>>=))
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -484,7 +484,7 @@ class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i
 -----------------------------------------------------------
 -- CLASS PERSISTENT
 -----------------------------------------------------------
-class (Cacheable v i, Encode v, Decode v) <= Persistent v i | i -> v,  v -> i where
+class (Cacheable v i, WriteForeign v, ReadForeign v) <= Persistent v i | i -> v,  v -> i where
   -- | Either a local database name, or a URL that identifies a database to read from, in some Couchdb installation on the internet.
   dbLocalName :: i -> MP String
   addPublicResource :: i -> MonadPerspectives Unit
@@ -511,7 +511,7 @@ instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
   removeInternally i = remove theCache (unwrap i)
 
 instance cacheablePerspectContext :: Cacheable PerspectContext ContextInstance where
-  -- identifier = _._id <<< unwrap
+  -- identifier = _.id <<< unwrap
   theCache = gets _.contextInstances
   representInternally c = do
     av <- liftAff empty

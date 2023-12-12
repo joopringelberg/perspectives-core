@@ -40,7 +40,7 @@ import Perspectives.Identifiers (typeUri2ModelUri_)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Simple.JSON (writeJSON)
@@ -50,7 +50,7 @@ derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
 
 screenForContextAndUser :: RoleInstance -> RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
 screenForContextAndUser userRoleInstance userRoleType contextType contextInstance = do
-  DomeinFile df <- lift2MPQ $ retrieveDomeinFile (unsafePartial typeUri2ModelUri_ $ unwrap contextType)
+  DomeinFile df <- lift2MPQ $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ $ unwrap contextType)
   case lookup (ScreenKey contextType userRoleType) df.screens of
     Just s -> do
       -- Now populate the screen definition with instance data.
