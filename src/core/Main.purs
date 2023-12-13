@@ -72,7 +72,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
-import Perspectives.SetupUser (setupUser)
+import Perspectives.SetupUser (reSetupUser, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read)
@@ -346,6 +346,37 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Created an account " <> usr
       callback true
 
+reCreateInstances :: Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+reCreateInstances rawPouchdbUser callback = void $ runAff handler
+  do
+    case decodePouchdbUser' rawPouchdbUser of
+      Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in reCreateInstances")
+      Right (pouchdbUser :: PouchdbUser) -> do
+        transactionFlag <- new 0
+        transactionWithTiming <- empty
+        modelToLoad <- empty
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
+        runPerspectivesWithState
+          (do
+            -- Clear the databases.
+            clearUserDatabase
+            clearPostDatabase
+            -- clear the caches, otherwise nothing happens.
+            resetCaches
+            addAllExternalFunctions
+            reSetupUser
+            saveMarkedResources)
+          state
+  where
+    handler :: Either Error Unit -> Effect Unit
+    handler (Left e) = do
+      logPerspectivesError $ Custom $ "An error condition in reCreateInstances: " <> (show e)
+      callback false
+    handler (Right _) = do
+      logPerspectivesError $ Custom $ "Succesfully re-created the instances of this installation."
+      callback true
+
+
 -- | This is for development only! Assumes the user identifier equals the user name.
 resetAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
 resetAccount usr rawPouchdbUser callback = void $ runAff handler
@@ -381,12 +412,6 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
           state
     where
 
-      clearUserDatabase :: MonadPerspectives Unit
-      clearUserDatabase = do
-        userDatabaseName <- entitiesDatabaseName
-        catchError (deleteDatabase userDatabaseName)
-          \_ -> createDatabase userDatabaseName
-        createDatabase userDatabaseName
       clearModelDatabase :: MonadPerspectives Unit
       clearModelDatabase = do
         dbname <- modelsDatabaseName
@@ -408,12 +433,6 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
             void $ withCouchdbUrl \url -> setSecurityDocument url dbname
                 (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
 
-      clearPostDatabase :: MonadPerspectives Unit
-      clearPostDatabase = do
-        dbname <- postDatabaseName
-        catchError (deleteDatabase dbname)
-          \_ -> createDatabase dbname
-        createDatabase dbname
       handler :: Either Error Unit -> Effect Unit
       handler (Left e) = do
         logPerspectivesError $ Custom $ "An error condition in resetAccount: " <> (show e)
@@ -421,6 +440,20 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
       handler (Right _) = do
         logPerspectivesError $ Custom $ "Reset the account " <> usr
         callback true
+
+clearPostDatabase :: MonadPerspectives Unit
+clearPostDatabase = do
+  dbname <- postDatabaseName
+  catchError (deleteDatabase dbname)
+    \_ -> createDatabase dbname
+  createDatabase dbname
+
+clearUserDatabase :: MonadPerspectives Unit
+clearUserDatabase = do
+  userDatabaseName <- entitiesDatabaseName
+  catchError (deleteDatabase userDatabaseName)
+    \_ -> createDatabase userDatabaseName
+  createDatabase userDatabaseName
 
 deleteDb :: DatabaseName -> MonadPerspectives Unit
 deleteDb dbname = do

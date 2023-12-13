@@ -22,14 +22,16 @@
 
 module Perspectives.SetupUser where
 
+import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Extern.Couchdb (addModelToLocalStore')
+import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Extern.Couchdb (addModelToLocalStore', createInitialInstances)
 import Perspectives.ModelDependencies (sysUser, systemModelName)
-import Perspectives.Persistent (entitiesDatabaseName, modelDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
-import Prelude (Unit, void, ($), discard, (>>=))
+import Prelude (Unit, void, ($), discard, (>>=), bind)
 
 modelDirectory :: String
 modelDirectory = "./src/model" 
@@ -49,3 +51,22 @@ setupUser = do
   modelDatabaseName >>= setContextSpecialisationsView
   -- Finally, upload model:System to perspect_models.
   void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))
+
+reSetupUser :: MonadPerspectives Unit
+reSetupUser = do
+  entitiesDatabaseName >>= setRoleView 
+  entitiesDatabaseName >>= setRoleFromContextView 
+  entitiesDatabaseName >>= setPendingInvitationView
+  entitiesDatabaseName >>= setContextView
+  entitiesDatabaseName >>= setCredentialsView
+  entitiesDatabaseName >>= setFilledRolesView
+  DomeinFile {referredModels} <- getDomeinFile (DomeinFileId systemModelName)
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) 
+    (createInitialInstances 
+      systemModelName   -- unversionedModelname
+      systemModelName   -- versionedModelname
+      "0"               -- patch
+      "0"               -- build
+      Nothing           -- versionedModelManifest
+      referredModels
+      )

@@ -57,7 +57,7 @@ import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (changeRol_isMe, rol_context)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectivesTransaction, MonadPerspectives, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
@@ -262,91 +262,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   lift $ addA repositoryUrl documentName revision
 
   if isInitialLoad'
-    then do
-      -- If and only if the model we load is model:System, create both the system context and the system user.
-      -- This is part of the installation routine.
-      if unversionedModelname == DEP.systemModelName
-        then initSystem
-        else pure unit
-      
-      -- Create the model instance
-      cid <- pure $ createDefaultIdentifier ((unsafePartial modelUri2ManifestUrl unversionedModelname).manifestName <> "_modelRootContext")
-      r <- runExceptT $ constructEmptyContext 
-        (ContextInstance cid)
-        unversionedModelname
-        "model root context"
-        (PropertySerialization empty)
-        Nothing
-      case r of 
-        Left e -> logPerspectivesError (Custom (show e))
-        Right (ctxt :: PerspectContext) -> do 
-          lift $ void $ saveEntiteit_ (identifier ctxt) ctxt
-          addCreatedContextToTransaction (identifier ctxt)
-
-      -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
-      -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-      -- it would introduce module imnport circularity.
-      (installerRole :: PerspectRol) <- constructEmptyRole
-        (ContextInstance cid)
-        (EnumeratedRoleType DEP.installer)
-        0
-        (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
-
-      -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
-      me <- RoleInstance <$> (lift $ getUserIdentifier)
-      lift ((identifier installerRole) `filledPointsTo` me)
-      lift (me `fillerPointsTo` (identifier installerRole))
-      roleIsMe (identifier installerRole) (rol_context installerRole)
-
-      subject <- getSubject
-      author <- getAuthor
-      delta@(RoleBindingDelta _) <- pure $ RoleBindingDelta
-        { filled : (identifier installerRole)
-        , filledType: (EnumeratedRoleType DEP.installer)
-        , filler: Just me
-        , fillerType: Just (EnumeratedRoleType DEP.sysUser)
-        , oldFiller: Nothing
-        , oldFillerType: Nothing
-        , deltaType: SetFirstBinding
-        , subject
-        }
-      signedDelta <- pure $ SignedDelta
-        { author: stripNonPublicIdentifiers author
-        , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
-
-      -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
-      (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
-      lift $ cacheAndSave (identifier installerRole) 
-        (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
-
-      -- And now add to the context.
-      void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
-
-      if unversionedModelname == DEP.systemModelName
-        then pure unit
-        else do
-          mySystem <- lift getMySystem
-          -- When we update a model M, we search all ModelsInUse for inverted queries that apply to M, and reapply them.
-          -- Therefore, the model we load here on demand should be in ModelsInUse.
-          -- Create a role instance filled with the VersionedModelManifest.
-          -- Add the versionedModelName as the value of the property ModelToRemove.
-          -- Set the property InstalledPatch.
-          void $ createAndAddRoleInstance (EnumeratedRoleType DEP.modelsInUse) mySystem
-            (RolSerialization 
-              { id: Nothing
-              , properties: PropertySerialization (fromFoldable
-                  [ Tuple DEP.modelToRemove [versionedModelName]
-                  , Tuple DEP.installedPatch [patch]
-                  , Tuple DEP.installedBuild [build]])
-              , binding: unwrap <<< _.versionedModelManifest <$> x})
-
-      -- Add new dependencies.
-      for_ referredModels \dfid -> do
-        mmodel <- lift $ tryGetPerspectEntiteit dfid
-        case mmodel of
-          Nothing -> addModelToLocalStore' dfid
-          Just _ -> pure unit
-    
+    then createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x) referredModels
     else pure unit
 
   -- Distribute the SeparateInvertedQueries over the other domains.
@@ -388,40 +304,127 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
           perspect_models <- modelsDatabaseName
           void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
           updateRevision (DomeinFileId modelName)
-    
-    initSystem :: MonadPerspectivesTransaction Unit
-    initSystem = do
-      lift $ saveMarkedResources
-      -- Create the system instance      
-      sysId <- lift getSystemIdentifier
-      cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId
-      r <- runExceptT $ constructEmptyContext 
-        (ContextInstance cid)
-        DEP.theSystem
-        "My System"
-        (PropertySerialization empty)
-        Nothing
-      case r of 
-        Left e -> logPerspectivesError (Custom (show e))
-        Right (system :: PerspectContext) -> do 
-          lift $ void $ saveEntiteit_ (identifier system) system
-          addCreatedContextToTransaction (identifier system)
-          -- Now create the user role (it is cached automatically).
-          -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-          -- it would introduce module imnport circularity.
-          (me :: PerspectRol) <- constructEmptyRole
-            (identifier system)
-            (EnumeratedRoleType DEP.sysUser)
-            0
-            (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ DEP.sysUser)))
-          lift $ void $ saveEntiteit_ (identifier me) (changeRol_isMe me true)
-          -- The user role is not filled.
-          -- And now add to the context.
-          addRoleInstanceToContext (identifier system) (EnumeratedRoleType DEP.sysUser) (Tuple (identifier me) Nothing)
-          void $ lift $ AMA.modify \ps -> ps 
-            { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
-            , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
-            }
+
+createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> Array DomeinFileId -> MonadPerspectivesTransaction Unit
+createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest referredModels = do
+  -- If and only if the model we load is model:System, create both the system context and the system user.
+  -- This is part of the installation routine.
+  if unversionedModelname == DEP.systemModelName
+    then initSystem
+    else pure unit
+  
+  -- Create the model instance
+  cid <- pure $ createDefaultIdentifier ((unsafePartial modelUri2ManifestUrl unversionedModelname).manifestName <> "_modelRootContext")
+  r <- runExceptT $ constructEmptyContext 
+    (ContextInstance cid)
+    unversionedModelname
+    "model root context"
+    (PropertySerialization empty)
+    Nothing
+  case r of 
+    Left e -> logPerspectivesError (Custom (show e))
+    Right (ctxt :: PerspectContext) -> do 
+      lift $ void $ saveEntiteit_ (identifier ctxt) ctxt
+      addCreatedContextToTransaction (identifier ctxt)
+
+  -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
+  -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
+  -- it would introduce module imnport circularity.
+  (installerRole :: PerspectRol) <- constructEmptyRole
+    (ContextInstance cid)
+    (EnumeratedRoleType DEP.installer)
+    0
+    (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
+
+  -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
+  me <- RoleInstance <$> (lift $ getUserIdentifier)
+  lift ((identifier installerRole) `filledPointsTo` me)
+  lift (me `fillerPointsTo` (identifier installerRole))
+  roleIsMe (identifier installerRole) (rol_context installerRole)
+
+  subject <- getSubject
+  author <- getAuthor
+  delta@(RoleBindingDelta _) <- pure $ RoleBindingDelta
+    { filled : (identifier installerRole)
+    , filledType: (EnumeratedRoleType DEP.installer)
+    , filler: Just me
+    , fillerType: Just (EnumeratedRoleType DEP.sysUser)
+    , oldFiller: Nothing
+    , oldFillerType: Nothing
+    , deltaType: SetFirstBinding
+    , subject
+    }
+  signedDelta <- pure $ SignedDelta
+    { author: stripNonPublicIdentifiers author
+    , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+
+  -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
+  (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
+  lift $ cacheAndSave (identifier installerRole) 
+    (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
+
+  -- And now add to the context.
+  void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
+
+  if unversionedModelname == DEP.systemModelName
+    then pure unit
+    else do
+      mySystem <- lift getMySystem
+      -- When we update a model M, we search all ModelsInUse for inverted queries that apply to M, and reapply them.
+      -- Therefore, the model we load here on demand should be in ModelsInUse.
+      -- Create a role instance filled with the VersionedModelManifest.
+      -- Add the versionedModelName as the value of the property ModelToRemove.
+      -- Set the property InstalledPatch.
+      void $ createAndAddRoleInstance (EnumeratedRoleType DEP.modelsInUse) mySystem
+        (RolSerialization 
+          { id: Nothing
+          , properties: PropertySerialization (fromFoldable
+              [ Tuple DEP.modelToRemove [versionedModelName]
+              , Tuple DEP.installedPatch [patch]
+              , Tuple DEP.installedBuild [build]])
+          , binding: unwrap <$> versionedModelManifest})
+
+  -- Add new dependencies.
+  for_ referredModels \dfid -> do
+    mmodel <- lift $ tryGetPerspectEntiteit dfid
+    case mmodel of
+      Nothing -> addModelToLocalStore' dfid
+      Just _ -> pure unit
+
+
+initSystem :: MonadPerspectivesTransaction Unit
+initSystem = do
+  lift $ saveMarkedResources
+  -- Create the system instance      
+  sysId <- lift getSystemIdentifier
+  cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId
+  r <- runExceptT $ constructEmptyContext 
+    (ContextInstance cid)
+    DEP.theSystem
+    "My System"
+    (PropertySerialization empty)
+    Nothing
+  case r of 
+    Left e -> logPerspectivesError (Custom (show e))
+    Right (system :: PerspectContext) -> do 
+      lift $ void $ saveEntiteit_ (identifier system) system
+      addCreatedContextToTransaction (identifier system)
+      -- Now create the user role (it is cached automatically).
+      -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
+      -- it would introduce module imnport circularity.
+      (me :: PerspectRol) <- constructEmptyRole
+        (identifier system)
+        (EnumeratedRoleType DEP.sysUser)
+        0
+        (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ DEP.sysUser)))
+      lift $ void $ saveEntiteit_ (identifier me) (changeRol_isMe me true)
+      -- The user role is not filled.
+      -- And now add to the context.
+      addRoleInstanceToContext (identifier system) (EnumeratedRoleType DEP.sysUser) (Tuple (identifier me) Nothing)
+      void $ lift $ AMA.modify \ps -> ps 
+        { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
+        , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
+        }
 
 -- Returns string ending on forward slash (/).
 repository :: String -> MonadPerspectivesTransaction String
