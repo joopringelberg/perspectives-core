@@ -194,7 +194,8 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
           then do
             contextInstance <- pure
               (PerspectContext defaultContextRecord
-                { id = id
+                { _id = takeGuid $ unwrap id
+                , id = id
                 , displayName = unwrap id 
                 , pspType = contextType
                 , buitenRol = RoleInstance $ buitenRol $ unwrap id
@@ -273,7 +274,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           then do
             allTypes <- lift (roleType ###= roleAspectsClosure)
             role <- pure (PerspectRol defaultRolRecord
-                  { id = rolInstanceId
+                  { _id = takeGuid $ unwrap rolInstanceId
+                  , id = rolInstanceId
                   , pspType = roleType
                   , allTypes = allTypes
                   , context = contextInstance

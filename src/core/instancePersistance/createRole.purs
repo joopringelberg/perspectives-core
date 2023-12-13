@@ -45,7 +45,7 @@ import Perspectives.Instances.ObjectGetters (contextType_)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType, cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
@@ -67,7 +67,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
   allTypes <- lift (roleType ###= roleAspectsClosure)
   contextType <- lift $ contextType_ contextInstance
   role <- pure (PerspectRol defaultRolRecord
-    { _id = unwrap rolInstanceId
+    { _id = takeGuid $ unwrap rolInstanceId
     , id = rolInstanceId
     , pspType = roleType
     , allTypes = allTypes

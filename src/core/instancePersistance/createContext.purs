@@ -22,7 +22,7 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
@@ -51,7 +51,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   subject <- lift $ getSubject
   contextInstance <- pure
     (PerspectContext defaultContextRecord
-      { _id = unwrap contextInstanceId
+      { _id = takeGuid $ unwrap contextInstanceId
       , id = contextInstanceId
       , displayName  = localName
       , pspType = pspType
@@ -69,7 +69,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
   _ <- lift $ lift $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
-      { _id = unwrap externalRole
+      { _id = takeGuid $ unwrap externalRole
       , id = externalRole
       , pspType = externalRoleType pspType
       , context = contextInstanceId
