@@ -45,6 +45,7 @@ import Affjax.ResponseFormat as ResponseFormat
 import Affjax.ResponseHeader (ResponseHeader, name, value)
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Error.Class (class MonadError, throwError)
+import Data.Argonaut (Json)
 import Data.Array (difference, find, union)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -60,13 +61,14 @@ import Effect.Exception (Error, error)
 import Foreign (MultipleErrors)
 import Foreign.Object (singleton)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, onAccepted, onAccepted', onAccepted_)
+import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, coerceToJson, onAccepted, onAccepted', onAccepted_, toJson)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Identifiers (deconstructUserName, endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
 import Perspectives.Persistence.State (getCouchdbCredentials, getSystemIdentifier)
 import Perspectives.Persistence.Types (Credential(..), DatabaseName, MonadPouchdb, Url)
-import Simple.JSON (class ReadForeign, class WriteForeign, E, readJSON, writeJSON)
+import Simple.JSON (class ReadForeign, class WriteForeign, readJSON)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | This module contains functions to write and read documents on Couchdb endpoints that Pouchdb prohibits:
 -- | _security, _replicator.
@@ -92,7 +94,7 @@ setSecurityDocument base db doc = do
   requestAuthentication (Authority base)
   rq <- defaultPerspectRequest
   -- Security documents have no versions.
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> db <> "/_security"), content = Just $ RequestBody.string (writeJSON $ unwrap doc)}
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> db <> "/_security"), content = Just $ RequestBody.json (toJson $ unwrap doc)}
   liftAff $ onAccepted res [StatusCode 200, StatusCode 201, StatusCode 202] "setSecurityDocument" (\_ -> pure unit)
 
 -- | Returns a security document, even if none existed before.
@@ -152,7 +154,7 @@ setReplicationDocument :: forall f. Url -> ReplicationDocument -> MonadPouchdb f
 setReplicationDocument base (ReplicationDocument rd@{_id}) = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
   rev <- retrieveDocumentVersion (base <> "_replicator/" <> _id)
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_replicator/" <> _id), content = Just $ RequestBody.string (writeJSON (rd {_rev = rev}))}
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_replicator/" <> _id), content = Just $ RequestBody.json (toJson (rd {_rev = rev}))}
   onAccepted res [StatusCode 200, StatusCode 201, StatusCode 202] "setReplicationDocument" (\_ -> pure unit)
 
 -----------------------------------------------------------
@@ -201,14 +203,14 @@ type Password = String
 createUser :: forall f. Url -> User -> Password -> Array Role -> MonadPouchdb f Unit
 createUser base user password roles = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
-  (content :: String) <- pure (writeJSON
+  (content :: Json) <- pure (toJson
     { _id: "org.couchdb.user:" <> user2couchdbuser user
     , name: user2couchdbuser user
     , password
     , roles
     , type: "user"
     })
-  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user ), content = Just $ RequestBody.string content}
+  res <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user ), content = Just $ RequestBody.json content}
   onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
 type Role = String
@@ -231,7 +233,7 @@ addRoleToUser base user role = do
   res <- liftAff $ AJ.request $ rq 
     { method = Left PUT
     , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user )
-    , content = Just $ RequestBody.string $ writeJSON (urecord {roles = union [role] roles})
+    , content = Just $ RequestBody.json $ toJson (urecord {roles = union [role] roles})
     }
   onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
@@ -243,7 +245,7 @@ removeRoleFromUser base user role = do
   res <- liftAff $ AJ.request $ rq 
     { method = Left PUT
     , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user )
-    , content = Just $ RequestBody.string $ writeJSON (urecord {roles = difference roles [role]})
+    , content = Just $ RequestBody.json $ toJson (urecord {roles = difference roles [role]})
     }
   onAccepted res [StatusCode 200, StatusCode 201] "createUser" (\_ -> pure unit)
 
@@ -259,24 +261,21 @@ deleteUser base user = deleteDocument (base <> "_users/org.couchdb.user:" <> use
 setPassword :: forall f. Url -> User -> Password -> MonadPouchdb f Unit
 setPassword base user password = ensureAuthentication (Authority base) \_ -> do
   rq <- defaultPerspectRequest
-  (res :: (Either AJ.Error (Response String))) <- liftAff $ AJ.request $ rq
+  (res :: (Either AJ.Error (Response Json))) <- liftAff $ AJ.request $ rq
     { method = Left GET
     , url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user)
-    , responseFormat = ResponseFormat.string
+    , responseFormat = ResponseFormat.json
     }
   onAccepted
     res
     [StatusCode 200]
     "setPassword"
     \response -> do
-        case changePassword response.body password of
-          Left e -> throwError $ error ("setPassword: cannot construct UserDocument with new password (" <> show e <> ").")
-          Right userDoc -> do 
-            res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.string userDoc}
-            onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
+        res1 <- liftAff $ AJ.request $ rq {method = Left PUT, url = (base <> "_users/org.couchdb.user:" <> user2couchdbuser user), content = Just $ RequestBody.json (changePassword response.body password)}
+        onAccepted res1 [StatusCode 200, StatusCode 201] "createUser" \_ -> pure unit
 
-changePassword :: String -> Password -> E String
-changePassword r password = (\(UserDocument doc) -> writeJSON (doc {password = password})) <$> readJSON r
+changePassword :: Json -> Password -> Json
+changePassword r password = coerceToJson ((unsafeCoerce r) {password = password})
 
 -----------------------------------------------------------
 -- GET DOCUMENT FROM URL (COPIED FROM Perspectives.Couchdb.Databases)
