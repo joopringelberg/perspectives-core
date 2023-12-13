@@ -33,7 +33,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
-import Prelude (class Eq, class Ord, class Show, Ordering(..), bind, compare, eq, flip, pure, show, ($), (&&), (<$>), (<*>), (<>))
+import Prelude (class Eq, class Ord, class Show, Ordering(..), bind, compare, eq, flip, pure, show, ($), (&&), (<$>), (<*>), (<>), (<<<))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl, writeJSON)
 
 type VariableName = String
@@ -610,10 +610,10 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction where
       "UnaryCombinator", functionName, _-> UnaryCombinator <$> readJSON' functionName
       "BinaryCombinator", functionName, _-> BinaryCombinator <$> readJSON' functionName
       "Constant", range, string -> flip Constant string <$> readJSON' range
-      "RoleIndividual", roleInstance, _-> pure $ RoleIndividual $ RoleInstance roleInstance
-      "ContextIndividual", contextInstance, _-> pure $ ContextIndividual $ ContextInstance contextInstance
-      "PublicContext", contextInstance, _-> pure $ PublicContext $ ContextInstance contextInstance
-      "PublicRole", roleInstance, _-> pure $ PublicRole $ RoleInstance roleInstance
+      "RoleIndividual", roleInstance, _-> RoleIndividual <<< RoleInstance <$> readJSON' roleInstance
+      "ContextIndividual", contextInstance, _-> ContextIndividual <<< ContextInstance <$> readJSON' contextInstance
+      "PublicContext", contextInstance, _-> PublicContext <<< ContextInstance <$> readJSON' contextInstance
+      "PublicRole", roleInstance, _-> PublicRole <<< RoleInstance <$> readJSON' roleInstance
       "CreateContext", contextType, roleType -> CreateContext <$> readJSON' contextType <*> readJSON' roleType
       "CreateRootContext", contextType, _-> CreateRootContext <$> (readJSON' contextType)
       "CreateContext_", contextType, _-> CreateContext_ <$> (readJSON' contextType)
