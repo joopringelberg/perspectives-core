@@ -67,13 +67,14 @@ instance WriteForeign AutomaticAction where
 
 instance ReadForeign AutomaticAction where
   readImpl f = 
-    do 
-      {r} :: {r :: TimeFacets ( effect :: QueryFunctionDescription )} <- read' f
-      pure $ ContextAction r
-    <|>
+    -- order matters here!
     do 
       {r} :: {r :: TimeFacets ( effect :: QueryFunctionDescription, currentContextCalculation :: QueryFunctionDescription )} <- read' f
       pure $ RoleAction r
+    <|>
+    do 
+      {r} :: {r :: TimeFacets ( effect :: QueryFunctionDescription )} <- read' f
+      pure $ ContextAction r
 
 newtype Action = Action QueryFunctionDescription
 derive instance genericAction :: Generic Action _

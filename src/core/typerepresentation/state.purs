@@ -91,7 +91,7 @@ instance WriteForeign StateDependentPerspective where
     , isSelfPerspective
     } :: StateDependentPerspective_)
   writeImpl (RolePerspective {properties, selfOnly, isSelfPerspective, currentContextCalculation}) = writeImpl 
-    { constructor: "ContextPerspective"
+    { constructor: "RolePerspective"
     , currentContextCalculation: Just currentContextCalculation
     , properties
     , selfOnly

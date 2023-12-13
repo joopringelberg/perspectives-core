@@ -32,7 +32,7 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.Range (Range)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType)
 import Prelude (class Eq, class Ord, class Show, Ordering(..), bind, compare, eq, flip, pure, show, ($), (&&), (<$>), (<*>), (<>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl, writeJSON)
 
@@ -83,11 +83,6 @@ data FunctionName =
   | IsInStateF
 
   | FirstF
-
-
-
-
-
 
 instance eqFunctionName :: Eq FunctionName where 
   eq ContextF ContextF = true
@@ -619,9 +614,9 @@ instance readForeignQueryFunction :: ReadForeign QueryFunction where
       "ContextIndividual", contextInstance, _-> pure $ ContextIndividual $ ContextInstance contextInstance
       "PublicContext", contextInstance, _-> pure $ PublicContext $ ContextInstance contextInstance
       "PublicRole", roleInstance, _-> pure $ PublicRole $ RoleInstance roleInstance
-      "CreateContext", contextType, roleType -> CreateContext (ContextType contextType) <$> readJSON' roleType
-      "CreateRootContext", contextType, _-> pure $ CreateRootContext (ContextType contextType)
-      "CreateContext_", contextType, _-> pure $ CreateContext_ (ContextType contextType)
+      "CreateContext", contextType, roleType -> CreateContext <$> readJSON' contextType <*> readJSON' roleType
+      "CreateRootContext", contextType, _-> CreateRootContext <$> (readJSON' contextType)
+      "CreateContext_", contextType, _-> CreateContext_ <$> (readJSON' contextType)
       "CreateRole", enumeratedRoleType, _-> CreateRole <$> readJSON' enumeratedRoleType
       "Bind", enumeratedRoleType, _-> Bind <$> readJSON' enumeratedRoleType
       "Bind_", _, _-> pure $ Bind_
