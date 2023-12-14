@@ -59,6 +59,9 @@ roleWithId = "model://perspectives.domains#System$RoleWithId$Id"
 installer :: String
 installer = "model://perspectives.domains#System$PerspectivesSystem$Installer"
 
+baseRepository :: String
+baseRepository = "model://perspectives.domains#System$PerspectivesSystem$BaseRepository"
+
 ------------------------------------------------------------------------------------
 -- ROOTCONTEXT
 ------------------------------------------------------------------------------------
@@ -126,6 +129,9 @@ installedBuild =  "model://perspectives.domains#System$PerspectivesSystem$Models
 ------------------------------------------------------------------------------------
 -- COUCHDBMANAGEMENT
 ------------------------------------------------------------------------------------
+couchdbManagementModelName :: String
+couchdbManagementModelName = "model://perspectives.domains#CouchdbManagement"
+
 versionToInstall :: String
 versionToInstall = "model://perspectives.domains#CouchdbManagement$ModelManifest$External$VersionToInstall"
 
@@ -216,3 +222,9 @@ userWithCredentialsPassword = "model://perspectives.domains#System$WithCredentia
 
 userWithCredentialsAuthorizedDomain :: String
 userWithCredentialsAuthorizedDomain = "model://perspectives.domains#System$WithCredentials$AuthorizedDomain"
+
+------------------------------------------------------------------------------------
+-- BODIESWITHACCOUNTS
+------------------------------------------------------------------------------------
+bodiesWithAccountsModelName :: String
+bodiesWithAccountsModelName = "model://perspectives.domains#BodiesWithAccounts"

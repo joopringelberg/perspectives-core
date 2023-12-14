@@ -43,7 +43,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.ModelDependencies (build, patch, versionToInstall)
 import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
+import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit, saveMarkedResources, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -190,6 +190,8 @@ storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{id}) = do
   mAttachment <- getAttachment repositoryUrl documentName "screens.js"
   void $ storeDomeinFileInCache id df
   (DomeinFile {_rev}) <- saveCachedDomeinFile id
+  -- Unless we actually store in the database, adding attachments will go wrong.
+  saveMarkedResources
   case mAttachment of
     Nothing -> pure unit
     Just attachment -> do

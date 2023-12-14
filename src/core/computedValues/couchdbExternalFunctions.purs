@@ -337,7 +337,7 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
   -- If and only if the model we load is model:System, create both the system context and the system user.
   -- This is part of the installation routine.
   if unversionedModelname == DEP.systemModelName
-    then initSystem unit
+    then initSystem
     else pure unit
   
   -- Create the model instance
@@ -357,6 +357,7 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
   -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
   -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
   -- it would introduce module imnport circularity.
+  -- TODO: refactor. We can now actually use createAndAddRoleInstance!!
   (installerRole :: PerspectRol) <- constructEmptyRole
     (ContextInstance cid)
     (EnumeratedRoleType DEP.installer)
@@ -418,7 +419,6 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
       Nothing -> addModelToLocalStore' dfid
       Just _ -> pure unit
 
-
 initSystem :: MonadPerspectivesTransaction Unit
 initSystem = do
   lift $ saveMarkedResources
@@ -452,6 +452,13 @@ initSystem = do
         { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
         , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
         }
+      -- Add the base repository:
+      void $ createAndAddRoleInstance (EnumeratedRoleType DEP.baseRepository) (identifier_ system)
+        (RolSerialization 
+          { id: Nothing 
+          , properties: PropertySerialization empty
+          , binding: Just "pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External"
+          })
 
 -- Returns string ending on forward slash (/).
 repository :: String -> MonadPerspectivesTransaction String

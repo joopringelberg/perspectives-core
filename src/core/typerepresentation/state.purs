@@ -174,18 +174,17 @@ derive instance genericNotification :: Generic Notification _
 instance showNotification :: Show Notification where show = genericShow
 instance eqNotification :: Eq Notification where eq = genericEq
 
-
-
 instance WriteForeign Notification where
   writeImpl (ContextNotification r) = writeImpl { constructor: "ContextNotification", r}
   writeImpl (RoleNotification r) = writeImpl { constructor: "RoleNotification", r}
 
 instance ReadForeign Notification where  
   readImpl f = 
-    do 
-      {r} :: {r :: TimeFacets ( sentence :: Sentence )} <- read' f
-      pure $ ContextNotification r
-    <|>
+    -- Order matters here!
     do 
       {r} :: {r :: TimeFacets ( sentence :: Sentence, currentContextCalculation :: QueryFunctionDescription )} <- read' f
       pure $ RoleNotification r
+    <|>
+    do 
+      {r} :: {r :: TimeFacets ( sentence :: Sentence )} <- read' f
+      pure $ ContextNotification r

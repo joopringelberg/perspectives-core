@@ -26,12 +26,12 @@ import Data.Maybe (Maybe(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore', createInitialInstances)
-import Perspectives.ModelDependencies (sysUser, systemModelName)
+import Perspectives.ModelDependencies (bodiesWithAccountsModelName, couchdbManagementModelName, sysUser, systemModelName)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
-import Prelude (Unit, void, ($), discard, (>>=), bind)
+import Prelude (Unit, bind, discard, void, ($), (>>=))
 
 modelDirectory :: String
 modelDirectory = "./src/model" 
@@ -63,12 +63,9 @@ reSetupUser = do
   entitiesDatabaseName >>= setCredentialsView
   entitiesDatabaseName >>= setFilledRolesView
   DomeinFile {referredModels} <- getDomeinFile (DomeinFileId systemModelName)
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) 
-    (createInitialInstances 
-      systemModelName   -- unversionedModelname
-      systemModelName   -- versionedModelname
-      "0"               -- patch
-      "0"               -- build
-      Nothing           -- versionedModelManifest
-      referredModels
-      )
+  -- INSTALLATION / MODEL DEPENDENCY HERE: we assume these models will have been installed.
+  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser)
+    do
+      createInitialInstances systemModelName systemModelName "0" "0" Nothing []
+      createInitialInstances bodiesWithAccountsModelName bodiesWithAccountsModelName "0" "0" Nothing []
+      createInitialInstances couchdbManagementModelName couchdbManagementModelName "0" "0" Nothing []
