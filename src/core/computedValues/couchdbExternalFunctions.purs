@@ -337,7 +337,7 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
   -- If and only if the model we load is model:System, create both the system context and the system user.
   -- This is part of the installation routine.
   if unversionedModelname == DEP.systemModelName
-    then initSystem
+    then initSystem unit
     else pure unit
   
   -- Create the model instance
