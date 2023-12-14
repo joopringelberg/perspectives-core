@@ -43,6 +43,7 @@ setupUser :: MonadPerspectives Unit
 setupUser = do 
   entitiesDatabaseName >>= setRoleView 
   entitiesDatabaseName >>= setRoleFromContextView 
+  -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
@@ -56,6 +57,7 @@ reSetupUser :: MonadPerspectives Unit
 reSetupUser = do
   entitiesDatabaseName >>= setRoleView 
   entitiesDatabaseName >>= setRoleFromContextView 
+  -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView

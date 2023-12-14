@@ -42,6 +42,7 @@ to generate this file without the comments in this block.
   , "http-methods"
   , "identity"
   , "integers"
+  , "iterable"
   , "js-date"
   , "kishimen"
   , "lists"

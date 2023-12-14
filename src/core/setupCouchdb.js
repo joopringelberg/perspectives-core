@@ -17,6 +17,7 @@ exports.roleView = (function (doc)
 
 }).toString();
 
+// OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
 exports.pendingInvitations = (function(doc)
 {
   if (doc.properties["model://perspectives.domains#System$Invitation$External$Message"])
@@ -53,6 +54,7 @@ exports.roleFromContextView = (function (doc)
    }
  }.toString())
 
+//  This is a view in the models database.
 exports.roleSpecialisations = (function( doc )
  {
    var eroles = doc.enumeratedRoles;
@@ -70,7 +72,8 @@ exports.roleSpecialisations = (function( doc )
    );
  }.toString());
 
- exports.contextSpecialisations = (function( doc )
+//  This is a view in the models database.
+exports.contextSpecialisations = (function( doc )
  {
    Object.values( doc.contexts ).forEach(
      function(context)

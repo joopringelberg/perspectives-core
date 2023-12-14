@@ -31,11 +31,12 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.State (State, StateT, execState, execStateT, get, modify, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (cons, foldl, head)
+import Data.Array (cons, filter, foldl, head, union)
 import Data.Array (union, delete) as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
+import Data.Iterable (toArray)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
@@ -48,15 +49,19 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.AVar (read)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Effect.Exception (error)
 import Foreign (Foreign)
 import Foreign.Object (Object, empty, fromFoldable, insert, lookup)
+import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
-import Perspectives.ContextAndRole (changeRol_isMe, rol_context)
+import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
@@ -74,7 +79,7 @@ import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
-import Perspectives.ModelDependencies (systemModelName)
+import Perspectives.ModelDependencies (invitation, systemModelName)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -86,6 +91,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.PerspectivesState (contextCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -99,7 +105,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceTy
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
-import Perspectives.SetupCouchdb (setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
+import Perspectives.SetupCouchdb (contextViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
@@ -110,7 +116,7 @@ import Unsafe.Coerce (unsafeCoerce)
 modelsDatabaseName :: MonadPerspectives String
 modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
--- | Retrieves all instances of a particular role type from Couchdb.
+-- | Retrieves all instances of a particular role type from Couchdb. Instances that have the type as aspect are returned as well!
 -- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model://perspectives.domains#System$PerspectivesSystem$User`
 -- | Notice that only the first element of the array argument is actually used.
 -- | Notice, too, that the second parameter is ignored. We must provide it, however, as the query compiler
@@ -129,12 +135,19 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
     Nothing -> pure []
     Just ct -> do
       -- push assumption!
-      (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/contextView" (head contextTypeArr)
+      instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/contextView" (head contextTypeArr)
+      instancesInCache <- lift (do
+        cache <- contextCache
+        cachedContextAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
+        cachedContexts <- lift $ traverse read cachedContextAvars
+        pure $ context_id <$> filter (contextViewFilter $ ContextType ct) cachedContexts
+        )
+      pure $ instancesInCouchdb `union` instancesInCache
 
 pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = ArrayT do
-  -- tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)]
-  (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/pendingInvitations" (Nothing :: Maybe String)
+    dbName <- lift entitiesDatabaseName
+    lift $ getViewOnDatabase dbName "defaultViews/roleView" (Just invitation)
 
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
@@ -612,6 +625,7 @@ createEntitiesDatabase databaseUrls databaseNames _ = case head databaseUrls, he
       dbName <- pure (databaseUrl <> databaseName)
       setRoleView dbName
       setRoleFromContextView dbName
+      -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
       setPendingInvitationView dbName
       setContextView dbName
       setCredentialsView dbName

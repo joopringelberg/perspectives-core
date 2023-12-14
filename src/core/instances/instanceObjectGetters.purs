@@ -25,8 +25,9 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
-import Data.Array (concat, elemIndex, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton)
+import Data.Array (concat, elemIndex, filter, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton, union)
 import Data.FoldableWithIndex (foldWithIndexM)
+import Data.Iterable (toArray)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -34,21 +35,28 @@ import Data.Newtype (unwrap, ala)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Aff.AVar (AVar, read)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Foreign.Object (Object, keys, lookup, values)
+import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (perspectivesUsers)
 import Perspectives.Persistence.API (getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.PerspectivesState (roleCache)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.PersistentType (getContext, getEnumeratedRole)
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
@@ -58,6 +66,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (guid, isInPublicScheme)
+import Perspectives.SetupCouchdb (filledRolesFilter)
 import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
@@ -275,7 +284,15 @@ getFilledRolesFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInst
 getFilledRolesFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid))
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid)
+    filledRolesInCache :: Array RoleInstance <- (do 
+      cache <- roleCache
+      cachedRoleAvars :: Array (AVar PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoles :: Array PerspectRol <- lift $ traverse read cachedRoleAvars
+      pure $ rol_id <$> filter (filledRolesFilter rid) cachedRoles
+      )
+    pure $ filledRolesInDatabase `union` filledRolesInCache
+  )
   >>=
   handlePerspectRolError' "getFilledRolesFromDatabase_" []
     \(roles :: Array RoleInstance) -> pure roles

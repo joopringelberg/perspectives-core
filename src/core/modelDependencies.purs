@@ -69,6 +69,12 @@ rootUser :: String
 rootUser = "model://perspectives.domains#System$RootContext$RootUser"
 
 ------------------------------------------------------------------------------------
+-- INVITATION
+------------------------------------------------------------------------------------
+invitation :: String
+invitation = "model://perspectives.domains#System$Invitation$External"
+
+------------------------------------------------------------------------------------
 -- NOTIFICATION
 ------------------------------------------------------------------------------------
 contextWithNotification :: String

@@ -22,14 +22,19 @@
 
 module Perspectives.SetupCouchdb where
 
-import Data.Maybe (Maybe(..))
+import Data.Array (elemIndex)
+import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff (Aff)
+import Perspectives.ContextAndRole (context_allTypes, context_id, context_pspType, rol_allTypes, rol_binding, rol_context)
 import Perspectives.Couchdb (SecurityDocument(..), User)
+import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, runMonadPouchdb)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistent (entitiesDatabaseName)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==), (&&))
 
 -----------------------------------------------------------
 -- SETUPPERSPECTIVESINCOUCHDB
@@ -105,6 +110,21 @@ createUserDatabases user = do
       (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
 
 -----------------------------------------------------------
+-- VIEWS AND FILTER FUNCTIONS
+-- As we do not immediately store new instances, but only at certain intervals, it may happen an instance has been created
+-- and is in cache, but not yet in the database. In such a situation, a view that might fetch the instance from the database
+-- will not return it.
+-- To compensate, we provide filter functions that can be applied to the caches, giving the same results as the views - but obviously
+-- only on cached resources.
+-- We provide filter functions for all views, excecpt for:
+--    * credentialsView
+--    * roleSpecialisationsView (a view on types rather than instances)
+--    * contextSpecialisationsView (idem)
+-- 
+-- The function names equal the view names, with "Filter" postfixed.
+-----------------------------------------------------------
+
+-----------------------------------------------------------
 -- THE VIEW 'ROLE'
 -- This view collects instances of a particular role type.
 -----------------------------------------------------------
@@ -114,6 +134,9 @@ setRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "roleView" (
 
 -- | Import the view definition as a String.
 foreign import roleView :: String
+
+roleViewFilter :: EnumeratedRoleType -> PerspectRol -> Boolean
+roleViewFilter rtype rinstance = isJust $ elemIndex rtype (rol_allTypes rinstance)
 
 -- THE VIEW 'ROLEFROMCONTEXT'
 -- This view collects instances of a particular role type, **from a particular context instance**.
@@ -125,6 +148,10 @@ setRoleFromContextView dbname = void $ addViewToDatabase dbname "defaultViews" "
 -- | Import the view definition as a String.
 foreign import roleFromContextView :: String
 
+roleFromContextFilter :: EnumeratedRoleType -> ContextInstance -> PerspectRol -> Boolean
+roleFromContextFilter eRoleType cinstance role = rol_context role == cinstance && isJust (elemIndex eRoleType (rol_allTypes role))
+
+-- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
 -----------------------------------------------------------
 -- THE VIEW 'PENDINGINVITATIONS'
 -- This view collects instances model:System$Invitation$External.
@@ -146,6 +173,9 @@ setContextView dbname = void $ addViewToDatabase dbname "defaultViews" "contextV
 
 -- | Import the view definition as a String.
 foreign import contextView :: String
+
+contextViewFilter :: ContextType -> PerspectContext -> Boolean
+contextViewFilter ctype cinstance = isJust $ elemIndex ctype (context_allTypes cinstance)
 
 -----------------------------------------------------------
 -- THE VIEW 'ROLESPECIALISATIONVIEW'
@@ -189,3 +219,6 @@ setFilledRolesView dbname = void $ addViewToDatabase dbname "defaultViews" "fill
 
 -- | Import the view definition as a String.
 foreign import filledRoles :: String
+
+filledRolesFilter :: RoleInstance -> PerspectRol -> Boolean
+filledRolesFilter rid role = Just rid == rol_binding role 

@@ -10,7 +10,7 @@ import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (getAuthor, getSubject, setProperty)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.Identifiers (buitenRol)
@@ -25,6 +25,7 @@ import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
 import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
 import Simple.JSON (writeJSON)
@@ -47,6 +48,8 @@ constructEmptyContext :: ContextInstance -> String -> String -> PropertySerializ
 constructEmptyContext contextInstanceId ctype localName externeProperties authorizedRole = do
   externalRole <- pure $ RoleInstance $ buitenRol $ unwrap contextInstanceId
   pspType <- ContextType <$> (lift $ lift $ expandDefaultNamespaces ctype)
+  allExternalRoleTypes <- lift $ lift (externalRoleType pspType ###= roleAspectsClosure)
+  allContextTypes <- lift $ lift (pspType ###= contextAspectsClosure)
   author <- lift $ getAuthor
   subject <- lift $ getSubject
   contextInstance <- pure
@@ -55,6 +58,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , id = contextInstanceId
       , displayName  = localName
       , pspType = pspType
+      , allTypes = allContextTypes
       , buitenRol = externalRole
       , universeContextDelta = SignedDelta
         { author: stripNonPublicIdentifiers author
@@ -72,6 +76,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       { _id = takeGuid $ unwrap externalRole
       , id = externalRole
       , pspType = externalRoleType pspType
+      , allTypes = allExternalRoleTypes
       , context = contextInstanceId
       , binding = Nothing
       , universeRoleDelta =

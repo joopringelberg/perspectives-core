@@ -69,7 +69,7 @@ import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replace
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (hasAspect, isPublicRole, roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
 import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 import Simple.JSON (readJSON')
@@ -184,6 +184,7 @@ handleError e = liftEffect $ log (show e)
 executeUniverseContextDelta :: UniverseContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, subject}) signedDelta = do
   log (show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
+  allTypes <- lift (contextType ###= contextAspectsClosure)
   externalRoleExists <- lift $ entityExists (RoleInstance $ buitenRol $ unwrap id)
   if externalRoleExists
     then case deltaType of
@@ -198,6 +199,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                 , id = id
                 , displayName = unwrap id 
                 , pspType = contextType
+                , allTypes = allTypes
                 , buitenRol = RoleInstance $ buitenRol $ unwrap id
                 , universeContextDelta = signedDelta
                 , states = [StateIdentifier $ unwrap contextType]

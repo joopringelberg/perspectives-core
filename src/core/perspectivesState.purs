@@ -31,7 +31,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RuntimeOptions)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, ContextInstances)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
@@ -81,6 +81,12 @@ defaultRuntimeOptions =
 -----------------------------------------------------------
 domeinCache :: MonadPerspectives DomeinCache
 domeinCache = gets _.domeinCache
+
+contextCache :: MonadPerspectives ContextInstances
+contextCache = gets _.contextInstances
+
+roleCache :: MonadPerspectives RolInstances
+roleCache = gets _.rolInstances
 
 domeinCacheLookup :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheLookup = lookup domeinCache

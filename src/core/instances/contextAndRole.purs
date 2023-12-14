@@ -87,6 +87,9 @@ context_pspType (PerspectContext{pspType})= pspType
 changeContext_type :: String -> PerspectContext -> PerspectContext
 changeContext_type tp (PerspectContext cr) = PerspectContext $ cr {pspType = ContextType tp}
 
+context_allTypes :: PerspectContext -> Array ContextType
+context_allTypes (PerspectContext{allTypes}) = allTypes
+
 context_buitenRol :: PerspectContext -> RoleInstance
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
@@ -181,6 +184,7 @@ defaultContextRecord =
   , _rev: Nothing
   , displayName: ""
   , pspType: ContextType ""
+  , allTypes: []
   , buitenRol: RoleInstance ""
   , rolInContext: empty
   , me: Nothing

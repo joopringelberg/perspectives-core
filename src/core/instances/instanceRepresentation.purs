@@ -62,6 +62,7 @@ type ContextRecord = PouchbdDocumentFields
   ( id :: ContextInstance
   , displayName :: String
   , pspType :: ContextType
+  , allTypes :: Array ContextType
   , buitenRol :: RoleInstance
   , rolInContext :: F.Object (Array RoleInstance)
   , me :: Maybe RoleInstance
