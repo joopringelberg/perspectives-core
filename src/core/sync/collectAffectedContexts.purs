@@ -232,6 +232,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createRoleStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createRoleStateQuery = do
+      -- Apply the compiled backwards query.
       (affectedRoles :: Array RoleInstance) <- lift (roleInstance ##= (roleInstancesGetter :: RoleInstance ~~> RoleInstance))
       addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []

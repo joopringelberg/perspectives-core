@@ -61,7 +61,7 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
-import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context)
+import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
@@ -91,7 +91,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit, updateRevision)
-import Perspectives.PerspectivesState (contextCache)
+import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -105,7 +105,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceTy
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
-import Perspectives.SetupCouchdb (contextViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
+import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
@@ -127,7 +127,14 @@ roleInstancesFromCouchdb roleTypes _ = ArrayT do
     Nothing -> pure []
     Just rt -> do
       (tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)])
-      (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (head roleTypes)
+      instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (head roleTypes)
+      instancesInCache <- lift (do
+        cache <- roleCache
+        cachedRoleAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
+        cachedRoles <- lift $ traverse read cachedRoleAvars
+        pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType rt) cachedRoles
+        )
+      pure $ instancesInCouchdb `union` instancesInCache
 
 contextInstancesFromCouchdb :: Array String -> (RoleInstance ~~> ContextInstance)
 contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
@@ -145,10 +152,17 @@ contextInstancesFromCouchdb contextTypeArr _ = ArrayT do
       pure $ instancesInCouchdb `union` instancesInCache
 
 pendingInvitations :: ContextInstance ~~> RoleInstance
-pendingInvitations _ = ArrayT do
-    dbName <- lift entitiesDatabaseName
-    lift $ getViewOnDatabase dbName "defaultViews/roleView" (Just invitation)
-
+pendingInvitations _ = ArrayT $ lift do
+  db <- entitiesDatabaseName
+  filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Just invitation)
+  filledRolesInCache :: Array RoleInstance <- (do 
+    cache <- roleCache
+    cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+    cachedRoles <- lift $ traverse read cachedRoleAvars
+    pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType invitation) cachedRoles
+    )
+  pure $ filledRolesInDatabase `union` filledRolesInCache
+  
 -- | Overwrites the model currently residing in the local models database.
 -- | Takes care of inverted queries.
 -- | Clears compiled states from cache.

@@ -49,8 +49,8 @@ import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssu
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
-import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InstanceRepresentation (PerspectRol(..), externalRole, states) as IP
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (perspectivesUsers)
@@ -65,8 +65,8 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (guid, isInPublicScheme)
-import Perspectives.SetupCouchdb (filledRolesFilter)
+import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
+import Perspectives.SetupCouchdb (filledRolesFilter, roleFromContextFilter)
 import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
@@ -91,12 +91,16 @@ getEnumeratedRoleInstances_ rn c = ArrayT $ (lift $ try $ getPerspectEntiteit c 
 
 getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInstance)
 getUnlinkedRoleInstances rn c = ArrayT $ try 
-  (do
-    db <- lift entitiesDatabaseName
-    -- Compare the identifier without the scheme, as the view consists of schemeless identifiers, too.
-    -- We do this to abstract from the way resources have been stored.
-    schemelessId <- lift $ guid $ unwrap c
-    lift $ getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, schemelessId]))
+  (lift do
+    db <- entitiesDatabaseName
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, takeGuid (unwrap c)])
+    filledRolesInCache :: Array RoleInstance <- (do 
+      cache <- roleCache
+      cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoles <- lift $ traverse read cachedRoleAvars
+      pure $ rol_id <$> filter (roleFromContextFilter rn c) cachedRoles
+      )
+    pure $ filledRolesInDatabase `union` filledRolesInCache)
   >>=
   handlePerspectRolError' "getUnlinkedRoleInstances" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [RoleAssumption c rn]) *> pure roles
@@ -273,9 +277,7 @@ getAllFilledRoles rid = (try $ getPerspectEntiteit rid) >>=
 -- | Is especially useful for a public filler, as that carries no inverse administration of the (private) roles it fills.
 getFilledRolesFromDatabase :: RoleInstance ~~> RoleInstance
 getFilledRolesFromDatabase rid = ArrayT $ try 
-  (do
-    db <- lift entitiesDatabaseName
-    lift $ getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid))
+  (lift $ getFilledRolesFromDatabase_ rid)
   >>=
   handlePerspectRolError' "getFilledRolesFromDatabase" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Filler rid]) *> pure roles
