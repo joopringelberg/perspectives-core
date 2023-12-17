@@ -50,7 +50,7 @@ derive instance ordSerializableDateTime :: Ord SerializableDateTime
 
 instance WriteForeign SerializableDateTime where
   writeImpl (SerializableDateTime d) = case unInstant (fromDateTime d) of
-    (Milliseconds n) -> writeImpl n
+    (Milliseconds n) -> writeImpl (show n)
 
 instance ReadForeign SerializableDateTime where
   readImpl d = read' d >>= \n -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)
