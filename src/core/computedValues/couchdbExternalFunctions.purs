@@ -62,7 +62,7 @@ import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context, rol_id)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, MonadPerspectivesTransaction, (##=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
@@ -83,14 +83,15 @@ import Perspectives.ModelDependencies (invitation, systemModelName)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (MonadPouchdb, addAttachment, addDocument, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument_, withDatabase, DesignDocument(..))
-import Perspectives.Persistence.API (deleteDocument) as Persistence
+import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, retrieveDocumentVersion, splitRepositoryFileUrl, tryGetDocument_, withDatabase)
+import Perspectives.Persistence.API (deleteDocument, addAttachment) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit, updateRevision)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (addAttachment) as P
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -286,7 +287,11 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
   -- Copy the attachment
-  lift $ addA repositoryUrl documentName revision
+  mAttachment <- lift $ getAttachment repositoryUrl modelname "screens.js"
+  case mAttachment of
+    Nothing -> pure unit
+    Just attachment -> lift $ void $ P.addAttachment (DomeinFileId modelname) "screens.js" attachment (MediaType "text/ecmascript")
+
 
   if isInitialLoad'
     then createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x) referredModels
@@ -318,19 +323,6 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
-
-  where
-
-    -- url is the path to the document in the repository.
-    addA :: String -> String -> Revision_ -> MP Unit
-    addA repoName modelName rev = do
-      mAttachment <- getAttachment repoName modelName "screens.js"
-      case mAttachment of
-        Nothing -> pure unit
-        Just attachment -> do
-          perspect_models <- modelsDatabaseName
-          void $ addAttachment perspect_models modelName rev "screens.js" attachment (MediaType "text/ecmascript")
-          updateRevision (DomeinFileId modelName)
 
 createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> Array DomeinFileId -> MonadPerspectivesTransaction Unit
 createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest referredModels = do
@@ -583,7 +575,7 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
 uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
-uploadToRepository_ splitName df = do 
+uploadToRepository_ splitName (DomeinFile df) = do 
   -- Get the attachment info
   (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
   attachments <- case atts of
@@ -593,7 +585,9 @@ uploadToRepository_ splitName df = do
       _attachments
   -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion splitName.repositoryUrl splitName.documentName
-  (newRev :: Revision_) <- addDocument splitName.repositoryUrl (changeRevision mVersion df) splitName.documentName
+  -- The _id of df will be a versionless identifier. If we don't set it to the versioned name, the document
+  -- will be stored under the versionless name.
+  (newRev :: Revision_) <- addDocument splitName.repositoryUrl (changeRevision mVersion (DomeinFile df {_id = splitName.documentName})) splitName.documentName
   -- Now add the attachments.
   void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
 
@@ -605,7 +599,7 @@ uploadToRepository_ splitName df = do
       Nothing -> pure unit
       Just attachment -> do
         newRev <- get
-        DeleteCouchdbDocument {rev} <- lift $ addAttachment documentUrl documentName newRev attName attachment mimetype
+        DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
         put rev
 
 removeFromRepository_ :: {repositoryUrl :: String, documentName :: String} -> MonadPerspectives Boolean

@@ -41,9 +41,8 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (DomeinFileName, buitenRol, deconstructBuitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.ModelDependencies (build, patch, versionToInstall)
-import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
-import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (getPerspectRol, removeEntiteit, saveEntiteit, saveMarkedResources, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
+import Perspectives.Persistence.API (getAttachment, tryGetDocument)
+import Perspectives.Persistent (addAttachment, getPerspectRol, removeEntiteit, saveEntiteit, saveMarkedResources, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -189,15 +188,13 @@ storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{id}) = do
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl (unwrap id)
   mAttachment <- getAttachment repositoryUrl documentName "screens.js"
   void $ storeDomeinFileInCache id df
+
   (DomeinFile {_rev}) <- saveCachedDomeinFile id
   -- Unless we actually store in the database, adding attachments will go wrong.
   saveMarkedResources
   case mAttachment of
-    Nothing -> pure unit
-    Just attachment -> do
-      perspect_models <- getSystemIdentifier >>= pure <<< (_ <> "_models")
-      void $ addAttachment perspect_models documentName _rev "screens.js" attachment (MediaType "text/ecmascript")
-      updateRevision (DomeinFileId documentName)
+    Nothing -> saveMarkedResources
+    Just attachment -> void $ addAttachment id "screens.js" attachment (MediaType "text/ecmascript")
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: DomeinFileName -> MonadPerspectives Unit

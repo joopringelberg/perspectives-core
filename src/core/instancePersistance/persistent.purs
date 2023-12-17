@@ -34,7 +34,8 @@
 -- | correct version, and an inner one that is always one step behind.
 
 module Perspectives.Persistent
-  ( entitiesDatabaseName
+  ( addAttachment
+  , entitiesDatabaseName
   , entityExists
   , fetchEntiteit
   , getDomeinFile
@@ -59,9 +60,10 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Except (catchError, lift, throwError)
-import Data.Array (cons, elemIndex)
+import Data.Array (cons, delete, elemIndex)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.MediaType (MediaType)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -71,14 +73,16 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Persistence.Attachment (class Attachment)
 import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
+import Perspectives.Persistence.API (AttachmentName, AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
+import Perspectives.Persistence.API (addAttachment) as P
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.Class.Cacheable (class Revision, Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache)
-import Perspectives.Representation.Class.Identifiable (identifier)
+import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
@@ -142,8 +146,8 @@ removeEntiteit_ entId entiteit =
       Nothing -> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
-
-        -- TODO: DIT IS DE NIEUWE STIJL RESOURCE IDENTIFIER
+        -- If on the list of items to be saved, remove!
+        modify \s@{entitiesToBeStored} -> s { entitiesToBeStored = delete (resourceToBeStored entiteit) entitiesToBeStored}
         {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
         void $ deleteDocument database documentName (Just rev)
         pure entiteit
@@ -259,3 +263,25 @@ updateRevision entId = do
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
   revision <- retrieveDocumentVersion database documentName
   setRevision entId revision 
+
+-----------------------------------------------------------
+-- ADDATTACHMENT
+-----------------------------------------------------------
+-- | Requires a revision if the document exists prior to adding the attachment.
+-- | Side effects:
+-- |    * all cached resources that are marked for storing in the database are actually stored;
+-- |    * the resource is removed from its cache.
+-- | The revision of the document changes if an attachment is added succesfully. By removing it from the cache,
+-- | we make sure to take that into account.
+addAttachment :: forall a i attachmentType. Attachment a => Persistent a i =>  i -> AttachmentName -> attachmentType -> MediaType -> MonadPerspectives Boolean
+addAttachment i attachmentName attachment mimetype = do
+  saveMarkedResources
+  -- The resource identified by i is now in Couchdb and the revision number in cache equals that in couchdb.
+  a :: a <- getPerspectEntiteit i
+  {database, documentName} <- resourceIdentifier2DocLocator (identifier_ a)
+  DeleteCouchdbDocument {ok} <- P.addAttachment database documentName (rev a) attachmentName attachment mimetype
+  -- The document in Couchdb now has a higher revision (unless the operation failed, which throws an exception not caught here).
+  -- Remove the document from the cache, so it will be retrieved again before it can be used - including the new revision and attachments.
+  void $ removeInternally i
+  pure $ maybe false identity ok
+

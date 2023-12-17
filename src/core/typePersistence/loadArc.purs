@@ -28,6 +28,7 @@ import Data.Array (delete, null)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List (List(..))
+import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (empty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
@@ -41,6 +42,7 @@ import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Prelude (bind, discard, pure, show, ($), (<<<))
 import Text.Parsing.Parser (ParseError(..))
 
@@ -84,6 +86,7 @@ loadAndCompileArcFile_ text = catchError
                     df <- pure $ DomeinFile correctedDFR
                       { referredModels = delete id refModels
                       , arc = text
+                      , _id = takeGuid $ unwrap id
                       }
                     -- void $ lift $ storeDomeinFileInCache id df
                     pure $ Right df

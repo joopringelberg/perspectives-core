@@ -46,7 +46,6 @@ import Perspectives.Authenticate (authenticate)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, removeInternally, (###=), (###>>), (##=), (##>), (##>>))
-import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -57,10 +56,10 @@ import Perspectives.Instances.ObjectGetters (getProperty, roleType)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, getAttachment, getDocument)
-import Perspectives.Persistent (entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistence.API (getAttachment, getDocument)
+import Perspectives.Persistent (addAttachment, entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity, rev)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
@@ -153,9 +152,9 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
                 Just val -> case parsePerspectivesFile (unwrap val) of
                   Left e -> pure unit
                   Right rec -> do 
-                    DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment pubDatabase documentName (rev prol) (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
-                    case ok of 
-                      Just true -> do
+                    success <- lift $ addAttachment id (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
+                    if success
+                      then do
                         -- The revision on the cached version is no longer valid.
                         -- Neither does it have the new attachment info.
                         void $ lift $ removeInternally id
@@ -168,7 +167,7 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
                         roleInstance :: PerspectRol <- lift $ getDocument rdb rdn
                         -- save version in cache. If we use cacheEntity, the revision will not be overwritten!
                         lift $ void $ overwriteEntity id roleInstance
-                      _ -> throwError (error ("Could not save file in the database"))
+                      else throwError (error ("Could not save file in the database"))
 
         else pure unit
 

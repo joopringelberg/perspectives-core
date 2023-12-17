@@ -60,8 +60,7 @@ import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (sign)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (class Persistent, MonadPerspectives, MonadPerspectivesTransaction, Updater, removeInternally, (###=), (##=), (##>), (##>>))
-import Perspectives.Couchdb (DeleteCouchdbDocument(..))
+import Perspectives.CoreTypes (class Persistent, MonadPerspectives, MonadPerspectivesTransaction, Updater, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -72,16 +71,16 @@ import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty,
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Persistence.API (addAttachment, getDocument, toFile)
-import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, getPerspectContext)
+import Perspectives.Persistence.API (toFile)
+import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getDynamicEnumeratedPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity, overwriteEntity, rev)
+import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, stripNonPublicIdentifiers)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -534,22 +533,11 @@ saveFile r property arrayBuf mimeType = do
     Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
     Right rec -> do
       theFile <- liftEffect $ toFile (typeUri2LocalName_ (unwrap replacementProperty)) rec.mimeType arrayBuf
-      DeleteCouchdbDocument{ok, rev} <- lift $ addAttachment database documentName (rev roleInstance) (typeUri2couchdbFilename (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
-      case ok of 
-        Just true -> do
-          -- The revision on the cached version is no longer valid.
-          -- Neither does it have the new attachment info.
-          void $ lift $ removeInternally rid
-          -- Retrieve again so it includes the new attachment info and revision.
-          -- But, because replication from the write database to the read database takes some time,
-          -- if we were to retrieve from the write database, we are likely to retrieve the previous version,
-          -- with neither attachments nor updated revision.
-          -- So we read from the write database.
-          {database:rdb, documentName:rdn} <- lift $ resourceIdentifier2WriteDocLocator (unwrap rid)
-          roleInstance' :: PerspectRol <- lift $ getDocument rdb rdn
-          -- save version in cache. If we use cacheEntity, the revision will not be overwritten!
-          lift $ void $ overwriteEntity rid roleInstance'
-          -- Add a delta.
+      success <- lift $ addAttachment r (typeUri2couchdbFilename (unwrap replacementProperty)) theFile (MediaType rec.mimeType)
+      if success
+        then do
+          -- Add an UploadFile delta.
+          -- TODO. Deze delta zit NIET in de rol zelf!
           delta <- pure $ RolePropertyDelta
             { id : rid
             , roleType: rol_pspType roleInstance
@@ -568,7 +556,7 @@ saveFile r property arrayBuf mimeType = do
               , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta} })
           setProperty [rid] replacementProperty [Value usedVal]
           pure usedVal
-        _ -> throwError (error ("Could not save file in the database"))
+        else throwError (error ("Could not save file in the database"))
 
  
 -----------------------------------------------------------

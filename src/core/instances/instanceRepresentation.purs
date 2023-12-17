@@ -124,7 +124,7 @@ type RolRecord = PouchbdDocumentFields
   , states :: Array StateIdentifier
   , roleAliases :: F.Object String
   , contextAliases :: F.Object String
-  , attachments :: Maybe Attachments
+  , _attachments :: Maybe Attachments
   )
 
 derive instance genericRepPerspectRol :: Generic PerspectRol _
@@ -149,8 +149,8 @@ instance identifiablePerspectRol :: Identifiable PerspectRol RoleInstance where
   displayName (PerspectRol{id}) = unwrap id
 
 instance Attachment PerspectRol where
-  setAttachment (PerspectRol r) ma = PerspectRol (r {attachments = ma})
-  getAttachments (PerspectRol {attachments}) = attachments
+  setAttachment (PerspectRol r) ma = PerspectRol (r {_attachments = ma})
+  getAttachments (PerspectRol {_attachments}) = _attachments
 
 -----------------------------------------------------------
 -- BINDING
