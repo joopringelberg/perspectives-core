@@ -63,7 +63,7 @@ import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, g
 import Perspectives.Authenticate (sign)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
-import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), DocWithAttachmentInfo(..), SecurityDocument(..))
+import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -577,12 +577,14 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
 uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
 uploadToRepository_ splitName (DomeinFile df) = do 
   -- Get the attachment info
-  (atts :: Maybe DocWithAttachmentInfo) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
-  attachments <- case atts of
+  (mremoteDf :: Maybe DomeinFile) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
+  attachments <- case mremoteDf of
     Nothing -> pure empty
-    Just (DocWithAttachmentInfo {_attachments}) -> traverseWithIndex
-      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment splitName.repositoryUrl splitName.documentName attName)
-      _attachments
+    Just (DomeinFile {_attachments}) -> case _attachments of
+      Nothing -> pure empty
+      Just atts ->  traverseWithIndex
+        (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment splitName.repositoryUrl splitName.documentName attName)
+        atts
   -- Get the revision (if any) from the remote database, so we can overwrite.
   (mVersion :: Maybe String) <- retrieveDocumentVersion splitName.repositoryUrl splitName.documentName
   -- The _id of df will be a versionless identifier. If we don't set it to the versioned name, the document

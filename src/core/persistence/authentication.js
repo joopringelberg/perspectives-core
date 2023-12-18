@@ -6,8 +6,10 @@
 exports.isUnauthorized = function (e)
 {
   var unauthorizedRegex = new RegExp(/unauthorized/i);
-  return (e.message && null != e.message.match(unauthorizedRegex)) ||
+  return (
+    (e.message && null != e.message.match(unauthorizedRegex)) ||
     (e.error && null != e.error.match(unauthorizedRegex)) ||
     (e.name && null != e.name.match(unauthorizedRegex)) ||
-    (e.status == 401);
+    (e.status == 401)
+    );
 }

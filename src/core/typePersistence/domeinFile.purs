@@ -24,17 +24,18 @@ module Perspectives.DomeinFile
 
   where
 
-import Control.Monad.State (State, execState, modify) 
+import Control.Monad.State (State, execState, modify)
 import Data.Array (cons)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (for_)
-import Data.Generic.Rep (class Generic) 
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
 import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Persistence.Attachment (class Attachment)
+import Persistence.Attachment (class Attachment, Attachments)
+import Perspectives.Couchdb (AttachmentInfo)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap (EncodableMap, addAll, removeAll)
 import Perspectives.Data.EncodableMap (empty) as EM
@@ -76,6 +77,7 @@ type DomeinFileRecord = PouchbdDocumentFields
   , upstreamAutomaticEffects :: Object (Array UpstreamAutomaticEffect)
   , userGraph :: UserGraph
   , screens :: EncodableMap ScreenKey ScreenDefinition
+  , _attachments :: Maybe AttachmentInfo
   )
 
 derive instance genericDomeinFile :: Generic DomeinFile _
@@ -208,6 +210,7 @@ defaultDomeinFileRecord =
   , upstreamAutomaticEffects: empty
   , userGraph: UserGraph $ EM.empty
   , screens: EM.empty
+  , _attachments: Nothing
 }
 
 defaultDomeinFile :: DomeinFile

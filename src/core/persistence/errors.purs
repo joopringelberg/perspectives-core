@@ -52,7 +52,7 @@ handleNotFound :: forall m a. MonadError Error m => String -> DocumentName -> Er
 handleNotFound funcName docName e = parsePouchError funcName docName e >>=
   \err -> case err.status of
     Just 404 -> pure Nothing
-    Just s -> handleError s empty ("getAttachment for " <> docName <> " (" <> err.message <> ")")
+    Just s -> handleError s empty (funcName <> " for " <> docName <> " (" <> err.message <> ")")
     Nothing -> throwError e
 
 parsePouchError :: forall m. MonadError Error m => String -> DocumentName -> Error -> m PouchError
