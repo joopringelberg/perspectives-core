@@ -90,8 +90,8 @@ import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePath
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.Persistent (addAttachment) as P
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -103,7 +103,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvert
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, stripNonPublicIdentifiers)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
@@ -272,18 +272,19 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   -- If we can find a version at all, this is it.
   versionedModelName <- pure (unversionedModelname <> (maybe "" ((<>) "@") version))
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl versionedModelName
-  df@(DomeinFile
-  { id
-  -- , indexedRoles
-  -- , indexedContexts
-  , referredModels
-  , invertedQueriesInOtherDomains
-  , upstreamStateNotifications
-  , upstreamAutomaticEffects}) <- lift $ getDocument repositoryUrl documentName
+  DomeinFile dfrecord@
+    { id
+    -- , indexedRoles
+    -- , indexedContexts
+    , referredModels
+    , invertedQueriesInOtherDomains
+    , upstreamStateNotifications
+    , upstreamAutomaticEffects} <- lift $ getDocument repositoryUrl documentName
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
-  lift $ void $ cacheEntity id (changeRevision Nothing df)
+  {documentName:unversionedDocumentName} <- lift $ resourceIdentifier2WriteDocLocator unversionedModelname
+  lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName})
   revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
   -- Copy the attachment
