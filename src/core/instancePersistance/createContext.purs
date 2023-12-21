@@ -8,7 +8,7 @@ import Data.Newtype (unwrap)
 import Foreign.Object (isEmpty)
 import Perspectives.ApiTypes (PropertySerialization(..))
 import Perspectives.Assignment.Update (getAuthor, getSubject, setProperty)
-import Perspectives.Authenticate (sign)
+import Perspectives.Authenticate (signDelta)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedRoleToTransaction)
@@ -22,9 +22,8 @@ import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedP
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
@@ -52,6 +51,14 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   allContextTypes <- lift $ lift (pspType ###= contextAspectsClosure)
   author <- lift $ getAuthor
   subject <- lift $ getSubject
+  delta <- lift $ lift $ signDelta 
+    author 
+    (writeJSON $ stripResourceSchemes $ UniverseContextDelta
+      { id: contextInstanceId
+      , contextType: pspType
+      , deltaType: ConstructEmptyContext
+      , subject
+    })
   contextInstance <- pure
     (PerspectContext defaultContextRecord
       { _id = takeGuid $ unwrap contextInstanceId
@@ -60,17 +67,19 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , pspType = pspType
       , allTypes = allContextTypes
       , buitenRol = externalRole
-      , universeContextDelta = SignedDelta
-        { author: stripNonPublicIdentifiers author
-        , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseContextDelta
-            { id: contextInstanceId
-            , contextType: pspType
-            , deltaType: ConstructEmptyContext
-            , subject
-          }}
+      , universeContextDelta = delta
       , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
+  delta' <- lift $ lift $ signDelta author
+    (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
+      { id: contextInstanceId
+      , contextType: pspType
+      , roleInstances: (SNEA.singleton externalRole)
+      , roleType: externalRoleType pspType
+      , authorizedRole
+      , deltaType: ConstructExternalRole
+      , subject })
   _ <- lift $ lift $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
       { _id = takeGuid $ unwrap externalRole
@@ -79,17 +88,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , allTypes = allExternalRoleTypes
       , context = contextInstanceId
       , binding = Nothing
-      , universeRoleDelta =
-          SignedDelta
-            { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
-              { id: contextInstanceId
-              , contextType: pspType
-              , roleInstances: (SNEA.singleton externalRole)
-              , roleType: externalRoleType pspType
-              , authorizedRole
-              , deltaType: ConstructExternalRole
-              , subject } }
+      , universeRoleDelta = delta'
       , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ addCreatedRoleToTransaction externalRole

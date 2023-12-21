@@ -100,7 +100,10 @@ domain model://perspectives.domains#System
     state NoPerspectivesUsers = not exists PerspectivesUsers
       on entry
         do for Initializer
-          create role PerspectivesUsers
+          letA
+            user <- create role PerspectivesUsers
+          in
+            PublicKey = callExternal util:SystemParameter( "PublicKey" ) returns String for user
     -- PDRDEPENDENCY
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
@@ -137,6 +140,7 @@ domain model://perspectives.domains#System
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
     user Me filledBy PerspectivesUsers
       property MyIdentity (File)
+      property MyPublicKey (functional) = binder PerspectivesUsers >> PublicKey
     user SystemUser = sys:Me
       perspective on Me
         only (Create, Fill)

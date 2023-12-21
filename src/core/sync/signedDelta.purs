@@ -26,13 +26,18 @@ import Prelude
 
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- | The author is the instance of sys:PerspectivesSystem$User who signed the delta.
-newtype SignedDelta = SignedDelta {author :: String, encryptedDelta :: String}
+newtype SignedDelta = SignedDelta 
+  { author :: String
+  , encryptedDelta :: String
+  , signature :: Maybe String
+  }
 
 derive instance genericRepSignedDelta :: Generic SignedDelta _
 

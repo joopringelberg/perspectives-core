@@ -42,7 +42,7 @@ import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
-import Perspectives.Authenticate (authenticate)
+import Perspectives.Authenticate (verifyDelta)
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, removeInternally, (###=), (###>>), (##=), (##>), (##>>))
@@ -66,7 +66,7 @@ import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Ver
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
@@ -310,7 +310,7 @@ executeTransaction :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 executeTransaction t@(TransactionForPeer{deltas}) = for_ deltas f
   where
     f :: SignedDelta -> MonadPerspectivesTransaction Unit
-    f s@(SignedDelta{author, encryptedDelta}) = executeDelta $ authenticate (RoleInstance author) encryptedDelta
+    f s = (lift $ verifyDelta s) >>= executeDelta
       where
         executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
         -- For now, we fail silently on deltas that cannot be authenticated.
@@ -339,7 +339,7 @@ expandDeltas t@(TransactionForPeer{deltas}) storageUrl = catMaybes <$> (for delt
   where
 
   expandDelta :: SignedDelta -> MonadPerspectivesTransaction (Maybe Delta)
-  expandDelta s@(SignedDelta{author, encryptedDelta}) = expandDelta' $ authenticate (RoleInstance author) encryptedDelta
+  expandDelta s = (lift $ verifyDelta s) >>= expandDelta'
     where
       expandDelta' :: Maybe String -> MonadPerspectivesTransaction (Maybe Delta)
       expandDelta' Nothing = pure Nothing

@@ -74,6 +74,8 @@ defaultRuntimeOptions :: RuntimeOptions
 defaultRuntimeOptions = 
   { isFirstInstallation: true
   , useSystemVersion: null
+  , privateKey: Nothing
+  , publicKey: Nothing
   }
 
 -----------------------------------------------------------

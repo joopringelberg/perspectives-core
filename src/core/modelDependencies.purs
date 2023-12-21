@@ -14,11 +14,20 @@ module Perspectives.ModelDependencies  where
 perspectivesUsers :: String
 perspectivesUsers = "model://perspectives.domains#System$TheWorld$PerspectivesUsers" 
 
+perspectivesUsersPublicKey :: String
+perspectivesUsersPublicKey = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$PublicKey" 
+
 socialEnvironment :: String
 socialEnvironment = "model://perspectives.domains#System$SocialEnvironment" 
 
 socialEnvironmentPersons :: String
 socialEnvironmentPersons = "model://perspectives.domains#System$SocialEnvironment$Persons" 
+
+socialEnvironmentMe :: String
+socialEnvironmentMe = "model://perspectives.domains#System$SocialEnvironment$Me" 
+
+socialEnvironmentMePublicKey :: String
+socialEnvironmentMePublicKey = "model://perspectives.domains#System$SocialEnvironment$Me$MyPublicKey" 
 
 systemIdentityValues :: String
 systemIdentityValues = "model://perspectives.domains#System$TheWorld$SystemIdentities" 

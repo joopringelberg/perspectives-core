@@ -35,6 +35,7 @@ module Perspectives.CoreTypes
   , BrokerService
   , ContextInstances
   , ContextPropertyValueGetter
+  , CryptoKey'
   , DomeinCache
   , InformedAssumption(..)
   , JustInTimeModelLoad(..)
@@ -125,6 +126,7 @@ import Perspectives.ResourceIdentifiers.Parser (pouchdbDatabaseName)
 import Perspectives.Sync.Transaction (Transaction, StorageScheme)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, unit, ($), (<<<), (<>), (>>=))
 import Simple.JSON (class ReadForeign, class WriteForeign)
+import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- PERSPECTIVESSTATE
@@ -194,8 +196,15 @@ type RuntimeOptions =
   { isFirstInstallation :: Boolean
   -- Default: null. Provide a value to test setup of an experimental new System version.
   , useSystemVersion :: Nullable String
+  -- Default: the CryptoKey object that has been created on setting up the installation. This is not extractable.
+  , privateKey :: Maybe CryptoKey'
+  -- Default: the CryptoKey object that has been created on setting up the installation. This is extractable.
+  , publicKey :: Maybe CryptoKey'
   }
 
+foreign import data CryptoKey' :: Type
+instance ReadForeign CryptoKey' where readImpl = pure <<< unsafeCoerce
+instance WriteForeign CryptoKey' where writeImpl = unsafeCoerce
 
 data RepeatingTransaction = TransactionWithTiming
   { transaction :: MonadPerspectivesTransaction Unit

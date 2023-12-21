@@ -60,7 +60,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
-import Perspectives.Authenticate (sign)
+import Perspectives.Authenticate (signDelta)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), SecurityDocument(..))
@@ -103,11 +103,10 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvert
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -375,9 +374,7 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
     , deltaType: SetFirstBinding
     , subject
     }
-  signedDelta <- pure $ SignedDelta
-    { author: stripNonPublicIdentifiers author
-    , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+  signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes $ delta)
 
   -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
   (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
@@ -429,9 +426,10 @@ initSystem = do
     Right (system :: PerspectContext) -> do 
       lift $ void $ saveEntiteit_ (identifier system) system
       addCreatedContextToTransaction (identifier system)
+
       -- Now create the user role (it is cached automatically).
       -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-      -- it would introduce module imnport circularity.
+      -- it would introduce module import circularity.
       (me :: PerspectRol) <- constructEmptyRole
         (identifier system)
         (EnumeratedRoleType DEP.sysUser)
@@ -441,6 +439,8 @@ initSystem = do
       -- The user role is not filled.
       -- And now add to the context.
       addRoleInstanceToContext (identifier system) (EnumeratedRoleType DEP.sysUser) (Tuple (identifier me) Nothing)
+
+      -- Add the new indexed resources.
       void $ lift $ AMA.modify \ps -> ps 
         { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
         , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles

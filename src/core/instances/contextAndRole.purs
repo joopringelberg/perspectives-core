@@ -189,7 +189,7 @@ defaultContextRecord =
   , rolInContext: empty
   , me: Nothing
   , preferredUserRoleType: Nothing
-  , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord"}
+  , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord", signature: Nothing}
   , states: []
   , publicUrl: Nothing
   }
@@ -207,8 +207,8 @@ defaultRolRecord =
   , filledRoles: empty
   , occurrence: 0
   , isMe: false
-  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord"}
-  , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord"}
+  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord", signature: Nothing}
+  , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord", signature: Nothing}
   , bindingDelta: Nothing
   , propertyDeltas: empty
   , states: []

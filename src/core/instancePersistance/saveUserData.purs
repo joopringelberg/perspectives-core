@@ -58,7 +58,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
-import Perspectives.Authenticate (sign)
+import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
@@ -76,13 +76,13 @@ import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEn
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
-import Perspectives.ResourceIdentifiers (isInPublicScheme, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (allUnlinkedRoles, isUnlinked_)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
@@ -159,13 +159,11 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
       users2 <- handleRoleOnContextRemoval buitenRol
       -- SYNCHRONISATION
       subject <- getSubject
-      me <- getAuthor
+      author <- getAuthor
       -- (roleType ###>> hasAspect (EnumeratedRoleType "sys:RootContext$External"))
-      addDelta $ DeltaInTransaction
-        { users: nub $ users1 <> users2
-        , delta: SignedDelta
-            { author: stripNonPublicIdentifiers me
-            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
+      delta <- lift $ signDelta 
+        author 
+        (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id
               , contextType
               , roleType: externalRoleType contextType
@@ -173,7 +171,10 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
               , roleInstances: SNEA.singleton (context_buitenRol ctxt)
               , deltaType: RemoveExternalRoleInstance
               , subject
-              }}}
+              })
+      addDelta $ DeltaInTransaction
+        { users: nub $ users1 <> users2
+        , delta }
 
 -- | Modifies the context instance by detaching the given role instances.
 -- | PERSISTENCE of the context instance.
@@ -267,18 +268,17 @@ synchroniseRoleRemoval (PerspectRol{id:roleId, pspType:roleType, context:context
         contextType <- lift $ contextType_ contextId
         subject <- getSubject
         author <- getAuthor
-        addDelta $ DeltaInTransaction
-          { users
-          , delta: SignedDelta
-            { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
-              { id: contextId
-              , contextType
-              , roleInstances: (SerializableNonEmptyArray (singleton roleId))
-              , roleType
-              , authorizedRole: Nothing
-              , deltaType: RemoveRoleInstance
-              , subject } }}
+        delta <- lift $ signDelta
+          author 
+          (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            { id: contextId
+            , contextType
+            , roleInstances: (SerializableNonEmptyArray (singleton roleId))
+            , roleType
+            , authorizedRole: Nothing
+            , deltaType: RemoveRoleInstance
+            , subject } )
+        addDelta $ DeltaInTransaction { users, delta }
 
 -- | QUERY UPDATES. Add correlation identifiers to the current transaction for
 -- | each request that needs to be updated when the role instance is removed.
@@ -429,9 +429,9 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             users <- usersWithPerspectiveOnRoleBinding delta true
             author <- getAuthor
             signedDelta <-  case msignedDelta of
-              Nothing -> pure $ SignedDelta
-                { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+              Nothing -> lift $ signDelta
+                author
+                (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
 
             -- SYNCHRONISATION
@@ -524,9 +524,9 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit
             -- Only push a RoleBindingDelta if the role will not be removed.
             author <- getAuthor
             signedDelta <- case msignedDelta of
-              Nothing ->  pure $ SignedDelta
-                { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+              Nothing -> lift $ signDelta
+                author 
+                (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
             handleNewPeer filled
             addDelta (DeltaInTransaction { users, delta: signedDelta})

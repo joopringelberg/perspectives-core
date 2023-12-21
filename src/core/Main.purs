@@ -47,6 +47,7 @@ import Foreign.Object (fromFoldable)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
+import Perspectives.Authenticate (getPrivateKey)
 import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
@@ -76,6 +77,7 @@ import Perspectives.SetupUser (reSetupUser, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read)
+import Unsafe.Coerce (unsafeCoerce)
 
 -- | Don't do anything. runPDR will actually start the core.
 main :: Effect Unit
@@ -127,7 +129,10 @@ runPDR usr rawPouchdbUser callback = void $ runAff handler do
         addAllExternalFunctions
         addIndexedNames
         retrieveAllCredentials
-        retrieveBrokerService)
+        retrieveBrokerService
+        key <- getPrivateKey
+        modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
+        )
         state
       void $ forkAff $ run state
       -- void $ forkAff $ forever do
@@ -330,6 +335,8 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       runPerspectivesWithState
         (do
           addAllExternalFunctions
+          key <- getPrivateKey
+          modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
           getSystemIdentifier >>= createUserDatabases
           setupUser
           saveMarkedResources
@@ -364,6 +371,9 @@ reCreateInstances rawPouchdbUser callback = void $ runAff handler
             -- clear the caches, otherwise nothing happens.
             resetCaches
             addAllExternalFunctions
+            key <- getPrivateKey
+            modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
+            getSystemIdentifier >>= createUserDatabases
             reSetupUser
             saveMarkedResources)
           state
@@ -407,6 +417,9 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
             -- clear the caches, otherwise nothing happens.
             resetCaches
             addAllExternalFunctions
+            key <- getPrivateKey
+            modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
+            getSystemIdentifier >>= createUserDatabases
             setupUser
             saveMarkedResources)
           state

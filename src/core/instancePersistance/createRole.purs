@@ -36,7 +36,7 @@ import Control.Monad.Writer (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Perspectives.Assignment.Update (getAuthor, getSubject)
-import Perspectives.Authenticate (sign)
+import Perspectives.Authenticate (signDelta)
 import Perspectives.ContextAndRole (defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=))
 import Perspectives.Deltas (addCreatedRoleToTransaction)
@@ -45,9 +45,8 @@ import Perspectives.Instances.ObjectGetters (contextType_)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType, cacheEntity)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, void, ($))
@@ -66,6 +65,16 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
   subject <- getSubject
   allTypes <- lift (roleType ###= roleAspectsClosure)
   contextType <- lift $ contextType_ contextInstance
+  delta <- lift $ signDelta 
+    author
+    (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
+      { id: contextInstance
+      , contextType
+      , roleInstances: (SNEA.singleton rolInstanceId)
+      , roleType
+      , authorizedRole: Nothing
+      , deltaType: ConstructEmptyRole
+      , subject })
   role <- pure (PerspectRol defaultRolRecord
     { _id = takeGuid $ unwrap rolInstanceId
     , id = rolInstanceId
@@ -73,17 +82,7 @@ constructEmptyRole contextInstance roleType i rolInstanceId = do
     , allTypes = allTypes
     , context = contextInstance
     , occurrence = i
-    , universeRoleDelta =
-        SignedDelta
-          { author: stripNonPublicIdentifiers author
-          , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
-            { id: contextInstance
-            , contextType
-            , roleInstances: (SNEA.singleton rolInstanceId)
-            , roleType
-            , authorizedRole: Nothing
-            , deltaType: ConstructEmptyRole
-            , subject } }
+    , universeRoleDelta = delta
     , states = [StateIdentifier $ unwrap roleType]
     })
   void $ lift $ cacheEntity rolInstanceId role

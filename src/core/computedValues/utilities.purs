@@ -39,6 +39,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Random (randomInt)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
+import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -166,9 +167,12 @@ evalExpression_ exprArray roleId = ArrayT case head exprArray of
 
 -- | Return various values from PerspectivesState or even other state.
 systemParameter_ :: Array String -> ContextInstance -> MonadPerspectivesQuery String
-systemParameter_ parArray _ = ArrayT case head parArray of 
+systemParameter_ parArray _ = ArrayT $ lift case head parArray of 
   Just par -> case par of
     "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation <<< _.runtimeOptions)
+    "PublicKey" -> getMyPublicKey >>= case _ of 
+      Just publicKey -> pure [publicKey]
+      Nothing -> pure []
     _ -> pure [] 
   _ -> pure []
 

@@ -57,7 +57,7 @@ import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, lookup)
 import Foreign.Object (union) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Persistence.Attachment (class Attachment)
-import Perspectives.Authenticate (sign)
+import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (class Persistent, MonadPerspectives, MonadPerspectivesTransaction, Updater, (###=), (##=), (##>), (##>>))
@@ -80,10 +80,10 @@ import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPrope
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
-import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
-import Perspectives.Sync.SignedDelta (SignedDelta(..))
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, indexedContextName, indexedRoleName, isUnlinked_, propertyAliases)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
@@ -172,18 +172,18 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
       addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
       delta <- case receivedDelta of
         Just d -> pure d
-        _ -> pure $ SignedDelta
-          { author: stripNonPublicIdentifiers author
-          , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ ContextDelta
-            { contextInstance : contextId
-            , contextType: context_pspType pe
-            , roleType: rolName
-            , deltaType: AddRoleInstancesToContext
-            , roleInstance: id
-            , destinationContext: Nothing
-            , destinationContextType: Nothing
-            , subject
-            } }
+        _ -> lift $ signDelta 
+              author
+              (writeJSON $ stripResourceSchemes $ ContextDelta
+                { contextInstance : contextId
+                , contextType: context_pspType pe
+                , roleType: rolName
+                , deltaType: AddRoleInstancesToContext
+                , roleInstance: id
+                , destinationContext: Nothing
+                , destinationContextType: Nothing
+                , subject
+                })
       addDelta $ DeltaInTransaction {users, delta}
       lift $ cacheAndSave id $ PerspectRol r { contextDelta = delta }
       -- QUERY UPDATES
@@ -212,19 +212,17 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
         subject <- getSubject
       -- SYNCHRONISATION
         author <- getAuthor
-        addDelta $ DeltaInTransaction
-          { users
-          , delta: SignedDelta
-            { author: stripNonPublicIdentifiers author
-            , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta
-              { id: contextId
-              , contextType: context_pspType pe
-              , roleInstances: (SerializableNonEmptyArray rolInstances)
-              , roleType: rolName
-              , authorizedRole: Nothing
-              , deltaType: RemoveRoleInstance
-              , subject } }}
-
+        delta <- lift $ signDelta 
+          author
+          (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
+            { id: contextId
+            , contextType: context_pspType pe
+            , roleInstances: (SerializableNonEmptyArray rolInstances)
+            , roleType: rolName
+            , authorizedRole: Nothing
+            , deltaType: RemoveRoleInstance
+            , subject })
+        addDelta $ DeltaInTransaction { users, delta}
         -- QUERY UPDATES.
         (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
         -- Modify the context: remove the role instances from those recorded with the role type.
@@ -337,9 +335,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       , values: [value]
                       , subject
                       }
-                    pure $ SignedDelta
-                      { author: stripNonPublicIdentifiers author
-                      , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+                    lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
@@ -413,9 +409,7 @@ removeProperty rids propertyName values = case ARR.head rids of
               , subject
               }
             author <- getAuthor
-            signedDelta <- pure $ SignedDelta
-              { author: stripNonPublicIdentifiers author
-              , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+            signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
             (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -457,9 +451,7 @@ deleteProperty rids propertyName = case ARR.head rids of
                 , subject
                 }
               author <- getAuthor
-              signedDelta <- pure $ SignedDelta
-                { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
+              signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
               (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -546,14 +538,8 @@ saveFile r property arrayBuf mimeType = do
             , values: [Value usedVal]
             , subject
             }
-          signedDelta <- pure $ SignedDelta
-                { author: stripNonPublicIdentifiers author
-                , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta}
-          addDelta (DeltaInTransaction 
-            { users
-            , delta: SignedDelta
-              { author: stripNonPublicIdentifiers author
-              , encryptedDelta: sign $ writeJSON $ stripResourceSchemes $ delta} })
+          signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
+          addDelta (DeltaInTransaction { users, delta: signedDelta })
           setProperty [rid] replacementProperty [Value usedVal]
           pure usedVal
         else throwError (error ("Could not save file in the database"))
