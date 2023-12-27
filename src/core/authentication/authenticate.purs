@@ -21,21 +21,24 @@
 -- END LICENSE
 
 module Perspectives.Authenticate
-  ( getMyPublicKey
+  ( deserializeJWK
+  , getMyPublicKey
   , getPrivateKey
   , signDelta
   , verifyDelta
+  , verifyDelta'
   )
   where
 
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
+import Control.Monad.Except (runExcept)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, toAffE)
 import Crypto.Subtle.Constants.AES (aesCBC, l256)
 import Crypto.Subtle.Constants.EC as ECConstants
-import Crypto.Subtle.Hash (sha1, sha256)
+import Crypto.Subtle.Hash (sha1, sha384)
 import Crypto.Subtle.Key.Derive (deriveBits, pbkdf2)
 import Crypto.Subtle.Key.Generate (aes, generateKey)
 import Crypto.Subtle.Key.Import (ImportAlgorithm, ec, importKey)
@@ -46,7 +49,8 @@ import Data.Array (foldMap)
 import Data.ArrayBuffer.ArrayBuffer (byteLength)
 import Data.ArrayBuffer.Builder (PutM, putArrayBuffer, execPut, putUint32be)
 import Data.ArrayBuffer.Typed (buffer, toArray, whole)
-import Data.ArrayBuffer.Types (ArrayBuffer, Int8Array)
+import Data.ArrayBuffer.Types (ArrayBuffer, Int8Array, Uint8Array)
+import Data.Either (Either(..))
 import Data.Int (hexadecimal, toStringAs)
 import Data.Maybe (Maybe(..))
 import Data.Nullable (Nullable, toMaybe)
@@ -65,14 +69,12 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
-import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, stripNonPublicIdentifiers)
 import Perspectives.ResourceIdentifiers.Parser (ResourceIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Simple.JSON (unsafeStringify)
+import Simple.JSON (parseJSON, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
-import Web.Encoding.TextDecoder (decode, new) as Decoder
 import Web.Encoding.TextEncoder (encode, new) as Encoder
-import Web.Encoding.UtfLabel (utf8)
 
 -----------------------------------------------------------
 -- SIGNING AND VERIFYING
@@ -90,25 +92,31 @@ signDelta author encryptedDelta = do
       , signature: Nothing
       }
     Just cryptoKey -> do 
-      signatureBuff <- lift $ sign (ecdsa sha256) (unsafeCoerce cryptoKey) deltaBuff
-      signature <- liftEffect $ buff2string signatureBuff
-      pure $ SignedDelta 
+      signatureBuff <- lift $ sign (ecdsa sha384) (unsafeCoerce cryptoKey) deltaBuff
+      (int8array :: Uint8Array) <- liftEffect $ whole signatureBuff
+      (signature :: String) <- liftAff $ bytesToBase64DataUrl int8array
+      publicKey <- getPublicKey (stripNonPublicIdentifiers author)
+      sd <- pure $ SignedDelta 
         { author: stripNonPublicIdentifiers author
         , encryptedDelta
         , signature: Just signature
         }
+      correct <- verifyDelta sd
+      pure sd
 
 verifyDelta :: SignedDelta -> MonadPerspectives (Maybe String)
-verifyDelta (SignedDelta{author, encryptedDelta, signature}) = do
-  mcryptoKey <- getPublicKey author
+verifyDelta d@(SignedDelta{author, encryptedDelta, signature}) = getPublicKey author >>= verifyDelta' d
+
+verifyDelta' :: SignedDelta -> Maybe CryptoTypes.CryptoKey -> MonadPerspectives (Maybe String)
+verifyDelta' (SignedDelta{author, encryptedDelta, signature}) mcryptoKey = do
   case signature, mcryptoKey of 
     Nothing, Nothing -> pure $ Just encryptedDelta
     Nothing, Just _ ->  pure $ Just encryptedDelta
     Just s, Nothing -> throwError (error $ "No public key found for " <> author)
     Just signature', Just cryptoKey -> do 
-      signatureBuff <- liftAff $ liftEffect $ string2buff signature'
+      signatureBuff <- buffer <$> (liftAff $ dataUrlToBytes signature')
       deltaBuff <- liftAff $ liftEffect $ string2buff encryptedDelta
-      trusted <- liftAff $ verify (ecdsa sha256) cryptoKey signatureBuff deltaBuff
+      trusted <- liftAff $ verify (ecdsa sha384) cryptoKey signatureBuff deltaBuff
       if trusted
         then pure $ Just encryptedDelta
         else pure Nothing
@@ -116,13 +124,22 @@ verifyDelta (SignedDelta{author, encryptedDelta, signature}) = do
 -- | Get the public key of a peer.
 getPublicKey :: String -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPublicKey author = do
-  mrawKey <- (RoleInstance author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
+  mrawKey <- (RoleInstance $ createDefaultIdentifier author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
   case mrawKey of 
     Nothing -> pure Nothing 
-    Just (Value rawKey) -> do
-      keyBuff <- liftAff $ liftEffect $ string2buff rawKey
-      key <- lift $ importKey CryptoTypes.jwk keyBuff (ec ECConstants.ecdsa ECConstants.p256) true [CryptoTypes.verify]
-      pure $ Just key
+    Just (Value rawKey) -> lift (Just <$> deserializeJWK rawKey)
+    -- do
+    --   keyBuff <- liftAff $ liftEffect $ string2buff rawKey
+    --   key <- lift $ importKey CryptoTypes.jwk keyBuff (ec ECConstants.ecdsa ECConstants.p384) true [CryptoTypes.verify]
+    --   pure $ Just key
+
+deserializeJWK :: String -> Aff CryptoTypes.CryptoKey
+deserializeJWK rawKey = do
+  -- keyBuff <- liftAff $ liftEffect $ string2buff rawKey
+  -- Even though `importKey` specifies a `buffer` as second argument, the Crypto.subtle API specifies a JSON object.
+  case runExcept (parseJSON rawKey) of
+    Left e -> throwError (error $ "Cannot parse JWK json: " <> show e)
+    Right jwk -> importKey CryptoTypes.jwk (unsafeCoerce jwk) (ec ECConstants.ecdsa ECConstants.p384) true [CryptoTypes.verify]
 
 -- | Get my private key (to sign a delta).
 -- | This is used on system startup. It takes the private key from IndexedDB 
@@ -160,16 +177,26 @@ getCryptoKey = getCryptoKeyImpl_ >>> toAffE
 getCryptoKeyImpl_ :: String -> Effect (Promise (Nullable CryptoKey))
 getCryptoKeyImpl_ = runEffectFn1 getCryptoKeyImpl
 
-buff2string :: ArrayBuffer -> Effect String
-buff2string buff = do
-  buffDecoder <- Decoder.new utf8
-  (int8array :: Int8Array) <- whole buff
-  Decoder.decode int8array buffDecoder
-
 string2buff :: String -> Effect ArrayBuffer
 string2buff s = do
   textEncoder <- liftEffect Encoder.new
   pure $ buffer $ Encoder.encode s textEncoder
+
+foreign import dataUrlToBytesImpl :: EffectFn1 String (Promise Uint8Array)
+
+dataUrlToBytesImpl_ :: String -> Effect (Promise Uint8Array)
+dataUrlToBytesImpl_ = runEffectFn1 dataUrlToBytesImpl
+
+dataUrlToBytes :: String -> Aff Uint8Array
+dataUrlToBytes = dataUrlToBytesImpl_ >>> toAffE
+
+foreign import bytesToBase64DataUrlImpl :: EffectFn1 Uint8Array (Promise String)
+
+bytesToBase64DataUrlImpl_ :: Uint8Array -> Effect (Promise String)
+bytesToBase64DataUrlImpl_ = runEffectFn1 bytesToBase64DataUrlImpl
+
+bytesToBase64DataUrl :: Uint8Array -> Aff String
+bytesToBase64DataUrl = bytesToBase64DataUrlImpl_ >>> toAffE
 
 -----------------------------------------------------------
 -- CREATEPASSWORD

@@ -48,7 +48,7 @@ import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
 import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, getFilledRolesFromDatabase_, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, clearPublicRolesJustLoaded, getPublicRolesJustLoaded, pushFrame, restoreFrame, transactionFlag)
@@ -88,7 +88,7 @@ runMonadPerspectivesTransaction' :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runMonadPerspectivesTransaction' share authoringRole a = getUserIdentifier >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT whenFlagIsDown
+runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPerspectivesUser) >>= lift <<< createTransaction authoringRole <<< unwrap >>= lift <<< new >>= runReaderT whenFlagIsDown
   where
     -- | Wait until the TransactionFlag can be taken down, then run the action; raise it again.
     whenFlagIsDown :: MonadPerspectivesTransaction o

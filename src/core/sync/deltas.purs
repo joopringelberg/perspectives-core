@@ -23,8 +23,8 @@
 module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
-import Control.Monad.State.Trans (StateT, execStateT, get, lift, put)
-import Data.Array (catMaybes, concat, elemIndex, filter, foldl, insertAt, length, nub, singleton, snoc, union)
+import Control.Monad.State.Trans (StateT, execStateT, get, lift, modify, put)
+import Data.Array (catMaybes, concat, elemIndex, filter, foldl, head, insertAt, length, nub, singleton, snoc, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Map (insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -35,30 +35,32 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Effect.Now (now)
 import Foreign.Object (Object, empty, insert, lookup)
-import Foreign.Object (filter) as OBJ
+import Foreign.Object (filter, Object, empty, lookup, insert) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
+import Perspectives.ContextAndRole (rol_property, rol_propertyDelta, rol_universeContextDelta, rol_universeRoleDelta)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (getFilledRoles, getProperty, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, sysUser) as DEP
-import Perspectives.ModelDependencies (socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
+import Perspectives.ModelDependencies (perspectivesUsersPublicKey, socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (Url, addDocument)
-import Perspectives.Persistent (postDatabaseName)
+import Perspectives.Persistent (getPerspectRol, postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
-import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Sync.Transaction (Transaction(..), PublicKeyInfo)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.Types.ObjectGetters (isPublicRole)
 import Prelude (Unit, bind, discard, eq, flip, map, not, notEq, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
@@ -72,7 +74,7 @@ distributeTransaction :: Transaction -> MonadPerspectives TransactionPerUser
 distributeTransaction t@(Transaction{changedDomeinFiles}) = do
   for_ changedDomeinFiles (DomeinFileId >>> saveCachedDomeinFile)
   -- Send the Transaction to all involved.
-  distributeTransactie' t
+  addPublicKeysToTransaction t >>= distributeTransactie'
   
 distributeTransactie' :: Transaction -> MonadPerspectives TransactionPerUser
 distributeTransactie' t = do
@@ -139,7 +141,7 @@ type TransactionPerUser = Object TransactionForPeer
 -- | This function builds a custom version of the Transaction for each such user.
 -- | `users` in DeltaInTransaction will not always be model://perspectives.domains#System$PerspectivesSystem$User instances.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
-transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBottoms}) = do
+transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBottoms, publicKeys}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
     -- Lookup the ultimate filler for all users in the delta.
     sysUsers <- pure $ concat $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
@@ -156,7 +158,8 @@ transactieForEachUser t@(Transaction tr@{author, timeStamp, deltas, userRoleBott
         then do
           trs <- get
           case lookup sysUser trs of
-            Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d]}) trs
+            -- TODO: verwijder public key info voor deltas die er niet toe doen voor deze user.
+            Nothing -> put $ insert sysUser (TransactionForPeer {author, timeStamp, deltas: [d], publicKeys}) trs
             Just trans -> put $ insert sysUser (addToTransactionForPeer d trans) trs
         else pure unit
       )
@@ -232,3 +235,32 @@ addCreatedRoleToTransaction rid =
     if isJust $ elemIndex rid createdRoles
       then createdRoles
       else snoc createdRoles rid})
+
+addPublicKeysToTransaction :: Transaction -> MonadPerspectives Transaction
+addPublicKeysToTransaction (Transaction tr@{deltas}) = do 
+  publicKeys :: OBJ.Object PublicKeyInfo <- execStateT (for_ deltas addPublicKeyInfo) OBJ.empty
+  pure $ Transaction tr { publicKeys = publicKeys}
+
+  where
+    addPublicKeyInfo :: DeltaInTransaction -> StateT (OBJ.Object PublicKeyInfo) MonadPerspectives Unit
+    addPublicKeyInfo (DeltaInTransaction{delta}) = case delta of 
+      SignedDelta {author} -> do
+        keys <- get
+        case OBJ.lookup author keys of 
+          Just _ -> pure unit
+          Nothing -> do 
+            pkInfo <- lift $ getPkInfo author
+            void $ modify (\keys' -> OBJ.insert author pkInfo keys')
+    
+    -- This is built on the assumption that the argument is the string value of the RoleInstance of type TheWorld$PerspectivesUser
+    -- that fills SocialEnvironment$Me
+    getPkInfo :: String -> MonadPerspectives PublicKeyInfo
+    getPkInfo author = do 
+      authorRole <- getPerspectRol (RoleInstance $ createDefaultIdentifier author)
+      pure let 
+        k@(Value key) = unsafePartial fromJust $ head $ rol_property authorRole (EnumeratedPropertyType perspectivesUsersPublicKey)
+        propertyDelta = unsafePartial fromJust $ rol_propertyDelta authorRole (EnumeratedPropertyType perspectivesUsersPublicKey) k
+        roleDelta = rol_universeRoleDelta authorRole
+        contextDelta = rol_universeContextDelta authorRole
+      in
+        { key, deltas: [roleDelta, contextDelta, propertyDelta]}

@@ -31,10 +31,12 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Foreign.Object (Object)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
+import Perspectives.Sync.Transaction (PublicKeyInfo)
 import Prelude (class Ord, class Show, class Eq, compare, show, ($), (<>), (&&), eq)
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -45,6 +47,7 @@ newtype TransactionForPeer = TransactionForPeer
   { author :: String
   , timeStamp :: SerializableDateTime
   , deltas :: Array SignedDelta
+  , publicKeys :: Object PublicKeyInfo
   }
 
 derive instance genericRepTransactionForPeer :: Generic TransactionForPeer _

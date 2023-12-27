@@ -30,13 +30,13 @@ import Data.Array (length, null, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, empty, union) as MAP
-import Data.Map (empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import Foreign.Object (Object, empty, union) as OBJ
 import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
@@ -47,6 +47,7 @@ import Perspectives.ScheduledAssignment (ScheduledAssignment)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
+import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Semigroup, class Show, bind, pure, ($), (&&), (<>), (>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
@@ -81,7 +82,14 @@ type TransactionRecord f =
   , timeStamp :: SerializableDateTime
   , deltas :: Array DeltaInTransaction
   , changedDomeinFiles :: Array String
+  -- The keys of the Object are the author string values.
+  , publicKeys :: OBJ.Object PublicKeyInfo
   | f
+  }
+
+type PublicKeyInfo = 
+  { key :: String                   -- the cryptographic (public) key, serialised as JWK.
+  , deltas :: Array SignedDelta
   }
 
 newtype Transaction' = Transaction' (TransactionRecord())
@@ -116,14 +124,15 @@ instance ReadForeign Transaction where
       , createdRoles: []
       , untouchableRoles: []
       , untouchableContexts: []
-      , userRoleBottoms: empty
+      , userRoleBottoms: MAP.empty
+      , publicKeys: OBJ.empty
       }
 
 derive newtype instance ReadForeign Transaction'
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms})
-    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb}) = Transaction
+  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys})
+    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , deltas: deltas `union` ds
@@ -139,6 +148,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
       , userRoleBottoms: userRoleBottoms `MAP.union` urb
+      , publicKeys: publicKeys `OBJ.union` pk
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -173,10 +183,11 @@ createTransaction authoringRole author =
       , untouchableContexts: []
       , untouchableRoles: []
       , userRoleBottoms: MAP.empty
+      , publicKeys: OBJ.empty
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms}) = Transaction
+cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys}) = Transaction
   { author
   , timeStamp
   , authoringRole
@@ -192,6 +203,7 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , untouchableRoles
   , untouchableContexts
   , userRoleBottoms
+  , publicKeys
 }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.

@@ -20,6 +20,9 @@ perspectivesUsersPublicKey = "model://perspectives.domains#System$TheWorld$Persp
 socialEnvironment :: String
 socialEnvironment = "model://perspectives.domains#System$SocialEnvironment" 
 
+mySocialEnvironment :: String
+mySocialEnvironment = "model://perspectives.domains#System$MySocialEnvironment"
+
 socialEnvironmentPersons :: String
 socialEnvironmentPersons = "model://perspectives.domains#System$SocialEnvironment$Persons" 
 

@@ -29,8 +29,8 @@ import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Time.Duration (Milliseconds(..))
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint)
-import Prelude (class Ord, class Show, class Eq, pure, show, ($), (<>), (>>=))
-import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
+import Prelude (class Eq, class Ord, class Show, bind, pure, show, ($), (<>))
+import Simple.JSON (class ReadForeign, class WriteForeign, read', readJSON', writeImpl)
 
 -----------------------------------------------------------
 -- DATETIME
@@ -53,4 +53,7 @@ instance WriteForeign SerializableDateTime where
     (Milliseconds n) -> writeImpl (show n)
 
 instance ReadForeign SerializableDateTime where
-  readImpl d = read' d >>= \n -> pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)
+  readImpl d = do
+    s :: String <- read' d
+    n :: Number <- readJSON' s
+    pure $ SerializableDateTime $ toDateTime $ unsafePartial $ fromJust $ instant (Milliseconds n)
