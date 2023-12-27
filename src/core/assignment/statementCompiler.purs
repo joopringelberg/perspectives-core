@@ -150,11 +150,27 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         if isContextRole
           then pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
           else throwError $ NotAContextRole start end
-      CreateRole {roleIdentifier, contextExpression, start, end} -> do
+      CreateRole {roleIdentifier, contextExpression, localName, start, end} -> do
+        mnameGetterDescription <- ensureStringValue localName
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte start end
         -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
-        pure $ UQD originDomain (QF.CreateRole qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) qualifiedRoleIdentifier)) True True
+        case mnameGetterDescription of
+          Nothing -> pure $ UQD 
+            originDomain 
+            (QF.CreateRole qualifiedRoleIdentifier) 
+            cte 
+            (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) qualifiedRoleIdentifier)) 
+            True 
+            True
+          Just nameGetterDescription -> pure $ BQD
+            originDomain
+            (QF.CreateRole qualifiedRoleIdentifier) 
+            cte
+            nameGetterDescription
+            (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) qualifiedRoleIdentifier)) 
+            True
+            True        
       CreateContext {contextTypeIdentifier, localName, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         mnameGetterDescription <- ensureStringValue localName

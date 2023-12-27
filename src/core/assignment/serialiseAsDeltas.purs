@@ -48,7 +48,7 @@ import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
-import Perspectives.Deltas (addDelta)
+import Perspectives.Deltas (addDelta, addPublicKeysToTransaction)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
@@ -79,18 +79,19 @@ serialisedAsDeltasFor cid userId = do
 serialisedAsDeltasForUserType :: ContextInstance -> RoleType -> MonadPerspectives Value
 serialisedAsDeltasForUserType cid userType = do
   me <- getUserIdentifier
-  (Transaction{author, timeStamp, deltas}) <- execMonadPerspectivesTransaction
+  (Transaction{author, timeStamp, deltas, publicKeys}) <- (execMonadPerspectivesTransaction
     -- The authoringRole is used on *constructing* deltas. However, here we merely *read* deltas from the
     -- context- and role representations. So this value is in effect ignored.
     (ENR $ EnumeratedRoleType sysUser)
     -- NOTE: we provide serialisedAsDeltasFor_ with the value (RoleInstance me) as
     -- identifier for the user for whom we serialise. As we don't know the real
     -- user identifier (we serialise for a type!) we use it as a stand in.
-    (serialisedAsDeltasFor_ cid (RoleInstance me) userType)
+    (serialisedAsDeltasFor_ cid (RoleInstance me) userType)) >>= addPublicKeysToTransaction
   tfp <- pure $ TransactionForPeer
     { author
     , timeStamp
     , deltas: _.delta <<< unwrap <$> deltas
+    , publicKeys
   }
   pure $ Value $ unsafeStringify $ write tfp
   where

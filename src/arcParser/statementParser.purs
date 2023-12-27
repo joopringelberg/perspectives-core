@@ -104,10 +104,11 @@ roleCreation :: IP Assignment
 roleCreation = do
   start <- getPosition
   roleIdentifier <- reserved "create" *> reserved "role" *> arcIdentifier
+  localName <- optionMaybe (reserved "named" *> step)
   -- Check indentiation to prevent confusion of 'in' with the 'in' of the letA.
   contextExpression <- optionMaybe (indented' *> reserved "in" *> step)
   end <- getPosition
-  pure $ CreateRole {start, end, roleIdentifier, contextExpression}
+  pure $ CreateRole {start, end, roleIdentifier, localName, contextExpression}
 
 -- createContext ContextType [bound to RoleType] [in <contextExpression>]
 createContext :: IP Assignment

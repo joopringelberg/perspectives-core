@@ -93,12 +93,14 @@ instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
   expandPrefix (RemoveContext r@{roleExpression}) = do
     eroleExpression <- expandPrefix roleExpression
     pure $ RemoveContext r{roleExpression = eroleExpression}
-  expandPrefix (CreateRole r@{contextExpression}) = do
+  expandPrefix (CreateRole r@{contextExpression, localName}) = do
     econtextExpression <- traverse expandPrefix contextExpression
-    pure $ CreateRole r {contextExpression = econtextExpression}
-  expandPrefix (CreateContext r@{contextExpression}) = do
+    elocalName <- traverse expandPrefix localName
+    pure $ CreateRole r {contextExpression = econtextExpression, localName = elocalName}
+  expandPrefix (CreateContext r@{contextExpression, localName}) = do
     econtextExpression <- traverse expandPrefix contextExpression
-    pure $ CreateContext r {contextExpression = econtextExpression}
+    elocalName <- traverse expandPrefix localName
+    pure $ CreateContext r {contextExpression = econtextExpression, localName = elocalName}
   expandPrefix (CreateContext_ r@{roleExpression}) = do
     eroleExpression <- expandPrefix roleExpression
     pure $ CreateContext_ r {roleExpression = eroleExpression}

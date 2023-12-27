@@ -46,10 +46,11 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
+-- import Perspectives.TypesForDeltas (UniverseRoleDelta(..))
 import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>), (<<<), (<>))
 
 -- CONTEXT
@@ -295,6 +296,18 @@ _propertyValues' (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t
 
 rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
 rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (NT.unwrap pn) properties)
+
+rol_propertyDelta :: PerspectRol -> EnumeratedPropertyType -> Value -> Maybe SignedDelta
+rol_propertyDelta (PerspectRol{propertyDeltas}) (EnumeratedPropertyType pn) (Value v) = 
+  case lookup pn propertyDeltas of
+    Nothing -> Nothing
+    Just x -> lookup v x
+
+rol_universeRoleDelta :: PerspectRol -> SignedDelta
+rol_universeRoleDelta (PerspectRol{universeRoleDelta}) = universeRoleDelta
+
+rol_universeContextDelta :: PerspectRol -> SignedDelta
+rol_universeContextDelta (PerspectRol{contextDelta}) = contextDelta
 
 addRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 -- addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl

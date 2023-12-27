@@ -51,7 +51,7 @@ type WithTextRange f = {start :: ArcPosition, end :: ArcPosition | f}
 data Assignment =
   RemoveRole (WithTextRange (roleExpression :: Step))
   | RemoveContext (WithTextRange (roleExpression :: Step))
-  | CreateRole (WithTextRange (roleIdentifier :: String, contextExpression :: Maybe Step))
+  | CreateRole (WithTextRange (roleIdentifier :: String, localName :: Maybe Step, contextExpression :: Maybe Step))
   | CreateContext (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleTypeIdentifier :: Maybe String, contextExpression :: Maybe Step))
   | CreateContext_ (WithTextRange (contextTypeIdentifier :: String, localName :: Maybe Step, roleExpression :: Step))
   | CreateFile (WithTextRange (fileNameExpression :: Step, mimeType :: String, propertyIdentifier :: String, roleExpression :: Maybe Step, contentExpression :: Step))

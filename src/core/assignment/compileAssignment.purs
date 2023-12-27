@@ -150,17 +150,11 @@ compileAssignment qfd@(BQD _ (QF.CreateContext_ _) _ nameGetterDescription _ _ _
   (unsafePartial makeUQD qfd) 
   (Just nameGetterDescription)
 
-compileAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
-  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
-  pure \contextId -> do
-    ctxts <- lift (contextId ##= contextGetter)
-    for_ ctxts \ctxt -> do
-      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
-      -- If the role type is indexed, adds the created instance to the indexed roles in PerspectivesState.
-      for_ roleTypesToCreate \qualifiedRoleIdentifier' -> lookupOrCreateRoleInstance
-          qualifiedRoleIdentifier'
-          (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier' (unwrap ctxt) 
-            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
+compileAssignment qfd@(UQD _ (QF.CreateRole qualifiedRoleIdentifier) _ _ _ _) = unsafePartial compileRoleAssignment qfd Nothing
+
+compileAssignment qfd@(BQD _ (QF.CreateRole qualifiedRoleIdentifier) _ nameGetterDescription _ _ _) = unsafePartial compileRoleAssignment 
+  (unsafePartial makeUQD qfd)
+  (Just nameGetterDescription)
 
 compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextToMoveTo
@@ -385,6 +379,25 @@ compileAssignment (MQD dom (ExternalDestructiveFunction functionName) args _ _ _
 -- Catchall, remove when all cases have been covered.
 compileAssignment otherwise = throwError (error ("Found unknown case for compileAssignment: " <> show otherwise))
 
+compileRoleAssignment :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (Updater ContextInstance)
+compileRoleAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) mnameGetterDescription = do
+  (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  (mNameGetter :: Maybe (ContextInstance ~~> String)) <- case mnameGetterDescription of
+    Just nameGetterDescription -> Just <$> context2string nameGetterDescription
+    Nothing -> pure Nothing
+  pure \contextId -> do
+    ctxts <- lift (contextId ##= contextGetter)
+    localName <- case mNameGetter of
+      Just nameGetter -> lift $ Just <$> (contextId ##>> nameGetter)
+      Nothing -> pure Nothing
+    for_ ctxts \ctxt -> do
+      roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
+      -- If the role type is indexed, adds the created instance to the indexed roles in PerspectivesState.
+      for_ roleTypesToCreate \qualifiedRoleIdentifier' -> lookupOrCreateRoleInstance
+          qualifiedRoleIdentifier'
+          (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier' (unwrap ctxt) 
+            (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing}))
+
 -- Create a context. Fill a new context role instance with its external role, unless it is a DBQ role.
 compileContextAssignment :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (Updater ContextInstance)
 compileContextAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) mnameGetterDescription = do
@@ -526,10 +539,27 @@ compileCreatingAssignments qfd@(UQD _ (QF.CreateRootContext qualifiedContextType
 compileCreatingAssignments qfd@(BQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier) contextGetterDescription mnameGetterDescription _ _ _) =
   unsafePartial compileContextCreatingAssignments (unsafePartial makeUQD qfd) (Just mnameGetterDescription)
 
-compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) = do
+compileCreatingAssignments qfd@(UQD _ (QF.CreateRole qualifiedRoleIdentifier) _ _ _ _) = 
+  unsafePartial compileRoleCreatingAssignments qfd Nothing
+
+compileCreatingAssignments qfd@(BQD _ (QF.CreateRole qualifiedRoleIdentifier) _ nameGetterDescription _ _ _) = 
+  unsafePartial compileRoleCreatingAssignments 
+    (unsafePartial makeUQD qfd) 
+    (Just nameGetterDescription)
+
+compileCreatingAssignments qfd = pure \ci -> pure []
+
+compileRoleCreatingAssignments :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (ContextInstance -> MonadPerspectivesTransaction (Array String))
+compileRoleCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGetterDescription _ _ _) mnameGetterDescription= do
   (contextGetter :: (ContextInstance ~~> ContextInstance)) <- context2context contextGetterDescription
+  (mNameGetter :: Maybe (ContextInstance ~~> String)) <- case mnameGetterDescription of
+    Just nameGetterDescription -> Just <$> context2string nameGetterDescription
+    Nothing -> pure Nothing
   pure \contextId -> do
     ctxts <- lift (contextId ##= contextGetter)
+    localName <- case mNameGetter of
+      Just nameGetter -> lift $ Just <$> (contextId ##>> nameGetter)
+      Nothing -> pure Nothing
     concat <$> for ctxts \ctxt -> do
       roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
       for roleTypesToCreate
@@ -539,8 +569,7 @@ compileCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contex
           (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance 
             roleTypeToCreate 
             (unwrap ctxt) 
-            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing}))
-compileCreatingAssignments qfd = pure \ci -> pure []
+            (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing}))
 
 compileContextCreatingAssignments :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (ContextInstance -> MonadPerspectivesTransaction (Array String))
 compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) contextGetterDescription _ _ _) mnameGetterDescription = do
