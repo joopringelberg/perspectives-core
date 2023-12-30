@@ -412,6 +412,8 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
 initSystem :: MonadPerspectivesTransaction Unit
 initSystem = do
   lift $ saveMarkedResources
+  -- TODO. Create the instance of PerspectivesUser that holds the private key.
+  
   -- Create the system instance      
   sysId <- lift getSystemIdentifier
   cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId

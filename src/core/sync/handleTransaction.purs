@@ -27,7 +27,7 @@ import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Except (lift, runExcept)
 import Control.Monad.State (StateT, gets, modify, runStateT) as ST
 import Crypto.Subtle.Key.Types (CryptoKey)
-import Data.Array (catMaybes)
+import Data.Array (catMaybes, concat)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -43,7 +43,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Object (Object, empty, insert, lookup)
+import Foreign.Object (Object, empty, insert, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (deserializeJWK, verifyDelta, verifyDelta')
@@ -67,7 +67,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -379,28 +379,34 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 -- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
 -- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
 -- | that specific url.
+-- | All deltas in this transaction have either been sent to this installation and thus have been verified before, or
+-- | they are created by this installation so verification is meaningless.
 expandDeltas :: TransactionForPeer -> String -> MonadPerspectivesTransaction (Array Delta)
-expandDeltas t@(TransactionForPeer{deltas}) storageUrl = catMaybes <$> (for deltas expandDelta)
+expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
+  contentDeltas :: Array Delta <- catMaybes <$> (for deltas expandDelta)
+  -- TODO: Somehow add the deltas for the publicKeys, in such a way that they are processed first in runMonadPerspectivesTransaction.
+  keyDeltas :: Array Delta <- concat <$> for (values publicKeys) \{deltas:kd} -> catMaybes <$> (for kd expandDelta)
+  pure  $ keyDeltas <> contentDeltas
+
   where
 
   expandDelta :: SignedDelta -> MonadPerspectivesTransaction (Maybe Delta)
-  expandDelta s = (lift $ verifyDelta s) >>= expandDelta'
-    where
-      expandDelta' :: Maybe String -> MonadPerspectivesTransaction (Maybe Delta)
-      expandDelta' Nothing = pure Nothing
-      expandDelta' (Just stringifiedDelta) = do 
-        case runExcept $ readJSON' stringifiedDelta of
-          Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s <$> addPublicResourceScheme storageUrl d1))
-          Left _ -> case runExcept $ readJSON' stringifiedDelta of
-            Right (d2 :: RoleBindingDelta) -> notWhenPublicSubject (unwrap d2) (lift $ (Just <<< RBD s <$> addPublicResourceScheme storageUrl d2))
-            Left _ -> case runExcept $ readJSON' stringifiedDelta of
-              Right (d3 :: ContextDelta) -> notWhenPublicSubject (unwrap d3) (lift $ (Just <<< CDD s <$> addPublicResourceScheme storageUrl d3))
-              Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                Right (d4 :: UniverseRoleDelta) -> notWhenPublicSubject (unwrap d4) (lift $ (Just <<< URD s <$> addPublicResourceScheme storageUrl d4))
-                Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                  Right (d5 :: UniverseContextDelta) -> notWhenPublicSubject (unwrap d5) (lift $ (Just <<< UCD s <$> addPublicResourceScheme storageUrl d5))
-                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta) *> pure Nothing
+  expandDelta s@(SignedDelta sr@{author, encryptedDelta, signature}) = do 
+    -- Use the storageUrl to add a public scheme to the author.
+    s' <- pure $ SignedDelta sr { author = createPublicIdentifier storageUrl author}
+    case runExcept $ readJSON' encryptedDelta of
+      Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s' <$> addPublicResourceScheme storageUrl d1))
+      Left _ -> case runExcept $ readJSON' encryptedDelta of
+        Right (d2 :: RoleBindingDelta) -> notWhenPublicSubject (unwrap d2) (lift $ (Just <<< RBD s' <$> addPublicResourceScheme storageUrl d2))
+        Left _ -> case runExcept $ readJSON' encryptedDelta of
+          Right (d3 :: ContextDelta) -> notWhenPublicSubject (unwrap d3) (lift $ (Just <<< CDD s' <$> addPublicResourceScheme storageUrl d3))
+          Left _ -> case runExcept $ readJSON' encryptedDelta of
+            Right (d4 :: UniverseRoleDelta) -> notWhenPublicSubject (unwrap d4) (lift $ (Just <<< URD s' <$> addPublicResourceScheme storageUrl d4))
+            Left _ -> case runExcept $ readJSON' encryptedDelta of
+              Right (d5 :: UniverseContextDelta) -> notWhenPublicSubject (unwrap d5) (lift $ (Just <<< UCD s' <$> addPublicResourceScheme storageUrl d5))
+              Left _ -> log ("Failing to parse and execute: " <> encryptedDelta) *> pure Nothing
 
+    where
       notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction (Maybe Delta) -> MonadPerspectivesTransaction (Maybe Delta)
       notWhenPublicSubject rec a = (lift $ isPublicRole rec.subject) >>= if _ then pure Nothing else a
 

@@ -95,15 +95,14 @@ signDelta author encryptedDelta = do
       signatureBuff <- lift $ sign (ecdsa sha384) (unsafeCoerce cryptoKey) deltaBuff
       (int8array :: Uint8Array) <- liftEffect $ whole signatureBuff
       (signature :: String) <- liftAff $ bytesToBase64DataUrl int8array
-      publicKey <- getPublicKey (stripNonPublicIdentifiers author)
       sd <- pure $ SignedDelta 
         { author: stripNonPublicIdentifiers author
         , encryptedDelta
         , signature: Just signature
         }
-      correct <- verifyDelta sd
       pure sd
 
+-- | Returns Nothing if the delta cannot be verified; a string representation of the Delta in the SignedDelta otherwise.
 verifyDelta :: SignedDelta -> MonadPerspectives (Maybe String)
 verifyDelta d@(SignedDelta{author, encryptedDelta, signature}) = getPublicKey author >>= verifyDelta' d
 
