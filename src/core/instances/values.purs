@@ -61,12 +61,10 @@ parseDate s = do
 
 -- | Decode a date from the Epoch format in which it is stored in Couchdb.
 decodeDate :: forall m. MonadError Error m => String -> m DateTime
-decodeDate s = case readJSON s of
-  Left e -> throwError $ error "Not a date"
-  Right (n :: Number) -> 
-    case (read $ unsafeToForeign n) of
-      Left e -> throwError $ error "Not a date"
-      Right (SerializableDateTime dt) -> pure dt
+decodeDate s = 
+  case (read $ unsafeToForeign s) of
+    Left e -> throwError $ error "Not a date"
+    Right (SerializableDateTime dt) -> pure dt
 
 foreign import parseInt__ :: EffectFn1 String Int
 
