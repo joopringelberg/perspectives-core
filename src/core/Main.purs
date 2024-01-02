@@ -266,7 +266,9 @@ forkDatabasePersistence :: AVar PerspectivesState -> Aff Unit
 forkDatabasePersistence state = do
   -- TODO. Read this from state.
   delay (Milliseconds 10000.0)
-  runPerspectivesWithState saveMarkedResources state
+  try (runPerspectivesWithState saveMarkedResources state) >>= case _ of 
+    Left e -> logPerspectivesError (Custom $ "Could not complete saving resources without an error: " <> show e)
+    Right _ -> pure unit
   forkDatabasePersistence state
 
 forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
@@ -336,7 +338,7 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
         (do
           addAllExternalFunctions
           key <- getPrivateKey
-          modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
+          modify \(s@{runtimeOptions:ro}) -> s {runtimeOptions = ro {privateKey = unsafeCoerce key}}
           getSystemIdentifier >>= createUserDatabases
           setupUser
           saveMarkedResources
