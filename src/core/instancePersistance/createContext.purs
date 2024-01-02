@@ -25,16 +25,16 @@ import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
-import Perspectives.TypesForDeltas (UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
 import Simple.JSON (writeJSON)
 
 
 -- | Constructs an empty context, caches it.
--- | The context contains a UniverseContextDelta, the external role contains a UniverseRoleDelta.
+-- | The context contains a UniverseContextDelta, the external role contains a UniverseRoleDelta and ContextDelta.
 -- | However, they have not yet been added to the Transaction. This is because we need to know the users
 -- | we should sent these deltas to, and these are computed on constructing the roles of the context.
--- | So each caller of constructEmptyContext should add these two deltas to the Transaction.
+-- | So each caller of constructEmptyContext should add these three deltas to the Transaction.
 -- | to the Transaction (and also a UniverseRoleDelta for the external role).
 -- | QUERY UPDATES
 -- | PERSISTENCE of the external role, but not of the context itself.
@@ -80,6 +80,17 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , authorizedRole
       , deltaType: ConstructExternalRole
       , subject })
+  contextDelta <- lift $ lift $ signDelta author
+    (writeJSON $ stripResourceSchemes $ ContextDelta
+      { contextInstance: contextInstanceId
+      , contextType: pspType
+      , roleType: externalRoleType pspType
+      , roleInstance: externalRole
+      , destinationContext: Nothing
+      , destinationContextType: Nothing
+      , deltaType: AddExternalRole
+      , subject
+      })
   _ <- lift $ lift $ cacheEntity externalRole
     (PerspectRol defaultRolRecord
       { _id = takeGuid $ unwrap externalRole
@@ -89,6 +100,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , context = contextInstanceId
       , binding = Nothing
       , universeRoleDelta = delta'
+      , contextDelta = contextDelta
       , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ addCreatedRoleToTransaction externalRole

@@ -94,6 +94,9 @@ context_allTypes (PerspectContext{allTypes}) = allTypes
 context_buitenRol :: PerspectContext -> RoleInstance
 context_buitenRol (PerspectContext{buitenRol})= buitenRol
 
+context_universeContextDelta :: PerspectContext -> SignedDelta
+context_universeContextDelta (PerspectContext{universeContextDelta}) = universeContextDelta
+
 context_iedereRolInContext :: PerspectContext -> Object (Array RoleInstance)
 context_iedereRolInContext (PerspectContext{rolInContext})= rolInContext
 
@@ -306,8 +309,8 @@ rol_propertyDelta (PerspectRol{propertyDeltas}) (EnumeratedPropertyType pn) (Val
 rol_universeRoleDelta :: PerspectRol -> SignedDelta
 rol_universeRoleDelta (PerspectRol{universeRoleDelta}) = universeRoleDelta
 
-rol_universeContextDelta :: PerspectRol -> SignedDelta
-rol_universeContextDelta (PerspectRol{contextDelta}) = contextDelta
+rol_contextDelta :: PerspectRol -> SignedDelta
+rol_contextDelta (PerspectRol{contextDelta}) = contextDelta
 
 addRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
 -- addRol_property rl propertyName values = over (_propertyValues propertyName) (flip Arr.union values) rl

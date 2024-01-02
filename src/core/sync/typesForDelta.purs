@@ -245,6 +245,7 @@ instance StrippedDelta ContextDelta where
 -----------------------------------------------------------
 data ContextDeltaType =
   AddRoleInstancesToContext |
+  AddExternalRole |
   MoveRoleInstancesToAnotherContext
 
 derive instance genericContextDeltaType :: Generic ContextDeltaType _

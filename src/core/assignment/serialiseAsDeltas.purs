@@ -244,7 +244,6 @@ serialiseDependency users mpreviousDependency currentDependency = do
 
     addDeltasForRole :: RoleInstance -> MonadPerspectivesTransaction Unit
     addDeltasForRole roleId = do
-      -- Todo: serialise the external role.
       (liftToMPT $ try $ getPerspectRol roleId) >>=
         handlePerspectRolError "addDeltasForRole"
           \(PerspectRol{context, universeRoleDelta, contextDelta}) -> do
@@ -253,12 +252,14 @@ serialiseDependency users mpreviousDependency currentDependency = do
                 \(PerspectContext{universeContextDelta, buitenRol}) -> do
                   (liftToMPT $ try $ getPerspectRol buitenRol) >>=
                     handlePerspectRolError "addDeltasForRole"
-                      \(PerspectRol{universeRoleDelta: eRoleDelta}) -> do
+                      \(PerspectRol{universeRoleDelta: eRoleDelta, contextDelta: eContextDelta}) -> do
                         -- ORDER IS OF THE ESSENCE, HERE!!
                         addDelta $ DeltaInTransaction {users, delta: eRoleDelta}
                         addDelta $ DeltaInTransaction {users, delta: universeContextDelta}
+                        addDelta $ DeltaInTransaction {users, delta: eContextDelta}
                         addDelta $ DeltaInTransaction {users, delta: universeRoleDelta}
                         addDelta $ DeltaInTransaction {users, delta: contextDelta}
+
 
     withContext :: Boolean
     withContext = true

@@ -159,17 +159,8 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
           lift $ cacheAndSave contextId (changeContext_me changedContext (Just roleId))
         else lift $ cacheAndSave contextId changedContext
 
-      -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
-      -- the transaction, too.
-      -- Also performs SYNCHRONISATION for paths that lie beyond the roleInstance provided to usersWithPerspectiveOnRoleInstance.
-      -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
-      -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
-      -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
-      users <- usersWithPerspectiveOnRoleInstance rolName roleId contextId true
-      -- SYNCHRONISATION
-      subject <- getSubject
       author <- getAuthor
-      addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
+      subject <- getSubject
       delta <- case receivedDelta of
         Just d -> pure d
         _ -> lift $ signDelta 
@@ -184,8 +175,20 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
                 , destinationContextType: Nothing
                 , subject
                 })
-      addDelta $ DeltaInTransaction {users, delta}
+      -- Add the delta to the role before computing the users, as that might involve serializing deltas and adding them
+      -- to the transaction. We cannot have the default contextDelta, then.
       lift $ cacheAndSave id $ PerspectRol r { contextDelta = delta }
+
+      -- Guarantees RULE TRIGGERING because contexts with a vantage point are added to
+      -- the transaction, too.
+      -- Also performs SYNCHRONISATION for paths that lie beyond the roleInstance provided to usersWithPerspectiveOnRoleInstance.
+      -- Notice that even though we compute the users for a single given RoleInstance, we can use that result
+      -- for any other instance of the same RoleType. This will no longer hold when we add filtering to the inverted queries
+      -- (because then the affected contexts found will depend on the properties of the RoleInstance, too).
+      users <- usersWithPerspectiveOnRoleInstance rolName roleId contextId true
+      -- SYNCHRONISATION
+      addDelta (DeltaInTransaction { users, delta: universeRoleDelta})
+      addDelta $ DeltaInTransaction {users, delta}
       -- QUERY UPDATES
       (lift $ findRoleRequests contextId rolName) >>= addCorrelationIdentifiersToTransactie
 
@@ -240,7 +243,6 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
           Just _ -> do
             (lift $ findMeRequests contextId) >>= addCorrelationIdentifiersToTransactie
             -- CURRENTUSER.
-            -- TODO. Is dit voldoende? Moet er niet een andere rol gevonden worden?
             lift $ cacheAndSave contextId (changeContext_me changedContext Nothing)
 
 -- | Detach the role instances from their current context and attach them to the new context.

@@ -39,7 +39,7 @@ import Foreign.Object (filter, Object, empty, lookup, insert) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.ContextAndRole (rol_property, rol_propertyDelta, rol_universeContextDelta, rol_universeRoleDelta)
+import Perspectives.ContextAndRole (context_buitenRol, context_universeContextDelta, rol_context, rol_property, rol_propertyDelta, rol_contextDelta, rol_universeRoleDelta)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
@@ -49,7 +49,7 @@ import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, sysUs
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey, socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (Url, addDocument)
-import Perspectives.Persistent (getPerspectRol, postDatabaseName)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -92,7 +92,6 @@ sendTransactie userId t = do
 -- | Send a transaction using the Couchdb Channel.
 sendTransactieToUserUsingCouchdb :: Url -> String -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUserUsingCouchdb cdbUrl userId t = do
-  -- TODO controleer of hier authentication nodig is!
   userType <- roleType_ (RoleInstance userId)
   getChannel <- getDynamicPropertyGetter DEP.userChannel (ST $ userType)
   mchannel <- (RoleInstance userId) ##> getChannel
@@ -257,10 +256,17 @@ addPublicKeysToTransaction (Transaction tr@{deltas}) = do
     getPkInfo :: String -> MonadPerspectives PublicKeyInfo
     getPkInfo author = do 
       authorRole <- getPerspectRol (RoleInstance $ createDefaultIdentifier author)
+      theworld <- getPerspectContext $ rol_context authorRole
+      theWorldExternal <- getPerspectRol (context_buitenRol theworld)
       pure let 
         k@(Value key) = unsafePartial fromJust $ head $ rol_property authorRole (EnumeratedPropertyType perspectivesUsersPublicKey)
         propertyDelta = unsafePartial fromJust $ rol_propertyDelta authorRole (EnumeratedPropertyType perspectivesUsersPublicKey) k
-        roleDelta = rol_universeRoleDelta authorRole
-        contextDelta = rol_universeContextDelta authorRole
       in
-        { key, deltas: [roleDelta, contextDelta, propertyDelta]}
+        { key, deltas: 
+          [ rol_universeRoleDelta theWorldExternal
+          , context_universeContextDelta theworld
+          , rol_contextDelta theWorldExternal
+          , rol_universeRoleDelta authorRole
+          , rol_contextDelta authorRole
+          , propertyDelta
+          ]}

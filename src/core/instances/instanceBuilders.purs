@@ -113,13 +113,15 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
 
       lift $ lift $ void $ saveEntiteit contextInstanceId
       -- Add a UniverseRoleDelta to the Transaction for the external role.
-      -- As we've just constructed the context and its external rol, no need to
+      -- As we've just constructed the context and its external role, no need to
       -- catch errors rising from not being able to exchange the identifier for the
       -- resources.
-      PerspectRol{universeRoleDelta} <- lift $ lift $ getPerspectRol buitenRol
+      PerspectRol{universeRoleDelta, contextDelta} <- lift $ lift $ getPerspectRol buitenRol
       lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
       -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
       lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
+      -- Add the ContextDelta for the external role to the transaction.
+      lift $ insertDelta (DeltaInTransaction{ users, delta: contextDelta}) (i + 2)
       -- Add the context as a createdContext to the transaction
       lift $ addCreatedContextToTransaction contextInstanceId
       -- If the context type has a public role, create an instance of its proxy.

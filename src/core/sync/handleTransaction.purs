@@ -61,7 +61,7 @@ import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, getDocument)
-import Perspectives.Persistent (addAttachment, entityExists, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (addAttachment, entityExists, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -100,6 +100,8 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
     MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
       Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
+    -- As the external role and the context have been constructed before (and apparently have not thrown errors) we just add the delta to the external role.
+    AddExternalRole -> lift (getPerspectRol roleInstance >>= \(PerspectRol r) -> void $ saveEntiteit_ roleInstance (PerspectRol r {contextDelta = signedDelta}))
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do
@@ -287,6 +289,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
                   , context = contextInstance
                   , occurrence = i
                   , universeRoleDelta = s
+                  -- The contextDelta will be added when we handle the corresponding ContextDelta.
                   , states = [StateIdentifier $ unwrap roleType]
                   })
             addCreatedRoleToTransaction rolInstanceId
@@ -384,7 +387,6 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 expandDeltas :: TransactionForPeer -> String -> MonadPerspectivesTransaction (Array Delta)
 expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
   contentDeltas :: Array Delta <- catMaybes <$> (for deltas expandDelta)
-  -- TODO: Somehow add the deltas for the publicKeys, in such a way that they are processed first in runMonadPerspectivesTransaction.
   keyDeltas :: Array Delta <- concat <$> for (values publicKeys) \{deltas:kd} -> catMaybes <$> (for kd expandDelta)
   pure  $ keyDeltas <> contentDeltas
 

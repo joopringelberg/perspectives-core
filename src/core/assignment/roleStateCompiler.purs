@@ -193,6 +193,8 @@ enteringRoleState roleId stateId = do
       userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (RoleInstance me))))
       case fromArray userInstances of
         Nothing -> pure unit
+        -- As the user gets a new perspective, he should have the corresonding resources. Hence we serialise them as Deltas and 
+        -- add these to the transaction.
         Just u' -> serialiseRoleInstancesAndProperties
           currentcontext
           u'

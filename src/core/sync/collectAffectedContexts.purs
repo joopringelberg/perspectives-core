@@ -709,9 +709,10 @@ magic ctxt roleInstances rtype users =  do
       \(PerspectContext{universeContextDelta, buitenRol}) -> do
         (try $ lift $ getPerspectRol buitenRol) >>=
           handlePerspectRolError "Perspectives.CollectAffectedContexts.magic"
-            \(PerspectRol{universeRoleDelta: externalRoleDelta}) -> do
+            \(PerspectRol{universeRoleDelta: externalRoleDelta, contextDelta: eContextDelta}) -> do
               addDelta $ DeltaInTransaction {users, delta: externalRoleDelta}
               addDelta $ DeltaInTransaction {users, delta: universeContextDelta}
+              addDelta $ DeltaInTransaction {users, delta: eContextDelta}
               for_ (toArray roleInstances) \roleInstance -> do
                 (try $ lift $ getPerspectRol roleInstance) >>=
                   handlePerspectRolError "Perspectives.CollectAffectedContexts.magic"
