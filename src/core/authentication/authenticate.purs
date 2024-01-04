@@ -69,7 +69,7 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, isInPublicScheme, stripNonPublicIdentifiers)
 import Perspectives.ResourceIdentifiers.Parser (ResourceIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Simple.JSON (parseJSON, unsafeStringify)
@@ -123,7 +123,9 @@ verifyDelta' (SignedDelta{author, encryptedDelta, signature}) mcryptoKey = do
 -- | Get the public key of a peer.
 getPublicKey :: String -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPublicKey author = do
-  mrawKey <- (RoleInstance $ createDefaultIdentifier author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
+  mrawKey <- if isInPublicScheme author 
+    then (RoleInstance $ author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
+    else (RoleInstance $ createDefaultIdentifier author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
   case mrawKey of 
     Nothing -> pure Nothing 
     Just (Value rawKey) -> lift (Just <$> deserializeJWK rawKey)
