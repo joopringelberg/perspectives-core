@@ -287,7 +287,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
   -- Copy the attachment
-  mAttachment <- lift $ getAttachment repositoryUrl modelname "screens.js"
+  mAttachment <- lift $ getAttachment repositoryUrl documentName "screens.js"
   case mAttachment of
     Nothing -> pure unit
     Just attachment -> lift $ void $ P.addAttachment (DomeinFileId modelname) "screens.js" attachment (MediaType "text/ecmascript")
