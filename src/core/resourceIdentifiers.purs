@@ -37,6 +37,7 @@ import Perspectives.Cuid2 (cuid2)
 import Perspectives.Identifiers (isUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
 import Perspectives.ResourceIdentifiers.Parser (DecomposedResourceIdentifier(..), Guid, ResourceIdentifier, parseResourceIdentifier, resourceIdentifierRegEx, pouchdbDatabaseName_)
 import Perspectives.Sync.Transaction (StorageScheme(..), Url, DbName) as TRANS
@@ -270,6 +271,14 @@ takeGuid s = case match discardStorageRegex s of
   Just matches -> case index matches 1 of
     Just (Just g) -> g
     _ -> s
+
+-----------------------------------------------------------
+-- TRANSFORM THE AUTHOR OF A DELTA INTO A RESOURCEIDENTIFIER
+-----------------------------------------------------------
+deltaAuthor2ResourceIdentifier :: String -> RoleInstance
+deltaAuthor2ResourceIdentifier author = if isInPublicScheme author 
+    then RoleInstance $ author
+    else RoleInstance $ createDefaultIdentifier author
 
 -----------------------------------------------------------
 -- TEST THE SHAPE OF A PUBLIC RESOURCE IDENTIFIER

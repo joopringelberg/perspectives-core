@@ -55,7 +55,7 @@ import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier)
+import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -255,7 +255,7 @@ addPublicKeysToTransaction (Transaction tr@{deltas}) = do
     -- that fills SocialEnvironment$Me
     getPkInfo :: String -> MonadPerspectives PublicKeyInfo
     getPkInfo author = do 
-      authorRole <- getPerspectRol (RoleInstance $ createDefaultIdentifier author)
+      authorRole <- getPerspectRol (deltaAuthor2ResourceIdentifier author)
       theworld <- getPerspectContext $ rol_context authorRole
       theWorldExternal <- getPerspectRol (context_buitenRol theworld)
       pure let 
