@@ -231,7 +231,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (ServerUrl, Name) verbs (Consult)
               --props (Name) verbs (SetPropertyValue)
           row
-            form Admin
+            table Admin
         tab "Repositories"
           row 
             table Repositories
