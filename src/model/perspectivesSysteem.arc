@@ -101,7 +101,10 @@ domain model://perspectives.domains#System
       on entry
         do for Initializer
           letA
-            user <- create role PerspectivesUsers
+            keyholder <- (sys:MySystem >> callExternal util:ContextIdentifier() returns String) + "_KeyHolder"
+            -- The identifier of this role must be available on startup, before any instance has been created, 
+            -- because it is the author of all instances created in this installation.
+            user <- create role PerspectivesUsers named keyholder
           in
             PublicKey = callExternal util:SystemParameter( "PublicKey" ) returns String for user
     -- PDRDEPENDENCY

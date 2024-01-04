@@ -126,7 +126,7 @@ domain model://perspectives.domains#CouchdbManagement
           do for Manager
             -- Tie these credentials to the CouchdbServer$Admin role.
             bind context >> Manager to Admin in binding >> context
-            AuthorizedDomain = Url for  binding >> context >> Admin
+            AuthorizedDomain = Url for  binding >> context >> Admin     -- zet dit wel voor een nieuwe CouchdbServer$Admin. Password en eventueel SpecificUserName moet hij zelf zetten.
             Password = AdminPassword for binding >> context >> Admin
             SpecificUserName = AdminUserName for binding >> context >> Admin
 
@@ -158,6 +158,9 @@ domain model://perspectives.domains#CouchdbManagement
         perspective of Accounts 
           perspective on extern >> binder CouchdbServers
             only (Create, Fill)
+        perspective of Admin 
+          perspective on extern >> binder CouchdbServers
+            only (Create, Fill)
         on entry
           -- When a peer assigns the current user to the Accounts role,
           -- we make sure that the current user has the CouchdbServer bound
@@ -165,6 +168,10 @@ domain model://perspectives.domains#CouchdbManagement
           do for Accounts
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Accounts
+            "You now have an account with CouchdbServer {Name}"
+          do for Admin
+            bind origin to CouchdbServers in cm:MyCouchdbApp
+          notify Admin
             "You now have an account with CouchdbServer {Name}"
 
         
@@ -183,7 +190,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- This role should be in public space insofar that e.g. acc:Body$Guest should be able to see it.
     -- Admin in Couchdb of a particular server.
     -- TODO Hernoem dit naar ServerAdmin.
-    user Admin filledBy CouchdbManagementApp$Manager 
+    user Admin (relational) filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
       -- These properties come from sys:WithCredentials
       -- WithCredentials$UserName - CALCULATED, either the SpecificUserName or the ID of the PerspectivesSystem$User.
@@ -284,7 +291,7 @@ domain model://perspectives.domains#CouchdbManagement
         -- Only lowercase characters (a-z), digits (0-9), and any of the characters _, $, (, ), +, -, and / are allowed. Must begin with a letter.
         -- However, the parser refuses (, ) and /.
         -- ^[a-z][a-z0-9_$()+/-]*$ according to https://docs.couchdb.org/en/3.2.0/api/database/common.html and https://localhost:6984//_utils/docs/api/database/common.html#specifying-the-document-id
-        pattern = "[a-z]([a-z]|[0-9]|[\\._$+-])*" "Only lowercase characters (a-z), digits (0-9), and any of the characters ., _, $, + and - are allowed. Must begin with a letter."
+        pattern = "^[a-z]([a-z]|[0-9]|[\\._$+-])*$" "Only lowercase characters (a-z), digits (0-9), and any of the characters ., _, $, + and - are allowed. Must begin with a letter."
 
       state CreateRepository = exists Repositories$NameSpace
         on entry
@@ -412,6 +419,10 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadInstances, UserName )
               -- Make authentication details available to the PDR (in fact only useful when the filler of Admin is not CouchdbServer$Admin)
               AuthorizedDomain = context >> extern >> RepositoryUrl
+        
+        state HasPassword = exists Password
+          on entry
+            do for ServerAdmin
               callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
 
 
