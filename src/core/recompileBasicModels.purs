@@ -77,7 +77,7 @@ recompileModelsAtUrl modelsDb manifestsDb = do
     _ -> pure unit
   where
     recompileModelAtUrl :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-    recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _rev, arc}) =
+    recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _id, _rev, arc}) =
       do
         log ("Recompiling " <> namespace)
         r <- lift $ loadAndCompileArcFile_ arc
@@ -86,11 +86,11 @@ recompileModelsAtUrl modelsDb manifestsDb = do
           Right df@(DomeinFile dfr) -> lift $ lift do
             log $  "Recompiled '" <> namespace <> "' succesfully (" <> namespace <> ")!"
             -- storeDomeinFileInCouchdbPreservingAttachments df
-            mattachment <- getAttachment modelsDb namespace "screens.js"
-            _rev' <- addDocument modelsDb (setRevision _rev df) namespace
+            mattachment <- getAttachment modelsDb _id "screens.js"
+            _rev' <- addDocument modelsDb (setRevision _rev (DomeinFile dfr {_id = _id})) namespace
             case mattachment of 
               Nothing -> pure unit
-              Just attachment -> void $ addAttachment modelsDb namespace _rev' "screens.js" attachment (MediaType "text/exmascript")
+              Just attachment -> void $ addAttachment modelsDb _id _rev' "screens.js" attachment (MediaType "text/exmascript")
         pure model
     getVersionedDomeinFileName :: String -> MonadPerspectivesTransaction (Maybe String)
     getVersionedDomeinFileName rid = do 
