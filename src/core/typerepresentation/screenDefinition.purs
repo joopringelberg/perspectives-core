@@ -24,12 +24,12 @@ module Perspectives.Representation.ScreenDefinition where
 
 import Prelude
 
-import Control.Alt ((<|>))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Data.Show.Generic (genericShow)
-import Foreign (Foreign, F)
+import Foreign (F, Foreign, ForeignError(..), fail)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
@@ -66,6 +66,9 @@ data ScreenElementDef =
 
 newtype RowDef = RowDef (Array ScreenElementDef)
 newtype ColumnDef = ColumnDef (Array ScreenElementDef)
+newtype TableDef = TableDef WidgetCommonFieldsDef
+newtype FormDef = FormDef WidgetCommonFieldsDef
+
 
 -----------------------------------------------------------
 -- WIDGETS
@@ -86,9 +89,6 @@ type WidgetCommonFieldsDefWithoutPerspective f =
   , userRole :: RoleType
   | f
   }
-
-newtype TableDef = TableDef WidgetCommonFieldsDef
-newtype FormDef = FormDef WidgetCommonFieldsDef
 
 -- For en- and decoding. This discharges us from implementing a lot of instances for
 -- SerialisedPerspective'.
@@ -138,24 +138,22 @@ instance writeForeignScreenDefinition :: WriteForeign ScreenDefinition where
   writeImpl (ScreenDefinition r) = write r
 
 instance writeForeignScreenElementDef :: WriteForeign ScreenElementDef where
-  writeImpl (RowElementD r) = write { row: write r}
-  writeImpl (ColumnElementD c) = write { column: write c}
-  writeImpl (TableElementD t) = write { table: write t}
-  writeImpl (FormElementD f) = write { form: write f}
+  writeImpl (RowElementD r) = write { elementType: "RowElementD", element: r}
+  writeImpl (ColumnElementD c) = write { elementType: "ColumnElementD", element: c}
+  writeImpl (TableElementD t) = write { elementType: "TableElementD", element: t}
+  writeImpl (FormElementD f) = write { elementType: "FormElementD", element: f}
 
 instance writeForeignTabDef :: WriteForeign TabDef where
   writeImpl (TabDef widgetCommonFields) = write widgetCommonFields
 
-derive newtype instance WriteForeign RowDef
-derive newtype instance WriteForeign ColumnDef
-derive newtype instance WriteForeign TableDef
-derive newtype instance WriteForeign FormDef
-
--- | Serialise just the title and perspective field, for the client side.
-writeWidgetCommonFields :: WidgetCommonFieldsDef -> Foreign
-writeWidgetCommonFields {title, perspective} = write
-  { title: write title
-  , perspective: write perspective}
+instance WriteForeign RowDef where
+  writeImpl (RowDef elements) = write { tag: "RowDef", elements}
+instance WriteForeign ColumnDef where
+  writeImpl (ColumnDef elements) = write { tag: "ColumnDef", elements}
+instance WriteForeign TableDef where
+  writeImpl (TableDef fields) = write { tag: "TableDef", fields}
+instance WriteForeign FormDef where
+  writeImpl (FormDef fields) = write { tag: "FormDef", fields}
 
 instance WriteForeign ScreenKey where
   writeImpl (ScreenKey ct rt) = writeImpl {ct, rt}
@@ -166,24 +164,47 @@ instance WriteForeign ScreenKey where
 derive newtype instance ReadForeign ScreenDefinition 
 
 instance ReadForeign ScreenElementDef where
-  readImpl f = 
-    RowElementD <<< _.row <$> ((read' f) :: F {row :: RowDef})
-    <|>
-    ColumnElementD <<< _.col <$> ((read' f) :: F {col :: ColumnDef})
-    <|>
-    TableElementD <<< _.table <$> ((read' f) :: F {table :: TableDef})
-    <|>
-    FormElementD <<< _.form <$> ((read' f) :: F {form :: FormDef})
+  readImpl f = do 
+    {elementType, element} :: {elementType :: String, element :: Foreign} <- read' f
+    unsafePartial $ case elementType of 
+      "RowElementD" -> RowElementD <$> ((read' element) :: F RowDef)
+      "ColumnElementD" -> ColumnElementD <$> ((read' element) :: F ColumnDef)
+      "TableElementD" -> TableElementD <$> ((read' element) :: F TableDef)
+      "FormElementD" -> FormElementD <$> ((read' element) :: F FormDef)
 
 instance ReadForeign ScreenKey where
   readImpl f = do 
     {ct, rt} :: {ct :: ContextType, rt :: RoleType} <- read' f
     pure $ ScreenKey ct rt
 
-derive newtype instance ReadForeign RowDef
-derive newtype instance ReadForeign ColumnDef
-derive newtype instance ReadForeign TableDef
-derive newtype instance ReadForeign FormDef
+instance ReadForeign RowDef where
+  readImpl f = do 
+    ({tag, elements} :: { tag :: String, elements :: Array ScreenElementDef}) <- read' f
+    case tag of 
+      "RowDef" -> pure $ RowDef elements
+      _ -> fail (TypeMismatch "RowDef" tag)
+
+instance ReadForeign ColumnDef where
+  readImpl f = do 
+    ({tag, elements} :: { tag :: String, elements :: Array ScreenElementDef}) <- read' f
+    case tag of 
+      "ColumnDef" -> pure $ ColumnDef elements
+      _ -> fail (TypeMismatch "ColumnDef" tag)
+
+instance ReadForeign TableDef where 
+  readImpl f = do 
+    ({tag, fields} :: { tag :: String, fields :: WidgetCommonFieldsDef}) <- read' f
+    case tag of 
+      "TableDef" -> pure $ TableDef fields
+      _ -> fail (TypeMismatch "TableDef" tag)
+
+instance ReadForeign FormDef where
+  readImpl f = do 
+    ({tag, fields} :: { tag :: String, fields :: WidgetCommonFieldsDef}) <- read' f
+    case tag of 
+      "FormDef" -> pure $ FormDef fields
+      _ -> fail (TypeMismatch "FormDef" tag)
+
 derive newtype instance ReadForeign TabDef
 
 -------------------------------------------------------------------------------
@@ -197,3 +218,9 @@ instance eqScreenKey :: Eq ScreenKey where eq = genericEq
 derive instance ordScreenKey :: Ord ScreenKey
 
 type ScreenMap = EncodableMap ScreenKey ScreenDefinition
+
+-- | Serialise just the title and perspective field, for the client side.
+writeWidgetCommonFields :: WidgetCommonFieldsDef -> Foreign
+writeWidgetCommonFields {title, perspective} = write
+  { title: write title
+  , perspective: write perspective}
