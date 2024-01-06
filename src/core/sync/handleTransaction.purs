@@ -27,23 +27,23 @@ import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Except (lift, runExcept)
 import Control.Monad.State (StateT, gets, modify, runStateT) as ST
 import Crypto.Subtle.Key.Types (CryptoKey)
-import Data.Array (catMaybes, concat)
+import Data.Array (catMaybes, concat, filterA)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
 import Data.Ordering (Ordering(..))
 import Data.Traversable (for)
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Object (Object, empty, insert, lookup, values)
+import Foreign.Object (Object, empty, fromFoldable, insert, lookup, toUnfoldable, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (deserializeJWK, verifyDelta, verifyDelta')
@@ -67,7 +67,7 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, deltaAuthor2ResourceIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -75,7 +75,7 @@ import Perspectives.Sync.Transaction (PublicKeyInfo)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublicRole, roleAspectsClosure)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
-import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, map, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 import Simple.JSON (readJSON')
 
 -- TODO. Each of the executing functions must catch errors that arise from unknown types.
@@ -317,9 +317,13 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
 -- | Executes all deltas, which leads to a changed store of resources. 
 -- | Does not change anything if some of the information could not be verified.
 executeTransaction :: TransactionForPeer -> MonadPerspectivesTransaction Unit
-executeTransaction t = try (verifyTransaction t) >>= case _ of 
-  Left e -> logPerspectivesError (Custom $  "Could not execute a transaction. Reason: " <> show e)
-  Right _ -> executeTransaction' t
+executeTransaction (TransactionForPeer tfpr) = do 
+  -- Just check keys for authors that we do not yet have.
+  newKeys <- fromFoldable <$> lift (filterA (map isJust <<< tryGetPerspectEntiteit <<< deltaAuthor2ResourceIdentifier <<< fst) (toUnfoldable tfpr.publicKeys))
+  t <- pure $ TransactionForPeer tfpr { publicKeys = newKeys}
+  try (verifyTransaction t) >>= case _ of 
+    Left e -> logPerspectivesError (Custom $  "Could not execute a transaction. Reason: " <> show e)
+    Right _ -> executeTransaction' t
 
 verifyTransaction :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 verifyTransaction t@(TransactionForPeer{deltas, publicKeys}) = void $ ST.runStateT
@@ -352,32 +356,32 @@ executeTransaction' :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 
   -- Add all public key information (possibly leading to more TheWorld$PerspectivesUsers instances).
-  for_ publicKeys \{deltas:keyDeltas} -> for_ keyDeltas f
+  for_ publicKeys \{deltas:keyDeltas} -> for_ keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
 
   -- Process all deltas.
-  for_ deltas f
+  for_ deltas verifyAndExcecuteDelta
   where
-    f :: SignedDelta -> MonadPerspectivesTransaction Unit
-    f s = (lift $ verifyDelta s) >>= executeDelta
-      where
-        executeDelta :: Maybe String -> MonadPerspectivesTransaction Unit
-        -- For now, we fail silently on deltas that cannot be authenticated.
-        executeDelta Nothing = pure unit
-        executeDelta (Just stringifiedDelta) = do 
-          storageSchemes <- lift $ gets _.typeToStorage
-          catchError
-            (case runExcept $ readJSON' stringifiedDelta of
-              Right d1 -> executeRolePropertyDelta (addResourceSchemes storageSchemes d1) s
+    verifyAndExcecuteDelta :: SignedDelta -> MonadPerspectivesTransaction Unit
+    verifyAndExcecuteDelta s = (lift $ verifyDelta s) >>= executeDelta s
+
+    executeDelta :: SignedDelta -> Maybe String -> MonadPerspectivesTransaction Unit
+    -- For now, we fail silently on deltas that cannot be authenticated.
+    executeDelta s Nothing = pure unit
+    executeDelta s (Just stringifiedDelta) = do 
+      storageSchemes <- lift $ gets _.typeToStorage
+      catchError
+        (case runExcept $ readJSON' stringifiedDelta of
+          Right d1 -> executeRolePropertyDelta (addResourceSchemes storageSchemes d1) s
+          Left _ -> case runExcept $ readJSON' stringifiedDelta of
+            Right d2 -> executeRoleBindingDelta (addResourceSchemes storageSchemes d2) s
+            Left _ -> case runExcept $ readJSON' stringifiedDelta of
+              Right d3 -> executeContextDelta (addResourceSchemes storageSchemes d3) s
               Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                Right d2 -> executeRoleBindingDelta (addResourceSchemes storageSchemes d2) s
+                Right d4 -> executeUniverseRoleDelta ((addResourceSchemes storageSchemes d4)) s
                 Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                  Right d3 -> executeContextDelta (addResourceSchemes storageSchemes d3) s
-                  Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                    Right d4 -> executeUniverseRoleDelta ((addResourceSchemes storageSchemes d4)) s
-                    Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                      Right d5 -> executeUniverseContextDelta (addResourceSchemes storageSchemes d5) s
-                      Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
-            (\e -> liftEffect $ log (show e))
+                  Right d5 -> executeUniverseContextDelta (addResourceSchemes storageSchemes d5) s
+                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
+        (\e -> liftEffect $ log (show e))
 
 -- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
 -- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
