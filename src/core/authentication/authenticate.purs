@@ -23,6 +23,7 @@
 module Perspectives.Authenticate
   ( deserializeJWK
   , getMyPublicKey
+  , tryGetPublicKey
   , getPrivateKey
   , signDelta
   , verifyDelta
@@ -67,6 +68,7 @@ import Perspectives.Instances.ObjectGetters (getProperty)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
+import Perspectives.Persistent (entityExists)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers)
@@ -127,10 +129,11 @@ getPublicKey author = do
   case mrawKey of 
     Nothing -> pure Nothing 
     Just (Value rawKey) -> lift (Just <$> deserializeJWK rawKey)
-    -- do
-    --   keyBuff <- liftAff $ liftEffect $ string2buff rawKey
-    --   key <- lift $ importKey CryptoTypes.jwk keyBuff (ec ECConstants.ecdsa ECConstants.p384) true [CryptoTypes.verify]
-    --   pure $ Just key
+
+tryGetPublicKey  :: String -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
+tryGetPublicKey author = entityExists (deltaAuthor2ResourceIdentifier author) >>= if _ 
+  then getPublicKey author
+  else pure Nothing
 
 deserializeJWK :: String -> Aff CryptoTypes.CryptoKey
 deserializeJWK rawKey = do
