@@ -498,6 +498,15 @@ domain model://perspectives.domains#System
         on entry
           notify Inviter
             "The confirmation code you entered is correct!"
+      state CreateInvitation = exists ConfirmationCode
+        on entry
+          do for Inviter
+            letA
+              text <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
+            in
+              create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
+                text
+
 
     user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
       perspective on Invitee
@@ -506,12 +515,7 @@ domain model://perspectives.domains#System
         props (Message, ConfirmationCode, SerialisedInvitation) verbs (SetPropertyValue, Consult)
         in object state Message
           action CreateInvitation
-            letA
-              text <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
-            in
-              ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
-              create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
-                text
+            ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
         in object state Invitation
           props (Confirmation) verbs (SetPropertyValue)
       
