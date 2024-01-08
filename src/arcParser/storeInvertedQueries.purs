@@ -384,6 +384,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     QF.RoleIndividual _ -> pure unit
 
+    QF.ContextIndividual _ -> pure unit
+
     _ -> lift $ throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
   where 

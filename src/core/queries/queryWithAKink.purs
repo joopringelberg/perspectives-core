@@ -33,7 +33,7 @@ import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
-import Perspectives.ModelDependencies (sysMe)
+import Perspectives.ModelDependencies (mySystem)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
@@ -42,7 +42,7 @@ import Perspectives.Representation.ADT (ADT, allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, getCalculation, getRole)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -114,7 +114,7 @@ invert_ :: QueryFunctionDescription -> PhaseThree (Array QueryWithAKink_)
 -- NOTE moeten we hier niet iets met de args?
 -- The inversion depends on the function f.
 invert_ (MQD dom (ExternalCoreRoleGetter f) args ran _ _) = case f of 
-  "model://perspectives.domains#Couchdb$PendingInvitations" -> pure [ZQ_ [SQD ran (RoleIndividual (RoleInstance sysMe)) dom True True] Nothing]
+  "model://perspectives.domains#Couchdb$PendingInvitations" -> pure [ZQ_ [SQD ran (ContextIndividual (ContextInstance mySystem)) dom True True] Nothing]
   _ -> pure $ [ZQ_ [MQD ran (ExternalCoreContextGetter "model://perspectives.domains#Couchdb$ContextInstances") args dom Unknown Unknown] Nothing]
  
 invert_ (MQD _ _ args _ _ _) = join <$> traverse invert_ args
