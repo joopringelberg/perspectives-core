@@ -92,9 +92,6 @@ domain model://perspectives.domains#BrokerServices
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
         props (Name, Url, Exchange) verbs (SetPropertyValue)
-      -- Without this perspective we get a synchronization warning.
-      perspective on Accounts >> binding >> context >> Administrator
-        props (ConfirmationCode) verbs (Consult)
 
     user Guest = sys:Me
       perspective on Administrator
@@ -124,7 +121,6 @@ domain model://perspectives.domains#BrokerServices
       property LastNameOfAccountHolder = context >> AccountHolder >> LastName
 
       view ForAccountHolder (Url, Exchange)
-      view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
 
     -- PDRDEPENDENCY
     user AccountHolder filledBy sys:PerspectivesSystem$User
@@ -135,18 +131,14 @@ domain model://perspectives.domains#BrokerServices
       property AccountPassword (mandatory, String)
       -- PDRDEPENDENCY
       property QueueName (mandatory, String)
-      property ConfirmationCode (String)
-
-      view ForAccountHolder (AccountName, AccountPassword, QueueName, ConfirmationCode, LastName)
 
       perspective on extern
-        view External$ForAccountHolder verbs (Consult)
+        props (Url, Name) verbs (Consult)
+      -- perspective on Administrator is inherited as the perspective of Invitee on Inviter.
       perspective on AccountHolder
         all roleverbs
         props (AccountPassword) verbs (SetPropertyValue)
         props (AccountName, QueueName) verbs (Consult)
-      perspective on BrokerContract$Administrator
-        props (LastName) verbs (Consult)
 
       screen "Broker Contract"
         column
@@ -156,11 +148,20 @@ domain model://perspectives.domains#BrokerServices
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
-      property ConfirmationCode (String)
-      view Confirmation (ConfirmationCode)
 
       perspective on AccountHolder
         all roleverbs
         props (AccountName, QueueName, AccountPassword) verbs (SetPropertyValue)
+
+      screen "Create Broker Contract"
+        row 
+          form External
+            -- NOTE: the file control should preferrably not show the upload button in this case.
+            props (Message) verbs (SetPropertyValue)
+        row 
+          form "Invitation" External
+            props (SerialisedInvitation, ConfirmationCode, CompleteMessage) verbs (Consult)
+        row
+          form "AccountHolder" AccountHolder
 
     aspect user sys:Invitation$Guest

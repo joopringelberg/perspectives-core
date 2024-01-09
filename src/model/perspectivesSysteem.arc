@@ -485,39 +485,33 @@ domain model://perspectives.domains#System
 
     external
       property SerialisedInvitation (File)
+      property Addressing = "This is an invitation to connect, sent by " + InviterLastName + ". Please contact this person to retrieve the security code needed to unlock the invitation.\n"
       property Message (String)
+        maxLength = 256
+      property CompleteMessage = Addressing + Message
       property ConfirmationCode (Number)
-      property Confirmation (Number)
-        minInclusive = 100000
-        maxInclusive = 999999
       property InviterLastName = context >> Inviter >> LastName
       property IWantToInviteAnUnconnectedUser (Boolean)
       state Message = exists Message
-      state Invitation = exists SerialisedInvitation
-      state Checks = Confirmation == ConfirmationCode
-        on entry
-          notify Inviter
-            "The confirmation code you entered is correct!"
       state CreateInvitation = exists ConfirmationCode
         on entry
           do for Inviter
             letA
-              text <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
+              transaction <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
+              invitation <- callExternal util:CreateInvitation( CompleteMessage, transaction, ConfirmationCode ) returns String
             in
               create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
-                text
-
+                invitation
 
     user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
       perspective on Invitee
         props (FirstName, LastName) verbs (Consult)
       perspective on External
         props (Message, ConfirmationCode, SerialisedInvitation) verbs (SetPropertyValue, Consult)
+        props (CompleteMessage) verbs (Consult)
         in object state Message
           action CreateInvitation
             ConfirmationCode = callExternal util:Random(100000, 999999) returns Number
-        in object state Invitation
-          props (Confirmation) verbs (SetPropertyValue)
       
       screen "Invite someone"
         row 
@@ -526,8 +520,7 @@ domain model://perspectives.domains#System
             props (Message) verbs (SetPropertyValue)
         row 
           form External
-            props (SerialisedInvitation) verbs (Consult)
-            -- props (SerialisedInvitation) verbs (Consult)
+            props (SerialisedInvitation, ConfirmationCode, CompleteMessage) verbs (Consult)
         row
           form "Invitee" Invitee
 
@@ -535,13 +528,13 @@ domain model://perspectives.domains#System
       perspective on Inviter
         props (FirstName, LastName) verbs (Consult)
       perspective on extern
-        props (InviterLastName, Message, ConfirmationCode) verbs (Consult)
+        props (InviterLastName, CompleteMessage, ConfirmationCode) verbs (Consult)
       screen "Invitation"
         row 
           form "You are invited by:" Inviter
         row
-          form "Message and confirmation code" External
-            props (Message, ConfirmationCode) verbs (Consult)
+          form "Message" External
+            props (CompleteMessage) verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
     user Guest = filter sys:Me with not fills (currentcontext >> Inviter)

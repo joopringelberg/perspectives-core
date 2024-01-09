@@ -60,6 +60,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Prelude (class Show, bind, pure, show, ($), (<<<), (<>), (>=>), (>>=))
+import Simple.JSON (writeJSON)
 import Text.Parsing.Parser (ParseError)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -176,6 +177,12 @@ systemParameter_ parArray _ = ArrayT $ lift case head parArray of
     _ -> pure [] 
   _ -> pure []
 
+-- | Given a serialised transaction and the string representation of a ConfirmationCode, creates a serialised Invitation
+createInvitation_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
+createInvitation_ messageA transactionA confirmationA _ = ArrayT $ lift case head messageA, head transactionA, head confirmationA of
+  Just message, Just transaction, Just confirmation -> pure [writeJSON { message, transaction, confirmation }]
+  _, _, _ -> pure []
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -191,4 +198,5 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$FormatDateTime" {func: unsafeCoerce formatDateTime_, nArgs: 3, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$EvalExpression" {func: unsafeCoerce evalExpression_, nArgs: 1, isFunctional: Unknown}
   , Tuple "model://perspectives.domains#Utilities$SystemParameter" {func: unsafeCoerce systemParameter_, nArgs: 1, isFunctional: True}
+  , Tuple "model://perspectives.domains#Utilities$CreateInvitation" {func: unsafeCoerce createInvitation_, nArgs: 3, isFunctional: True}
   ]
