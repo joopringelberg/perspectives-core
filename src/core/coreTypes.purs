@@ -200,7 +200,9 @@ type RuntimeOptions =
   , privateKey :: Maybe CryptoKey'
   -- Default: the CryptoKey object that has been created on setting up the installation. This is extractable.
   , publicKey :: Maybe CryptoKey'
-  }
+    -- Default: the package number taken from package.json
+  , myContextsVersion :: String 
+}
 
 foreign import data CryptoKey' :: Type
 instance ReadForeign CryptoKey' where readImpl = pure <<< unsafeCoerce

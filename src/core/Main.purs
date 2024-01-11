@@ -106,15 +106,15 @@ main = pure unit
 -- | To be called from the client.
 -- | Execute the Perspectives Distributed Runtime by creating a listener to the internal channel.
 -- | Implementation note: the PouchdbUser should have a couchdbUrl that terminates on a forward slash.
-runPDR :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
-runPDR usr rawPouchdbUser callback = void $ runAff handler do
+runPDR :: UserName -> Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
+runPDR usr rawPouchdbUser options callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -355,8 +355,8 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Created an account " <> usr
       callback true
 
-reCreateInstances :: Foreign -> (Boolean -> Effect Unit) -> Effect Unit
-reCreateInstances rawPouchdbUser callback = void $ runAff handler
+reCreateInstances :: Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
+reCreateInstances rawPouchdbUser options callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in reCreateInstances")
@@ -364,7 +364,7 @@ reCreateInstances rawPouchdbUser callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options
         runPerspectivesWithState
           (do
             -- Clear the databases.
@@ -390,8 +390,8 @@ reCreateInstances rawPouchdbUser callback = void $ runAff handler
 
 
 -- | This is for development only! Assumes the user identifier equals the user name.
-resetAccount :: UserName -> Foreign -> (Boolean -> Effect Unit) -> Effect Unit
-resetAccount usr rawPouchdbUser callback = void $ runAff handler
+resetAccount :: UserName -> Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
+resetAccount usr rawPouchdbUser options callback = void $ runAff handler
   do
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
@@ -399,7 +399,7 @@ resetAccount usr rawPouchdbUser callback = void $ runAff handler
         transactionFlag <- new 0
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options
         runPerspectivesWithState
           (do
             (catchError do

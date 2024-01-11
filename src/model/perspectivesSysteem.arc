@@ -107,6 +107,7 @@ domain model://perspectives.domains#System
             user <- create role PerspectivesUsers named keyholder
           in
             PublicKey = callExternal util:SystemParameter( "PublicKey" ) returns String for user
+
     -- PDRDEPENDENCY
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
@@ -187,6 +188,8 @@ domain model://perspectives.domains#System
       property ConnectedToAMQPBroker (Boolean)
       property CardClipBoard (String)
       property ShowLibraries (Boolean)
+      property MyContextsVersion = callExternal util:SystemParameter( "MyContextsVersion" ) returns String
+      property PDRVersion = callExternal util:SystemParameter( "PDRVersion" ) returns String
 
       view ShowLibraries (ShowLibraries)
 
@@ -229,7 +232,8 @@ domain model://perspectives.domains#System
         only (CreateAndFill, Remove)
         props (InviterLastName) verbs (Consult)
       perspective on External
-        view ShowLibraries verbs (Consult, SetPropertyValue)
+        props (ShowLibraries) verbs (Consult, SetPropertyValue)
+        props (MyContextsVersion, PDRVersion) verbs (Consult)
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
       perspective on ModelsInUse
@@ -260,6 +264,10 @@ domain model://perspectives.domains#System
         only (CreateAndFill)
 
       screen "Home"
+        tab "System"
+          row
+            form External
+              props (MyContextsVersion, PDRVersion) verbs (Consult)
         tab "SystemCaches"
           row
             form SystemCaches

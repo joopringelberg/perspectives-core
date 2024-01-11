@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 const path = require("path");
+const webpack = require('webpack');
 
 module.exports = function(env)
   {
@@ -20,6 +21,11 @@ module.exports = function(env)
     module: {
       rules: []
     },
+    plugins: [
+      new webpack.DefinePlugin({
+        __PDRVersion__: JSON.stringify(require("./package.json").version)
+      })        
+      ],
     externals: {
       "perspectives-proxy": {
         commonjs: 'perspectives-proxy',

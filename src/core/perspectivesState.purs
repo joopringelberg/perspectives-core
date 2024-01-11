@@ -76,6 +76,7 @@ defaultRuntimeOptions =
   , useSystemVersion: null
   , privateKey: Nothing
   , publicKey: Nothing
+  , myContextsVersion: "1.0.0"
   }
 
 -----------------------------------------------------------

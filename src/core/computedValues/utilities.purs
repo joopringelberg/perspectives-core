@@ -174,8 +174,12 @@ systemParameter_ parArray _ = ArrayT $ lift case head parArray of
     "PublicKey" -> getMyPublicKey >>= case _ of 
       Just publicKey -> pure [publicKey]
       Nothing -> pure []
-    _ -> pure [] 
+    "MyContextsVersion" -> gets (singleton <<< _.myContextsVersion <<< _.runtimeOptions)
+    "PDRVersion" -> pure [pdrVersion]
+    _ -> pure []
   _ -> pure []
+
+foreign import pdrVersion :: String
 
 -- | Given a serialised transaction and the string representation of a ConfirmationCode, creates a serialised Invitation
 createInvitation_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
