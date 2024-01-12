@@ -1,17 +1,16 @@
 {
   "name": "perspectives-core",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Core functionality of Perspectives",
   "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
+    "lru-cache": "^7.8.1",
     "@paralleldrive/cuid2": "^2.2.2",
     "@stomp/stompjs": "^6.0.0",
     "eventsource": "^1.0.7",
     "fuzzysort": "^1.1.4",
-    "idb-keyval": "^6.2.1",
-    "lru-cache": "^7.8.1",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.18.0",
+    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.19.0",
     "pouchdb": "^7.2.2",
     "pouchdb-browser": "^7.2.2",
     "xhr2-cookies": "^1.1.0"
@@ -27,7 +26,7 @@
     "builddevelopment": "webpack --env target=development",
     "symlinks": "./createPerspectivesLinks.sh",
     "docs": "./gendocs.sh",
-    "stats": "webpack --env target=production --json > stats.json"
+    "stats": "webpack --json > stats.json"
   },
   "devDependencies": {
     "webpack": "^5.71.0",

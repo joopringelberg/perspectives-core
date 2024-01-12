@@ -146,7 +146,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/perspectives-couchdb.git"
     , version =
-        "v2.8.7"
+        "v2.9.0"
     }
 
   with affjax.repo = "https://github.com/joopringelberg/purescript-affjax.git"
