@@ -44,7 +44,7 @@ domain model://perspectives.domains#System
         -- which in turn requires a previously existing installation with both the System and CouchdbManagement model available to compile them.
         -- This is because the line below is a forward reference to a CouchdbManagement type.
         -- This is a Catch22 situation that fully plays out when we recompile all models of an installation. 
-        -- For that reason, it is removed from the source that is included in the DomeinFile.
+        -- For that reason, it is removed from the source that is included in the DomeinFile. Instead, it is added during system setup.
 
         -- Add the perspectives.domains repository as BaseRepository:
         -- bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem

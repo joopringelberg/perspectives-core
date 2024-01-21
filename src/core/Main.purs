@@ -112,9 +112,10 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
+      brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -325,9 +326,10 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pouchdbUser :: PouchdbUser) -> do
       transactionFlag <- new 0
+      brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions brokerService
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Fork aff to save to the database
@@ -362,9 +364,10 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in reCreateInstances")
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new 0
+        brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService
         runPerspectivesWithState
           (do
             -- Clear the databases.
@@ -397,9 +400,10 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new 0
+        brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options brokerService
         runPerspectivesWithState
           (do
             (catchError do
@@ -490,9 +494,10 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
           , couchdbUrl: pdbu.couchdbUrl
           }
         transactionFlag <- new 0
+        brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions brokerService
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -540,9 +545,10 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
         transactionFlag <- new 0
+        brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions brokerService
         runPerspectivesWithState
           (do
             addAllExternalFunctions

@@ -27,27 +27,44 @@ module Perspectives.AMQP.RabbitMQManagement where
 import Prelude
 
 import Affjax (Request, Response, printError, request)
+import Affjax.RequestBody as RequestBody
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT, gets)
+import Data.Array (head)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
+import Foreign (MultipleErrors)
+import Foreign.Object (Object, empty)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Simple.JSON (readJSON)
+import Perspectives.Couchdb (onAccepted_)
+import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.Types (UserName)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Simple.JSON (readJSON, writeJSON)
 
 type VirtualHost = String
 type BrokerServiceUrl = String
 type NodeName = String
 type AdminUserName = String
 type AdminPassword = String
+type QueueName = String
+
 
 nodesEndpoint :: String
 nodesEndpoint = "api/nodes/"
+
+userEndpoint :: String
+userEndpoint = "api/users/"
+
+permissionsEndpoint :: String
+permissionsEndpoint = "api/permissions/"
 
 virtualHost :: String
 virtualHost = "mycontexts"
@@ -55,46 +72,175 @@ virtualHost = "mycontexts"
 type RabbitState = 
   { virtualHost :: VirtualHost
   , brokerServiceUrl :: BrokerServiceUrl
-  , nodeName :: NodeName
   , adminUserName :: AdminUserName
   , adminPassword :: AdminPassword
   }
 
 type WithRabbitState = StateT RabbitState MonadPerspectives
 
-runRabbitState :: forall x. VirtualHost -> BrokerServiceUrl -> NodeName -> AdminUserName -> AdminPassword -> WithRabbitState x -> MonadPerspectives x
-runRabbitState vhost brokerServiceUrl nodeName adminUserName adminPassword computation = evalStateT computation
-  { virtualHost: vhost, brokerServiceUrl, nodeName, adminUserName, adminPassword } 
+runRabbitState :: forall x. VirtualHost -> BrokerServiceUrl -> AdminUserName -> AdminPassword -> WithRabbitState x -> MonadPerspectives x
+runRabbitState vhost brokerServiceUrl adminUserName adminPassword computation = evalStateT computation
+  { virtualHost: vhost, brokerServiceUrl, adminUserName, adminPassword } 
+
+runRabbitState' :: forall x. RabbitState -> WithRabbitState x -> MonadPerspectives x
+runRabbitState' state computation = evalStateT computation state
 
 getAuthenticationHeader :: AdminUserName -> AdminPassword -> RequestHeader
 getAuthenticationHeader uname pwd = RequestHeader uname pwd
 
-defaultRabbitRequest :: BrokerServiceUrl -> AdminUserName -> AdminPassword -> WithRabbitState (Request String)
-defaultRabbitRequest url username password = pure
-  { method: Left GET
-  , url
-  , headers: []
-  , content: Nothing
-  -- TODO. Zonder de credentials weer mee te sturen, ben je niet geauthenticeerd.
-  , username: Just username
-  , password: Just password
-  , withCredentials: true
-  , responseFormat: ResponseFormat.string
-  , timeout: Nothing
-}
-
-getNodes :: WithRabbitState (Array String)
-getNodes = do
+-- | A request with the credentials and url from RabbitState
+defaultRabbitRequest :: WithRabbitState (Request String)
+defaultRabbitRequest = do 
   url <- gets _.brokerServiceUrl
   username <- gets _.adminUserName
   password <- gets _.adminPassword
-  (rq :: (Request String)) <- defaultRabbitRequest (url <> nodesEndpoint) username password
-  res <- liftAff $ request rq 
+  pure
+    { method: Left GET
+    , url
+    , headers: []
+    , content: Nothing
+    -- TODO. Zonder de credentials weer mee te sturen, ben je niet geauthenticeerd.
+    , username: Just username
+    , password: Just password
+    , withCredentials: true
+    , responseFormat: ResponseFormat.string
+    , timeout: Nothing
+  }
+
+getNodes :: WithRabbitState (Array String)
+getNodes = do
+  (rq :: (Request String)) <- defaultRabbitRequest
+  res <- liftAff $ request rq { url = rq.url <> nodesEndpoint}
   case res of 
     Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.getNodes: error in call: " <> printError e)
     Right (response :: Response String) -> if response.status == StatusCode 200
       then case (readJSON response.body) of
         Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.getNodes: error in decoding result: " <> show e)
-        Right nodeNames -> pure nodeNames
+        Right (nodeNames :: Array {name :: String}) -> pure $ _.name <$> nodeNames
       else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.getNodes: unexpected statuscode " <> show response.status)
 
+createUser :: {password :: String, tags :: String } ->  UserName -> WithRabbitState Unit
+createUser user userName = do
+  (rq :: (Request String)) <- defaultRabbitRequest
+  res <- liftAff $ request (rq 
+    { url = rq.url <> userEndpoint <> userName
+    , method = Left PUT
+    , content = Just $ RequestBody.string $ writeJSON user
+    })
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createUser: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 201
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createUser: unexpected statuscode " <> show response.status)
+
+type RabbitUser = 
+  { name :: String
+  , password_hash :: String
+  , hashing_algorithm :: String
+  , tags :: Array String
+  -- , limits:{}
+  }
+getUser :: UserName -> WithRabbitState (Maybe RabbitUser)
+getUser userName = do
+  (rq :: (Request String)) <- defaultRabbitRequest 
+  res <- liftAff $ request rq { url = rq.url <> userEndpoint <> userName }
+  onAccepted_
+    (\response _ -> logPerspectivesError 
+      (Custom $ "getUser received the following statuscode when trying to retrieve " <> userName <> ": " <> show response.status) *> pure Nothing)
+    res
+    [StatusCode 200]
+    "getUser"
+    \response -> do 
+      (x :: Either MultipleErrors RabbitUser) <- pure $ readJSON response.body
+      case x of
+        (Left e) -> do
+          throwError $ error ("getUser: error in decoding result: " <> show e)
+        (Right user) -> pure $ Just user
+
+deleteUser :: UserName -> WithRabbitState Unit
+deleteUser userName = do
+  (rq :: (Request String)) <- defaultRabbitRequest
+  res <- liftAff $ request (rq 
+    { url = rq.url <> userEndpoint <> userName
+    , method = Left DELETE
+    })
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createUser: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 204
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.deleteUser: unexpected statuscode " <> show response.status)
+
+createQueue :: QueueName -> WithRabbitState Unit
+createQueue queueName = do 
+  vhost <- gets _.virtualHost
+  nodes <- getNodes
+  case head nodes of
+    Nothing -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createQueue: no nodes found in AMQP server.")
+    Just node -> do
+      queueEndpoint <- pure $ "api/queues/" <> vhost <> "/"
+      (rq :: (Request String)) <- defaultRabbitRequest
+      res <- liftAff $ request (rq 
+        { url = rq.url <> queueEndpoint <> queueName
+        , method = Left PUT
+        , content = Just $ RequestBody.string $ writeJSON ({ auto_delete: false, durable: true, arguments: empty, node: node } :: Queue)
+        })
+      case res of 
+        Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createQueue: error in call: " <> printError e)
+        Right (response :: Response String) -> if response.status == StatusCode 201 || response.status == StatusCode 204
+          then pure unit
+          else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createQueue: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
+  
+type Queue = { auto_delete :: Boolean, durable :: Boolean, arguments :: Object String, node :: String}
+
+deleteQueue :: QueueName -> WithRabbitState Unit
+deleteQueue queueName = do 
+  vhost <- gets _.virtualHost
+  queueEndpoint <- pure $ "api/queues/" <> vhost <> "/"
+  (rq :: (Request String)) <- defaultRabbitRequest
+  res <- liftAff $ request (rq 
+    { url = rq.url <> queueEndpoint <> queueName
+    , method = Left DELETE
+    })
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.deleteQueue: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 204
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.deleteQueue: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
+  
+              -- { "configure": "^$"                         // No configuring rights for an ordinary Perspectives user.
+              -- , "write": "amq.topic"                      // Just write to the default exchange.
+              -- , "read": component.state.newAccountName    // Just read from the accounts own queue.
+              -- } )
+
+type AMQPUserPermissions = { configure :: String, write :: String, read :: String}
+setPermissions :: UserName -> AMQPUserPermissions -> WithRabbitState Unit
+setPermissions userName permissions = do
+  vhost <- gets _.virtualHost
+  rq <- defaultRabbitRequest
+  res <- liftAff $ request (rq
+    { url = rq.url <> permissionsEndpoint <> vhost <> "/" <> userName
+    , method = Left PUT
+    , content = Just $ RequestBody.string $ writeJSON permissions
+    })
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setPermissions: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 201
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setPermissions: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
+
+createBinding :: RoleInstance -> QueueName -> WithRabbitState Unit
+createBinding (RoleInstance rid) queueName = do
+  vhost <- gets _.virtualHost
+  bindingsEndpoint <- pure $ "api/bindings/" <> vhost <> "/e/amq.topic/q/" <> queueName
+  rq <- defaultRabbitRequest
+  res <- liftAff $ request (rq
+    { url = rq.url <> bindingsEndpoint
+    , method = Left POST
+    , content = Just $ RequestBody.string $ writeJSON ({routing_key: rid } :: { routing_key :: String})
+    })
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setBindings: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 201
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setBindings: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
+  

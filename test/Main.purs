@@ -26,7 +26,8 @@ import Test.ArrayT as ARRT
 import Test.Sync.HandleTransaction as HTA
 import Test.Utilities as UT
 import Test.DomeinFile.Encoding as DFE
-import Test.Guid as GUID
+import Test.Guid as GUID 
+import Test.RabbitMQ as RB
 
 
 main :: Effect Unit
@@ -52,4 +53,5 @@ main = runTest do
   -- HTA.theSuite
   -- UT.theSuite
   -- GUID.theSuite
-  DFE.theSuite
+  -- DFE.theSuite
+  RB.theSuite

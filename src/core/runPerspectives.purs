@@ -38,6 +38,7 @@ runPerspectives :: forall a. String -> String -> String -> String -> Int -> Mona
   -> Aff a
 runPerspectives userName password systemId host port mp = do
   transactionFlag <- new 0 
+  brokerService <- empty
   transactionWithTiming <- empty
   modelToLoad <- empty
   (rf :: AVar PerspectivesState) <- new $
@@ -50,7 +51,8 @@ runPerspectives userName password systemId host port mp = do
       transactionFlag
       transactionWithTiming
       modelToLoad
-       defaultRuntimeOptions) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
+      defaultRuntimeOptions
+      brokerService) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

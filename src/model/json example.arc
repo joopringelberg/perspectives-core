@@ -6,5 +6,20 @@ case JSONExample
       all roleverbs
       -- defaults betekent: alle properties, alle property verbs
       defaults
+    perspective on SubContexts
+      all roleverbs
+      props (P) verbs (Consult)
   thing B
-    property 1 (Boolean)
+    property X (Boolean)
+  
+  context SubContexts filledBy SubContext
+  
+  case SubContext
+    extern 
+      Property P (String)
+    user SubUser
+      perspective on C
+        all roleverbs
+        props (Y) verbs (Consult) 
+    thing C
+      property Y (Number)

@@ -163,7 +163,7 @@ type PerspectivesExtraState =
   -- Do not confuse with transactionFlag! This member is used for numbering transactions that are sent to peers.
   , transactionNumber :: Int
 
-  , brokerService :: Maybe BrokerService
+  , brokerService :: AVar BrokerService
 
   , stompClient :: Maybe StompClient
 

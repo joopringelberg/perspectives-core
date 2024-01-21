@@ -107,10 +107,12 @@ domain model://perspectives.domains#BrokerServices
     state NoAdministrator = not exists Administrator
       on entry
         do for sys:Invitation$Guest
+          -- Guest has a sufficient perspective on Administrator in state Invitation$NoInviter, which corresponds to this state NoAdministrator.
           bind extern >> binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> Administrator >>= first to Administrator
     state NoAccountHolder = (exists Administrator) and (not exists AccountHolder)
       on entry
         do for BrokerContract$Administrator
+          -- This is the role that the Invitee/AccountHolder will fill with himself if she accepts the BrokerContract.
           create role AccountHolder
     external
       aspect sys:Invitation$External

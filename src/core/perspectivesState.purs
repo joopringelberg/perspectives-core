@@ -23,24 +23,25 @@
 module Perspectives.PerspectivesState where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
+import Control.Monad.Trans.Class (lift)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..))
 import Data.Nullable (null)
-import Effect.Aff.AVar (AVar)
+import Effect.Aff.AVar (AVar, put, read)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, ContextInstances)
+import Perspectives.CoreTypes (AssumptionRegister, ContextInstances, DomeinCache, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, BrokerService)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
-import Prelude (Unit, bind, discard, pure, void, ($), (+), (<<<), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> PerspectivesState
-newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions =
+newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> PerspectivesState
+newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -56,7 +57,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , post: Nothing
   , developmentRepository: "http://127.0.0.1:5984/repository/"
   , transactionNumber: 0
-  , brokerService: Nothing
+  , brokerService
   , stompClient: Nothing
   , databases: empty
   , warnings: []
@@ -121,11 +122,13 @@ nextTransactionNumber = do
   void $ modify \(s@{transactionNumber:cn}) -> s {transactionNumber = cn + 1}
   pure n
 
-brokerService :: MonadPerspectives (Maybe BrokerService)
-brokerService = gets _.brokerService
+getBrokerService :: MonadPerspectives BrokerService
+getBrokerService = gets _.brokerService >>= lift <<< read
 
 setBrokerService :: Maybe BrokerService -> MonadPerspectives Unit
-setBrokerService bs = modify \s -> s {brokerService = bs}
+setBrokerService bs = case bs of
+  Just bs' -> gets _.brokerService >>= lift <<< put bs'
+  Nothing -> pure unit
 
 stompClient :: MonadPerspectives (Maybe StompClient)
 stompClient = gets _.stompClient

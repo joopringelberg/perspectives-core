@@ -197,6 +197,11 @@ createResourceIdentifier' ctype g = do
     Just (TRANS.Local dbName) -> pure $ createLocalIdentifier dbName g
     Just (TRANS.Remote url) -> pure $ createRemoteIdentifier url g
 
+createCuid :: MonadPerspectives String
+createCuid = do
+  s <- getSystemIdentifier
+  liftEffect $ cuid2 s
+
 createDefaultIdentifier :: String -> ResourceIdentifier
 createDefaultIdentifier g = "def:#" <> g
 

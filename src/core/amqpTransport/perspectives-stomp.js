@@ -67,12 +67,17 @@ function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emi
     {
       // result = {id, unsubscribe}
       const result = stompClient.subscribe(
-        "/queue/" + params.queueId,
+        // publish to amq.topic
+        "/topic/" + params.topic,
+        // publish to the default exchange.
+        // "/queue/" + params.queueId,
         stompClient.emitToPurescript,
         { durable: true
         , "auto-delete": false
+        // This will be the id that we identify the STOMP-subscription with.
         , id: params.queueId // As soon as we create more than one subscription within a connection, we'll have to generate ids.
         , ack: "client"
+        , "x-queue-name": params.queueId
         });
         emit( emitStep( {body: "connection"} ) )();
       };

@@ -19,7 +19,11 @@
 -- Full text of this license can be found in the LICENSE directory in the projects root.
 -- END LICENSE
 
-module Perspectives.AMQP.IncomingPost where
+module Perspectives.AMQP.IncomingPost
+  ( incomingPost
+  , retrieveBrokerService
+  )
+  where
 
 import Control.Coroutine (Consumer, Producer, await, runProcess, ($$))
 import Control.Monad.Rec.Class (forever)
@@ -44,7 +48,7 @@ import Perspectives.ModelDependencies (brokerService) as DEP
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
-import Perspectives.PerspectivesState (brokerService, setBrokerService, setStompClient, stompClient)
+import Perspectives.PerspectivesState (getBrokerService, setBrokerService, setStompClient, stompClient)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
@@ -56,23 +60,20 @@ import Simple.JSON (writeJSON)
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
-  mbrokerService <- brokerService
-  case mbrokerService of
-    Just {topic, queueId, login, passcode, vhost, url} -> do
-      -- Create a Stomp Client: url
-      stpClient <- liftEffect $ createStompClient( url )
-      -- Save the client in state.
-      setStompClient stpClient
-      -- Create a messageProducer: ConnectAndSubscriptionParameters
-      (transactionProducer :: Producer (Either MultipleErrors (StructuredMessage TransactionForPeer)) MonadPerspectives Unit) <- pure $ messageProducer stpClient
-        { topic
-        , queueId
-        , login
-        , passcode
-        , vhost
-        }
-      void $ runProcess $ transactionProducer $$ transactionConsumer
-    Nothing -> pure unit
+  {topic, queueId, login, passcode, vhost, url} <- getBrokerService
+  -- Create a Stomp Client: url
+  stpClient <- liftEffect $ createStompClient( url )
+  -- Save the client in state.
+  setStompClient stpClient
+  -- Create a messageProducer: ConnectAndSubscriptionParameters
+  (transactionProducer :: Producer (Either MultipleErrors (StructuredMessage TransactionForPeer)) MonadPerspectives Unit) <- pure $ messageProducer stpClient
+    { topic -- the user's identifier.
+    , queueId
+    , login
+    , passcode
+    , vhost
+    }
+  void $ runProcess $ transactionProducer $$ transactionConsumer
 
   where
     transactionConsumer :: Consumer (Either MultipleErrors (StructuredMessage TransactionForPeer)) MonadPerspectives Unit
