@@ -59,6 +59,7 @@ import Perspectives.Query.UnsafeCompiler (compileFunction)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
+import Perspectives.ResourceIdentifiers (createCuid)
 import Prelude (class Show, bind, pure, show, ($), (<<<), (<>), (>=>), (>>=))
 import Simple.JSON (writeJSON)
 import Text.Parsing.Parser (ParseError)
@@ -66,7 +67,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
 genSym :: RoleInstance -> MonadPerspectivesQuery String
-genSym _ = pure "geheim"
+genSym _ = lift $ lift createCuid
 
 -- | Returns a random number in the closed interval [l;u].
 random :: Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery Value
