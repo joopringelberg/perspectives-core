@@ -30,7 +30,7 @@ import Data.Eq.Generic (genericEq)
 import Data.List.NonEmpty (cons, singleton, snoc)
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), maybe)
-import Perspectives.Instances.Values (bool2Value, int2Value, value2Bool, value2Int)
+import Perspectives.Instances.Values (bool2Value, number2Value, value2Bool, value2Number)
 import Perspectives.Query.QueryTypes (Domain(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType(..), propertytype2string)
@@ -114,11 +114,11 @@ allPaths dp = case dp.mainPath of
   Nothing -> dp.supportingPaths
   Just d -> ARR.cons d dp.supportingPaths
 
--- | To apply a binary function like (+) converted with functionOnIntegers to two DependencyPaths.
+-- | To apply a binary function like (+) converted with functionOnNumbers to two DependencyPaths.
 -- | The function has to cater for all Depencency types. In practice that is just for Values;
 -- | it returns Left Error otherwise.
 -- | For example:
--- |    `applyValueFunction (functionOnIntegers (+))`
+-- |    `applyValueFunction (functionOnNumbers (+))`
 -- | Can be applied to two DependencyPaths.
 applyValueFunction :: Partial => (Value -> Value -> Value) -> DependencyPath -> DependencyPath -> DependencyPath
 applyValueFunction f dp1@{head: h1} dp2@{head: h2} =
@@ -133,10 +133,10 @@ applyValueFunction f dp1@{head: h1} dp2@{head: h2} =
 dependencyToValue :: Partial => Dependency -> Value
 dependencyToValue (V propName v) = v
 
--- | Wrap a binary function on Int values to become a binary function on Value values.
+-- | Wrap a binary function on Number values to become a binary function on Value values.
 -- | Note that this is an UNSAFE function!
-functionOnIntegers :: (Int -> Int -> Int) -> (Value -> Value -> Value)
-functionOnIntegers f a b = int2Value (f (value2Int a) (value2Int b))
+functionOnNumbers :: (Number -> Number -> Number) -> (Value -> Value -> Value)
+functionOnNumbers f a b = number2Value (f (value2Number a) (value2Number b)) 
 
 -- | Wrap a binary function on String values to become a binary function on Value values.
 functionOnStrings :: (String -> String -> String) -> (Value -> Value -> Value)

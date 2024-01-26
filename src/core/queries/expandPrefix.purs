@@ -62,6 +62,7 @@ instance containsPrefixesUnaryStep :: ContainsPrefixes UnaryStep where
   expandPrefix (FilledBy pos s) = FilledBy pos <$> expandPrefix s
   expandPrefix (Fills pos s) = Fills pos <$> expandPrefix s
   expandPrefix (Available pos s) = Available pos <$> expandPrefix s
+  expandPrefix (DurationOperator pos op s) = DurationOperator pos op <$> expandPrefix s
 
 instance containsPrefixesLetStep :: ContainsPrefixes LetStep where
   expandPrefix (LetStep r@{bindings, assignments}) = do

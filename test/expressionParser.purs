@@ -7,13 +7,14 @@ import Data.Array (length)
 import Data.Either (Either(..))
 import Data.Maybe (isJust, isNothing)
 import Effect.Class.Console (log, logShow)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression (computationStep, operator, simpleStep, step, unaryStep)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Statement (assignment, roleAssignment)
-import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..))
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..)) as PAS
+import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Utilities (prettyPrint)
@@ -27,7 +28,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
     (r :: Either ParseError Step) <- {-pure $ unwrap $-} runIndentParser "MyRole" simpleStep
     case r of
       (Left e) -> assert (show e) false
-      (Right id) -> do
+      (Right id) -> do 
         -- logShow id
         assert "'MyRole' should be parsed as a the simple step ArcIdentifier" case id of
           (Simple (ArcIdentifier (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
@@ -306,7 +307,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
           otherwise -> false
 
   test "Operator: >>=" do
-    (r :: Either ParseError Operator) <- {-pure $ unwrap $-} runIndentParser ">>=" operator
+    (r :: Either ParseError Operator) <- {-pure $ unwrap $-} runIndentParser ">>=" (unsafePartial operator)
     case r of
       (Left e) -> assert (show e) false
       (Right id) -> do

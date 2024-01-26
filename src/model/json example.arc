@@ -17,7 +17,7 @@ case JSONExample
   case SubContext
     extern 
       Property P (String)
-    user SubUser
+    user SubUser filledBy A
       perspective on C
         all roleverbs
         props (Y) verbs (Consult) 

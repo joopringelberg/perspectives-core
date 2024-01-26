@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, handleSequenceFunctions, makeComposition, mandatory, productOfDomains, propertyOfRange, range, replaceContext, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, handleSequenceFunctions, makeComposition, mandatory, productOfDomains, propertyOfRange, range, replaceContext, replaceRange, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -69,7 +69,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
-import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.Range (Duration_(..), Range(..), isPDate, isPDuration)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
@@ -588,6 +588,21 @@ compileUnaryStep currentDomain st@(Available pos s) = do
     VDOM _ _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
     otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator AvailableF) descriptionOfs (VDOM PBool Nothing) True True
 
+compileUnaryStep currentDomain st@(DurationOperator start duration s) = do
+  descriptionOfs <- compileStep currentDomain s
+  durationRange <- unsafePartial case duration of 
+    Year _ -> pure Year_
+    Month _ -> pure Month_
+    Week _ -> pure Week_
+    Day _ -> pure Day_
+    Hour _ -> pure Hour_
+    Minute _ -> pure Minute_
+    Second _ -> pure Second_ 
+    Millisecond _ -> pure MilliSecond_
+  case range descriptionOfs of
+    VDOM PNumber _ -> pure $ replaceRange descriptionOfs (VDOM (PDuration durationRange) Nothing)
+    otherwise -> throwError $ IncompatibleQueryArgument start currentDomain (Unary st)
+
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
   case operator of
@@ -658,11 +673,11 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         LogicalAnd pos -> binOp pos f1 f2 [PBool] AndF
         LogicalOr pos -> binOp pos f1 f2 [PBool] OrF
         -- Possibly allow PBool
-        Add pos -> binOp pos f1 f2 [PNumber, PString] AddF
-        Subtract pos -> binOp pos f1 f2 [PNumber, PString] SubtractF
-        Divide pos -> binOp pos f1 f2 [PNumber] DivideF
+        Add pos -> binOp pos f1 f2 [PNumber, PString, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] AddF
+        Subtract pos -> binOp pos f1 f2 [PNumber, PString, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] SubtractF
+        Divide pos -> binOp pos f1 f2 [PNumber, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] DivideF
         -- Possibly allow PBool
-        Multiply pos -> binOp pos f1 f2 [PNumber] MultiplyF
+        Multiply pos -> binOp pos f1 f2 [PNumber, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] MultiplyF
 
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Compose"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Filter"
@@ -691,7 +706,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
               -- For MinimumF and MaximumF we have interpretations for numbers and strings and booleans and dates.
               -- For AndF and OrF we have an interpretation for Booleans only.
               -- We also require that the VDOM should have an EnumeratedPropertyType.
-              AddF -> ensureDomainIsRange dom [PNumber, PString] pos
+              AddF -> ensureDomainIsRange dom [PNumber, PString, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] pos
                 (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
               SubtractF -> ensureDomainIsRange dom [PNumber, PString] pos
                 (pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True)
@@ -706,6 +721,7 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
               FirstF -> pure $ BQD currentDomain (QF.BinaryCombinator QF.ComposeSequenceF) f1 f2' ran True True
               _ -> throwError $ ArgumentMustBeSequenceFunction pos
             _ -> throwError $ ArgumentMustBeSequenceFunction pos
+        op -> throwError $ Custom ("This case in compileBinaryStep should never be reached: " <> show op)
 
   where
     ensureDomainIsRange :: Domain -> Array Range -> ArcPosition -> FD -> FD
@@ -725,6 +741,10 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
+      d1@(VDOM rc1 _), (VDOM rc2 _) | (isPDate rc1 && isPDuration rc2 || isPDate rc2 && isPDuration rc1) && (functionName == AddF || functionName == SubtractF) -> 
+        if (pessimistic $ functional left') && (pessimistic $ functional right')
+          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
+          else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
       -- Both ranges must be equal, both sides must be functional.
       d1@(VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
         if  allowed rc1 && allowed rc2

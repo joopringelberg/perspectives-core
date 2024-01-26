@@ -408,6 +408,10 @@ newline = "\n"
 ind :: String
 ind = "  "
 
+domain2PropertyRange :: Partial => Domain -> RAN.Range
+domain2PropertyRange d = case d of 
+  VDOM r _ -> r
+
 sumOfDomains :: Domain -> Domain -> Maybe Domain
 -- sumOfDomains (RDOM a ec1) (RDOM b ec2) | ec1 == ec2 = Just (RDOM (SUM [a, b]) ec1)
 sumOfDomains (RDOM a) (RDOM b) = Just (RDOM (SUM [a, b]))
@@ -448,9 +452,6 @@ equalDomainKinds _ _ = false
 data Calculation = S Step Boolean | Q QueryFunctionDescription
 
 derive instance genericRepCalculation :: Generic Calculation _
-
-
-
 
 instance showCalculation :: Show Calculation where
   show = genericShow

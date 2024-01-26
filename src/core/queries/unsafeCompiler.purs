@@ -46,7 +46,7 @@ import Data.Traversable (for, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (##>>), (###=))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (###=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -55,13 +55,13 @@ import Perspectives.Instances.Combinators (available_, exists, filter, logicalAn
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
-import Perspectives.Instances.Values (decodeDate, parseBool, parseInt)
+import Perspectives.Instances.Values (decodeDate, parseBool, parseNumber)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2contextType, range, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2PropertyRange, domain2contextType, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
@@ -73,11 +73,12 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..)) as RAN
+import Perspectives.Representation.Range (isPDate, isPDuration)
 import Perspectives.Representation.State (State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, const, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||))
+import Prelude (class Eq, class Ord, bind, const, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||), (&&), negate)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -375,7 +376,13 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 _ _ _) | g `eq` OrF = do
 compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = do
   f1' <- compileFunction f1
   f2' <- compileFunction f2
-  pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
+  -- If both ranges are equal:
+  if range f1 `eq` range f2
+    then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
+    -- Otherwise we know one of the ranges is a PDate and the other is a PDuration and the function is AddF or SubtractF.
+    else if isPDate (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f1)
+      then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
+      else pure $ performNumericOperation g ran f2' f1' (unsafePartial $ mapNumericOperator g ran)
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -441,30 +448,39 @@ compileSequenceFunction :: QueryFunctionDescription -> MP (Array String -> Monad
 compileSequenceFunction (SQD dom (UnaryCombinator sequenceFunctionName) _ _ _) | isJust $ elemIndex sequenceFunctionName [CountF, MinimumF, MaximumF, AddF, FirstF]  = case sequenceFunctionName of
   CountF -> pure \things -> pure (show $ length things)
   MinimumF -> case dom of
-    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT do
-      nrs <- traverse parseInt numbers
-      pure $ maybe [] (singleton <<< show) (minimum nrs)
+    (VDOM RAN.PNumber _) -> pure smallestNumber
+    (VDOM (RAN.PDuration _) _) -> pure smallestNumber 
     (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure $ (maybe [] singleton) (minimum strings)
     (VDOM RAN.PBool _) -> pure \bools -> ArrayT do
       bls <- traverse parseBool bools
       pure $ maybe [] (singleton <<< show) (minimum bools)
     _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'minimum'.")
   MaximumF -> case dom of
-    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT do
-      nrs <- traverse parseInt numbers
-      pure $ maybe [] (singleton <<< show) (maximum nrs)
+    (VDOM RAN.PNumber _) -> pure largestNumber
+    (VDOM (RAN.PDuration _) _) -> pure largestNumber
     (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure $ (maybe [] singleton) (maximum strings)
     _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'maximum'.")
   AddF -> case dom of
-    (VDOM RAN.PNumber _) -> pure \numbers -> ArrayT $ do
-      (nrs :: Array Int) <- traverse parseInt numbers
-      pure $ [show (foldl (\cumulator nr -> cumulator + nr) 0 nrs)]
-    -- pure (\numbers -> pure $ foldl (\cumulator str -> cumulator + str) "" numbers)
+    (VDOM RAN.PNumber _) -> pure addNumbers
+    (VDOM (RAN.PDuration _) _) -> pure addNumbers
     (VDOM RAN.PString _) -> pure \strings -> ArrayT $ pure [foldl (\cumulator str -> cumulator <> str) "" strings]
     _ -> throwError (error $ "compileSequenceFunction cannot handle domain '" <> show dom <> "' for 'add'.")
   FirstF -> pure firstOfSequence
 
   op -> throwError (error $ "compileSequenceFunction cannot handle sequence function: '" <> show op <> "'.")
+  where
+    addNumbers :: Array String -> MonadPerspectivesQuery String
+    addNumbers numbers = ArrayT $ do
+      (nrs :: Array Number) <- traverse parseNumber numbers
+      pure $ [show (foldl (\(cumulator :: Number) (nr :: Number) -> cumulator + nr) 1.0 nrs)]
+    smallestNumber :: Array String -> MonadPerspectivesQuery String
+    smallestNumber numbers = ArrayT do
+      nrs <- traverse parseNumber numbers
+      pure $ maybe [] (singleton <<< show) (minimum nrs)
+    largestNumber :: Array String -> MonadPerspectivesQuery String
+    largestNumber numbers = ArrayT do
+      nrs <- traverse parseNumber numbers
+      pure $ maybe [] (singleton <<< show) (maximum nrs)
 -- Catch all
 compileSequenceFunction qd = throwError (error $ "compileSequenceFunction cannot create a function out of '" <> prettyPrint qd <> "'.")
 
@@ -543,12 +559,15 @@ order (VDOM ran _) a b f c = ArrayT do
     Just a', Just b' -> case ran of
       RAN.PString -> pure [show $ fString a' b']
       
-      RAN.PNumber -> singleton <<< show <$> (fInt <$> (parseInt a') <*> (parseInt b'))
+      RAN.PNumber -> singleton <<< show <$> (fInt <$> (parseNumber a') <*> (parseNumber b'))
       RAN.PBool ->  singleton <<< show <$> (fBool <$> parseBool a' <*> parseBool b')
       RAN.PDate -> singleton <<< show <$> (fDate <$> (decodeDate a') <*> decodeDate b')
       -- Compare email addresses as strings.
       RAN.PEmail -> pure [show $ fString a' b']
       RAN.PFile -> pure [show $ fString a' b']
+      -- Compare durations as integers. NOTE that we can only compare exactly equal Duration_ s!
+      -- E.g. Days with Days, but not Days with Minutes.
+      RAN.PDuration _ -> singleton <<< show <$> (fInt <$> (parseNumber a') <*> (parseNumber b'))
     _, _ -> pure []
   where
     fString :: String -> String -> Boolean
@@ -558,7 +577,7 @@ order (VDOM ran _) a b f c = ArrayT do
       GreaterThanF -> (>)
       GreaterThanEqualF -> (>=)
 
-    fInt :: Int -> Int -> Boolean
+    fInt :: Number -> Number -> Boolean
     fInt = unsafePartial case f of
       LessThanF -> (<)
       LessThanEqualF -> (<=)
@@ -603,7 +622,8 @@ performNumericOperation ::
 performNumericOperation g ran a b f c = ArrayT do
   (as :: Array String) <- runArrayT (a c)
   (bs :: Array String) <- runArrayT (b c)
-  (performNumericOperation' g ran f) as bs
+  r <- performNumericOperation' g ran f as bs
+  pure r
 
 performNumericOperation' ::
   FunctionName ->
@@ -620,7 +640,7 @@ performNumericOperation' g ran f as bs = do
       AddF -> pure [b1]
       -- Subtract the second value from the first means: negate it, when a number.
       SubtractF -> case ran of
-        VDOM RAN.PNumber _ -> (\x -> [show (0 - x)]) <$> parseInt b1
+        VDOM RAN.PNumber _ -> (\(x :: Number) -> [show (- x)]) <$> parseNumber b1
         otherwise -> pure []
       otherwise -> pure []
     Just a1, Nothing -> case g of
@@ -629,18 +649,30 @@ performNumericOperation' g ran f as bs = do
       otherwise -> pure []
     _, _ -> pure []
 
+-- Notice that for PDuration, both operands have the same duration type!
 mapNumericOperator :: Partial => FunctionName -> Domain -> (String -> String ~~> String)
 mapNumericOperator AddF (VDOM RAN.PNumber _) = wrapNumericOperator (+)
 mapNumericOperator AddF (VDOM RAN.PString _) = \s1 s2 -> pure (s1 <> s2)
+mapNumericOperator AddF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (+)
+mapNumericOperator AddF (VDOM RAN.PDate _) = wrapNumericOperator (+)
 mapNumericOperator SubtractF (VDOM RAN.PNumber _) = wrapNumericOperator (-)
 mapNumericOperator SubtractF (VDOM RAN.PString _) = \s1 s2 -> case (STRING.Pattern s1) `STRING.stripSuffix` s2 of
   Nothing -> pure s1
   Just r -> pure r
+mapNumericOperator SubtractF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (-)
+mapNumericOperator SubtractF (VDOM RAN.PDate _) = wrapNumericOperator (-)
 mapNumericOperator DivideF (VDOM RAN.PNumber _) = wrapNumericOperator (/)
+mapNumericOperator DivideF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (/)
 mapNumericOperator MultiplyF (VDOM RAN.PNumber _) = wrapNumericOperator (*)
+mapNumericOperator MultiplyF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (/)
 
-wrapNumericOperator :: (Int -> Int -> Int) -> (String -> String ~~> String)
-wrapNumericOperator g p q = show <$> (g <$> (parseInt p) <*> (parseInt q))
+wrapNumericOperator :: (Number -> Number -> Number) -> (String -> String ~~> String)
+-- wrapNumericOperator g p q = show <$> (g <$> (parseNumber p) <*> (parseNumber q))
+wrapNumericOperator g p q = do
+  q' <- parseNumber q
+  p' <- parseNumber p
+  r <- pure $ g p' q'
+  pure $ show r
 
 ---------------------------------------------------------------------------------------------------
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS

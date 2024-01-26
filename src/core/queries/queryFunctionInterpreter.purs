@@ -49,7 +49,7 @@ import Data.Traversable (maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MP, MPQ, liftToInstanceLevel, (##>>), (##=))
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MP, MPQ, liftToInstanceLevel, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
@@ -57,7 +57,7 @@ import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, externalRole, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
-import Perspectives.Instances.Values (bool2Value, parseInt, value2Date, value2Int)
+import Perspectives.Instances.Values (bool2Value, parseNumber, value2Date, value2Number)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Arc.Position (arcParserStartPosition)
@@ -243,7 +243,7 @@ interpretBQD (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g
     Just fr1h, Just fr2h -> unsafePartial $ case ran of
       VDOM PString _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
       VDOM PBool _ -> pure [unsafePartial applyValueFunction (functionOnBooleans (orderFunction g)) fr1h fr2h]
-      VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Int x) (value2Int y))) fr1h fr2h]
+      VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Number x) (value2Number y))) fr1h fr2h]
       VDOM PDate _ -> pure [unsafePartial applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Date x) (value2Date y))) fr1h fr2h] 
       VDOM PEmail _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
     _, _ -> pure []
@@ -311,13 +311,8 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
                 (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
                 -- We can safely assume the heads of the paths can be added up, but we do have to know whether they are Integers or Strings.
                 unsafePartial $ case rangeType of
-                  PNumber -> do
-                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-                    sum <- pure (foldl (\cumulator nr -> cumulator + nr) 0 nrs)
-                    pure [{ head: (V (show fname) (Value $ show sum))
-                          , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
-                          , supportingPaths: concat (allPaths <$> result)
-                          }]
+                  PNumber -> addNumbers fname result
+                  PDuration _ -> addNumbers fname result
                   PString -> do
                     (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
                     sum <- pure (foldl (\cumulator nr -> cumulator <> nr) "" strs)
@@ -329,12 +324,8 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
               MaximumF -> do
                 (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
                 unsafePartial case rangeType of 
-                  PNumber -> do
-                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-                    pure [{ head: (V (show fname) (Value $ show (maximum nrs)))
-                          , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum nrs)))
-                          , supportingPaths: concat (allPaths <$> result)
-                          }]
+                  PNumber -> largestNumber fname result
+                  PDuration _ -> largestNumber fname result
                   PString -> do
                     (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
                     pure [{ head: (V (show fname) (Value $ show (maximum strs)))
@@ -345,12 +336,8 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
               MinimumF -> do
                 (result :: Array DependencyPath) <- runArrayT (interpret f1 a)
                 unsafePartial case rangeType of 
-                  PNumber -> do
-                    (nrs :: Array Int) <- traverse (parseInt <<< unwrap <<< dependencyToValue <<< _.head) result
-                    pure [{ head: (V (show fname) (Value $ show (minimum nrs)))
-                          , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum nrs)))
-                          , supportingPaths: concat (allPaths <$> result)
-                          }]
+                  PNumber -> smallestNumber fname result
+                  PDuration _ -> smallestNumber fname result
                   PString -> do
                     (strs :: Array String) <- pure $ (unwrap <<< dependencyToValue <<< _.head) <$> result
                     pure [{ head: (V (show fname) (Value $ show (minimum strs)))
@@ -361,6 +348,29 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
               _ -> throwError (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
           _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
     _ -> throwError $ (error $ show $ ArgumentMustBeSequenceFunction arcParserStartPosition)
+  where
+    addNumbers :: FunctionName -> Array DependencyPath -> AssumptionTracking (Array DependencyPath)
+    addNumbers fname result = do
+      (nrs :: Array Number) <- traverse (parseNumber <<< unwrap <<< dependencyToValue <<< _.head) result
+      sum <- pure (foldl (\cumulator nr -> cumulator + nr) 0.0 nrs)
+      pure [{ head: (V (show fname) (Value $ show sum))
+            , mainPath: Just $ singleton (V (show fname) (Value $ show $ length result))
+            , supportingPaths: concat (allPaths <$> result)
+            }]
+    smallestNumber :: FunctionName -> Array DependencyPath -> AssumptionTracking (Array DependencyPath)
+    smallestNumber fname result = do
+      (nrs :: Array Number) <- traverse (parseNumber <<< unwrap <<< dependencyToValue <<< _.head) result
+      pure [{ head: (V (show fname) (Value $ show (maximum nrs)))
+            , mainPath: Just $ singleton (V (show fname) (Value $ show (maximum nrs)))
+            , supportingPaths: concat (allPaths <$> result)
+            }]
+    largestNumber :: FunctionName -> Array DependencyPath -> AssumptionTracking (Array DependencyPath)
+    largestNumber fname result = do
+      (nrs :: Array Number) <- traverse (parseNumber <<< unwrap <<< dependencyToValue <<< _.head) result
+      pure [{ head: (V (show fname) (Value $ show (maximum nrs)))
+            , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum nrs)))
+            , supportingPaths: concat (allPaths <$> result)
+            }]
 
 -----------------------------------------------------------
 -- MQD

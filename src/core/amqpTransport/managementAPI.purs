@@ -42,7 +42,7 @@ import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Foreign.Object (Object, empty)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (onAccepted_)
+import Perspectives.Couchdb (Password, onAccepted_)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.Types (UserName)
@@ -99,7 +99,6 @@ defaultRabbitRequest = do
     , url
     , headers: []
     , content: Nothing
-    -- TODO. Zonder de credentials weer mee te sturen, ben je niet geauthenticeerd.
     , username: Just username
     , password: Just password
     , withCredentials: true
@@ -244,3 +243,23 @@ createBinding (RoleInstance rid) queueName = do
       then pure unit
       else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setBindings: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
   
+type SelfRegisterInformation = { userName :: String, password :: String, queueName :: String }
+
+selfRegisterWithRabbitMQ_ :: BrokerServiceUrl -> UserName -> Password -> QueueName -> MonadPerspectives Unit
+selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName = do
+  res <- liftAff $ request 
+    { method: Left GET
+    , url: brokerServiceUrl
+    , headers: []
+    , content: Just $ RequestBody.string $ writeJSON ({ userName, password, queueName } :: SelfRegisterInformation)
+    , username: Just userName
+    , password: Just password
+    , withCredentials: true
+    , responseFormat: ResponseFormat.string
+    , timeout: Nothing
+    }
+  case res of 
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.selfRegisterWithRabbitMQ: error in call: " <> printError e)
+    Right (response :: Response String) -> if response.status == StatusCode 200 || response.status == StatusCode 201
+      then pure unit
+      else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.selfRegisterWithRabbitMQ: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)

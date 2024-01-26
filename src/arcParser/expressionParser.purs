@@ -34,6 +34,7 @@ import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved, pubParser)
@@ -55,9 +56,20 @@ step_ :: Boolean -> IP Step
 step_ parenthesised = do
   start <- getPosition
   left <- (token.parens (step_ true)) <|> leftSide
-  mop <- optionMaybe operator
+  mop <- optionMaybe (unsafePartial operator)
   case mop of
-    Nothing -> pure left
+    Nothing -> do 
+      mdop <- optionMaybe (unsafePartial durationOperator)
+      unsafePartial case mdop of 
+        Nothing -> pure left
+        Just (Year pos) -> pure $ Unary (DurationOperator start (Year pos) left)
+        Just (Month pos) -> pure $ Unary (DurationOperator start (Month pos) left)
+        Just (Week pos) -> pure $ Unary (DurationOperator start (Week pos) left)
+        Just (Day pos) -> pure $ Unary (DurationOperator start (Day pos) left)
+        Just (Hour pos) -> pure $ Unary (DurationOperator start (Hour pos) left)
+        Just (Minute pos) -> pure $ Unary (DurationOperator start (Minute pos) left)
+        Just (Second pos) -> pure $ Unary (DurationOperator start (Second pos) left)
+        Just (Millisecond pos) -> pure $ Unary (DurationOperator start (Millisecond pos) left)
     (Just op) -> do
       right <- step
       end <- getPosition
@@ -236,13 +248,13 @@ unaryStep = do
     "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
     s -> fail ("Expected not, exists, filledBy, fills or available, but found: '" <> s <> "'. ")
 
-operator :: IP Operator
+operator :: Partial => IP Operator
 operator =
-  (Filter <$> (getPosition <* reserved "with"))
+  ((Filter <$> (getPosition <* reserved "with"))
   <|>
   (Sequence <$> (getPosition <* token.reservedOp ">>="))
   <|>
-  ((Compose <$> (getPosition <* token.reservedOp ">>"))
+  (Compose <$> (getPosition <* token.reservedOp ">>"))
   <|>
   (Equals <$> (getPosition <* token.reservedOp "=="))
   <|>
@@ -281,7 +293,34 @@ operator =
   (Compose <$> (getPosition <* token.reserved "matches"))
   ) <?> "with, >>=, >>, ==, /=, <, <=, >, >=, and, or, +, -, /, *, union, intersection, otherwise, filledBy. "
 
+durationOperator :: Partial => IP Operator
+durationOperator =
+  ((Year <$> (getPosition <* reserved "year"))
+  <|>
+  (Month <$> (getPosition <* reserved "month"))
+  <|>
+  (Week <$> (getPosition <* reserved "week"))
+  <|>
+  (Day <$> (getPosition <* reserved "day"))
+  <|>
+  (Hour <$> (getPosition <* reserved "hour"))
+  <|>
+  (Minute <$> (getPosition <* reserved "minute"))
+  <|>
+  (Second <$> (getPosition <* reserved "second"))
+  <|>
+  (Millisecond <$> (getPosition <* reserved "millisecond"))
+  ) <?> "year, month, week, day, hour, minute, second, second, millisecond"
+
 operatorPrecedence :: Operator -> Int
+operatorPrecedence (Year _) = 10
+operatorPrecedence (Month _) = 10
+operatorPrecedence (Week _) = 10
+operatorPrecedence (Day _) = 10
+operatorPrecedence (Hour _) = 10
+operatorPrecedence (Minute _) = 10
+operatorPrecedence (Second _) = 10
+operatorPrecedence (Millisecond _) = 10
 operatorPrecedence (Compose _) = 9
 
 operatorPrecedence (Union _) = 8
@@ -351,6 +390,7 @@ startOf stp = case stp of
     startOfUnary (FilledBy p _) = p
     startOfUnary (Fills p _) = p
     startOfUnary (Available p _) = p
+    startOfUnary (DurationOperator p _ _) = p
 
 
 endOf :: Step -> ArcPosition
@@ -394,6 +434,7 @@ endOf stp = case stp of
     endOfUnary (FilledBy (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Fills (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Available (ArcPosition{line, column}) step') = endOf step'
+    endOfUnary (DurationOperator _ _ step') = endOf step'
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column

@@ -76,6 +76,7 @@ data UnaryStep =
   | FilledBy ArcPosition Step
   | Fills ArcPosition Step
   | Available ArcPosition Step
+  | DurationOperator ArcPosition Operator Step
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step, parenthesised :: Boolean}
 
@@ -106,14 +107,19 @@ data Operator =
   | OrElse ArcPosition
   | BindsOp ArcPosition
   | Matches ArcPosition
+  | Year ArcPosition
+  | Month ArcPosition
+  | Week ArcPosition
+  | Day ArcPosition
+  | Hour ArcPosition
+  | Minute ArcPosition
+  | Second ArcPosition
+  | Millisecond ArcPosition
 
 derive instance genericStep :: Generic Step _
 instance showStep :: Show Step where show s = genericShow s
 instance eqStep :: Eq Step where eq = genericEq
 derive instance ordStep :: Ord Step
-
-
-
 
 instance prettyPrintStep :: PrettyPrint Step where
   prettyPrint' t (Simple s) = prettyPrint' t s
@@ -173,6 +179,7 @@ instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
   prettyPrint' t (FilledBy _ s) = "FilledBy " <> prettyPrint' t s
   prettyPrint' t (Fills _ s) = "Fills " <> prettyPrint' t s
   prettyPrint' t (Available _ s) = "Available " <> prettyPrint' t s
+  prettyPrint' t (DurationOperator _ op s) = show op <> " " <> prettyPrint' t s
 
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow
@@ -213,6 +220,15 @@ instance prettyPrintOperator :: PrettyPrint Operator where
   prettyPrint' t (OrElse _) = "OrElse"
   prettyPrint' t (BindsOp _) = "FilledBy"
   prettyPrint' t (Matches _) = "Matches"
+  prettyPrint' t (Year _) = "Year"
+  prettyPrint' t (Month _) = "Month"
+  prettyPrint' t (Week _) = "Week"
+  prettyPrint' t (Day _) = "Day"
+  prettyPrint' t (Hour _) = "Hour"
+  prettyPrint' t (Minute _) = "Minute"
+  prettyPrint' t (Second _) = "Second"
+  prettyPrint' t (Millisecond _) = "Millisecond"
+  
 
 derive instance genericComputationStep :: Generic ComputationStep _
 instance showComputationStep :: Show ComputationStep where show s = genericShow s

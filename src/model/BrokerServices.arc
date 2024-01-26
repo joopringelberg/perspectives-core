@@ -85,7 +85,9 @@ domain model://perspectives.domains#BrokerServices
       property Exchange (mandatory, String)
       -- For mycontexts this is "https://mycontexts.com/rbmq/".
       property ManagementEndpoint (mandatory, String)
-
+      -- For mycontexts this is "https://mycontexts.com/rbsr/".
+      property SelfRegisterEndpoint (mandatory, String)
+      
     user Administrator filledBy sys:PerspectivesSystem$User
       -- The credentials of Administrator for the remote RabbitMQ server.
       property AdminUserName (String)

@@ -37,7 +37,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Effect.Random (randomInt)
+import Effect.Random (randomRange)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
@@ -45,7 +45,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.Instances.ObjectGetters (context, contextType, roleType)
-import Perspectives.Instances.Values (parseInt)
+import Perspectives.Instances.Values (parseNumber)
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
@@ -73,10 +73,10 @@ genSym _ = lift $ lift createCuid
 random :: Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery Value
 random lower_ upper_ _ = ArrayT case head lower_, head upper_ of
   Just l, Just u -> do 
-    lowerBound <- try $ liftAff $ parseInt l
-    upperBound <- try $ liftAff $ parseInt u
+    lowerBound <- try $ liftAff $ parseNumber l 
+    upperBound <- try $ liftAff $ parseNumber u
     case lowerBound, upperBound of 
-      Right lower, Right upper -> (liftEffect (randomInt lower upper)) >>= pure <<< singleton <<< Value <<< show
+      Right lower, Right upper -> (liftEffect (randomRange lower upper)) >>= pure <<< singleton <<< Value <<< show
       _, _ -> pure []
   _, _ -> pure []
 
@@ -123,14 +123,14 @@ type FormatOptions = String
 formatDateTime_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
 formatDateTime_ dts locales optionss _ = ArrayT $ case head dts, head locales, head optionss of
   Just dt, Just locale, Just options -> do
-    epoch <- parseInt dt
+    epoch <- parseNumber dt
     runArrayT $ formatDateTime epoch locale options
   _, _, _ -> pure []
 
-formatDateTime :: Int -> Locale -> FormatOptions -> MonadPerspectivesQuery String
+formatDateTime :: Number -> Locale -> FormatOptions -> MonadPerspectivesQuery String
 formatDateTime dt locale options = liftEffect $ runEffectFn3 formatDateTimeImpl dt locale options
 
-foreign import formatDateTimeImpl :: EffectFn3 Int Locale FormatOptions String
+foreign import formatDateTimeImpl :: EffectFn3 Number Locale FormatOptions String
 
 data EvaluationResult = Success (Array String) | PE ParseError | PSPE MultiplePerspectivesErrors
 

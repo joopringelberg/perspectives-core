@@ -24,17 +24,19 @@ module Perspectives.Representation.Range where
 
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Show.Generic (genericShow)
-import Foreign (unsafeToForeign)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
-import Prelude (class Eq, class Ord, class Show, show, (<<<))
-import Simple.JSON (class ReadForeign, class WriteForeign)
+import Prelude (class Eq, class Ord, class Show, bind, pure, show, ($), (<$>), eq)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
+import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- RANGE
 -----------------------------------------------------------
 -- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate | PEmail | PFile
+data Range = PString | PBool | PNumber | PDate | PEmail | PFile | PDuration Duration_
 
 derive instance genericRange :: Generic Range _
 
@@ -42,10 +44,37 @@ instance eqRange :: Eq Range where eq = genericEq
 derive instance ordRange :: Ord Range
 
 instance writeForeignRange :: WriteForeign Range where
-  writeImpl = unsafeToForeign <<< show
+  writeImpl (PDuration d) = write {range: "PDuration", dtype: show d}
+  writeImpl r = write ({ range: show r, dtype: Nothing} :: { range :: String, dtype :: Maybe String})
+  -- writeImpl = unsafeToForeign <<< show
 
 instance readForeignRange :: ReadForeign Range where
-  readImpl = enumReadForeign
+  readImpl f = do
+    (d :: { range :: String, dtype :: Maybe String}) <- readImpl f
+    unsafePartial case d.range of 
+      -- "PDuration" -> PDuration $ unsafePartial $ fromJust d.dtype
+      "PDuration" -> PDuration <$> enumReadForeign (unsafeCoerce (unsafePartial $ fromJust d.dtype))
+      "PString" -> pure PString
+      "PBool" -> pure PBool
+      "PNumber" -> pure PNumber
+      "PDate" -> pure PDate
+      "PEmail" -> pure PEmail
+      "PFile" -> pure PFile
+  -- readImpl r = enumReadForeign r
 
 instance rangeShow :: Show Range where
   show = genericShow
+
+data Duration_ = Year_ | Month_ | Week_ | Day_ | Hour_ | Minute_ | Second_ | MilliSecond_
+
+derive instance Generic Duration_ _
+instance Show Duration_ where show = genericShow
+instance Eq Duration_ where eq = genericEq
+derive instance Ord Duration_
+
+isPDate :: Range -> Boolean
+isPDate r = r `eq` PDate
+
+isPDuration :: Range -> Boolean
+isPDuration (PDuration _) = true
+isPDuration _ = false

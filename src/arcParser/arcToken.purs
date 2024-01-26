@@ -98,6 +98,14 @@ perspectDef = LanguageDef
                   , "File"
                   , "file"
                   , "Email"
+                  , "year"
+                  , "month"
+                  , "week"
+                  , "day"
+                  , "hour"
+                  , "minute"
+                  , "second"
+                  , "millisecond"
 
                   -- PropertyFacets
                   , "minLength"

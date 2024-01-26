@@ -32,7 +32,7 @@ import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService)
-import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, BrokerServiceUrl, QueueName, createBinding, createUser, deleteQueue, deleteUser, runRabbitState', setPermissions, virtualHost)
+import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, BrokerServiceUrl, QueueName, createBinding, createUser, deleteQueue, deleteUser, runRabbitState', selfRegisterWithRabbitMQ_, setPermissions, virtualHost)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -69,7 +69,7 @@ prepareAMQPaccount ::
   Array AccountName -> 
   Array AccountPassword ->
   Array QueueName -> 
-  RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
+  RoleInstance ->  
   MonadPerspectivesTransaction Unit
 prepareAMQPaccount url_ adminUserName_ adminPassword_ accountName_ accountPassword_ queueName_ _ = case 
     head url_, 
@@ -90,6 +90,31 @@ prepareAMQPaccount url_ adminUserName_ adminPassword_ accountName_ accountPasswo
         Right _ -> pure unit
 
   _, _, _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount." 
+
+-- | This function calls a service on the url that registers a user with RabbitMQ, using 
+-- | Admin credentials fixed in the service's code.
+-- | The url is based on another management endpoint than that which is used in prepareAMQPaccount.
+-- | The actual service lives at 'rbsr'.
+-- | For mycontexts this is "https://mycontexts.com/rbsr/". Apache proxies this to the RabbitMQ management endpoint, 
+-- | with server admin credentials provided on starting the service on the server.
+selfRegisterWithRabbitMQ :: 
+  Array BrokerServiceUrl -> 
+  Array AccountName -> 
+  Array AccountPassword ->
+  Array QueueName -> 
+  RoleInstance ->
+  MonadPerspectivesTransaction Unit
+selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = case 
+    head url_, 
+    head accountName_, 
+    head accountPassword_, 
+    head queueName_ of
+  Just brokerServiceUrl, Just userName, Just password, Just queueName -> do
+    r <- try $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
+    case r of 
+      Left e -> logPerspectivesError $ Custom $ show e
+      Right _ -> pure unit
+  _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount." 
 
 
 -- | Creates the binding between a user identifier and a queue, so peers can push transactions
@@ -190,4 +215,5 @@ externalFunctions =
   , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5, isFunctional: True}
   , Tuple "model://perspectives.domains#RabbitMQ$SetPermissionsForAMQPaccount" {func: unsafeCoerce setPermissionsForAMQPaccount, nArgs: 5, isFunctional: True}
   , Tuple "model://perspectives.domains#RabbitMQ$StartListening" {func: unsafeCoerce startListening, nArgs: 0, isFunctional: True}
+  , Tuple "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ" {func: unsafeCoerce selfRegisterWithRabbitMQ, nArgs: 4, isFunctional: True}
   ]

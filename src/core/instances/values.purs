@@ -20,7 +20,28 @@
 
 -- END LICENSE
 
-module Perspectives.Instances.Values where
+module Perspectives.Instances.Values
+  ( MIME
+  , PerspectivesFile
+  , bool2Value
+  , date2Value
+  , decodeDate
+  , defaultDateTime
+  , number2Value
+  , parseBool
+  , parseDate
+  , parseNumber
+  , parseNumber__
+  , parsePerspectivesFile
+  , value2Bool
+  , value2Bool'
+  , value2Date
+  , value2Date'
+  , value2Number
+  , value2Number'
+  , writePerspectivesFile
+  )
+  where
 
 
 -- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
@@ -40,7 +61,7 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Exception (Error, error, try)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import Effect.Unsafe (unsafePerformEffect)
-import Foreign (ForeignError, MultipleErrors, readInt, unsafeToForeign)
+import Foreign (ForeignError, MultipleErrors, readNumber, unsafeToForeign)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType)
@@ -66,16 +87,16 @@ decodeDate s =
     Left e -> throwError $ error "Not a date"
     Right (SerializableDateTime dt) -> pure dt
 
-foreign import parseInt__ :: EffectFn1 String Int
+foreign import parseNumber__ :: EffectFn1 String Number
 
-parseInt_ :: String -> Effect Int
-parseInt_ = runEffectFn1 parseInt__
+parseNumber_ :: String -> Effect Number
+parseNumber_ = runEffectFn1 parseNumber__
 
-parseInt :: forall m. MonadError Error m => MonadEffect m => String -> m Int
-parseInt s = do
-  r <- liftEffect $ try (parseInt_ s)
+parseNumber :: forall m. MonadError Error m => MonadEffect m => String -> m Number
+parseNumber s = do
+  r <- liftEffect $ try (parseNumber_ s)
   case r of
-    Left e -> throwError (error $ "Cannot parse an integer from '" <> s <> "' (" <> show e <> ")")
+    Left e -> throwError (error $ "Cannot parse a number from '" <> s <> "' (" <> show e <> ")")
     Right i -> pure i
 
 parseBool :: forall m. MonadError Error m => MonadEffect m => String -> m Boolean
@@ -86,18 +107,18 @@ parseBool s = throwError (error $ "Cannot parse a bool from '" <> s <> "'.")
 -------------------------------------------------------------------------------
 -- VALUE TO VARIOUS TYPES
 -------------------------------------------------------------------------------
-value2Int' :: Value -> Either Error Int
-value2Int' (Value is) = either
+value2Number' :: Value -> Either Error Number
+value2Number' (Value is) = either
   (Left <<< error <<< show)
   Right 
-  ((runExcept $ readInt $ unsafeToForeign is) :: Either (NonEmptyList ForeignError) Int)
+  ((runExcept $ readNumber $ unsafeToForeign is) :: Either (NonEmptyList ForeignError) Number)
 
 -- | An UNSAFE operation!
-value2Int :: Value -> Int
-value2Int (Value is) = unsafePerformEffect $ parseInt_ is
+value2Number :: Value -> Number
+value2Number (Value is) = unsafePerformEffect $ parseNumber_ is
 
-int2Value :: Int -> Value
-int2Value = Value <<< show
+number2Value :: Number -> Value
+number2Value = Value <<< show
 
 value2Bool' :: Value -> Either Error Boolean
 value2Bool' (Value "true") = Right true
