@@ -64,8 +64,8 @@ import Perspectives.Parsing.Arc.Position (arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..))
-import Perspectives.Query.UnsafeCompiler (lookup, mapNumericOperator, orderFunction, performNumericOperation')
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2PropertyRange, range)
+import Perspectives.Query.UnsafeCompiler (lookup, mapDurationOperator, mapNumericOperator, orderFunction, performNumericOperation')
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
@@ -75,10 +75,10 @@ import Perspectives.Representation.Class.Property (getPropertyType)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.Range (Range(..), isPDate, isPDuration)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', propertyAliases, roleTypeModelName', specialisesRoleType)
-import Prelude (bind, discard, flip, pure, show, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), notEq, (&&), (||), (<#>), (<=), (+))
+import Prelude (bind, discard, eq, flip, notEq, pure, show, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a
@@ -266,18 +266,45 @@ interpretBQD (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g
   (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
   fr2 <- runArrayT (interpret f1 a)
   case head fr1, head fr2 of
-    Just fr1h, Just fr2h -> do
-      (result :: Array String) <- (performNumericOperation'
-        g
-        ran
-        (unsafePartial mapNumericOperator g ran)
-        [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
-        [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
-        )
-      pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
-        , mainPath: Nothing
-        , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
-        }]
+    Just fr1h, Just fr2h -> if range f1 `eq` range f2
+      then do
+        (result :: Array String) <- (performNumericOperation'
+          g
+          ran
+          (unsafePartial mapNumericOperator g ran)
+          [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+          [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+          )
+        pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+          , mainPath: Nothing
+          , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+          }]
+      else if isPDate (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
+        then do 
+          (result :: Array String) <- (performNumericOperation'
+            g
+            ran
+            (unsafePartial mapDurationOperator g (range f2))
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+            )
+          pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+            , mainPath: Nothing
+            , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+            }]
+        else do 
+          (result :: Array String) <- (performNumericOperation'
+            g
+            ran
+            (unsafePartial mapDurationOperator g (range f1))
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+            )
+          pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+            , mainPath: Nothing
+            , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+            }]
+
     _, _ -> pure []
   
 interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = ArrayT

@@ -295,22 +295,22 @@ operator =
 
 durationOperator :: Partial => IP Operator
 durationOperator =
-  ((Year <$> (getPosition <* reserved "year"))
+  ((Year <$> (getPosition <* (reserved "year" <|> reserved "years")))
   <|>
-  (Month <$> (getPosition <* reserved "month"))
+  (Month <$> (getPosition <* (reserved "month" <|> reserved "months")))
   <|>
-  (Week <$> (getPosition <* reserved "week"))
+  (Week <$> (getPosition <* (reserved "week" <|> reserved "weeks")))
   <|>
-  (Day <$> (getPosition <* reserved "day"))
+  (Day <$> (getPosition <* (reserved "day" <|> reserved "days")))
   <|>
-  (Hour <$> (getPosition <* reserved "hour"))
+  (Hour <$> (getPosition <* (reserved "hour" <|> reserved "hours")))
   <|>
-  (Minute <$> (getPosition <* reserved "minute"))
+  (Minute <$> (getPosition <* (reserved "minute" <|> reserved "minutes")))
   <|>
-  (Second <$> (getPosition <* reserved "second"))
+  (Second <$> (getPosition <* (reserved "second" <|> reserved "seconds")))
   <|>
-  (Millisecond <$> (getPosition <* reserved "millisecond"))
-  ) <?> "year, month, week, day, hour, minute, second, second, millisecond"
+  (Millisecond <$> (getPosition <* (reserved "millisecond" <|> reserved "milliseconds"))))
+  <?> "year(s), month(s), week(s), day(s), hour(s), minute(s), second(s), second(s), millisecond(s)"
 
 operatorPrecedence :: Operator -> Int
 operatorPrecedence (Year _) = 10

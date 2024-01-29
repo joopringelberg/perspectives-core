@@ -48,7 +48,8 @@ domain model://joopringelberg.nl#TestDuration
       aspect sys:RootContext$External
       property Today = callExternal sensor:ReadSensor("clock", "now") returns DateTime
       property Tomorrow = Today + 1 day
+      property DayAfterTomorrow = Today + 2 days
     
     user Manager = sys:Me
       perspective on extern
-        props (Today, Tomorrow) verbs (Consult)
+        props (Today, Tomorrow, DayAfterTomorrow) verbs (Consult)

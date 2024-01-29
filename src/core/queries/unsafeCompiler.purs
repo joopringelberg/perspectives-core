@@ -72,13 +72,13 @@ import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.Range (Duration_(..), isPDate, isPDuration)
 import Perspectives.Representation.Range (Range(..)) as RAN
-import Perspectives.Representation.Range (isPDate, isPDuration)
 import Perspectives.Representation.State (State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, bind, const, discard, eq, flip, identity, notEq, pure, show, ($), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||), (&&), negate)
+import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -380,9 +380,10 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex 
   if range f1 `eq` range f2
     then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
     -- Otherwise we know one of the ranges is a PDate and the other is a PDuration and the function is AddF or SubtractF.
-    else if isPDate (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f1)
-      then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
-      else pure $ performNumericOperation g ran f2' f1' (unsafePartial $ mapNumericOperator g ran)
+    -- TODO: introduce a multiplier for the duration based on its subtype.
+    else if isPDate (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
+      then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapDurationOperator g (range f2))
+      else pure $ performNumericOperation g ran f2' f1' (unsafePartial $ mapDurationOperator g (range f1))
 
 compileFunction (UQD _ (BindVariable varName) f1 _ _ _) = do
   f1' <- compileFunction f1
@@ -666,13 +667,44 @@ mapNumericOperator DivideF (VDOM (RAN.PDuration duration) _) = wrapNumericOperat
 mapNumericOperator MultiplyF (VDOM RAN.PNumber _) = wrapNumericOperator (*)
 mapNumericOperator MultiplyF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (/)
 
+-- Notice that the the compiler has made sure that the first operand is a PDate while the second is a PDuration.
+-- Furthermore, we can only add or subtract durations.
+mapDurationOperator_ :: Partial => (Number -> Number -> Number) -> Domain -> (String -> String ~~> String)
+mapDurationOperator_ op (VDOM (RAN.PDuration duration) _) = case duration of 
+  Year_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerYear) <$> (parseNumber q)))
+  Month_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerMonth) <$> (parseNumber q)))
+  Week_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerWeek) <$> (parseNumber q)))
+  Day_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerDay) <$> (parseNumber q)))
+  Hour_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerHour) <$> (parseNumber q)))
+  Minute_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerMinute) <$> (parseNumber q)))
+  Second_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul 1000.0) <$> (parseNumber q)))
+  MilliSecond_ -> \p q -> show <$> (op <$> (parseNumber p) <*> (parseNumber q))
+
+mapDurationOperator :: Partial => FunctionName -> Domain -> (String -> String ~~> String)
+mapDurationOperator AddF = mapDurationOperator_ add
+mapDurationOperator SubtractF = mapDurationOperator_ sub
+
+millisecondsPerMinute :: Number
+millisecondsPerMinute = 60000.0
+millisecondsPerHour :: Number
+millisecondsPerHour = 60.0 * millisecondsPerMinute
+millisecondsPerDay :: Number
+millisecondsPerDay = 24.0 * millisecondsPerHour
+millisecondsPerWeek :: Number
+millisecondsPerWeek = 7.0 * millisecondsPerDay
+-- NOTE: this is an approximation!
+millisecondsPerMonth :: Number
+millisecondsPerMonth = 365.0 / 12.0 * millisecondsPerDay
+millisecondsPerYear :: Number
+millisecondsPerYear = 365.0 * millisecondsPerDay
+
 wrapNumericOperator :: (Number -> Number -> Number) -> (String -> String ~~> String)
--- wrapNumericOperator g p q = show <$> (g <$> (parseNumber p) <*> (parseNumber q))
-wrapNumericOperator g p q = do
-  q' <- parseNumber q
-  p' <- parseNumber p
-  r <- pure $ g p' q'
-  pure $ show r
+wrapNumericOperator g p q = show <$> (g <$> (parseNumber p) <*> (parseNumber q))
+-- wrapNumericOperator g p q = do
+--   q' <- parseNumber q
+--   p' <- parseNumber p
+--   r <- pure $ g p' q'
+--   pure $ show r
 
 ---------------------------------------------------------------------------------------------------
 -- CONSTRUCT ROLE- AND PROPERTYVALUE GETTERS
