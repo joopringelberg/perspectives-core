@@ -45,6 +45,19 @@ instance containsPrefixesStep :: ContainsPrefixes Step where
 
 instance containsPrefixesSimpleStep :: ContainsPrefixes SimpleStep where
   expandPrefix (ArcIdentifier pos s) = ArcIdentifier pos <$> expandNamespace s
+  expandPrefix (ContextTypeIndividual pos s) = ContextTypeIndividual pos <$> expandNamespace s
+  expandPrefix (RoleTypeIndividual pos s) = RoleTypeIndividual pos <$> expandNamespace s
+  expandPrefix (Filler pos mcontext) = Filler pos <$> (traverse expandNamespace mcontext)
+  expandPrefix (Filled pos s mcontext) = Filled pos <$> expandNamespace s <*> (traverse expandNamespace mcontext)
+  expandPrefix (SpecialisesRoleType pos s) = SpecialisesRoleType pos <$> expandNamespace s
+  expandPrefix (IsInState pos s) = IsInState pos <$> expandNamespace s
+  expandPrefix (PublicRole pos s) = PublicRole pos <$> expandNamespace s
+  expandPrefix (PublicContext pos s) = PublicContext pos <$> expandNamespace s
+  expandPrefix (TypeTimeOnlyContext pos s) = TypeTimeOnlyContext pos <$> expandNamespace s
+  expandPrefix (TypeTimeOnlyEnumeratedRole pos s1 s2) = TypeTimeOnlyEnumeratedRole pos <$> expandNamespace s1 <*> expandNamespace s2
+  expandPrefix (TypeTimeOnlyCalculatedRole pos s) = TypeTimeOnlyCalculatedRole pos <$> expandNamespace s
+  
+
   expandPrefix x = pure x
 
 instance containsPrefixesVarBinding :: ContainsPrefixes VarBinding where
