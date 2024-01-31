@@ -2,6 +2,7 @@ domain model://joopringelberg.nl#TestDuration
   use sys for model://perspectives.domains#System
   use td for model://joopringelberg.nl#TestDuration
   use sensor for model://perspectives.domains#Sensor
+  use util for model://perspectives.domains#Utilities
 
   -------------------------------------------------------------------------------
   ---- SETTING UP
@@ -44,12 +45,22 @@ domain model://joopringelberg.nl#TestDuration
   case TestDurationApp
     indexed td:MyTestDurationApp
     aspect sys:RootContext
+    aspect sys:ContextWithNotification
     external
       aspect sys:RootContext$External
+      property ExtraDays (Day)
       property Today = callExternal sensor:ReadSensor("clock", "now") returns DateTime
       property Tomorrow = Today + 1 day
-      property DayAfterTomorrow = Today + 2 days
+      property EndDate = Today + ExtraDays
+      property EndTime (Time)
+      property SystemCurrentHour (functional) = binder sys:PerspectivesSystem$IndexedContexts >> context >> extern >> CurrentHour
+
+      state Expired = SystemCurrentHour >= EndTime
+        on entry
+          notify Manager
+            "The time is now past { callExternal util:FormatDateTime( EndTime, "nl-NL", "{\"timeStyle\": \"short\"}" ) returns String }"
     
     user Manager = sys:Me
       perspective on extern
-        props (Today, Tomorrow, DayAfterTomorrow) verbs (Consult)
+        props (ExtraDays, EndTime) verbs (SetPropertyValue)
+        props (Today, Tomorrow, EndDate) verbs (Consult)

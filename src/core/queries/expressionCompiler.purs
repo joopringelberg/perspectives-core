@@ -69,7 +69,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
-import Perspectives.Representation.Range (Duration_(..), Range(..), isPDate, isPDuration)
+import Perspectives.Representation.Range (Duration_(..), Range(..), isDate, isPDuration, isPMonth, isTime, isTimeDuration)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued, pessimistic)
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
@@ -673,11 +673,31 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         LogicalAnd pos -> binOp pos f1 f2 [PBool] AndF
         LogicalOr pos -> binOp pos f1 f2 [PBool] OrF
         -- Possibly allow PBool
-        Add pos -> binOp pos f1 f2 [PNumber, PString, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] AddF
-        Subtract pos -> binOp pos f1 f2 [PNumber, PString, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] SubtractF
-        Divide pos -> binOp pos f1 f2 [PNumber, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] DivideF
+        Add pos -> binOp pos f1 f2 
+          [ PNumber
+          , PString
+          , PDuration Year_
+          , PDuration Month_
+          , PDuration Week_
+          , PDuration Day_
+          , PDuration Hour_
+          , PDuration Minute_
+          , PDuration Second_
+          , PDuration MilliSecond_] AddF
+        Subtract pos -> binOp pos f1 f2 
+          [ PNumber
+          , PString
+          , PDuration Year_
+          , PDuration Month_
+          , PDuration Week_
+          , PDuration Day_
+          , PDuration Hour_
+          , PDuration Minute_
+          , PDuration Second_
+          , PDuration MilliSecond_] SubtractF
+        Divide pos -> binOp pos f1 f2 [ PNumber ] DivideF
         -- Possibly allow PBool
-        Multiply pos -> binOp pos f1 f2 [PNumber, PDuration Year_, PDuration Month_, PDuration Week_, PDuration Day_, PDuration Hour_, PDuration Minute_, PDuration Second_, PDuration MilliSecond_] MultiplyF
+        Multiply pos -> binOp pos f1 f2 [ PNumber ] MultiplyF
 
         Compose _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Compose"
         Filter _ -> throwError $ Custom "This case in compileBinaryStep should never be reached: Filter"
@@ -740,19 +760,23 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
-    binOp pos left' right' allowedRangeConstructors functionName = case range left', range right' of
-      d1@(VDOM rc1 _), (VDOM rc2 _) | (isPDate rc1 && isPDuration rc2 || isPDate rc2 && isPDuration rc1) && (functionName == AddF || functionName == SubtractF) -> 
-        if (pessimistic $ functional left') && (pessimistic $ functional right')
-          then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
-          else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
-      -- Both ranges must be equal, both sides must be functional.
-      d1@(VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
-        if  allowed rc1 && allowed rc2
-          then if (pessimistic $ functional left') && (pessimistic $ functional right')
+    binOp pos left' right' allowedRangeConstructors functionName = if (pessimistic $ functional left') && (pessimistic $ functional right')
+      then case range left', range right' of
+        -- In calling binOp we have made sure that if one operand is a Duration, the functions are either AddF or SubtractF
+        -- Notice that only in runtime we make sure that the duration is subtracted from the time, by switching arguments.
+        d1@(VDOM rc1 _), (VDOM rc2 _) | (isDate rc1 && isPDuration rc2 || isPDuration rc1 && isDate rc2) -> 
+          if isPMonth rc1 || isPMonth rc2
+            then throwError $ NoMonths pos
+            else pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
+        d1@(VDOM rc1 _), (VDOM rc2 _) | (isTime rc1 && isTimeDuration rc2 || isTimeDuration rc2 && isTime rc1) -> 
+          pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
+        -- Both ranges must be equal, both sides must be functional.
+        d1@(VDOM rc1 _), (VDOM rc2 _) | rc1 == rc2 ->
+          if allowed rc1 && allowed rc2
             then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM rc1 Nothing) (isFunctionalFunction functionName) True
-            else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
-          else throwError $ WrongTypeForOperator pos allowedRangeConstructors d1
-      l, r -> throwError $ TypesCannotBeCompared pos l r
+            else throwError $ WrongTypeForOperator pos allowedRangeConstructors d1
+        l, r -> throwError $ TypesCannotBeCompared pos l r
+      else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
       where
         allowed :: Range -> Boolean
         allowed r = isJust $ elemIndex r allowedRangeConstructors

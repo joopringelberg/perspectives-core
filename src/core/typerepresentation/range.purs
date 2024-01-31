@@ -28,7 +28,7 @@ import Data.Maybe (Maybe(..), fromJust)
 import Data.Show.Generic (genericShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
-import Prelude (class Eq, class Ord, class Show, bind, pure, show, ($), (<$>), eq)
+import Prelude (class Eq, class Ord, class Show, bind, pure, show, ($), (<$>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -36,7 +36,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- RANGE
 -----------------------------------------------------------
 -- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate | PEmail | PFile | PDuration Duration_
+data Range = PString | PBool | PNumber | PDate | PDateTime | PTime | PEmail | PFile | PDuration Duration_
 
 derive instance genericRange :: Generic Range _
 
@@ -58,6 +58,8 @@ instance readForeignRange :: ReadForeign Range where
       "PBool" -> pure PBool
       "PNumber" -> pure PNumber
       "PDate" -> pure PDate
+      "PDateTime" -> pure PDateTime
+      "PTime" -> pure PTime
       "PEmail" -> pure PEmail
       "PFile" -> pure PFile
   -- readImpl r = enumReadForeign r
@@ -72,9 +74,42 @@ instance Show Duration_ where show = genericShow
 instance Eq Duration_ where eq = genericEq
 derive instance Ord Duration_
 
-isPDate :: Range -> Boolean
-isPDate r = r `eq` PDate
+isDateOrTime :: Range -> Boolean
+isDateOrTime r = case r of 
+  PDateTime -> true
+  PDate -> true
+  PTime -> true
+  _ -> false
+
+isDate :: Range -> Boolean
+isDate r = case r of 
+  PDateTime -> true
+  PDate -> true
+  _ -> false
+
+isTime :: Range -> Boolean
+isTime r = case r of 
+  PTime -> true
+  _ -> false
 
 isPDuration :: Range -> Boolean
 isPDuration (PDuration _) = true
 isPDuration _ = false
+
+isPMonth :: Range -> Boolean
+isPMonth (PDuration Month_) = true
+isPMonth _ = false
+
+isTimeDuration :: Range -> Boolean
+isTimeDuration (PDuration Hour_) = true
+isTimeDuration (PDuration Minute_) = true
+isTimeDuration (PDuration Second_) = true
+isTimeDuration (PDuration MilliSecond_) = true
+isTimeDuration _ = false
+
+isDateDuration :: Range -> Boolean
+isDateDuration (PDuration Year_) = true
+isDateDuration (PDuration Month_) = true
+isDateDuration (PDuration Week_) = true
+isDateDuration (PDuration Day_) = true
+isDateDuration _ = false

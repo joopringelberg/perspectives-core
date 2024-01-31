@@ -120,6 +120,7 @@ type Locale = String
 -- | E.g. {weekday: "long", year: "numeric", month: "long", day: "numeric"}. See: https://tc39.es/ecma402/#sec-createdatetimeformat.
 type FormatOptions = String
 
+-- | The timeZone is always UTC. This is in line with the time values that we obtain from the SmartFieldControl.
 formatDateTime_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
 formatDateTime_ dts locales optionss _ = ArrayT $ case head dts, head locales, head optionss of
   Just dt, Just locale, Just options -> do

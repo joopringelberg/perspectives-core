@@ -71,6 +71,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -----------------------------------------------------------
 -- | Runs an update function (a function in MonadPerspectivesTransaction that produces deltas),
 -- | runs actions as long as they are triggered, sends deltas to other participants and re-runs active queries
+-- | Create a Transaction with the role in TheWorld that fills SocialEnvironment$Me (which in turn fills PerspectivesSystem$User).
 runMonadPerspectivesTransaction :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
@@ -83,6 +84,7 @@ shareWithPeers = true
 doNotShareWithPeers :: Boolean
 doNotShareWithPeers = false
 
+-- | Create a Transaction with the role in TheWorld that fills SocialEnvironment$Me (which in turn fills PerspectivesSystem$User).
 runMonadPerspectivesTransaction' :: forall o.
   Boolean ->
   RoleType ->

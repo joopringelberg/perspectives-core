@@ -1,6 +1,9 @@
 exports.formatDateTimeImpl = function( epoch, locale, options)
 {
-  return new Intl.DateTimeFormat(locale, JSON.parse(options)).format( new Date( epoch ) );
+  const opts = JSON.parse(options);
+  // opts.timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  opts.timeZone = "UTC"
+  return new Intl.DateTimeFormat(locale, opts).format( new Date( epoch ) );
 }
 
 exports.pdrVersion = __PDRVersion__;

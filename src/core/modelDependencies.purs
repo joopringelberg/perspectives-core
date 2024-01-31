@@ -62,6 +62,12 @@ modelToRemove = "model://perspectives.domains#System$PerspectivesSystem$ModelsIn
 connectedToAMQPBroker :: String
 connectedToAMQPBroker = "model://perspectives.domains#System$PerspectivesSystem$External$ConnectedToAMQPBroker"
 
+currentSystemHour :: String
+currentSystemHour = "model://perspectives.domains#System$PerspectivesSystem$External$CurrentHour"
+
+currentSystemDate :: String
+currentSystemDate = "model://perspectives.domains#System$PerspectivesSystem$External$CurrentDate"
+
 userChannel :: String
 userChannel = "model://perspectives.domains#System$PerspectivesSystem$User$Channel"
 

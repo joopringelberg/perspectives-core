@@ -35,7 +35,6 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT)
 import Control.Plus (empty)
 import Data.Array (catMaybes, elemIndex, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
-import Data.DateTime (DateTime)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), lastIndexOf, stripSuffix, length) as STRING
@@ -55,7 +54,7 @@ import Perspectives.Instances.Combinators (available_, exists, filter, logicalAn
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
-import Perspectives.Instances.Values (decodeDate, parseBool, parseNumber)
+import Perspectives.Instances.Values (parseBool, parseNumber)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
@@ -72,10 +71,11 @@ import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.Range (Duration_(..), isPDate, isPDuration)
+import Perspectives.Representation.Range (Duration_(..), isDateOrTime, isPDuration)
 import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.State (State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
+import Perspectives.Time (string2Date, string2DateTime, string2Time)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||))
@@ -380,8 +380,7 @@ compileFunction (BQD _ (BinaryCombinator g) f1 f2 ran _ _) | isJust $ elemIndex 
   if range f1 `eq` range f2
     then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapNumericOperator g ran)
     -- Otherwise we know one of the ranges is a PDate and the other is a PDuration and the function is AddF or SubtractF.
-    -- TODO: introduce a multiplier for the duration based on its subtype.
-    else if isPDate (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
+    else if isDateOrTime (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
       then pure $ performNumericOperation g ran f1' f2' (unsafePartial $ mapDurationOperator g (range f2))
       else pure $ performNumericOperation g ran f2' f1' (unsafePartial $ mapDurationOperator g (range f1))
 
@@ -558,42 +557,22 @@ order (VDOM ran _) a b f c = ArrayT do
   bs <- runArrayT $ b c
   case head as, head bs of
     Just a', Just b' -> case ran of
-      RAN.PString -> pure [show $ fString a' b']
-      
-      RAN.PNumber -> singleton <<< show <$> (fInt <$> (parseNumber a') <*> (parseNumber b'))
-      RAN.PBool ->  singleton <<< show <$> (fBool <$> parseBool a' <*> parseBool b')
-      RAN.PDate -> singleton <<< show <$> (fDate <$> (decodeDate a') <*> decodeDate b')
+      RAN.PString -> pure [show $ compareFun a' b']      
+      RAN.PNumber -> singleton <<< show <$> (compareFun <$> (parseNumber a') <*> (parseNumber b'))
+      RAN.PBool ->  singleton <<< show <$> (compareFun <$> parseBool a' <*> parseBool b')
+      RAN.PDate -> singleton <<< show <$> (compareFun <$> (string2Date a') <*> string2Date b')
+      RAN.PTime ->  singleton <<< show <$> (compareFun <$> (string2Time a') <*> string2Time b')
+      RAN.PDateTime ->  singleton <<< show <$> (compareFun <$> (string2DateTime a') <*> string2DateTime b')
       -- Compare email addresses as strings.
-      RAN.PEmail -> pure [show $ fString a' b']
-      RAN.PFile -> pure [show $ fString a' b']
-      -- Compare durations as integers. NOTE that we can only compare exactly equal Duration_ s!
+      RAN.PEmail -> pure [show $ compareFun a' b']
+      RAN.PFile -> pure [show $ compareFun a' b']
+      -- Compare durations as Numbers. NOTE that we can only compare exactly equal Duration_ s!
       -- E.g. Days with Days, but not Days with Minutes.
-      RAN.PDuration _ -> singleton <<< show <$> (fInt <$> (parseNumber a') <*> (parseNumber b'))
+      RAN.PDuration _ -> singleton <<< show <$> (compareFun <$> (parseNumber a') <*> (parseNumber b'))
     _, _ -> pure []
   where
-    fString :: String -> String -> Boolean
-    fString = unsafePartial case f of
-      LessThanF -> (<)
-      LessThanEqualF -> (<=)
-      GreaterThanF -> (>)
-      GreaterThanEqualF -> (>=)
-
-    fInt :: Number -> Number -> Boolean
-    fInt = unsafePartial case f of
-      LessThanF -> (<)
-      LessThanEqualF -> (<=)
-      GreaterThanF -> (>)
-      GreaterThanEqualF -> (>=)
-
-    fBool :: Boolean -> Boolean -> Boolean
-    fBool = unsafePartial case f of
-      LessThanF -> (<)
-      LessThanEqualF -> (<=)
-      GreaterThanF -> (>)
-      GreaterThanEqualF -> (>=)
-
-    fDate :: DateTime -> DateTime -> Boolean
-    fDate = unsafePartial case f of
+    compareFun :: forall a. Ord a => a -> a -> Boolean
+    compareFun = unsafePartial case f of
       LessThanF -> (<)
       LessThanEqualF -> (<=)
       GreaterThanF -> (>)
@@ -655,24 +634,39 @@ mapNumericOperator :: Partial => FunctionName -> Domain -> (String -> String ~~>
 mapNumericOperator AddF (VDOM RAN.PNumber _) = wrapNumericOperator (+)
 mapNumericOperator AddF (VDOM RAN.PString _) = \s1 s2 -> pure (s1 <> s2)
 mapNumericOperator AddF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (+)
+
+-- TODO: vervang wrapNumericOperator door iets dat werkt op de respectievelijke tijd representaties.
 mapNumericOperator AddF (VDOM RAN.PDate _) = wrapNumericOperator (+)
+mapNumericOperator AddF (VDOM RAN.PTime _) = wrapNumericOperator (+)
+mapNumericOperator AddF (VDOM RAN.PDateTime _) = wrapNumericOperator (+)
+
 mapNumericOperator SubtractF (VDOM RAN.PNumber _) = wrapNumericOperator (-)
 mapNumericOperator SubtractF (VDOM RAN.PString _) = \s1 s2 -> case (STRING.Pattern s1) `STRING.stripSuffix` s2 of
   Nothing -> pure s1
   Just r -> pure r
 mapNumericOperator SubtractF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (-)
+
+-- TODO: vervang wrapNumericOperator door iets dat werkt op de respectievelijke tijd representaties.
 mapNumericOperator SubtractF (VDOM RAN.PDate _) = wrapNumericOperator (-)
+mapNumericOperator SubtractF (VDOM RAN.PTime _) = wrapNumericOperator (-)
+mapNumericOperator SubtractF (VDOM RAN.PDateTime _) = wrapNumericOperator (-)
+
 mapNumericOperator DivideF (VDOM RAN.PNumber _) = wrapNumericOperator (/)
 mapNumericOperator DivideF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (/)
 mapNumericOperator MultiplyF (VDOM RAN.PNumber _) = wrapNumericOperator (*)
 mapNumericOperator MultiplyF (VDOM (RAN.PDuration duration) _) = wrapNumericOperator (/)
 
--- Notice that the the compiler has made sure that the first operand is a PDate while the second is a PDuration.
+-- Notice that the the compiler has made sure that the first operand is a PDateTime, PDate or Ptime while the second is a PDuration.
 -- Furthermore, we can only add or subtract durations.
+-- PDate and PDateTime are represented as Instants.
+-- PTime is represented as milliseconds.
+-- In all cases, we can just add or subtract the duration representation from the time or date representation.
+-- Note that we might convert to DateTime, Date and Time and then adjust with a Duration and finally convert back to string via instant and milliseconds.
+-- But this implementation in terms of milliseconds is ok as well.
+-- NOTICE that we do not allow a Month duration.
 mapDurationOperator_ :: Partial => (Number -> Number -> Number) -> Domain -> (String -> String ~~> String)
 mapDurationOperator_ op (VDOM (RAN.PDuration duration) _) = case duration of 
   Year_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerYear) <$> (parseNumber q)))
-  Month_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerMonth) <$> (parseNumber q)))
   Week_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerWeek) <$> (parseNumber q)))
   Day_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerDay) <$> (parseNumber q)))
   Hour_ -> \p q -> show <$> (op <$> (parseNumber p) <*> ((mul millisecondsPerHour) <$> (parseNumber q)))

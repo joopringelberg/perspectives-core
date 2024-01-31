@@ -108,6 +108,7 @@ data PerspectivesError
     | FillerRestrictionNotAnAspectSubtype ArcPosition ArcPosition String String
     | RecursiveDefinition String
     | ExpressionsShouldBeFunctional Boolean Boolean ArcPosition
+    | NoMonths ArcPosition
 
     | UnauthorizedForProperty String RoleType RoleType PropertyType PropertyVerb
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb)
@@ -201,6 +202,7 @@ instance showPerspectivesError :: Show PerspectivesError where
     where 
       showCardinality :: Boolean -> String 
       showCardinality b = if b then "functional" else "relational"
+  show (NoMonths pos) = "(NoMonths) It is not allowed to subtract months from or add to a date. Try days or weeks instead."
   show (UnauthorizedForProperty author userRole role property verb) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> "."
   show (UnauthorizedForRole author userRole role verbs) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType

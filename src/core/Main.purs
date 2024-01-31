@@ -75,6 +75,7 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (reSetupUser, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
+import Perspectives.SystemClocks (forkedSystemClocks)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read)
 import Unsafe.Coerce (unsafeCoerce)
@@ -150,6 +151,10 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
         catchError (joinFiber postFiber)
           \e -> do
             logPerspectivesError $ Custom $ "Stopped handling incoming post because of: " <> show e
+
+      -- Fork aff to run the system clocks. Should not be started before we have added the private key to state!
+      void $ forkAff $ forkedSystemClocks state
+
   where
     run :: AVar PerspectivesState -> Aff Unit
     run state = catchError 

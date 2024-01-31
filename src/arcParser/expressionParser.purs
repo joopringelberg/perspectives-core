@@ -25,11 +25,12 @@ module Perspectives.Parsing.Arc.Expression where
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
 import Data.Array (elemIndex, fromFoldable, many)
-import Data.DateTime (DateTime)
+import Data.DateTime (Date, DateTime(..), Hour, Time(..))
 import Data.Either (Either(..))
+import Data.Enum (toEnum)
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.List (List(..))
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.String (length)
 import Data.String.CodeUnits as SCU
 import Data.String.Regex (parseFlags, regex)
@@ -43,7 +44,8 @@ import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Range(..))
-import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>))
+import Perspectives.Time (date2String, dateTime2String, time2String)
+import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>), eq)
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, lookAhead, manyTill, option, optionMaybe, try, (<?>))
 import Text.Parsing.Parser.String (char)
@@ -157,7 +159,11 @@ simpleStep' =
   <|>
   Simple <$> (IndexedName <$> (getPosition <* reserved "indexedName"))
   <|>
-  Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< show))
+  Simple <$> (Value <$> getPosition <*> pure PDateTime <*> (parseDateTime >>= pure <<< dateTime2String))
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PDate <*> (parseDate >>= pure <<< date2String))
+  <|>
+  Simple <$> (Value <$> getPosition <*> pure PTime <*> (parseTime >>= pure <<< time2String))
   <|>
   Simple <$> (Value <$> getPosition <*> pure PString <*> token.stringLiteral)
   <|>
@@ -219,14 +225,36 @@ propertyRange = (reserved "Boolean" *> (pure "Boolean")
   <|> reserved "String" *> (pure "String")
   <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime, "
 
--- | Parse a date. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
+-- | Parse a time. Succeeds if the Time component of parseDateTime is empty.
+parseDate :: IP Date
+parseDate = do
+  (DateTime date time) <- parseDateTime
+  if time `eq` Time (unsafePartial fromJust (toEnum 0) :: Hour) (unsafePartial fromJust $ toEnum 0) (unsafePartial fromJust $ toEnum 0) (unsafePartial fromJust $ toEnum 0)
+    then pure date
+    else fail "a date without a time component."
+
+-- | Only supports the "hh:mm:ss" and "hh:mm:ss.sss" format. See https://tc39.es/ecma262/multipage/numbers-and-dates.html#sec-date-time-string-format.
+parseTime :: IP Time
+parseTime = between (char '\'') (char '\'' <?> "end of string. ") do
+  hh <- token.integer
+  _ <- token.colon
+  mm <- token.integer
+  _ <- token.colon
+  ss <- token.integer
+  _ <- token.dot
+  sss <- option 0 token.integer
+  case (toEnum hh), (toEnum mm), (toEnum ss), (toEnum sss) of
+    Just hh', Just mm', Just ss', Just sss' -> pure $ Time hh' mm' ss' sss'
+    _, _, _, _ -> fail "a time string like hh:mm:ss or hh:mm:ss.sss"
+
+-- | Parse a date-time combination. See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse#Date_Time_String_Format for the supported string format of the date.
 -- | Summary: the type must conform to YYYY-MM-DDTHH:mm:ss.sssZ, but time may be left out.
-parseDate :: IP DateTime
-parseDate = try do
+parseDateTime :: IP DateTime
+parseDateTime = try do
   s <- dateTimeLiteral
   (d :: JSDate) <- pure $ unsafePerformEffect $ parse s
   case toDateTime d of
-    Nothing -> fail "Not a date, "
+    Nothing -> fail "a date-time combination like YYYY-MM-DDTHH:mm:ss.sssZ."
     (Just (dt :: DateTime)) -> pure dt
 
 parseJSDate :: IP JSDate
