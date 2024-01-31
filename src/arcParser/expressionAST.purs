@@ -82,7 +82,21 @@ newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, opera
 
 newtype PureLetStep = PureLetStep {start :: ArcPosition, end :: ArcPosition, bindings:: Array VarBinding, body :: Step}
 
-newtype ComputationStep = ComputationStep {functionName :: String, arguments :: Array Step, computedType :: String, start :: ArcPosition, end :: ArcPosition}
+newtype ComputationStep = ComputationStep {functionName :: String, arguments :: Array Step, computedType :: ComputedType, start :: ArcPosition, end :: ArcPosition}
+
+data ComputedType = ComputedRange Range | OtherType String
+instance Show ComputedType where
+  show (ComputedRange r) = show r
+  show (OtherType s) = s
+
+instance Eq ComputedType where
+  eq (ComputedRange r1) (ComputedRange r2) = eq r1 r2
+  eq (OtherType s1) (OtherType s2) = eq s1 s2
+  eq _ _ = false
+instance Ord ComputedType where
+  compare (ComputedRange r1) (ComputedRange r2) = compare r1 r2
+  compare (OtherType s1) (OtherType s2) = compare s1 s2
+  compare _ _ = EQ
 
 data VarBinding = VarBinding String Step
 
@@ -235,4 +249,4 @@ instance showComputationStep :: Show ComputationStep where show s = genericShow 
 instance eqComputationStep :: Eq ComputationStep where eq c1 c2 = genericEq c1 c2
 derive instance ordComputationStep :: Ord ComputationStep
 instance prettyPrintComputationStep :: PrettyPrint ComputationStep where
-  prettyPrint' t (ComputationStep{functionName, arguments, computedType}) = "Computation\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> " ") <$> arguments) <> "\n" <> t <> computedType
+  prettyPrint' t (ComputationStep{functionName, arguments, computedType}) = "Computation\n" <> intercalate ("\n" <> t) (prettyPrint' (t <> " ") <$> arguments) <> "\n" <> t <> show computedType

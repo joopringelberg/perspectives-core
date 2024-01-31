@@ -36,14 +36,14 @@ import Data.String.CodeUnits as SCU
 import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved, pubParser)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
-import Perspectives.Representation.Range (Range(..))
+import Perspectives.Representation.Range (Duration_(..), Range(..))
 import Perspectives.Time (date2String, dateTime2String, time2String)
 import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>), eq)
 import Text.Parsing.Parser (fail)
@@ -219,11 +219,32 @@ sequenceFunction = (token.symbol "sum" *> pure AddF
   ) <?> "sum, product, minimum,\
 \ maximum or count, "
 
-propertyRange :: IP String
-propertyRange = (reserved "Boolean" *> (pure "Boolean")
-  <|> reserved "Number" *> (pure "Number")
-  <|> reserved "String" *> (pure "String")
-  <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime, "
+-- propertyRange :: IP String
+-- propertyRange = (reserved "Boolean" *> (pure "Boolean")
+--   <|> reserved "Number" *> (pure "Number")
+--   <|> reserved "String" *> (pure "String")
+--   <|> reserved "Time" *> (pure "Time")
+--   <|> reserved "Date" *> (pure "Date")
+--   <|> reserved "DateTime" *> (pure "DateTime")) <?> "Boolean, Number, String or DateTime, "
+
+propertyRange :: IP Range
+propertyRange = (reserved "Boolean" *> (pure $ PBool)
+  <|> reserved "Number" *> (pure $ PNumber)
+  <|> reserved "String" *> (pure $ PString)
+  <|> reserved "DateTime" *> (pure $ PDateTime)
+  <|> reserved "Email" *> (pure $ PEmail)
+  <|> reserved "File" *> (pure $ PFile)
+  <|> reserved "Date" *> (pure $ PDate)
+  <|> reserved "Time" *> (pure $ PTime)
+  <|> reserved "Year" *> (pure $ (PDuration Year_))
+  <|> reserved "Month" *> (pure $ (PDuration Month_))
+  <|> reserved "Week" *> (pure $ (PDuration Week_))
+  <|> reserved "Day" *> (pure $ (PDuration Day_))
+  <|> reserved "Hour" *> (pure $ (PDuration Hour_))
+  <|> reserved "Minute" *> (pure $ (PDuration Minute_))
+  <|> reserved "Second" *> (pure $ (PDuration Second_))
+  <|> reserved "MilliSecond" *> (pure $ (PDuration MilliSecond_))
+  )
 
 -- | Parse a time. Succeeds if the Time component of parseDateTime is empty.
 parseDate :: IP Date
@@ -507,6 +528,6 @@ computationStep = do
       -- sepBy would hide them.
       rest <- manyTill (token.comma *> step) (token.symbol ")")
       pure (Cons first rest))
-  computedType <- reserved "returns" *> (arcIdentifier <|> propertyRange)
+  computedType <- reserved "returns" *> ((OtherType <$> arcIdentifier) <|> (ComputedRange <$> propertyRange))
   end <- getPosition
   pure $ Computation $ ComputationStep {functionName, arguments: (fromFoldable arguments), computedType, start, end}

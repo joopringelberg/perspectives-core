@@ -26,7 +26,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Parsing.Arc (domain) as ARC
 import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..))
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), Step(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), Step(..))
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..)) as AST
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
@@ -135,7 +135,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
                   case calculation of
                     (Q (MQD _ f _ (RDOM (ST (RoleInContext {context: (ContextType "model:System$PerspectivesSystem"), role: (EnumeratedRoleType "model:System$PerspectivesSystem$Modellen")}))) _ _)) -> assert "The queryfunction of the calculation should be '(ExternalCoreRoleGetter \"model:Couchdb$Models\")'" (f == (ExternalCoreRoleGetter "model:Couchdb$Models"))
                     (Q _) -> assert "The calculation should have '(RDOM (ST EnumeratedRoleType Modellen))' as its Range" false
-                    (S (Computation (ComputationStep {computedType})) _) -> assert "The step should have 'model:MyTestDomain$Modellen' as computedType" (computedType == "model:MyTestDomain$Modellen")
+                    (S (Computation (ComputationStep {computedType})) _) -> assert "The step should have 'model:MyTestDomain$Modellen' as computedType" (computedType == OtherType "model:MyTestDomain$Modellen")
                     otherwise -> assert ("Unexpected result: " <> show otherwise) false
                   -- logShow calculation
 

@@ -9,7 +9,7 @@ import Data.Maybe (isJust, isNothing)
 import Effect.Class.Console (log, logShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression (computationStep, operator, simpleStep, step, unaryStep)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), SimpleStep(..), Step(..), UnaryStep(..))
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Statement (assignment, roleAssignment)
@@ -31,7 +31,7 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
       (Right id) -> do 
         -- logShow id
         assert "'MyRole' should be parsed as a the simple step ArcIdentifier" case id of
-          (Simple (ArcIdentifier (ArcPosition{column: 1, line: 1}) "MyRole")) -> true
+          (Simple (ArcIdentifier (ArcPosition{column: 1, line: 1}) "MyRole")) -> true 
           otherwise -> false
 
   test "SimpleStep: Binding" do
@@ -496,5 +496,5 @@ theSuite = suite "Perspectives.Parsing.Arc.Expression" do
         -- logShow a
         assert "functionName should be 'cbd:LoadModel'" (functionName == "ser:SerialiseFor")
         assert "two arguments" (length arguments == 2)
-        assert "ComputedType should be 'String'" (computedType == "String")
+        assert "ComputedType should be 'String'" (computedType == ComputedRange PString)
       otherwise -> assert ("'callExternal ser:SerialiseFor( \"model:System$Invitation$Invitee\", context ) returns String' should be parsed as an ComputationStep, instead this was returned: " <> show otherwise) false

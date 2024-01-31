@@ -25,7 +25,7 @@ module Perspectives.Query.ExpandPrefix where
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
@@ -38,7 +38,7 @@ class ContainsPrefixes s where
 
 instance containsPrefixesStep :: ContainsPrefixes Step where
   expandPrefix (Simple s) = Simple <$> expandPrefix s
-  expandPrefix (Binary s) = Binary <$> expandPrefix s
+  expandPrefix (Binary s) = Binary <$> expandPrefix s 
   expandPrefix (Unary s) = Unary <$> expandPrefix s
   expandPrefix (PureLet s) = PureLet <$> expandPrefix s
   expandPrefix (Computation s) = Computation <$> expandPrefix s
@@ -97,8 +97,12 @@ instance containsPrefixesComputationStep :: ContainsPrefixes ComputationStep whe
   expandPrefix (ComputationStep r@{functionName, arguments, computedType}) = do
     efunctionName <- expandNamespace functionName
     earguments <- traverse expandPrefix arguments
-    ecomputedType <- expandNamespace computedType
+    ecomputedType <- expandPrefix computedType
     pure $ ComputationStep r {functionName = efunctionName, arguments = earguments, computedType = ecomputedType}
+
+instance ContainsPrefixes ComputedType where
+  expandPrefix (OtherType s) = OtherType <$> expandNamespace s
+  expandPrefix x = pure x
 
 instance containsPrefixesAssignment :: ContainsPrefixes Assignment where
   expandPrefix (RemoveRole r@{roleExpression}) = do

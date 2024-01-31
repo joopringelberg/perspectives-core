@@ -43,7 +43,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
-import Perspectives.Parsing.Arc.Expression (parseJSDate, regexExpression, step)
+import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
 import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, sameOrOutdented', setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
@@ -56,7 +56,7 @@ import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Repetition (Duration(..), Repeater(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Range (Duration_(..), Range(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
@@ -658,7 +658,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> functional <|> range) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> functional <|> (Ran <$> propertyRange)) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
@@ -666,25 +666,6 @@ propertyE = do
           -- | Properties are by default functional.
           functional :: IP PropertyPart
           functional = (reserved "relational" *> (pure (FunctionalAttribute' false)))
-
-          range :: IP PropertyPart
-          range = (reserved "Boolean" *> (pure $ Ran PBool)
-            <|> reserved "Number" *> (pure $ Ran PNumber)
-            <|> reserved "String" *> (pure $ Ran PString)
-            <|> reserved "DateTime" *> (pure $ Ran PDateTime)
-            <|> reserved "Email" *> (pure $ Ran PEmail)
-            <|> reserved "File" *> (pure $ Ran PFile)
-            <|> reserved "Date" *> (pure $ Ran PDate)
-            <|> reserved "Time" *> (pure $ Ran PTime)
-            <|> reserved "Year" *> (pure $ Ran (PDuration Year_))
-            <|> reserved "Month" *> (pure $ Ran (PDuration Month_))
-            <|> reserved "Week" *> (pure $ Ran (PDuration Week_))
-            <|> reserved "Day" *> (pure $ Ran (PDuration Day_))
-            <|> reserved "Hour" *> (pure $ Ran (PDuration Hour_))
-            <|> reserved "Minute" *> (pure $ Ran (PDuration Minute_))
-            <|> reserved "Second" *> (pure $ Ran (PDuration Second_))
-            <|> reserved "MilliSecond" *> (pure $ Ran (PDuration MilliSecond_))
-            )
 
     propertyFacets :: Range -> IP (List PropertyFacet)
     propertyFacets r = nestedBlock propertyFacet

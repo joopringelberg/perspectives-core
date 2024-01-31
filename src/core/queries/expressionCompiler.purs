@@ -51,7 +51,7 @@ import Perspectives.Identifiers (endsWithSegments, isExternalRole, isTypeUri, qu
 import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
+import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
@@ -836,32 +836,40 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
             Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
               then do 
                 isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality functionName
-                case mapToRange computedType of
+                case computedType of
                   -- Collect property instances.
-                  Just r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
-                  Nothing -> (lift $ lift $ typeExists (ContextType computedType)) >>= if _
+                  ComputedRange r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
+                  OtherType s -> (lift $ lift $ typeExists (ContextType s)) >>= if _
                     -- Collect Context instances.
-                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType computedType))) isFunctional Unknown
+                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType s))) isFunctional Unknown
 
                     -- Collect role instances. Having no other information, we conjecture these instances to have their
                     -- role type in their lexical context.
                     else do
-                      context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType computedType)
-                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context, role: EnumeratedRoleType computedType})) isFunctional Unknown
+                      context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType s)
+                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context, role: EnumeratedRoleType s})) isFunctional Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments
         -- TODO. This is a stub.
         -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-        pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context: ContextType "", role: EnumeratedRoleType computedType})) Unknown Unknown
+        case computedType of 
+          ComputedRange r -> 
+            pure $ MQD currentDomain (QF.ForeignPropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
+          OtherType s -> 
+            pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context: ContextType "", role: EnumeratedRoleType s})) Unknown Unknown
 
-  where
+  -- where
 
-    mapToRange :: String -> Maybe Range
-    mapToRange s = case s of
-      "String" -> Just PString
-      "Boolean" -> Just PBool
-      "Number" -> Just PNumber
-      "DateTime" -> Just PDate
-      "Email" -> Just PEmail
-      otherwise -> Nothing
+    -- mapToRange :: String -> Maybe Range
+    -- mapToRange s = case s of
+    --   "String" -> Just PString
+    --   "Boolean" -> Just PBool
+    --   "Number" -> Just PNumber
+    --   "DateTime" -> Just PDateTime
+    --   "Date" -> Just PDate
+    --   "Time" -> Just PTime
+    --   -- durations
+    --   -> PDuration 
+    --   "Email" -> Just PEmail
+    --   otherwise -> Nothing
