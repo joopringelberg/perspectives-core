@@ -461,9 +461,11 @@ repository url' = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url' of
   Nothing -> throwError (error ("Cannot get repository from " <> url'))
   Just s -> pure s
 
+-- | Add an InvertedQuery stored in a DomeinFile under invertedQueriesInOtherDomains with the target DomeinFile.
 addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
 addInvertedQuery = modifyInvertedQuery true
 
+-- | Remove an InvertedQuery stored in a DomeinFile under invertedQueriesInOtherDomains from the target DomeinFile.
 removeInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
 removeInvertedQuery = modifyInvertedQuery false
 

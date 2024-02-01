@@ -24,7 +24,7 @@ module Perspectives.Query.Kinked where
 
 import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, snoc, unsnoc)
+import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, last, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
@@ -172,7 +172,7 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       --   -- may be combined with any inversion of right.
       --   Nothing, _ -> true
       --   _, _ -> false
-      guard $ case range <$> head right_inverted_steps, domain <$> head left_inverted_steps of
+      guard $ case range <$> (last right_inverted_steps), domain <$> head left_inverted_steps of
         Just ranRight, Just domLeft -> ranRight `equalsOrGeneralizesDomain` domLeft
         -- NOTE that as the backwards part cannot be empty, the next case may not occur.
         _, _ -> false

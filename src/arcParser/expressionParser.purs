@@ -82,37 +82,38 @@ step_ parenthesised = do
           , operator:opOfRight
           , right: rightOfRight
           , end: endOfRight
-          , parenthesised: protected})) -> if
+          , parenthesised: protected})) -> 
+            if
               not protected &&
               ((operatorPrecedence op) > (operatorPrecedence opOfRight))
 
-          -- Regrouping: the parse tree (a op1 (b op2 c)) becomes ((a op1 b) op2 c).
-          -- The expression was: "a op2 b op1 c"
-          -- (op1 = operator with precedence 1, op2 = operator with precedence 2)
-          -- The right expression is binary and not contained in parenthesis, and
-          -- the left operator has higher precedence (than (or equal to) the right operator).
-          then pure $ Binary $ BinaryStep
-            { start
-            , end -- equals endOfRight.
-            , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight, parenthesised: false})
-            , operator: opOfRight
-            , right: rightOfRight
-            , parenthesised: false
-          }
+            -- Regrouping: the parse tree (a op1 (b op2 c)) becomes ((a op1 b) op2 c).
+            -- The expression was: "a op2 b op1 c"
+            -- (op1 = operator with precedence 1, op2 = operator with precedence 2)
+            -- The right expression is binary and not contained in parenthesis, and
+            -- the left operator has higher precedence (than (or equal to) the right operator).
+            then pure $ Binary $ BinaryStep
+              { start
+              , end -- equals endOfRight.
+              , left: Binary (BinaryStep {start, end: endOf(leftOfRight), operator: op, left: left, right: leftOfRight, parenthesised: false})
+              , operator: opOfRight
+              , right: rightOfRight
+              , parenthesised: false
+            }
 
-          -- No regrouping.
-          -- The right expression is binary and is contained in parenthesis, OR
-          -- its operator is as precedent as (or more so then) that of the enclosing binary expression.
-          -- Hence, we maintain the right-association that is present in the parse tree: (a op (b op c)).
-          -- The expression is either:
-          --    "a opx (b opy c)"
-          -- (opx and opy have any precedence; precedence does not rule, parenthesis prevail), or:
-          --    "a op1 b op1 c"
-          -- (both operators have equal precedence but we adhere to right-associativity)
-          --    "a op1 b op2 c"
-          -- (op1 = operator with precedence 1, op2 = operator with precedence 2). The parse tree already respects
-          -- the operator precedences.
-          else pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
+            -- No regrouping.
+            -- The right expression is binary and is contained in parenthesis, OR
+            -- its operator is as precedent as (or more so then) that of the enclosing binary expression.
+            -- Hence, we maintain the right-association that is present in the parse tree: (a op (b op c)).
+            -- The expression is either:
+            --    "a opx (b opy c)"
+            -- (opx and opy have any precedence; precedence does not rule, parenthesis prevail), or:
+            --    "a op1 b op1 c"
+            -- (both operators have equal precedence but we adhere to right-associativity)
+            --    "a op1 b op2 c"
+            -- (op1 = operator with precedence 1, op2 = operator with precedence 2). The parse tree already respects
+            -- the operator precedences.
+            else pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}
 
         -- The right expression is not binary. No regrouping.
         otherwise -> pure $ Binary $ BinaryStep {start, end, left, operator: op, right, parenthesised}

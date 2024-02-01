@@ -31,7 +31,6 @@ import Prelude
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.Except (runExcept)
-import Data.Array (foldl, foldr, snoc, uncons)
 import Data.Array.Partial (head, last)
 import Data.Either (Either(..))
 import Data.Eq.Generic (genericEq)
@@ -49,7 +48,7 @@ import Perspectives.Parsing.Arc.Expression.AST (Step)
 import Perspectives.Representation.ADT (ADT(..), equalsOrGeneralisesADT)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, or)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic, and, or)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType, PropertyType)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Simple.JSON (class ReadForeign, class WriteForeign, read', readImpl, write, writeImpl)
@@ -159,29 +158,6 @@ hasQueryFunction f q@(MQD _ qf qfds _ _ _) = if eq qf f
   then true
   else unwrap $ foldMap (Disj <<< hasQueryFunction f) qfds
 
----------------------------------------------------------------------------------------------------------------------
----- HANDLE SEQUENCEFUNCTION
----------------------------------------------------------------------------------------------------------------------
--- Queries are right-associative compositions. However, for a sequencefunction like first to work properly, we
--- must have the entire expression up to >>= re-composed but then left-associative, so we can pipe the result into 
--- the sequencefunction.
-
--- | From a description of a composition that is right-associative, create a left-associative description.
--- | The function is partial because we only handle BQD with ComposeF.
-handleSequenceFunctions :: Partial => QueryFunctionDescription -> Array QueryFunctionDescription -> QueryFunctionDescription
--- Recursive case.
-handleSequenceFunctions (BQD dom (BinaryCombinator ComposeF) f1 f2 ran fun man) cumulator = 
-  handleSequenceFunctions f2 (snoc cumulator f1)
--- Bottom case.
-handleSequenceFunctions qfd@(BQD dom (BinaryCombinator ComposeSequenceF) f1 sequenceFunction ran fun man) cumulator = case uncons cumulator of
-  Nothing -> qfd
-  Just {head, tail} -> let
-    -- foldl will create a left-associative composition of all terms.
-    left = foldl makeComposition head (snoc tail f1)
-    in
-    (BQD dom (BinaryCombinator ComposeSequenceF) left sequenceFunction ran True man)
--- Other bottom case. No ComposeSequenceF found. Foldr will reconstruct the original right-associative composition.
-handleSequenceFunctions last cumulator = foldr makeComposition last cumulator
 -----------------------------------------------------------------------------------------
 ---- BOOLEAN FUNCTIONS
 -----------------------------------------------------------------------------------------

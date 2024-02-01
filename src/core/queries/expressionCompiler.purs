@@ -300,7 +300,7 @@ compileAndDistributeStep dom stp users stateIdentifiers = do
 compileStep :: Domain -> Step -> FD
 compileStep currentDomain (Simple st) = compileSimpleStep currentDomain st
 compileStep currentDomain (Unary st) = compileUnaryStep currentDomain st
-compileStep currentDomain (Binary st) = unsafePartial $ flip handleSequenceFunctions [] <$> (compileBinaryStep currentDomain st)
+compileStep currentDomain (Binary st) = (compileBinaryStep currentDomain st)
 compileStep currentDomain (PureLet st) = compileLetStep currentDomain st
 compileStep currentDomain (Computation st) = compileComputationStep currentDomain st
 
