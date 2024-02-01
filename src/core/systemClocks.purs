@@ -83,8 +83,8 @@ forkedSystemClocks state = do
       case msystemHour of 
         Just (Value systemHour) -> do 
           systemHour' <- string2Time systemHour
-          -- Compare the time component of PerspectivesSystem$CurrentTime with the current date. If it is less, set CurrentDate.
-          if (hour systemHour') < (hour currentTime) || (fromEnum $ hour systemHour') == 23
+          -- if the hour of the currentTime is not equal to the systemHour', set the currentTime to the hour of the currentTime.
+          if (hour currentTime) `notEq` (hour systemHour')
             then setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemHour) 
               [Value $ time2String (wholeHour (hour currentTime))]
             else pure unit
