@@ -79,10 +79,12 @@ domain model://perspectives.domains#System
 
   -- PDRDEPENDENCY
   user WithCredentials filledBy sys:PerspectivesSystem$User
-    -- | The value of field systemIdentifier of the PouchdbUser object that is passed in to runPDR.
-    -- | Currently, this is the raw username that is used to log into MyContexts, e.g. "dev1".
+    -- | The role identifier of the filler of SocialEnvironment$Me - that is, the unique identifier of this user
+    -- | in the Perspectives Universe.
+    -- | This includes the storage scheme!
     -- PDRDEPENDENCY
-    property UserName = SpecificUserName orElse callExternal util:SystemIdentifier() returns String
+    property UserName = SpecificUserName orElse sys:MySocialEnvironment >> Me >> binding >> callExternal util:RoleIdentifier() returns String
+    -- property UserName = SpecificUserName orElse callExternal util:SystemIdentifier() returns String
     property SpecificUserName (String)
     -- PDRDEPENDENCY
     property Password (String)

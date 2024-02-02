@@ -51,7 +51,7 @@ import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.HTTP.Method (Method(..))
 import Data.Map (insert, fromFoldable) as MAP
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.String (toLower)
 import Data.String.Base64 (btoa)
@@ -60,13 +60,13 @@ import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Foreign (MultipleErrors)
 import Foreign.Object (singleton)
-import Partial.Unsafe (unsafePartial)
 import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), ReplicationEndpoint(..), SecurityDocument(..), SelectorObject, coerceToJson, onAccepted, onAccepted', onAccepted_, toJson)
 import Perspectives.Couchdb.Revision (class Revision)
-import Perspectives.Identifiers (deconstructUserName, endsWithSegments)
+import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
 import Perspectives.Persistence.State (getCouchdbCredentials, getSystemIdentifier)
 import Perspectives.Persistence.Types (Credential(..), DatabaseName, MonadPouchdb, Url)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -398,9 +398,9 @@ databaseStatusCodes = MAP.fromFoldable
 -----------------------------------------------------------
 -- user2couchdbuser
 -----------------------------------------------------------
--- | Transforms a canonical user identification in Perspectives to an acceptable user name in Couchdb.
+-- | Transforms a canonical user identification in Perspectives to an acceptable user name in Couchdb, by stripping away the storage scheme.
 user2couchdbuser :: String -> String
-user2couchdbuser = unsafePartial fromJust <<< deconstructUserName
+user2couchdbuser = takeGuid
 
 -----------------------------------------------------------
 -- concatenatePathSegments

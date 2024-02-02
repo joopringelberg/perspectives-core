@@ -383,7 +383,7 @@ getSecondMatch regex s = case match regex s of
 userNameRegEx :: Regex
 userNameRegEx = unsafeRegex "^def:#(.*)\\$User" noFlags
 
--- Used in module Perspectives.Persistence.CouchdbFunctions
+-- Used in module Perspectives.Persistence.CouchdbFunctions. Returns the schemeless system identifier.
 -- Will probably be OBSOLETE now since we have new resource identifiers.
 deconstructUserName :: String -> Maybe String
 deconstructUserName = getFirstMatch userNameRegEx

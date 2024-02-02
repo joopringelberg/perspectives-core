@@ -269,7 +269,6 @@ discardStorageRegex = unsafeRegex "^[^#$]+#(.+)" noFlags
 
 -- | Just retains the (unique) identifier of the ResourceIdentifier; 
 -- | discards all storage information such as scheme, database name or url.
--- TODO: IMPLEMENT
 takeGuid :: ResourceIdentifier -> String
 takeGuid s = case match discardStorageRegex s of
   Nothing -> s
