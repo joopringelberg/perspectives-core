@@ -387,7 +387,7 @@ compileCalculatedRoles = do
             Q _ -> pure unit
             -- Compiles the parsed expression and stores the modified CalculatedRole in
             -- the DomeinCache.
-            S stp _-> void $ compileAndSaveRole (CDOM $ ST context) stp cr
+            S stp isFunctional -> void $ compileAndSaveRole (CDOM $ ST context) stp cr isFunctional
 
 compileCalculatedProperties :: PhaseThree Unit
 compileCalculatedProperties = do

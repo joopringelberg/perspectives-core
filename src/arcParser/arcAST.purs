@@ -92,7 +92,7 @@ data RolePart =
   MandatoryAttribute Boolean |
   UnlinkedAttribute |
   FilledByAttribute String ContextType |
-  Calculation Step |
+  Calculation Step Boolean |
   RoleAspect String ArcPosition (Maybe PropertyMapping) |
   IndexedRole String ArcPosition |
   ROLESTATE StateE |

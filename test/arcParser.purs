@@ -29,7 +29,7 @@ import Text.Parsing.Parser (ParseError(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 testDirectory :: String
-testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"
+testDirectory = "/Users/joopringelberg/Code/perspectives-core/test" 
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc" do
@@ -163,7 +163,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Right rl@(RE (RoleE{roleParts}))) -> do
         (assert "Role should have a Calculation"
           (isJust (findIndex (case _ of
-            (Calculation _) -> true
+            (Calculation _ _) -> true
             otherwise -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
@@ -375,7 +375,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
           Nothing -> assert "The Domain should have a role." false
           (Just (RE (RoleE{roleParts}))) -> do
             case (head (filter (case _ of
-                (Calculation _) -> true
+                (Calculation _ _) -> true
                 otherwise -> false) roleParts)) of
               Nothing -> assert "There should be a computation RolePart" false
               otherwise -> assert "" true

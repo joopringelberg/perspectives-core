@@ -210,7 +210,7 @@ traverseRoleE r ns = if isCalculatedRole r
   where
     isCalculatedRole :: RoleE -> Boolean
     isCalculatedRole (RoleE {roleParts}) = (isJust (findIndex (case _ of
-      (Calculation _) -> true
+      (Calculation _ _) -> true
       otherwise -> false) roleParts))
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
@@ -450,9 +450,9 @@ traverseCalculatedRoleE_ role@(CalculatedRole{id:roleName, kindOfRole}) rolePart
     -- Parse the query expression.
 
     -- CALCULATION
-    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc) = do
+    handleParts (CalculatedRole roleUnderConstruction) (Calculation calc isFunctional) = do
       expandedCalc <- expandPrefix calc
-      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc false})
+      pure $ CalculatedRole (roleUnderConstruction {calculation = S expandedCalc isFunctional})
 
     -- PERSPECTIVE
     handleParts crole (SQP stateQualifiedParts) = do
@@ -503,7 +503,7 @@ traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, propertyFacets
   property' <- pure $ EnumeratedProperty pr {constrainingFacets = ARR.fromFoldable propertyFacets}
   modifyDF (\df -> addPropertyToDomeinFile (Property.E property') df)
   pure (Property.E property')
-
+ 
   where
     -- Construct members for the new Property type according to the type of
     -- parts found in the PropertyE AST type. Insert these members into the new Property.

@@ -61,45 +61,12 @@ import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
-import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=), (||))
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
 import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
 import Text.Parsing.Parser.String (char, eof, satisfy)
 
--- | SEMI-BNF NOTATION
--- | We use a syntax to describe the grammar of the Perspectives Language that is derived from BNF:
--- |
--- | <production> -> refers to a production rule.
--- | [...] -> whatever is between brackets, zero or one time (optional)
--- | <production>* -> zero or more times the production.
--- | <production>+ -> one or more times the production.
--- |
--- | Grouping constructs:
--- | {...} -> whatever is between brackets, exactly once.
--- | {...}* -> whatever is between brackets, zero or more times
--- | {...}+ -> whatever is between brackets, one or more times
--- | {<p> | <q>} -> <p> or <q> (grouped for convenience or to disambiguate)
--- |
--- | (<p> <q>) -> <p> and <q> between parentheses, i.e. the parenthesis are part of the production.
--- | NOTE: parenthesis have no special meaning in this grammar syntax. Hence '(' and ')' are perfectly ordinary parts of a production.
--- |
--- | <p> | <q> -> <p> or alternatively <q>
--- |
--- | '{' -> the literal character "{"
--- |
--- | state -> the literal keyword "state". We don't write keywords between double quotes.
--- |
--- | NOTE: double quotes have no special meaning in this grammar syntax. Hence " is a perfectly ordinary part of a production.
-
-
--- | context =
--- |   <contextKind> <ident>
--- |     use <lowercaseName> for <ident>
--- |     indexed <ident>
--- |     aspect <ident>+
--- |     state <state>
--- |     {<context> | <role>}+
 contextE :: IP ContextPart
 contextE = withPos do
   -- | log "contextE"
@@ -174,7 +141,7 @@ contextE = withPos do
     enumeratedPublicDuplicate :: ContextPart -> ContextPart
     enumeratedPublicDuplicate (RE (RoleE r@({id}))) = RE $ replaceIdentifier id "Proxy" $ RoleE r 
       { roleParts = filter (case _ of 
-        Calculation _ -> false
+        Calculation _ _ -> false
         Screen _ -> false
         _ -> true) r.roleParts
       }
@@ -216,19 +183,19 @@ contextE = withPos do
 
     explicitSubjectState :: IP StateSpecification
     explicitSubjectState = do
-      (Tuple segments isCalculated) <- lookAhead (Tuple <$> (reserved "user" *> token.identifier) <*> option false (reserved "=" *> pure true))
+      (Tuple segments calculated) <- lookAhead (Tuple <$> (reserved "user" *> token.identifier) <*> isCalculated)
       ctxt@(ContextType ccontext) <- getCurrentContext
       pos <- getPosition
-      if isCalculated
+      if calculated
         then getCurrentState
         else pure $ SubjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
     explicitObjectState :: IP StateSpecification
     explicitObjectState = do
-      (Tuple segments isCalculated) <- lookAhead (Tuple <$> (reservedIdentifier *> token.identifier) <*> option false (reserved "=" *> pure true))
+      (Tuple segments calculated) <- lookAhead (Tuple <$> (reservedIdentifier *> token.identifier) <*> isCalculated)
       ctxt@(ContextType ccontext) <- getCurrentContext
       pos <- getPosition
-      if isCalculated
+      if calculated
         then getCurrentState
         else pure $ ObjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
@@ -338,8 +305,8 @@ userRoleE = do
       uname <- arcIdentifier
       -- | We've added the role name to the state before running userRoleE.
       ct@(ContextType ctxt) <- getCurrentContext
-      isCalculated <- option false (lookAhead (reserved "=") *> pure true)
-      if isCalculated
+      calculated <- isCalculated
+      if calculated
         then do
           setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
           calculatedRole_ uname kind pos
@@ -375,8 +342,10 @@ publicRoleE = do
       url <- PublicUrl <$> (reserved "at" *> step)
       ct@(ContextType ctxt) <- getCurrentContext
       setSubject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
-      calculation <- reserved "=" *> step >>= pure <<< Calculation
-      pure {uname, knd, pos, parts: (url : calculation : Nil), isEnumerated: false, declaredAsPrivate: false}
+      isFunctional <- functionalCalculation
+      token.reservedOp "="
+      calculation <- step
+      pure {uname, knd, pos, parts: (url : (Calculation calculation isFunctional) : Nil), isEnumerated: false, declaredAsPrivate: false}
 
     publicState :: IP StateSpecification
     publicState = do
@@ -408,14 +377,20 @@ thingRoleE = do
       kind <- reserved "thing" *> pure RoleInContext
       uname <- arcIdentifier
       ct@(ContextType ctxt) <- getCurrentContext
-      isCalculated <- option false (lookAhead (reserved "=") *> pure true)
-      if isCalculated
+      calculated <- isCalculated
+      if calculated
         then do
           setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
           calculatedRole_  uname kind pos
         else do
           setObject (ExplicitRole ct (ENR $ EnumeratedRoleType (ctxt <> "$" <> uname)) pos)
           enumeratedRole_ uname kind pos
+
+isCalculated :: IP Boolean
+isCalculated = do
+  hasIs <- option false (lookAhead (reserved "=") *> pure true)
+  hasFunctional <- option false (lookAhead (token.parens (reserved "functional")) *> pure true)
+  pure (hasIs || hasFunctional)
 
 contextRoleE :: IP ContextPart
 contextRoleE = do
@@ -441,8 +416,8 @@ contextRoleE = do
       uname <- arcIdentifier
       ct@(ContextType ctxt) <- getCurrentContext
       -- | Het is niet noodzakelijk een EnumeratedRole!
-      isCalculated <- option false (lookAhead (reserved "=") *> pure true)
-      if isCalculated
+      calculated <- isCalculated
+      if calculated
         then do
           setObject (ExplicitRole ct (CR $ CalculatedRoleType (ctxt <> "$" <> uname)) pos)
           calculatedRole_ uname kind pos
@@ -476,8 +451,14 @@ externalRoleE = do
 calculatedRole_ :: String -> RoleKind -> ArcPosition 
   -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
 calculatedRole_ uname knd pos = do
-  calculation <- reserved "=" *> step >>= pure <<< Calculation
-  pure {uname, knd, pos, parts: Cons calculation Nil, isEnumerated: false, declaredAsPrivate: false}
+  isFunctional <- functionalCalculation
+  token.reservedOp "="
+  calculation <- step
+  pure {uname, knd, pos, parts: Cons (Calculation calculation isFunctional) Nil, isEnumerated: false, declaredAsPrivate: false}
+
+-- | Calculated roles and properties are by default relational.
+functionalCalculation :: IP Boolean
+functionalCalculation = option false ((try $ token.parens (reserved "functional")) *> (pure true))
 
 enumeratedRole_ :: String -> RoleKind -> ArcPosition 
   -> IP (Record (uname :: String, knd :: RoleKind, pos :: ArcPosition, parts :: List RolePart, isEnumerated :: Boolean, declaredAsPrivate :: Boolean))
@@ -622,7 +603,7 @@ propertyE = do
   where
     calculatedProperty :: ArcPosition -> String -> IP RolePart
     calculatedProperty pos uname = do
-      isFunctional <- option false functional
+      isFunctional <- option false functionalCalculation
       token.reservedOp "="
       calc <- step
       pure $ PE $ PropertyE
@@ -630,11 +611,6 @@ propertyE = do
         , range: Nothing
         , propertyParts: Cons (Calculation' calc isFunctional) Nil, pos: pos
         , propertyFacets: Nil}
-      where
-          -- | Calculated properties are by default relational.
-          functional :: IP Boolean
-          functional = (try $ token.parens (reserved "functional")) *> (pure true)
-
 
     -- | This parser always succeeds, either with or without consuming part of the input stream.
     enumeratedProperty :: ArcPosition -> String -> IP RolePart
@@ -658,14 +634,14 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> functional <|> (Ran <$> propertyRange)) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> relational <|> (Ran <$> propertyRange)) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
 
           -- | Properties are by default functional.
-          functional :: IP PropertyPart
-          functional = (reserved "relational" *> (pure (FunctionalAttribute' false)))
+          relational :: IP PropertyPart
+          relational = (reserved "relational" *> (pure (FunctionalAttribute' false)))
 
     propertyFacets :: Range -> IP (List PropertyFacet)
     propertyFacets r = nestedBlock propertyFacet

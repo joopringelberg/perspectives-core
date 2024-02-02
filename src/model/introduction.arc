@@ -46,6 +46,7 @@ domain model://perspectives.domains#Introduction
       aspect sys:RootContext$External
 
     context Introductions (relational) filledBy Introduction
+    -- NB: WAARSCHIJNLIJK IS NIET SYS:ME MAAR DE PERSPECTIVESUSER OF DE SOCIALENVIRONMENT$PERSONS ROLLEN DE VULLERS.
     context IncomingIntroductions = sys:Me >> binder Introducee >> context >> extern
     user Manager = sys:Me
       perspective on Introductions

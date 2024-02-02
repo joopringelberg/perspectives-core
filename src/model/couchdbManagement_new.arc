@@ -190,7 +190,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- This role should be in public space insofar that e.g. acc:Body$Guest should be able to see it.
     -- Admin in Couchdb of a particular server.
     -- TODO Hernoem dit naar ServerAdmin.
-    user Admin (relational) filledBy CouchdbManagementApp$Manager 
+    user Admin filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
       -- These properties come from sys:WithCredentials
       -- WithCredentials$UserName - CALCULATED, either the SpecificUserName or the ID of the PerspectivesSystem$User.
@@ -218,6 +218,10 @@ domain model://perspectives.domains#CouchdbManagement
         in object state NoNameSpace
           props (Repositories$NameSpace) verbs (SetPropertyValue)
         
+      perspective on Accounts
+        all roleverbs
+        props (FirstName, LastName) verbs (Consult)
+
         -- This is currently not very useful, because a Repositories instance will not enter state WithoutManifests 
         -- when its last Manifest is deleted. Negation by failure breaks on removing instances!
         -- in object state WithoutManifests
@@ -231,7 +235,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (ServerUrl, Name) verbs (Consult)
               --props (Name) verbs (SetPropertyValue)
           row
-            table Admin
+            form Admin
         tab "Repositories"
           row 
             table Repositories
@@ -244,20 +248,50 @@ domain model://perspectives.domains#CouchdbManagement
       -- WithCredentials$SpecificUserName
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
-      -- TODO. Is dit nodig? 
-      on entry
-        do for Admin
-          letA
-            serverurl <- context >> extern >> ServerUrl
-          in
-            callEffect cdb:MakeWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+      state Filled = exists binding
+        on entry
+          do for Admin
+            letA
+              serverurl <- context >> extern >> ServerUrl
+            in
+              Password = callExternal util:GenSym() returns String
+              AuthorizedDomain = serverurl
+              -- NOTICE: we do not check whether UserName is already a registered user of the Couchdb installation at serverurl.
+              callEffect cdb:CreateUser( serverurl, UserName, Password )
+              callEffect cdb:MakeWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
       on exit
         do for Admin
           letA
             serverurl <- context >> extern >> ServerUrl
           in
             callEffect cdb:RemoveAsWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+            callEffect cdb:DeleteUser( serverurl, UserName, Password )
+      
+      perspective on Accounts
+        selfonly
+        props (Password, AuthorizedDomain) verbs (Consult)
 
+      perspective on External
+        props (ServerUrl, Name) verbs (Consult)
+
+      perspective on Admin
+        props (FirstName, LastName) verbs (Consult)
+      
+      perspective on Repositories
+        props (Repositories$NameSpace) verbs (Consult)
+
+      screen "Couchdb Server"
+        tab "The server"
+          row
+            form External
+          row
+            form Admin
+          row
+            table Accounts
+        tab "Repositories"
+          row
+            table Repositories
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
     -- TODO: als omkering van filtered queries volledig is, beperk dan het perspectief van Visitor tot PublicRepositories.
@@ -377,7 +411,7 @@ domain model://perspectives.domains#CouchdbManagement
       property AdminLastName = context >> Admin >> LastName
 
     -- We need the ServerAdmin in this context in order to configure the local Admin and to give Authors write access.
-    user ServerAdmin = extern >> binder Repositories >> context >> CouchdbServer$Admin >>= first
+    user ServerAdmin (functional) = extern >> binder Repositories >> context >> CouchdbServer$Admin
       perspective on Admin
         only (Create, Fill, RemoveFiller, Remove)
         props (SpecificUserName, Password) verbs (SetPropertyValue)
@@ -448,7 +482,7 @@ domain model://perspectives.domains#CouchdbManagement
         action CompileRepositoryModels
           callEffect p:CompileRepositoryModels( RepositoryUrl + ReadModels, RepositoryUrl + ReadInstances )
 
-      -- The desogm pattern for nested public contexts requires that Admin has write access
+      -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
         only (Create, Fill, Delete, Remove)
@@ -458,6 +492,10 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
+      
+      perspective on Authors
+        only (Create, Fill)
+        props (FirstName, LastName)
       
       -- Moet in staat zijn om een instantie toe te voegen aan Accounts.
       -- perspective on Accounts
@@ -471,6 +509,9 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Manifests"
           row
             table Manifests
+        tab "Authors"
+          row
+            table Authors
       
     user Authors (relational) filledBy CouchdbServer$Accounts
       state Filled = exists binding
@@ -489,7 +530,26 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
               callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
 
+      perspective on External
+        props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
 
+      perspective on Manifests
+        only (Create, Fill, Delete, Remove)
+        props (Description, LocalModelName) verbs (Consult)
+        in object state NoLocalModelName
+          props (LocalModelName) verbs (SetPropertyValue)
+      
+      perspective on Manifests >> binding >> context >> Author
+        only (Create, Fill)
+
+      screen "Repository"
+        tab "This repository"
+          row 
+            form "Repository information" External
+              props (RepositoryUrl) verbs (Consult)
+        tab "Manifests"
+          row
+            table Manifests
     
     -- Levert een pattern match failure in Perspectives.Representation.Perspective (line 220, column 29 - line 220, column 51): CP
     user Accounts (relational, unlinked) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
@@ -566,7 +626,7 @@ domain model://perspectives.domains#CouchdbManagement
         delete context bound to Versions
     
     -- The external role of the Repository.
-    context Repository = extern >> binder Manifests >> context >> extern >>= first
+    context Repository (functional) = extern >> binder Manifests >> context >> extern
 
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
@@ -640,7 +700,7 @@ domain model://perspectives.domains#CouchdbManagement
           do for Author
             letA
               v <- (context >> extern >> RecommendedVersion) orElse (context >> extern >> HighestVersion)
-              versionname <- context >> extern >> binder Manifests >> context >> extern >> NameSpace_ >>= first + "-" + VersionedLocalModelName
+              versionname <- (context >> extern >> binder Manifests >> context >> extern >> NameSpace_ >>= first) + "-" + VersionedLocalModelName
             in
               -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
               create_ context VersionedModelManifest named versionname bound to origin
@@ -745,7 +805,7 @@ domain model://perspectives.domains#CouchdbManagement
         row
           form "All versions" Manifest 
 
-    context Manifest = extern >> binder Versions >> context >> extern >>= first
+    context Manifest (functional) = extern >> binder Versions >> context >> extern
 
 
     user ActiveUser = extern >> binder Versions >> context >> ActiveUser

@@ -101,7 +101,7 @@ makeRoleGetter currentDomain rt@(CR ct) = do
     crole@(CalculatedRole{calculation}) <- lift2 $ getCalculatedRole ct
     case calculation of
       Q qfd -> lift2 $ roleADT crole
-      S step isFunctional -> compileAndSaveRole currentDomain step crole
+      S step isFunctional -> compileAndSaveRole currentDomain step crole isFunctional
   isF <- lift2 $ roleTypeIsFunctional rt
   isM <- lift2 $ roleTypeIsMandatory rt
   pure $ SQD currentDomain (QF.RolGetter rt) (RDOM adt) (bool2threeValued isF) (bool2threeValued isM)
@@ -117,8 +117,8 @@ makeRoleGetter currentDomain@(CDOM contextAdt) rt@(ENR et) = do
 -- | Compiles the parsed expression (type Step) that defines the CalculatedRole.
 -- | Saves it in the DomainCache.
 -- | Returns the range of the calculation.
-compileAndSaveRole :: Domain -> Step -> CalculatedRole -> PhaseThree (ADT RoleInContext)
-compileAndSaveRole dom step (CalculatedRole cr@{id, kindOfRole, pos}) = withFrame do
+compileAndSaveRole :: Domain -> Step -> CalculatedRole -> Boolean -> PhaseThree (ADT RoleInContext)
+compileAndSaveRole dom step (CalculatedRole cr@{id, kindOfRole, pos}) considerFunctional = withFrame do
   loops <- isBeingCalculated (Role id)
   if loops
     then throwError $ (RecursiveDefinition $ loopErrorMessage (Role id) pos pos) 
@@ -130,9 +130,12 @@ compileAndSaveRole dom step (CalculatedRole cr@{id, kindOfRole, pos}) = withFram
           ]
           step
         compiledExpression <- compileExpression dom expressionWithEnvironment
+        compiledExpression' <- if considerFunctional
+          then pure $ setCardinality compiledExpression True
+          else pure compiledExpression
         -- Save the result in DomeinCache.
-        lift2 $ void $ modifyCalculatedRoleInDomeinFile (DomeinFileId $ unsafePartial fromJust $ typeUri2ModelUri (unwrap id)) (CalculatedRole cr {calculation = Q compiledExpression})
-        pure $ unsafePartial $ domain2roleType $ range compiledExpression
+        lift2 $ void $ modifyCalculatedRoleInDomeinFile (DomeinFileId $ unsafePartial fromJust $ typeUri2ModelUri (unwrap id)) (CalculatedRole cr {calculation = Q compiledExpression'})
+        pure $ unsafePartial $ domain2roleType $ range compiledExpression'
 
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
 -- | EnumeratedRole.
