@@ -22,7 +22,7 @@
 
 module Perspectives.Instances.SerialiseAsJson where
 
-import Control.Monad.Error.Class (throwError)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.State (StateT, execStateT, gets, modify)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (void)
@@ -41,6 +41,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasForUserType)
 import Perspectives.CoreTypes (MPQ, MPT, MonadPerspectives, (###>>), (##>>), (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -63,10 +64,12 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | the RoleType (representing a User); the second should be the external role of the
 -- | context instance to be serialised.
 serialiseFor :: Array RoleType -> RoleInstance -> MPQ Value
-serialiseFor userTypes externalRoleId = ArrayT $ case ARR.head userTypes of
-  Nothing -> pure []
-  Just u -> do
-    lift $ ARR.singleton <$> serialisedAsDeltasForUserType (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) u
+serialiseFor userTypes externalRoleId = try 
+  (ArrayT $ case ARR.head userTypes of
+    Nothing -> pure []
+    Just u -> do
+      lift $ ARR.singleton <$> serialisedAsDeltasForUserType (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId) u)
+  >>= handleExternalFunctionError "model://perspectives.domains#Serialise$SerialiseFor"
     -- (sers :: Array ContextSerialization) <- lift $ execStateT (serialiseAsJsonFor_ u (ContextInstance $ deconstructBuitenRol $ unwrap externalRoleId)) []
     -- pure $ ARR.singleton $ Value $ unsafeStringify $ encode sers
 
@@ -156,45 +159,51 @@ serialiseAsJsonFor_ userType cid = do
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
 -- | in the role PrivateChannel.
 addChannel :: ContextInstance -> MPT Unit
-addChannel invitation = do
-  mCouchdburl <- lift $ getCouchdbBaseURL
-  case mCouchdburl of
-    Nothing -> throwError $ (error "addChannel expects a couchdbUrl.")
-    Just url -> createChannel url >>= \channel -> do
-      void $ createAndAddRoleInstance
-        (EnumeratedRoleType privateChannel)
-        (unwrap invitation)
-        (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
-      lift $ setChannelReplication url channel
+addChannel invitation = try
+  (do
+    mCouchdburl <- lift $ getCouchdbBaseURL
+    case mCouchdburl of
+      Nothing -> throwError $ (error "addChannel expects a couchdbUrl.")
+      Just url -> createChannel url >>= \channel -> do
+        void $ createAndAddRoleInstance
+          (EnumeratedRoleType privateChannel)
+          (unwrap invitation)
+          (RolSerialization{id: Nothing, properties: PropertySerialization OBJ.empty, binding: Just (buitenRol $ unwrap channel)})
+        lift $ setChannelReplication url channel)
+  >>= handleExternalStatementError "model://perspectives.domains#Serialise$AddChannel"
 
 -- | Create a database with the given name, if it does not yet exist (it may exist if the Initiator uses the same
 -- | Couchdb installation as the ConnectedPartner).
 -- | Also set up sync with the post database.
 createCopyOfChannelDatabase :: Array String -> ContextInstance -> MPT Unit
-createCopyOfChannelDatabase arrWithChannelName invitation =case ARR.head arrWithChannelName of
-  Just channelName -> void $ lift $ withCouchdbUrl \url -> do
-    -- If the database existed prior to this line, nothing is created.
-    void $ createDatabase channelName
-    mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType privateChannel) >=> binding >=> context)
-    case mchannelContext of
-      Just channelContext -> setChannelReplication url channelContext
-      Nothing -> pure unit
-  Nothing -> pure unit
+createCopyOfChannelDatabase arrWithChannelName invitation = try 
+  (case ARR.head arrWithChannelName of
+    Just channelName -> void $ lift $ withCouchdbUrl \url -> do
+      -- If the database existed prior to this line, nothing is created.
+      void $ createDatabase channelName
+      mchannelContext <- invitation ##> (getEnumeratedRoleInstances (EnumeratedRoleType privateChannel) >=> binding >=> context)
+      case mchannelContext of
+        Just channelContext -> setChannelReplication url channelContext
+        Nothing -> pure unit
+    Nothing -> pure unit)
+  >>= handleExternalStatementError "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase"
 
 addConnectedPartnerToChannel :: Array String -> Array String -> (ContextInstance -> MPT Unit)
-addConnectedPartnerToChannel userArr channelArr cid = do
-  -- log $ "addConnectedPartnerToChannel " <> show userArr <> " en " <> show channelArr
-  case ARR.head userArr of
-    Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the first argument.")
-    Just r -> do
-      sysUser <- lift ((RoleInstance r) ##> bottom)
-      case sysUser of
-        Nothing -> throwError (error "addConnectedPartnerToChannel: first argument is not a User Role (this error may not occur).")
-        Just usr -> case ARR.head channelArr of
-          Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the second argument.")
-          Just channelId -> do
-            -- log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
-            addPartnerToChannel usr (ContextInstance channelId)
+addConnectedPartnerToChannel userArr channelArr cid = try
+  (do
+    -- log $ "addConnectedPartnerToChannel " <> show userArr <> " en " <> show channelArr
+    case ARR.head userArr of
+      Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the first argument.")
+      Just r -> do
+        sysUser <- lift ((RoleInstance r) ##> bottom)
+        case sysUser of
+          Nothing -> throwError (error "addConnectedPartnerToChannel: first argument is not a User Role (this error may not occur).")
+          Just usr -> case ARR.head channelArr of
+            Nothing -> throwError (error "addConnectedPartnerToChannel did not get a value for the second argument.")
+            Just channelId -> do
+              -- log $ "addConnectedPartnerToChannel " <> show usr <> " en " <> show channelId
+              addPartnerToChannel usr (ContextInstance channelId))
+  >>= handleExternalStatementError "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
