@@ -26,7 +26,7 @@ module Perspectives.Extern.Parsing where
 
 import Prelude
 
-import Control.Monad.Error.Class (catchError)
+import Control.Monad.Error.Class (catchError, try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, head, intercalate)
@@ -45,6 +45,7 @@ import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
@@ -63,19 +64,21 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
 -- | However, will load, cache and store dependencies of the model.
 parseAndCompileArc :: Array ArcSource -> (ContextInstance ~~> Value)
-parseAndCompileArc arcSource_ _ = case head arcSource_ of
-  Nothing -> pure $ Value "No arc source given!"
-  Just arcSource -> catchError
-    do
-      lift $ lift $ resetWarnings
-      r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
-      case r of
-        Left errs -> ArrayT $ pure (Value <<< show <$> errs)
-        -- Als er meldingen zijn, geef die dan terug.
-        Right _ -> do
-          warnings <- lift $ lift $ getWarnings
-          pure $ Value $ intercalate "\n" (cons "OK" warnings)
-    \e -> ArrayT $ pure [Value (show e)]
+parseAndCompileArc arcSource_ _ = try
+  (case head arcSource_ of
+    Nothing -> pure $ Value "No arc source given!"
+    Just arcSource -> catchError
+      do
+        lift $ lift $ resetWarnings
+        r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
+        case r of
+          Left errs -> ArrayT $ pure (Value <<< show <$> errs)
+          -- Als er meldingen zijn, geef die dan terug.
+          Right _ -> do
+            warnings <- lift $ lift $ getWarnings
+            pure $ Value $ intercalate "\n" (cons "OK" warnings)
+      \e -> ArrayT $ pure [Value (show e)])
+  >>= handleExternalFunctionError "model://perspectives.domains#Parsing$ParseAndCompileArc"
 
 type ArcSource = String
 type CrlSource = String
@@ -87,16 +90,18 @@ uploadToRepository ::
   Array String -> 
   Array ArcSource ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-uploadToRepository domeinFileName_ arcSource_ _ = case head domeinFileName_, head arcSource_ of
-  Just domeinFileName, Just arcSource -> do
-    r <- loadAndCompileArcFile_ arcSource
-    case r of
-      Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-      Right df@(DomeinFile {id, namespace}) -> do
-        -- lift $ void $ storeDomeinFileInCache id df
-        -- lift $ void $ CDB.uploadToRepository (DomeinFileId id)
-        lift $ void $ uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
-  _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
+uploadToRepository domeinFileName_ arcSource_ _ = try
+  (case head domeinFileName_, head arcSource_ of
+    Just domeinFileName, Just arcSource -> do
+      r <- loadAndCompileArcFile_ arcSource
+      case r of
+        Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
+        Right df@(DomeinFile {id, namespace}) -> do
+          -- lift $ void $ storeDomeinFileInCache id df
+          -- lift $ void $ CDB.uploadToRepository (DomeinFileId id)
+          lift $ void $ uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+    _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments"))
+  >>= handleExternalStatementError "model://perspectives.domains#Parsing$UploadToRepository"
 
 type URL = String
 
@@ -134,11 +139,13 @@ uploadToRepository_ splitName (DomeinFile df) = do
 removeFromRepository :: 
   Array ModelUri ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-removeFromRepository modelUris _ = case head modelUris of
-  Just modelUri -> if isModelUri modelUri
-    then void $ lift $ removeFromRepository_ (unsafePartial modelUri2ModelUrl modelUri)
-    else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> modelUri)
-  _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument.")
+removeFromRepository modelUris _ = try 
+  (case head modelUris of
+    Just modelUri -> if isModelUri modelUri
+      then void $ lift $ removeFromRepository_ (unsafePartial modelUri2ModelUrl modelUri)
+      else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> modelUri)
+    _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument."))
+  >>= handleExternalStatementError "model://perspectives.domains#Parsing$RemoveFromRepository"
 
   where
   removeFromRepository_ :: {repositoryUrl :: String, documentName :: String} -> MonadPerspectives Boolean
@@ -149,9 +156,11 @@ compileRepositoryModels ::
   Array Url ->
   Array Url -> 
   Array RoleInstance -> MonadPerspectivesTransaction Unit
-compileRepositoryModels modelsurl_ manifestsurl_ _ = case head modelsurl_, head manifestsurl_ of
-  Just modelsurl, Just manifestsurl -> recompileModelsAtUrl modelsurl manifestsurl
-  _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments") 
+compileRepositoryModels modelsurl_ manifestsurl_ _ = try
+  (case head modelsurl_, head manifestsurl_ of
+    Just modelsurl, Just manifestsurl -> recompileModelsAtUrl modelsurl manifestsurl
+    _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments"))
+  >>= handleExternalStatementError "model://perspectives.domains#Parsing$CompileRepositoryModels"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
