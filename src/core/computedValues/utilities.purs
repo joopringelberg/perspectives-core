@@ -30,6 +30,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..))
 import Data.String (replace) as String
 import Data.String.Regex (regex, replace) as REGEX
@@ -44,7 +45,7 @@ import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch)
-import Perspectives.Instances.ObjectGetters (context, contextType, roleType)
+import Perspectives.Instances.ObjectGetters (bottom, context, contextType, roleType)
 import Perspectives.Instances.Values (parseNumber)
 import Perspectives.Parsing.Arc.Expression (step)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
@@ -88,6 +89,9 @@ contextIdentifier (ContextInstance id) = pure id
 
 systemIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 systemIdentifier _ = lift $ lift getSystemIdentifier
+
+bottomIdentifier :: RoleInstance -> MonadPerspectivesQuery String
+bottomIdentifier = bottom >=> pure <<< unwrap
 
 replace :: Array String -> Array String -> String -> MonadPerspectivesQuery String
 replace patterns replacements value = case head patterns, head replacements of
@@ -197,6 +201,7 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$RoleIdentifier" {func: unsafeCoerce roleIdentifier, nArgs: 0, isFunctional: True }
   , Tuple "model://perspectives.domains#Utilities$ContextIdentifier" {func: unsafeCoerce contextIdentifier, nArgs: 0, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$SystemIdentifier" {func: unsafeCoerce systemIdentifier, nArgs: 0, isFunctional: True}
+  , Tuple "model://perspectives.domains#Utilities$BottomIdentifier" {func: unsafeCoerce bottomIdentifier, nArgs: 0, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$Replace" {func: unsafeCoerce replace, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$ReplaceR" {func: unsafeCoerce replaceR, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$SelectR" {func: unsafeCoerce selectR, nArgs: 1, isFunctional: True}

@@ -82,8 +82,12 @@ domain model://perspectives.domains#System
     -- | The role identifier of the filler of SocialEnvironment$Me - that is, the unique identifier of this user
     -- | in the Perspectives Universe.
     -- | This includes the storage scheme!
+    -- | A consequence of this design is that every account with an external service obtained through a Perspectives model
+    -- | will have this identifier as user name.
+    -- | Also, every account that has been established outside of Perspectives and must be registered with Perspectives,
+    -- | should have this identifier as user name.
     -- PDRDEPENDENCY
-    property UserName = SpecificUserName orElse sys:MySocialEnvironment >> Me >> binding >> callExternal util:RoleIdentifier() returns String
+    property UserName = SpecificUserName orElse callExternal util:BottomIdentifier() returns String
     -- property UserName = SpecificUserName orElse callExternal util:SystemIdentifier() returns String
     property SpecificUserName (String)
     -- PDRDEPENDENCY
