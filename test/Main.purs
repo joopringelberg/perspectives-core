@@ -18,7 +18,6 @@ import Test.Query.Inversion as INV
 import Test.Parsing.Arc.PhaseThree.SetAffectedContextCalculations as SACC
 import Test.Combinators as COMB
 import Test.Extern.Couchdb as CDB
-import Test.Model.System as TMS
 import Test.Types.ObjectGetters as TTO
 import Test.Queries as QR
 import Test.Sync.Channel as CHA

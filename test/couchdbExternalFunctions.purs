@@ -3,21 +3,27 @@ module Test.Extern.Couchdb where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Free (Free)
 import Data.Array (length, null)
-import Data.Maybe (Maybe(..), isJust) 
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..), isJust)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Effect.Exception (error)
 import Foreign.Object (insert, lookup)
-import Perspectives.CoreTypes ((##=))
+import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives, (##=))
 import Perspectives.Couchdb (designDocumentViews)
-import Perspectives.Extern.Couchdb (createUser, uploadToRepository)
+import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Extern.Couchdb (createUser)
+import Perspectives.Extern.Parsing (uploadToRepository_)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.Identifiers (isModelUri, modelUri2ModelUrl)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (tryGetDocument_)
 import Perspectives.Persistence.Types (Credential(..))
-import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectEntiteit)
 import Perspectives.PerspectivesState (domeinCache)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -49,6 +55,21 @@ testDirectory = "test"
 
 modelDirectory :: String
 modelDirectory = "src/model"
+
+-- | Take a DomeinFile from the local perspect_models database and upload it to the repository database.
+-- | Notice that repositoryUrl is derived from the DomeinFileId.
+-- | Attachments are preserved: if they were in the repository before uploading,
+-- | they will be in the repository after uploading.
+uploadToRepository :: DomeinFileId -> MonadPerspectives Unit
+uploadToRepository dfId@(DomeinFileId domeinFileName) = do
+  if isModelUri domeinFileName
+    then do
+      mdf <- try $ getPerspectEntiteit dfId
+      case mdf of
+        Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err) 
+        Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+    else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
+
 
 theSuite :: Free TestF Unit
 theSuite = suiteOnly "Perspectives.Extern.Couchdb" do 
