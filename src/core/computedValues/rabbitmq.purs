@@ -33,30 +33,19 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService)
 import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, BrokerServiceUrl, QueueName, createBinding, createUser, deleteQueue, deleteUser, runRabbitState', selfRegisterWithRabbitMQ_, setPermissions, virtualHost)
-import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction)
+import Perspectives.Error.Boundaries (handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 type AccountName = String
 type RoutingKey = String
 type AccountPassword = String
-
--- | The use case for this function is that of an Administrator making a BrokerContract for 
--- | a user whom he already has the identifier of.
-createAMQPaccount :: 
-  BrokerServiceUrl -> 
-  AdminUserName -> 
-  AdminPassword -> 
-  AccountName -> 
-  RoutingKey -> 
-  RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
-  MonadPerspectivesQuery AccountPassword
-createAMQPaccount url_ adminUserName_ adminPassword_ accountName_ routingKey_ _ = pure "some password"
 
 -- | Create a user account. Provide a CUID as username and a CUID as password.
 -- | Create user permissions.
@@ -71,25 +60,26 @@ prepareAMQPaccount ::
   Array QueueName -> 
   RoleInstance ->  
   MonadPerspectivesTransaction Unit
-prepareAMQPaccount url_ adminUserName_ adminPassword_ accountName_ accountPassword_ queueName_ _ = case 
-    head url_, 
-    head adminUserName_, 
-    head adminPassword_, 
-    head accountName_, 
-    head accountPassword_,
-    head queueName_ of
-  Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just userName, Just password, Just queueName -> do
-    -- userName <- lift createCuid
-    -- queueName <- lift createCuid
-    lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do 
-      r <- try do
-        createUser {password, tags: ""} userName
-        setPermissions userName {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
-      case r of 
-        Left e -> logPerspectivesError $ Custom $ show e
-        Right _ -> pure unit
-
-  _, _, _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount." 
+prepareAMQPaccount url_ adminUserName_ adminPassword_ accountName_ accountPassword_ queueName_ _ = try
+  (case 
+      head url_, 
+      head adminUserName_, 
+      head adminPassword_, 
+      head accountName_, 
+      head accountPassword_,
+      head queueName_ of
+    Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just userName, Just password, Just queueName -> do
+      -- userName <- lift createCuid
+      -- queueName <- lift createCuid
+      lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do 
+        r <- try do
+          createUser {password, tags: ""} userName
+          setPermissions userName {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
+        case r of 
+          Left e -> logPerspectivesError $ Custom $ show e
+          Right _ -> pure unit
+    _, _, _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount.")
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$PrepareAMQPAccount"
 
 -- | This function calls a service on the url that registers a user with RabbitMQ, using 
 -- | Admin credentials fixed in the service's code.
@@ -104,17 +94,19 @@ selfRegisterWithRabbitMQ ::
   Array QueueName -> 
   RoleInstance ->
   MonadPerspectivesTransaction Unit
-selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = case 
-    head url_, 
-    head accountName_, 
-    head accountPassword_, 
-    head queueName_ of
-  Just brokerServiceUrl, Just userName, Just password, Just queueName -> do
-    r <- try $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
-    case r of 
-      Left e -> logPerspectivesError $ Custom $ show e
-      Right _ -> pure unit
-  _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount." 
+selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
+  (case 
+      head url_, 
+      head accountName_, 
+      head accountPassword_, 
+      head queueName_ of
+    Just brokerServiceUrl, Just userName, Just password, Just queueName -> do
+      r <- try $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
+      case r of 
+        Left e -> logPerspectivesError $ Custom $ show e
+        Right _ -> pure unit
+    _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount.")
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ"
 
 
 -- | Creates the binding between a user identifier and a queue, so peers can push transactions
@@ -128,21 +120,22 @@ setBindingKey ::
   Array RoutingKey ->
   RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
   MonadPerspectivesTransaction Unit
-setBindingKey url_ userName_ password_ queueName_ routingKey_ _ = case 
-    head url_, 
-    head userName_, 
-    head password_, 
-    head queueName_,
-    head routingKey_ of
-  Just brokerServiceUrl, Just userName, Just password, Just queueName, Just routingKey -> do
-      r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName: userName, adminPassword: password }
-        -- TODO: misschien kunnen we het resource argument gebruiken?
-        (createBinding (RoleInstance routingKey) queueName)
-      case r of 
-        Left e -> logPerspectivesError $ Custom $ show e
-        Right _ -> pure unit
-  
-  _, _, _, _, _ -> throwError $ error "Missing some arguments in setBindingKey." 
+setBindingKey url_ userName_ password_ queueName_ routingKey_ _ = try
+  (case 
+      head url_, 
+      head userName_, 
+      head password_, 
+      head queueName_,
+      head routingKey_ of
+    Just brokerServiceUrl, Just userName, Just password, Just queueName, Just routingKey -> do
+        r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName: userName, adminPassword: password }
+          -- TODO: misschien kunnen we het resource argument gebruiken?
+          (createBinding (RoleInstance routingKey) queueName)
+        case r of 
+          Left e -> logPerspectivesError $ Custom $ show e
+          Right _ -> pure unit  
+    _, _, _, _, _ -> throwError $ error "Missing some arguments in setBindingKey.")
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$SetBindingKey"
 
 setPassword :: 
   BrokerServiceUrl -> 
@@ -163,20 +156,22 @@ deleteAMQPaccount ::
   Array QueueName ->
   RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
   MonadPerspectivesTransaction Unit
-deleteAMQPaccount url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = case 
-    head url_, 
-    head adminUserName_, 
-    head adminPassword_, 
-    head accountName_,
-    head queueName_ of
-  Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
-      r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do
-        deleteUser accountName
-        deleteQueue queueName
-      case r of 
-        Left e -> logPerspectivesError $ Custom $ show e
-        Right _ -> pure unit
-  _, _, _, _, _ -> throwError $ error "Missing some arguments in deleteAMQPaccount." 
+deleteAMQPaccount url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = try 
+  (case 
+      head url_, 
+      head adminUserName_, 
+      head adminPassword_, 
+      head accountName_,
+      head queueName_ of
+    Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
+        r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do
+          deleteUser accountName
+          deleteQueue queueName
+        case r of 
+          Left e -> logPerspectivesError $ Custom $ show e
+          Right _ -> pure unit
+    _, _, _, _, _ -> throwError $ error "Missing some arguments in deleteAMQPaccount.")
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$deleteAMQPaccount"
 
 setPermissionsForAMQPaccount ::
   Array BrokerServiceUrl -> 
@@ -186,30 +181,32 @@ setPermissionsForAMQPaccount ::
   Array QueueName ->
   RoleInstance ->   -- NOTE: this may have to be a ContextInstance.
   MonadPerspectivesTransaction Unit
-setPermissionsForAMQPaccount url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = case 
-    head url_, 
-    head adminUserName_, 
-    head adminPassword_, 
-    head accountName_,
-    head queueName_ of
-  Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
-      r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do
-        setPermissions accountName {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
-        deleteQueue queueName
-      case r of 
-        Left e -> logPerspectivesError $ Custom $ show e
-        Right _ -> pure unit
-  _, _, _, _, _ -> throwError $ error "Missing some arguments in deleteAMQPaccount." 
+setPermissionsForAMQPaccount url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = try
+  (case 
+      head url_, 
+      head adminUserName_, 
+      head adminPassword_, 
+      head accountName_,
+      head queueName_ of
+    Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
+        r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do
+          setPermissions accountName {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
+          deleteQueue queueName
+        case r of 
+          Left e -> logPerspectivesError $ Custom $ show e
+          Right _ -> pure unit
+    _, _, _, _, _ -> throwError $ error "Missing some arguments in SetPermissionsForAMQPaccount.")
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$SetPermissionsForAMQPaccount"
 
 startListening :: RoleInstance -> MonadPerspectivesTransaction Unit
-startListening _ = lift retrieveBrokerService
+startListening _ = try (lift retrieveBrokerService)
+  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$StartListening"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#RabbitMQ$CreateAMQPaccount" {func: unsafeCoerce createAMQPaccount, nArgs: 6, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce prepareAMQPaccount, nArgs: 6, isFunctional: True}
+  [ Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce prepareAMQPaccount, nArgs: 6, isFunctional: True}
   , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setBindingKey, nArgs: 5, isFunctional: True}
   , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 5, isFunctional: True}
   , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 5, isFunctional: True}
