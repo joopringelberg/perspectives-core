@@ -27,23 +27,31 @@ module Perspectives.Extern.Parsing where
 import Prelude
 
 import Control.Monad.Error.Class (catchError)
-import Control.Monad.Trans.Class (lift) 
+import Control.Monad.State (StateT, execStateT, get, put)
+import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, head, intercalate)
 import Data.Either (Either(..))
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..))
+import Data.MediaType (MediaType(..))
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Foreign (Foreign)
+import Foreign.Object (Object, empty)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction, MonadPerspectives)
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
+import Perspectives.Couchdb.Revision (Revision_, changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (removeFromRepository_)
-import Perspectives.Extern.Couchdb (uploadToRepository_) as CDB
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (addAttachment) as Persistence
+import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, retrieveDocumentVersion, tryGetDocument_)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -87,8 +95,41 @@ uploadToRepository domeinFileName_ arcSource_ _ = case head domeinFileName_, hea
       Right df@(DomeinFile {id, namespace}) -> do
         -- lift $ void $ storeDomeinFileInCache id df
         -- lift $ void $ CDB.uploadToRepository (DomeinFileId id)
-        lift $ void $ CDB.uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+        lift $ void $ uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
   _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments")
+
+type URL = String
+
+-- | As uploadToRepository, but provide the DomeinFile as argument.
+uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
+uploadToRepository_ splitName (DomeinFile df) = do 
+  -- Get the attachment info
+  (mremoteDf :: Maybe DomeinFile) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
+  attachments <- case mremoteDf of
+    Nothing -> pure empty
+    Just (DomeinFile {_attachments}) -> case _attachments of
+      Nothing -> pure empty
+      Just atts ->  traverseWithIndex
+        (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment splitName.repositoryUrl splitName.documentName attName)
+        atts
+  -- Get the revision (if any) from the remote database, so we can overwrite.
+  (mVersion :: Maybe String) <- retrieveDocumentVersion splitName.repositoryUrl splitName.documentName
+  -- The _id of df will be a versionless identifier. If we don't set it to the versioned name, the document
+  -- will be stored under the versionless name.
+  (newRev :: Revision_) <- addDocument splitName.repositoryUrl (changeRevision mVersion (DomeinFile df {_id = splitName.documentName})) splitName.documentName
+  -- Now add the attachments.
+  void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
+
+  where
+    -- As each attachment that we add will bump the document version, we have to catch it and use it on the
+    -- next attachment.
+    go :: URL -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
+    go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
+      Nothing -> pure unit
+      Just attachment -> do
+        newRev <- get
+        DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
+        put rev
 
 removeFromRepository :: 
   Array ModelUri ->
@@ -99,6 +140,9 @@ removeFromRepository modelUris _ = case head modelUris of
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> modelUri)
   _ -> logPerspectivesError $ Custom ("removeFromRepository lacks the ModelURI argument.")
 
+  where
+  removeFromRepository_ :: {repositoryUrl :: String, documentName :: String} -> MonadPerspectives Boolean
+  removeFromRepository_ splitName = deleteDocument splitName.repositoryUrl splitName.documentName Nothing
 
 -- | Parse and compile all models found at the URL, e.g. https://perspectives.domains/models_perspectives_domains
 compileRepositoryModels ::

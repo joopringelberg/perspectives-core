@@ -22,11 +22,15 @@
 
 module Perspectives.Error.Boundaries where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Either (Either(..))
 import Effect.Class (class MonadEffect)
 import Effect.Exception (Error)
-import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Warning (PerspectivesWarning(..))
 import Prelude (Unit, show, ($), pure, unit, bind, (*>))
 
 handlePerspectRolError :: forall a m r. MonadEffect m => String -> (r -> m a) -> Either Error r -> m Unit
@@ -70,3 +74,11 @@ handleDomeinFileError' :: forall a m r. MonadEffect m => String -> a -> (r -> m 
 handleDomeinFileError' boundaryName default f dfile = case dfile of
   Left err -> (logPerspectivesError $ DomeinFileErrorBoundary boundaryName (show err)) *> pure default
   Right ctxt -> f ctxt
+
+handleExternalFunctionError :: forall a. String -> Either Error a -> MonadPerspectivesQuery a
+handleExternalFunctionError fname (Left e) = ArrayT (lift $ warnModeller (ExternalFunctionError fname (show e)) *> pure [])
+handleExternalFunctionError fname (Right result) = pure result
+
+handleExternalStatementError :: String -> Either Error Unit -> MonadPerspectivesTransaction Unit
+handleExternalStatementError fname (Left e) = (lift $ warnModeller (ExternalFunctionError fname (show e)) *> pure unit)
+handleExternalStatementError fname (Right result) = pure result

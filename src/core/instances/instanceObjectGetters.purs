@@ -308,21 +308,6 @@ getProperty pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
         Nothing -> pure []
         (Just p) -> pure p
 
--- | Get a property on a chain of EnumeratedRole instances that are filled by each other.
--- | The function [getDynamicPropertyGetter](Perspectives.Query.UnsafeCompiler.html#t:getDynamicPropertyGetter)
--- | will compute the Values for a PropertyType (Enumerated or Calculated).
-getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
-getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
-  handlePerspectRolError' "getPropertyFromTelescope" []
-    \((IP.PerspectRol{properties, binding: bnd}) :: IP.PerspectRol) -> do
-      tell $ ArrayWithoutDoubles [Property r pn]
-      case (lookup (unwrap pn) properties) of
-        Nothing -> do
-          case bnd of
-            Nothing -> pure []
-            Just b -> runArrayT $ getPropertyFromTelescope pn b
-        (Just p) -> pure p
-
 -- | From a Property value getter, create a function that tries to find a value for the property
 -- | on the role or its binding, recursively.
 makeChainGetter :: (RoleInstance ~~> Value) -> (RoleInstance ~~> Value)

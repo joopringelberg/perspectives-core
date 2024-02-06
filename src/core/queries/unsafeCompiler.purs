@@ -30,9 +30,9 @@ module Perspectives.Query.UnsafeCompiler where
 import Control.Alt (map, void, (<|>))
 import Control.Alternative (guard)
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (WriterT)
+import Control.Monad.Writer (WriterT, tell)
 import Control.Plus (empty)
 import Data.Array (catMaybes, elemIndex, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
@@ -45,11 +45,13 @@ import Data.Traversable (for, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption, MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (###=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (###=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
+import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
+import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
@@ -59,6 +61,7 @@ import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
+import Perspectives.Persistent (getPerspectEntiteit)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2PropertyRange, domain2contextType, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
@@ -73,7 +76,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Duration_(..), isDateOrTime, isPDuration)
 import Perspectives.Representation.Range (Range(..)) as RAN
-import Perspectives.Representation.State (State(..), StateFulObject(..))
+import Perspectives.Representation.State (State(..), StateFulObject(..)) as STATE
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Time (string2Date, string2DateTime, string2Time)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
@@ -94,9 +97,9 @@ compileFunction (SQD _ (RolGetter (CR cr)) _ _ _) = do
   -- TODO moeten we hier de currentcontext pushen?
   RC.calculation ct >>= compileFunction
 
-compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP (EnumeratedPropertyType pt))) _ _ _) = do
-  g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
-  pure $ unsafeCoerce g
+compileFunction (SQD (RDOM roleAdt) (PropertyGetter (ENP prop@(EnumeratedPropertyType pt))) _ _ _) = do
+  -- g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
+  pure $ unsafeCoerce (getPropertyFromTelescope prop)
 
 compileFunction (SQD (RDOM roleAdt) (PropertyGetter (CP (CalculatedPropertyType pt))) _ _ _) = do
   g <- getDynamicPropertyGetter pt (roleInContext2Role <$> roleAdt)
@@ -419,11 +422,11 @@ compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ 
     FillerF -> pure $ unsafeCoerce bindingInContext (ContextType parameter)
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
     IsInStateF -> do 
-      (State {stateFulObject}) <- getState (StateIdentifier parameter)
+      (STATE.State {stateFulObject}) <- getState (StateIdentifier parameter)
       case stateFulObject of 
-        Cnt ct -> pure $ \contextId -> lift $ lift $ getActiveStates_ (ContextInstance contextId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
-        Orole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
-        Srole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+        STATE.Cnt ct -> pure $ \contextId -> lift $ lift $ getActiveStates_ (ContextInstance contextId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+        STATE.Orole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
+        STATE.Srole rt -> pure $ \roleId -> lift $ lift $ getActiveRoleStates_ (RoleInstance roleId) >>= pure <<< show <<< isJust <<< elemIndex (StateIdentifier parameter)
     GetRoleInstancesForContextFromDatabaseF -> pure $ unsafeCoerce $ getUnlinkedRoleInstances (EnumeratedRoleType parameter)
 
     _ -> throwError (error $ "Unknown function for DataTypeGetterWithParameter: " <> show functionName)
@@ -830,49 +833,63 @@ getHiddenFunction = unsafeCoerce $ compileFunction
 
 -- | From a string that represents either a Calculated or an Enumerated property,
 -- | for a given abstract datatype of roles, retrieve the values from a role instance.
--- | This function can return an empty value even while somewhere on the chain the property 
--- | actually has a value. This is because it looks for the value on the FIRST role instance
--- | that COULD have the property.
 getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getDynamicPropertyGetter p adt = do
   (pt :: PropertyType) <- getPropertyType p
   case pt of 
     CP _ -> do 
+      -- We MUST explore whether the property is defined locally for the current ADT EnumeratedRoleType.
+      -- This is because the calculation starts at that role type.
       allProps <- allLocallyRepresentedProperties adt
       -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
       if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
         then getterFromPropertyType pt
         else pure (binding >=> f)
-    ENP eprop -> pure $ g eprop
+    ENP eprop -> pure $ getPropertyFromTelescope eprop
   where
-    g :: EnumeratedPropertyType -> RoleInstance ~~> Value
-    g eprop rid = do 
-      -- We must take aliases of the actual role type into account.
-      (roleType :: EnumeratedRoleType) <- lift $ lift $ roleType_ rid
-      -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
-      -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
-      -- get the models until the end user explicitly asks for it.
-      -- This situation will go away in the next version.
-      aliases <- catchError (lift $ lift $ propertyAliases roleType)
-        \e -> pure OBJ.empty
-      case OBJ.lookup (unwrap eprop) aliases of
-        Just destination -> do 
-          getter <- lift $ lift $ getterFromPropertyType (ENP destination)
-          getter rid
-        Nothing -> do
-          allProps <- lift $ lift $ allLocallyRepresentedProperties adt
-          if isJust $ elemIndex (ENP eprop) allProps
-            then do 
-              getter <- lift $ lift $ getterFromPropertyType (ENP eprop)
-              getter rid
-            else (binding >=> f) rid
-
     f :: RoleInstance ~~> Value
     f bnd = do
       (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
       getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
       getter bnd
 
+-- | Get a property on a chain of EnumeratedRole instances that are filled by each other.
+-- | The function [getDynamicPropertyGetter](Perspectives.Query.UnsafeCompiler.html#t:getDynamicPropertyGetter)
+-- | will compute the Values for a PropertyType (Enumerated or Calculated).
+getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
+getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
+  handlePerspectRolError' "getPropertyFromTelescope" []
+    \((PerspectRol{properties, binding: bnd, pspType:roleType}) :: PerspectRol) -> do
+      -- We must take aliases of the actual role type into account. An alias is another name for an Aspect Property that 
+      -- has been added to the role.
+      aliases <- catchError (lift $ propertyAliases roleType)
+        \e -> pure OBJ.empty
+      case OBJ.lookup (unwrap pn) aliases of
+        Just aliasPropertyName -> do 
+          -- getProperty destination rid
+          case (OBJ.lookup (unwrap aliasPropertyName) properties) of
+            Nothing -> do
+              case bnd of
+                Nothing -> pure []
+                -- Search further with the original name. The alias was defined just for this role type.
+                Just b -> runArrayT $ getPropertyFromTelescope pn b
+            (Just p) -> do 
+              tell $ ArrayWithoutDoubles [Property r aliasPropertyName]
+              pure p
+        Nothing -> case (OBJ.lookup (unwrap pn) properties) of
+          Nothing -> do
+            case bnd of
+              Nothing -> pure []
+              -- Search further with the original name. The alias was defined just for this role type.
+              Just b -> runArrayT $ getPropertyFromTelescope pn b
+          (Just p) ->  do 
+            tell $ ArrayWithoutDoubles [Property r pn]
+            pure p
+
+-- | Builds, in compile time, a composition of `binding` and `getProperty` that will retrieve the value from the first 
+-- | instance on the chain on which that property has been declared. 
+-- NOTE that the implementation critically depends on the actual instance. That is not correct. It should take 
+-- the roleType(s) from the ADT.
 getDynamicEnumeratedPropertyGetter :: EnumeratedPropertyType -> ADT EnumeratedRoleType -> RoleInstance ~~> Value
 getDynamicEnumeratedPropertyGetter eprop adt rid = do
   -- We must take aliases of the actual role type into account.

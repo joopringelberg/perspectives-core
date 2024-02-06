@@ -96,11 +96,15 @@ domain model://perspectives.domains#CouchdbManagement
       property CouchdbPort (mandatory, String)
         pattern = "^\\d{1,5}$" "A port number written as a string, consisting of up to 5 digits, maximally 65535."
       -- The Password and UserName of Manager (and therefore CouchdbServer$Admin) for Url.
+      -- Notice that the AdminUserName *must* be 
       property AdminPassword (mandatory, String)
       property AdminUserName (mandatory, String)
 
       -- Add credentials to Perspectives State (not to the Couchdb_).
       -- This means that the PDR can now authenticate on behalf of the Admin with Couchdb_.
+      -- These credentials are only effective in the current session. 
+      -- They are added (persistently) to CouchdbServer$Admin as soon as that role is filled. From then on,
+      -- this installation can authenticate with the server at Url.
       state AddCredentials = ((exists Url) and exists AdminPassword) and exists AdminUserName
         on entry
           do for Manager
@@ -124,7 +128,9 @@ domain model://perspectives.domains#CouchdbManagement
       state NoAdmin = (exists binding) and not exists binding >> context >> CouchdbServer$Admin
         on entry
           do for Manager
-            -- Tie these credentials to the CouchdbServer$Admin role.
+            -- Manager 
+            -- Tie these credentials to the CouchdbServer$Admin role. As this has aspect WithCredentials,
+            -- from now on this set of credentials will be added to Perspectives State on startup.
             bind context >> Manager to Admin in binding >> context
             AuthorizedDomain = Url for  binding >> context >> Admin     -- zet dit wel voor een nieuwe CouchdbServer$Admin. Password en eventueel SpecificUserName moet hij zelf zetten.
             Password = AdminPassword for binding >> context >> Admin
@@ -584,7 +590,6 @@ domain model://perspectives.domains#CouchdbManagement
               -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
               create_ context ModelManifest named manifestname bound to origin
               bind currentactor to Author in origin >> binding >> context
-              -- dit werkt.
               DomeinFileName = manifestname + ".json" for origin >> binding
 
   case ModelManifest 

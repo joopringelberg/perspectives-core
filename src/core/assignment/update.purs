@@ -74,7 +74,7 @@ import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistence.API (toFile)
 import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Persistent (saveEntiteit) as Instances
-import Perspectives.Query.UnsafeCompiler (getDynamicEnumeratedPropertyGetter)
+import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
@@ -480,7 +480,7 @@ setProperty rids propertyName values = do
     hasDifferentValues :: RoleInstance -> MonadPerspectivesTransaction Boolean
     hasDifferentValues rid = do
       rtype <- lift $ roleType_ rid
-      vals <- lift (rid ##= getDynamicEnumeratedPropertyGetter propertyName (ST rtype))
+      vals <- lift (rid ##= getPropertyFromTelescope propertyName)
       pure $ (not $ null (difference values vals)) || (not $ null (difference vals values))
 
 -----------------------------------------------------------

@@ -265,7 +265,7 @@ checkSynchronization = do
         projectedGraph <- unsafePartial projectForPropertyDeltas propId roleId
         case checkAllStartpoints projectedGraph of
           none | null none -> pure unit
-          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (PropertySynchronizationIncomplete propId source destinations)
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller (PropertySynchronizationIncomplete propId source destinations)
       otherwise -> pure unit
     pure unit
   for_ contexts \c@(Context{id, roleInvertedQueries}) -> do
@@ -277,11 +277,11 @@ checkSynchronization = do
         projectedGraph <- unsafePartial projectForRoleInstanceDeltas roleId roleInvertedQueries
         case checkAllStartpoints projectedGraph of
           none | null none -> pure unit
-          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleSynchronizationIncomplete roleId source destinations)
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller (RoleSynchronizationIncomplete roleId source destinations)
         -- CHECK INVERTED QUERIES FOR 'BINDING' AND 'BINDER' OPERATORS
         projectedGraph' <- unsafePartial projectForRoleBindingDeltas roleId id
         case checkAllStartpoints projectedGraph' of
           none | null none -> pure unit
-          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller Nothing (RoleBindingSynchronizationIncomplete roleId source destinations)
+          failures -> lift $ lift $ for_ failures \(Tuple source destinations) -> warnModeller (RoleBindingSynchronizationIncomplete roleId source destinations)
       otherwise -> pure unit
  

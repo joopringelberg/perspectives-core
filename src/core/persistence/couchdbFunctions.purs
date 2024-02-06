@@ -53,6 +53,7 @@ import Data.HTTP.Method (Method(..))
 import Data.Map (insert, fromFoldable) as MAP
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
+import Data.Nullable (Nullable)
 import Data.String (toLower)
 import Data.String.Base64 (btoa)
 import Data.Tuple (Tuple(..))
@@ -174,7 +175,7 @@ newtype UserDocument = UserDocument
   , _rev :: Maybe String
   , name :: String
   , password_scheme :: String
-  , password :: String
+  , password :: Maybe String 
   , iterations :: Int
   , derived_key :: String
   , salt :: String
