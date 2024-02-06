@@ -29,6 +29,7 @@ import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
 import Data.Either (Either(..))
+import Data.Int (floor)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), Replacement(..))
@@ -43,6 +44,7 @@ import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.CoreTypes (MonadPerspectivesQuery)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Error.Boundaries (handleExternalFunctionError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.Instances.ObjectGetters (bottom, context, contextType, roleType)
@@ -68,18 +70,22 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
 genSym :: RoleInstance -> MonadPerspectivesQuery String
-genSym _ = lift $ lift createCuid
+genSym _ = try 
+  (lift $ lift createCuid)
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$GenSym"
 
--- | Returns a random number in the closed interval [l;u].
+-- | Returns a random int in the closed interval [l;u].
 random :: Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery Value
-random lower_ upper_ _ = ArrayT case head lower_, head upper_ of
-  Just l, Just u -> do 
-    lowerBound <- try $ liftAff $ parseNumber l 
-    upperBound <- try $ liftAff $ parseNumber u
-    case lowerBound, upperBound of 
-      Right lower, Right upper -> (liftEffect (randomRange lower upper)) >>= pure <<< singleton <<< Value <<< show
-      _, _ -> pure []
-  _, _ -> pure []
+random lower_ upper_ _ = try 
+  (ArrayT case head lower_, head upper_ of
+    Just l, Just u -> do 
+      lowerBound <- try $ liftAff $ parseNumber l 
+      upperBound <- try $ liftAff $ parseNumber u
+      case lowerBound, upperBound of 
+        Right lower, Right upper -> (liftEffect (randomRange lower upper)) >>= pure <<< singleton <<< Value <<< show <<< floor
+        _, _ -> pure []
+    _, _ -> pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$Random"
 
 roleIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 roleIdentifier (RoleInstance id) = pure id
@@ -88,33 +94,41 @@ contextIdentifier :: ContextInstance -> MonadPerspectivesQuery String
 contextIdentifier (ContextInstance id) = pure id
 
 systemIdentifier :: RoleInstance -> MonadPerspectivesQuery String
-systemIdentifier _ = lift $ lift getSystemIdentifier
+systemIdentifier _ = try
+  (lift $ lift getSystemIdentifier)
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$SystemIdentifier"
 
 bottomIdentifier :: RoleInstance -> MonadPerspectivesQuery String
 bottomIdentifier = bottom >=> pure <<< unwrap
 
 replace :: Array String -> Array String -> String -> MonadPerspectivesQuery String
-replace patterns replacements value = case head patterns, head replacements of
-  Just pattern, Just replacement -> pure $ String.replace (Pattern pattern) (Replacement replacement) value
-  _, _ -> pure value
+replace patterns replacements value = try
+  (case head patterns, head replacements of
+    Just pattern, Just replacement -> pure $ String.replace (Pattern pattern) (Replacement replacement) value
+    _, _ -> pure value)
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$Replace"
 
 replaceR :: Array String -> Array String -> String -> MonadPerspectivesQuery String
-replaceR patterns replacements value = case head patterns, head replacements of
-  Just regexString, Just replacement -> do
-    theRegex <- pure $ REGEX.regex regexString noFlags
-    case theRegex of
-      Left e -> pure value
-      Right r -> pure $ REGEX.replace r replacement value
-  _, _ -> pure value
+replaceR patterns replacements value = try
+  (case head patterns, head replacements of
+    Just regexString, Just replacement -> do
+      theRegex <- pure $ REGEX.regex regexString noFlags
+      case theRegex of
+        Left e -> pure value
+        Right r -> pure $ REGEX.replace r replacement value
+    _, _ -> pure value)
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$ReplaceR"
 
 selectR :: Array String -> String -> MonadPerspectivesQuery String
-selectR patterns value = ArrayT case head patterns of
-  Just regexString -> case REGEX.regex regexString noFlags of
-    Left e -> pure []
-    Right r -> case getFirstMatch r value of
-      Nothing -> pure []
-      Just s -> pure [s]
-  Nothing -> pure []
+selectR patterns value = try 
+  (ArrayT case head patterns of
+    Just regexString -> case REGEX.regex regexString noFlags of
+      Left e -> pure []
+      Right r -> case getFirstMatch r value of
+        Nothing -> pure []
+        Just s -> pure [s]
+    Nothing -> pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$SelectR"
 
 -- | See https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat for the values of Locale and 
 -- | the shape that the options can have.
@@ -126,11 +140,13 @@ type FormatOptions = String
 
 -- | The timeZone is always UTC. This is in line with the time values that we obtain from the SmartFieldControl.
 formatDateTime_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
-formatDateTime_ dts locales optionss _ = ArrayT $ case head dts, head locales, head optionss of
-  Just dt, Just locale, Just options -> do
-    epoch <- parseNumber dt
-    runArrayT $ formatDateTime epoch locale options
-  _, _, _ -> pure []
+formatDateTime_ dts locales optionss _ = try 
+  (ArrayT $ case head dts, head locales, head optionss of
+    Just dt, Just locale, Just options -> do
+      epoch <- parseNumber dt
+      runArrayT $ formatDateTime epoch locale options
+    _, _, _ -> pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$FormatDateTime"
 
 formatDateTime :: Number -> Locale -> FormatOptions -> MonadPerspectivesQuery String
 formatDateTime dt locale options = liftEffect $ runEffectFn3 formatDateTimeImpl dt locale options
@@ -168,30 +184,37 @@ evalExpression expr roleId@(RoleInstance id) = do
               pure $ "result#" <> result
 
 evalExpression_ :: Array String -> RoleInstance -> MonadPerspectivesQuery String
-evalExpression_ exprArray roleId = ArrayT case head exprArray of 
-  Just expr -> runArrayT $ evalExpression expr roleId
-  _ -> pure []
+evalExpression_ exprArray roleId = try
+  (ArrayT case head exprArray of 
+    Just expr -> runArrayT $ evalExpression expr roleId
+    _ -> pure []
+  )
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$EvalExpression"
 
 -- | Return various values from PerspectivesState or even other state.
 systemParameter_ :: Array String -> ContextInstance -> MonadPerspectivesQuery String
-systemParameter_ parArray _ = ArrayT $ lift case head parArray of 
-  Just par -> case par of
-    "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation <<< _.runtimeOptions)
-    "PublicKey" -> getMyPublicKey >>= case _ of 
-      Just publicKey -> pure [publicKey]
-      Nothing -> pure []
-    "MyContextsVersion" -> gets (singleton <<< _.myContextsVersion <<< _.runtimeOptions)
-    "PDRVersion" -> pure [pdrVersion]
-    _ -> pure []
-  _ -> pure []
+systemParameter_ parArray _ = try 
+  (ArrayT $ lift case head parArray of 
+    Just par -> case par of
+      "IsFirstInstallation" -> gets (singleton <<< show <<< _.isFirstInstallation <<< _.runtimeOptions)
+      "PublicKey" -> getMyPublicKey >>= case _ of 
+        Just publicKey -> pure [publicKey]
+        Nothing -> pure []
+      "MyContextsVersion" -> gets (singleton <<< _.myContextsVersion <<< _.runtimeOptions)
+      "PDRVersion" -> pure [pdrVersion]
+      _ -> pure []
+    _ -> pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$SystemParameter"
 
 foreign import pdrVersion :: String
 
 -- | Given a serialised transaction and the string representation of a ConfirmationCode, creates a serialised Invitation
 createInvitation_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
-createInvitation_ messageA transactionA confirmationA _ = ArrayT $ lift case head messageA, head transactionA, head confirmationA of
-  Just message, Just transaction, Just confirmation -> pure [writeJSON { message, transaction, confirmation }]
-  _, _, _ -> pure []
+createInvitation_ messageA transactionA confirmationA _ = try 
+  (ArrayT $ lift case head messageA, head transactionA, head confirmationA of
+    Just message, Just transaction, Just confirmation -> pure [writeJSON { message, transaction, confirmation }]
+    _, _, _ -> pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$CreateInvitation"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
