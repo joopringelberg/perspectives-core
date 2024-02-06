@@ -27,6 +27,7 @@ module Perspectives.Extern.Sensors where
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets)
+import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
 import Data.Map (Map, fromFoldable, lookup)
@@ -38,6 +39,7 @@ import LRUCache (size)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectives)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.Error.Boundaries (handleExternalFunctionError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -93,11 +95,13 @@ cacheSize device sensor = show <$> case device, sensor of
 
 -- | Read a value from a Sensor on a Device.
 readSensor :: Array Device -> Array Sensor -> RoleInstance -> MonadPerspectivesQuery String
-readSensor device' sensor' _ = case head device', head sensor' of
-  Just device, Just sensor -> ArrayT case lookup (Tuple device sensor) sensorFunctions of
-    Nothing -> pure []
-    Just f -> lift $ singleton <$> f device sensor
-  _, _ -> ArrayT $ pure []
+readSensor device' sensor' _ = try 
+  (case head device', head sensor' of
+    Just device, Just sensor -> ArrayT case lookup (Tuple device sensor) sensorFunctions of
+      Nothing -> pure []
+      Just f -> lift $ singleton <$> f device sensor
+    _, _ -> ArrayT $ pure [])
+  >>= handleExternalFunctionError "model://perspectives.domains#Sensor$ReadSensor"
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
