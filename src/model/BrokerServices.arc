@@ -45,6 +45,7 @@ domain model://perspectives.domains#BrokerServices
 
   -- The entry point (the `application`), available as bs:MyBrokers.
   case BrokerServices
+    -- PDRDEPENDENCY
     indexed bs:MyBrokers
     aspect sys:RootContext
     external
@@ -85,8 +86,11 @@ domain model://perspectives.domains#BrokerServices
       property Exchange (mandatory, String)
       -- For mycontexts this is "https://mycontexts.com/rbmq/".
       property ManagementEndpoint (mandatory, String)
+        pattern = "^https://[^\\/]+\\/rbmq$" "A url with the https scheme, ending on '/rbmq/'"
       -- For mycontexts this is "https://mycontexts.com/rbsr/".
       property SelfRegisterEndpoint (mandatory, String)
+        pattern = "^https://[^\\/]+\\/rbmq$" "A url with the https scheme, ending on '/rbsr/'"
+
       
     user Administrator filledBy sys:PerspectivesSystem$User
       -- The credentials of Administrator for the remote RabbitMQ server.
@@ -125,14 +129,19 @@ domain model://perspectives.domains#BrokerServices
           create role AccountHolder
     external
       aspect sys:Invitation$External
+    -- PDRDEPENDENCY
       property Url = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Url
       property ManagementEndpoint = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> ManagementEndpoint
+    -- PDRDEPENDENCY
       property Exchange = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
       property Name = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Name
       property FirstNameOfAccountHolder = context >> AccountHolder >> FirstName
       property LastNameOfAccountHolder = context >> AccountHolder >> LastName
+      -- We use this on system startup.
+      -- PDRDEPENDENCY
+      property CurrentQueueName = sys:MySystem >> extern >> binder Queues >> QueueName
 
-      view ForAccountHolder (Url, Exchange)
+      view ForAccountHolder (Url, Exchange )
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
     
     -- PDRDEPENDENCY
@@ -143,27 +152,32 @@ domain model://perspectives.domains#BrokerServices
       -- PDRDEPENDENCY
       property AccountPassword (mandatory, String)
       -- PDRDEPENDENCY
-      property QueueName (mandatory, String)
+      -- property QueueName (mandatory, String)
 
       -- Create an account on the RabbitMQ server. It is ready for the AccountHolder to listen to,
       -- but no other users can reach him yet.
       state PrepareAccount = not exists binding
         on entry
           do for BrokerContract$Administrator
-            AccountName = callExternal util:GenSym() returns String
-            AccountPassword = callExternal util:GenSym() returns String
-            QueueName = callExternal util:GenSym() returns String
-            callEffect rabbit:PrepareAMQPaccount(
-              context >> extern >> ManagementEndpoint,
-              context >> Administrator >> AdminUserName,
-              context >> Administrator >> AdminPassword,
-              AccountName,
-              AccountPassword,
-              QueueName)
+            letA 
+              queue <- create role Queues
+              queueid <- callExternal util:GenSym() returns String
+            in
+              AccountName = callExternal util:GenSym() returns String
+              AccountPassword = callExternal util:GenSym() returns String
+              QueueName = queueid for queue
+              callEffect rabbit:PrepareAMQPaccount(
+                context >> extern >> ManagementEndpoint,
+                context >> Administrator >> AdminUserName,
+                context >> Administrator >> AdminPassword,
+                AccountName,
+                AccountPassword,
+                queueid)
       
       state StartService = exists binding
         on entry
           do for AccountHolder
+            bind_ (sys:MySystem >> extern) to (context >> EmptyQueue)
             callEffect rabbit:StartListening()
 
       on exit
@@ -172,30 +186,45 @@ domain model://perspectives.domains#BrokerServices
             context >> extern >> ManagementEndpoint,
             context >> Administrator >> AdminUserName,
             context >> Administrator >> AdminPassword,
-            AccountName,
-            QueueName)
+            AccountName)
 
-      view ForAccountHolder (AccountName, AccountPassword, QueueName, LastName)
+      view ForAccountHolder (AccountName, AccountPassword, LastName)
 
       perspective on extern
-        view External$ForAccountHolder verbs (Consult)
+        props (Url, Exchange, CurrentQueueName) verbs (Consult)
       perspective on AccountHolder
         all roleverbs
-        props (AccountName, AccountPassword, QueueName) verbs (SetPropertyValue)
-        props (AccountName, QueueName) verbs (Consult)
+        props (AccountName, AccountPassword) verbs (SetPropertyValue)
+      
+      perspective on Queues
+        only (CreateAndFill)
+        props (QueueName) verbs (SetPropertyValue, Consult)
 
       screen "Broker Contract"
         column
-          form "BrokerService" External
-          form "Administrator" Administrator
-          form "Account" AccountHolder
+          row
+            form "BrokerService" External
+          row
+            form "Administrator" Administrator
+          row
+            form "Account" AccountHolder
+          row
+            table Queues
+              props (QueueName) verbs (Consult)
+
+
+    context EmptyQueue (functional) = filter Queues with not exists binding
 
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
 
       perspective on AccountHolder
         all roleverbs
-        props (AccountName, QueueName, AccountPassword) verbs (SetPropertyValue)
+        props (AccountName, AccountPassword) verbs (SetPropertyValue)
+      
+      perspective on Queues
+        only (CreateAndFill)
+        props (QueueName) verbs (SetPropertyValue)
 
       screen "Create Broker Contract"
         row 
@@ -207,5 +236,17 @@ domain model://perspectives.domains#BrokerServices
             props (SerialisedInvitation, ConfirmationCode, CompleteMessage) verbs (Consult)
         row
           form "AccountHolder" AccountHolder
+        row 
+          table "Queues" Queues
 
     aspect user sys:Invitation$Guest
+
+    context Queues (relational) filledBy sys:PerspectivesSystem
+      property QueueName (String)
+      on exit
+        do for BrokerContract$Administrator
+          callEffect rabbit:DeleteQueue(
+            context >> extern >> ManagementEndpoint,
+            context >> Administrator >> AdminUserName,
+            context >> Administrator >> AdminPassword,
+            QueueName)

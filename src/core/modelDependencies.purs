@@ -200,14 +200,17 @@ addressRelayPort = "model://perspectives.domains#System$PhysicalContext$UserWith
 brokerService :: String
 brokerService = "model://perspectives.domains#BrokerServices$BrokerService"
 
+myBrokers :: String
+myBrokers = "model://perspectives.domains#BrokerServices$MyBrokers"
+
 brokerServiceAccounts :: String
 brokerServiceAccounts = "model://perspectives.domains#BrokerServices$BrokerService$Accounts"
 
 brokerEndpoint :: String
-brokerEndpoint = "model://perspectives.domains#BrokerServices$BrokerService$External$Url"
+brokerEndpoint = "model://perspectives.domains#BrokerServices$BrokerContract$External$Url"
 
 brokerServiceExchange :: String
-brokerServiceExchange = "model://perspectives.domains#BrokerServices$BrokerService$External$Exchange"
+brokerServiceExchange = "model://perspectives.domains#BrokerServices$BrokerContract$External$Exchange"
 
 brokerContract :: String
 brokerContract = "model://perspectives.domains#BrokerServices$BrokerContract"
@@ -222,7 +225,7 @@ accountHolderPassword :: String
 accountHolderPassword = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder$AccountPassword"
 
 accountHolderQueueName :: String
-accountHolderQueueName = "model://perspectives.domains#BrokerServices$BrokerContract$AccountHolder$QueueName"
+accountHolderQueueName = "model://perspectives.domains#BrokerServices$BrokerContract$External$CurrentQueueName"
 
 -- "model:perspectives.domains#Couchdb$ContextInstances"
 

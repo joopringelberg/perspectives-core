@@ -24,7 +24,7 @@ module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, modify, put)
-import Data.Array (catMaybes, concat, elemIndex, filter, foldl, head, insertAt, length, nub, singleton, snoc, union)
+import Data.Array (catMaybes, concat, elemIndex, foldl, head, insertAt, length, nub, snoc, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Map (insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -40,21 +40,21 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.ContextAndRole (context_buitenRol, context_universeContextDelta, rol_context, rol_property, rol_propertyDelta, rol_contextDelta, rol_universeRoleDelta)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (##=), (##>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (getFilledRoles, getProperty, perspectivesUsersRole_, roleType_)
+import Perspectives.Instances.ObjectGetters (getProperty, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, sysUser) as DEP
-import Perspectives.ModelDependencies (perspectivesUsersPublicKey, socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
+import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -63,7 +63,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (Transaction(..), PublicKeyInfo)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.Types.ObjectGetters (isPublicRole)
-import Prelude (Unit, bind, discard, eq, flip, map, not, notEq, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (Unit, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (writeJSON)
 
 -- | Splits the transaction in versions specific for each peer and sends them.
@@ -175,17 +175,7 @@ computeUserRoleBottoms rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= 
   then pure $ [Tuple rid [rid]]
   else perspectivesUsersRole_ rid >>= case _ of 
     Nothing -> pure []
-    Just r -> singleton <<< Tuple rid <$> otherSystemIdentities r
-
-systemIdentities :: RoleInstance ~~> RoleInstance
-systemIdentities = getFilledRoles (ContextType socialEnvironment) (EnumeratedRoleType socialEnvironmentPersons) >=> 
-  getFilledRoles (ContextType theSystem) (EnumeratedRoleType sysUser)
-
-otherSystemIdentities :: RoleInstance -> MonadPerspectives (Array RoleInstance)
-otherSystemIdentities rid = do
-  thisUser <- RoleInstance <$> getUserIdentifier
-  candidates <- rid ##= systemIdentities
-  pure $ filter (notEq thisUser) candidates
+    Just r -> pure [Tuple rid [r]]
 
 -- | Add the delta at the end of the array, unless it is already in the transaction!
 -- | Only include 

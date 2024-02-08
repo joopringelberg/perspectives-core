@@ -40,15 +40,15 @@ import Effect.Class.Console (log)
 import Foreign (ForeignError(..), MultipleErrors)
 import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClient, messageProducer, sendToTopic)
 import Perspectives.Assignment.Update (setProperty)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesQuery, BrokerService, (##>))
+import Perspectives.CoreTypes (BrokerService, MonadPerspectives, MonadPerspectivesQuery, (##>))
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty, getFilledRoles)
-import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerServiceAccounts, brokerServiceExchange, brokerEndpoint, connectedToAMQPBroker, sysUser)
-import Perspectives.ModelDependencies (brokerService) as DEP
+import Perspectives.Instances.ObjectGetters (context, externalRole, getFilledRoles, getProperty)
+import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerEndpoint, brokerServiceExchange, connectedToAMQPBroker, sysUser)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (getBrokerService, setBrokerService, setStompClient, stompClient)
+import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
@@ -60,6 +60,7 @@ import Simple.JSON (writeJSON)
 
 incomingPost :: MonadPerspectives Unit
 incomingPost = do
+  setConnectionState false
   {topic, queueId, login, passcode, vhost, url} <- getBrokerService
   -- Create a Stomp Client: url
   stpClient <- liftEffect $ createStompClient( url )
@@ -134,11 +135,14 @@ constructBrokerServiceForUser userId = do
     userId
   (Value login) <- getProperty (EnumeratedPropertyType accountHolderName) accountHolder
   (Value passcode) <- getProperty (EnumeratedPropertyType accountHolderPassword) accountHolder
-  (Value queueId) <- getProperty (EnumeratedPropertyType accountHolderQueueName) accountHolder
-
-  brokerContractExternal <- (context >=> externalRole >=> getFilledRoles (ContextType DEP.brokerService) (EnumeratedRoleType brokerServiceAccounts) >=> context >=> externalRole) accountHolder
-  (Value url) <- getProperty (EnumeratedPropertyType brokerEndpoint) brokerContractExternal
-  (Value vhost) <- getProperty (EnumeratedPropertyType brokerServiceExchange) brokerContractExternal
+  
+  brokerContractExternal <- (context >=> externalRole) accountHolder
+  endpointGetter <- lift $ lift $ getPropertyFunction brokerEndpoint
+  (Value url) <- endpointGetter brokerContractExternal
+  exchangeGetter <- lift $ lift $ getPropertyFunction brokerServiceExchange
+  (Value vhost) <- exchangeGetter brokerContractExternal
+  queueNameGetter <- lift $ lift $ getPropertyFunction accountHolderQueueName
+  (Value queueId) <- queueNameGetter brokerContractExternal
 
   pure $
     { topic : (unwrap userId)

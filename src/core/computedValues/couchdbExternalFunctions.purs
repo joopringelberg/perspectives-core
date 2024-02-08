@@ -288,6 +288,7 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   {documentName:unversionedDocumentName} <- lift $ resourceIdentifier2WriteDocLocator unversionedModelname
   lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName})
+  -- saveCachedDomeinFile takes care of revisions.
   revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
   -- Copy the attachment

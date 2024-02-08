@@ -8,7 +8,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Effect.Aff.Class (liftAff)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.RabbitMQManagement (RabbitState, createQueue, createUser, deleteQueue, deleteUser, getNodes, getUser, runRabbitState', setPermissions)
-import Perspectives.Extern.RabbitMQ (deleteAMQPaccount, prepareAMQPaccount, setBindingKey)
+import Perspectives.Extern.RabbitMQ (deleteAMQPaccount, deleteQueue_, prepareAMQPaccount, setBindingKey)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Test.Perspectives.Utils (runMonadPerspectivesTransaction, runP)
 import Test.Unit (TestF, suite, test, testSkip)
@@ -39,7 +39,7 @@ theSuite = suite "Perspectives.AMQP.RabbitMQManagement" do
     nodes <- runRabbitState' rabbitState getNodes
     liftAff $ assert "The only node should be ''" ("rabbit@ubuntu-1cpu-1gb-nl-ams1" == (unsafePartial fromJust $ head nodes))
   
-  testSkip "Remove a user account" $ runP do
+  testSkip "Remove a user account" $ runP do 
     runRabbitState' rabbitState (deleteUser "rabbit_test_user")
   
   testSkip "Retrieve a user account" $ runP do
@@ -94,11 +94,19 @@ theSuite = suite "Perspectives.AMQP.RabbitMQManagement" do
 
   test "Perspectives.Extern.RabbitMQ.deleteAMQPaccount" $ runP $ do
     void $ runMonadPerspectivesTransaction $
-      deleteAMQPaccount
+      deleteAMQPaccount 
         ["https://mycontexts.com/rbmq/"]
         ["joopring"]
         ["dOnkered1g"]
         ["rabbit_test_user"]
+        (RoleInstance "ignore")
+ 
+  test "Perspectives.Extern.RabbitMQ.deleteQueue" $ runP $ do
+    void $ runMonadPerspectivesTransaction $
+      deleteQueue_
+        ["https://mycontexts.com/rbmq/"]
+        ["joopring"]
+        ["dOnkered1g"]
         ["rabbit_test_queue"]
         (RoleInstance "ignore")
  
