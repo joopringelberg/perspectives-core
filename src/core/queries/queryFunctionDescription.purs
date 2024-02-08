@@ -112,11 +112,11 @@ instance readForeignQFD :: ReadForeign QueryFunctionDescription where
   readImpl f = do 
     f' :: QFD_ <- read' f 
     case f' of
-      {constructor: "SQD", domain, function, range, isFunctional, isMandatory} -> pure $ SQD domain function range isFunctional isMandatory
-      {constructor: "UQD", domain, function, args, range, isFunctional, isMandatory} -> pure $ UQD domain function (unsafePartial head args) range isFunctional isMandatory 
-      {constructor: "BQD", domain, function, args, range, isFunctional, isMandatory} -> pure $ BQD domain function (unsafePartial head args) (unsafePartial last args) range isFunctional isMandatory 
-      {constructor: "MQD", domain, function, args, range, isFunctional, isMandatory} ->
-        pure $ MQD domain function args range isFunctional isMandatory 
+      {constructor: "SQD", domain:dom, function, range:ran, isFunctional, isMandatory} -> pure $ SQD dom function ran isFunctional isMandatory
+      {constructor: "UQD", domain:dom, function, args, range:ran, isFunctional, isMandatory} -> pure $ UQD dom function (unsafePartial head args) ran isFunctional isMandatory 
+      {constructor: "BQD", domain:dom, function, args, range:ran, isFunctional, isMandatory} -> pure $ BQD dom function (unsafePartial head args) (unsafePartial last args) ran isFunctional isMandatory 
+      {constructor: "MQD", domain:dom, function, args, range:ran, isFunctional, isMandatory} ->
+        pure $ MQD dom function args ran isFunctional isMandatory 
       otherwise -> fail $ ForeignError "Expected record with constructor SQD, UQD, BQD, or MQD"
 
 derive instance genericRepQueryFunctionDescription :: Generic QueryFunctionDescription _
@@ -477,3 +477,5 @@ addTermOnRight left@(BQD _ (BinaryCombinator ComposeF) left' right' _ _ _) extra
   -- _ -> makeComposition left extraTerm
   _ -> makeComposition left' (makeComposition right' extraTerm)
 addTermOnRight left@(SQD _ _ _ _ _) extraTerm = makeComposition left extraTerm
+addTermOnRight left@(UQD _ _ _ _ _ _) extraTerm = makeComposition left extraTerm
+addTermOnRight left@(MQD _ _ _ _ _ _) extraTerm = makeComposition left extraTerm
