@@ -122,9 +122,9 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       role <- traverseRoleE r (modelName id)
       context' <- pure (role `insertRoleInto` contextUnderConstruction)
       case role of 
-        E (EnumeratedRole {id, roleAspects}) -> do
+        E (EnumeratedRole {id:roleId, roleAspects}) -> do
           case context' of 
-            Context cr@{roleAliases} -> pure $ Context $ cr { roleAliases = foldl (\als (RoleInContext{role:role'}) -> insert (unwrap role') id als) roleAliases roleAspects }
+            Context cr@{roleAliases} -> pure $ Context $ cr { roleAliases = foldl (\als (RoleInContext{role:role'}) -> insert (unwrap role') roleId als) roleAliases roleAspects }
         _ -> pure context'
 
     -- Prefixes are handled earlier, so this can be a no-op
@@ -142,9 +142,9 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
       qualifiedIndexedName <- expandNamespace indexedName
       pure (Context $ contextUnderConstruction {indexedContext = Just $ ContextInstance qualifiedIndexedName})
 
-    handleParts c@(Context contextUnderConstruction@({id})) (STATE s@(StateE{id:stateId, subStates})) = do
-      state@(State{id:ident}) <- traverseStateE (Cnt id) s
-      substates <- for subStates (traverseStateE (Cnt id))
+    handleParts c@(Context contextUnderConstruction@({id:contextId})) (STATE s@(StateE{id:stateId, subStates})) = do
+      state@(State{id:ident}) <- traverseStateE (Cnt contextId) s
+      substates <- for subStates (traverseStateE (Cnt contextId))
       modifyDF (\domeinFile -> addStatesToDomeinFile (cons state (ARR.fromFoldable substates)) domeinFile)
       -- If this state is the context root state, we could register it as such with the context.
       -- However, if not, we should register it with its parent and that need not be available.
@@ -173,28 +173,28 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
 
     -- Insert a sub-Context type into a Context type.
     insertInto :: Context -> Context -> Context
-    insertInto (Context{id}) (Context cr@{nestedContexts}) = Context $ cr {nestedContexts = cons id nestedContexts}
+    insertInto (Context{id:contextId}) (Context cr@{nestedContexts}) = Context $ cr {nestedContexts = cons contextId nestedContexts}
 
     -- Insert a Role type into a Context type.
     insertRoleInto :: Role -> Context -> Context
-    insertRoleInto (E (EnumeratedRole {id, kindOfRole})) c = case kindOfRole, c of
-      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR id) rolInContext}
-      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR id) contextRol}
+    insertRoleInto (E (EnumeratedRole {id:roleId, kindOfRole})) c = case kindOfRole, c of
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (ENR roleId) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (ENR roleId) contextRol}
       TI.ExternalRole, ctxt -> ctxt
       -- We may have added the user before, on handling his BotRole.
-      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR id) gebruikerRol of
-        Nothing -> cons (ENR id) gebruikerRol
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR roleId) gebruikerRol of
+        Nothing -> cons (ENR roleId) gebruikerRol
         (Just _) -> gebruikerRol}
       -- This is the Enumerated variant of the public role:
-      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR id) gebruikerRol of
-        Nothing -> cons (ENR id) gebruikerRol
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR roleId) gebruikerRol of
+        Nothing -> cons (ENR roleId) gebruikerRol
         (Just _) -> gebruikerRol}
 
-    insertRoleInto (C (CalculatedRole {id, kindOfRole})) c = case kindOfRole, c of
-      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR id) rolInContext}
-      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR id) contextRol}
-      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR id) gebruikerRol}
-      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR id) gebruikerRol}
+    insertRoleInto (C (CalculatedRole {id:roleId, kindOfRole})) c = case kindOfRole, c of
+      TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR roleId) rolInContext}
+      TI.ContextRole, (Context cr@{contextRol}) -> Context $ cr {contextRol = cons (CR roleId) contextRol}
+      TI.UserRole, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR roleId) gebruikerRol}
+      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = cons (CR roleId) gebruikerRol}
       -- A catchall case that just returns the context. Calculated roles for ExternalRole and UserRole should be ignored.
       _, _ -> c
 

@@ -32,7 +32,7 @@ import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error)
+import Effect.Exception (error) 
 import Foreign.Object (Object, toArrayWithKey) 
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
@@ -362,7 +362,7 @@ contextOfRole (C c) = context c
 -- RDOM cases.
 -- | The same result as roleAspects, but not in MonadPerspectives.
 expansionOfRole :: Partial => Role -> Array EnumeratedRoleType
-expansionOfRole (E (EnumeratedRole {id})) = [id]
+expansionOfRole (E (EnumeratedRole {id:i})) = [i]
 expansionOfRole (C (CalculatedRole {calculation})) = roleInContext2Role <$> (commonLeavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd))
 
 -----------------------------------------------------------
