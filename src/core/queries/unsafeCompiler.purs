@@ -81,7 +81,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Time (string2Date, string2DateTime, string2Time)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (>>>), (||))
+import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -783,27 +783,8 @@ role2propertyValue qd = unsafeCoerce $ compileFunction qd
 -- | get values for that Property from a Role instance. Notice that this function may fail.
 -- TODO: make this function cache.
 getPropertyFunction :: String -> MonadPerspectives (RoleInstance ~~> Value)
-getPropertyFunction p = do
-  ident <- expandDefaultNamespaces p
-  getterFromPropertyType (ENP (EnumeratedPropertyType ident)) <|> getterFromPropertyType (CP (CalculatedPropertyType ident))
+getPropertyFunction = expandDefaultNamespaces >=> getPropertyType >=> getterFromPropertyType
 
--- getPropertyFunction id = do
---   ident <- expandDefaultNamespaces id
---   (unsafePartial $
---     case lookupPropertyValueGetterByName ident of
---       Nothing -> empty
---       (Just g) -> pure g
---     <|>
---     do
---       (p :: EnumeratedProperty) <- getPerspectType (EnumeratedPropertyType ident)
---       unsafeCoerce $ PC.calculation p >>= compileFunction
---     <|>
---     do
---       (p :: CalculatedProperty) <- getPerspectType (CalculatedPropertyType ident)
---       unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentObject)
---       )
-
--- TODO: opruimen!
 pushCurrentObject :: (String ~~> String) -> (String ~~> String)
 pushCurrentObject f roleId = do
   -- save contextId in it under the name currentobject
@@ -823,9 +804,9 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupProperty
     p <- getPerspectType cp
     functional <- PC.functional p
     mandatory <- PC.mandatory p
-    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ >>> pushCurrentObject)
-    void $ pure $ propertyGetterCacheInsert id getter functional mandatory
-    pure getter
+    getter <- unsafeCoerce $ PC.calculation p >>= compileFunction >>= pure <<< (withFrame_ <<< pushCurrentObject)
+    void $ pure $ propertyGetterCacheInsert id (unsafeCoerce getter) functional mandatory
+    pure (unsafeCoerce getter)
   Just g -> pure g
 
 getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
