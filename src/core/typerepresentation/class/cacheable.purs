@@ -68,7 +68,11 @@ cacheEntity id e = do
         then liftAff $ put e avar *> pure avar
         else do
           oldE <- liftAff $ take avar
-          liftAff $ put (changeRevision (rev oldE) e) avar *> pure avar
+          -- If the cache holds a version with a revision that is higher than 
+          -- that of the entity, replace the entities revision.
+          if (rev oldE) > (rev e)
+          then liftAff $ put (changeRevision (rev oldE) e) avar *> pure avar
+          else liftAff $ put e avar *> pure avar
 
 -- | Put the entity in the existing AVar (overwriting it completely) or create a new AVar.
 overwriteEntity :: forall a i. Cacheable a i => i -> a -> MonadPerspectives (AVar a)
