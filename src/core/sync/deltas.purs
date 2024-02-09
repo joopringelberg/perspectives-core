@@ -45,7 +45,7 @@ import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (getProperty, perspectivesUsersRole_, roleType_)
-import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, sysUser) as DEP
+import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, perspectivesUsers) as DEP
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
@@ -85,7 +85,7 @@ distributeTransactie' t = do
 sendTransactie :: String -> TransactionForPeer -> MonadPerspectives (Maybe TransactionForPeer)
 sendTransactie userId t = do 
   userType <- roleType_ (RoleInstance userId)
-  if userType == (EnumeratedRoleType DEP.sysUser)
+  if userType == (EnumeratedRoleType DEP.perspectivesUsers)
     then sendTransactieToUserUsingAMQP userId t *> pure Nothing
     else pure $ Just t
 
