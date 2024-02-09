@@ -851,7 +851,9 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>
           case (OBJ.lookup (unwrap aliasPropertyName) properties) of
             Nothing -> do
               case bnd of
-                Nothing -> pure []
+                Nothing -> do 
+                  tell $ ArrayWithoutDoubles [Property r aliasPropertyName]
+                  pure []
                 -- Search further with the original name. The alias was defined just for this role type.
                 Just b -> runArrayT $ getPropertyFromTelescope pn b
             (Just p) -> do 
@@ -860,7 +862,9 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>
         Nothing -> case (OBJ.lookup (unwrap pn) properties) of
           Nothing -> do
             case bnd of
-              Nothing -> pure []
+              Nothing -> do 
+                tell $ ArrayWithoutDoubles [Property r pn] 
+                pure []
               -- Search further with the original name. The alias was defined just for this role type.
               Just b -> runArrayT $ getPropertyFromTelescope pn b
           (Just p) ->  do 
