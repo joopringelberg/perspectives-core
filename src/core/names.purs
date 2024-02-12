@@ -114,6 +114,7 @@ getMySystem = getSystemIdentifier >>= \sysId -> pure $ "def:#" <> sysId
 -- PERSPECTIVESUSER
 -----------------------------------------------------------
 -- | Returns the role in TheWorld that fills SocialEnvironment$Me (and this instance in turn fills PerspectivesSystem$User).
+-- | This is dependent on model://perspectives.domains#System.
 getPerspectivesUser :: MonadPerspectives RoleInstance
 getPerspectivesUser = getMySystem >>= pure <<< RoleInstance <<< flip append "_KeyHolder"
 

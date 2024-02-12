@@ -44,7 +44,7 @@ import Perspectives.CoreTypes (BrokerService, MonadPerspectives, MonadPerspectiv
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getFilledRoles, getProperty)
 import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerEndpoint, brokerServiceExchange, connectedToAMQPBroker, sysUser)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getMySystem, getPerspectivesUser, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (getBrokerService, setBrokerService, setStompClient, stompClient)
@@ -143,9 +143,9 @@ constructBrokerServiceForUser userId = do
   (Value vhost) <- exchangeGetter brokerContractExternal
   queueNameGetter <- lift $ lift $ getPropertyFunction accountHolderQueueName
   (Value queueId) <- queueNameGetter brokerContractExternal
-
+  perspectivesUser <- lift $ lift $ getPerspectivesUser
   pure $
-    { topic : (unwrap userId)
+    { topic : (unwrap perspectivesUser)
     , queueId
     , login
     , passcode
