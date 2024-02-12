@@ -479,12 +479,11 @@ interpretSQD (SQD dom (RoleIndividual individual) _ _ _) a = ArrayT do
   case mi of
     Nothing -> pure [a]
     Just i -> pure $ [consOnMainPath (R i) a]
-
-interpretSQD (SQD dom (ContextIndividual (ContextInstance individual)) _ _ _) a = ArrayT do
-  mi <- lift $ lookupIndexedContext individual
-  case mi of
-    Nothing -> pure [a]
-    Just i -> pure $ [consOnMainPath (C i) a]
+-- An indexed individual is private to a PerspectivesUser. As we use this interpreter to calculate what to 
+-- serialise, we should stop here. The receiving users will substitute whatever role instance that is this
+-- indexed individual to them. We need not, indeed cannot, send them that.
+-- interpretSQD (SQD dom (RoleIndividual individual) _ _ _) a = ArrayT $ pure [a]
+interpretSQD (SQD dom (ContextIndividual (ContextInstance individual)) _ _ _) a = ArrayT $ pure []
 
 interpretSQD (SQD dom (VariableLookup varName) range _ _) a = do
   -- the lookup function ignores its second argument.
