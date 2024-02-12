@@ -59,7 +59,7 @@ import Perspectives.Instances.Environment (_pushFrame)
 import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, externalRole, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, parseNumber, value2Date, value2Number)
 import Perspectives.ModelDependencies (roleWithId)
-import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
+import Perspectives.Names (lookupIndexedRole)
 import Perspectives.Parsing.Arc.Position (arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
@@ -217,96 +217,6 @@ interpretBQD (BQD _(BinaryCombinator OrElseF) f1 f2 ran fun man) a = ArrayT do
     then runArrayT (interpret f2 a)
     else pure fr1
 
--- The compiler only allows f1 and f2 if they're functional.
-interpretBQD (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [EqualsF, NotEqualsF] = ArrayT do
-  -- Both are singleton arrays, or empty.
-  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-  fr2 <- runArrayT (interpret f1 a)
-  unsafePartial $ case g of
-    EqualsF -> case head fr1, head fr2 of
-      Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x == y)) fr1h fr2h]
-      _, _ -> pure []
-    NotEqualsF -> case head fr1, head fr2 of
-      Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x `notEq` y)) fr1h fr2h]
-      _, _ -> pure []
-
--- NOTICE: THE CASES BELOW ARE NOT REACHABLE ACCORDING TO THE COMPILER.
--- This is probably due to the compiler not taking into account the conditions (it cannot, because these depend on runtime values).
-
--- The Description Compiler makes sure we only have Value types that can be ordered, here.
--- It also ensures the f1 and f2 are functional.
-interpretBQD (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] = ArrayT do
-  -- Both are singleton arrays, or empty.
-  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-  fr2 <- runArrayT (interpret f1 a)
-  case head fr1, head fr2 of
-    Just fr1h, Just fr2h -> unsafePartial $ case ran of
-      VDOM PString _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
-      VDOM PBool _ -> pure [unsafePartial applyValueFunction (functionOnBooleans (orderFunction g)) fr1h fr2h]
-      VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Number x) (value2Number y))) fr1h fr2h]
-      VDOM PDate _ -> pure [unsafePartial applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Date x) (value2Date y))) fr1h fr2h] 
-      VDOM PEmail _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
-    _, _ -> pure []
-
-  -- throwError (error $ "Perspectives.Query.Interpreter: no implementation for LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF")
--- The Description Compiler ensuers we have only PBool Value types and that both f1 and f2 are functional.
-interpretBQD (BQD _ (BinaryCombinator g) f1 f2 _ _ _) a | isJust $ elemIndex g [AndF, OrF] = ArrayT do
-  -- Both are singleton arrays, or empty.
-  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-  fr2 <- runArrayT (interpret f2 a)
-  case head fr1, head fr2 of
-    Just fr1h, Just fr2h -> do
-      bfunction <- if g == AndF then pure (&&) else pure (||)
-      pure [unsafePartial applyValueFunction (functionOnBooleans bfunction) fr1h fr2h]
-    _, _ -> pure []
-
--- The Description Compiler ensures we have only Value types on which these operations are valid and that both f1 and f2 are functional.
-interpretBQD (BQD _ (BinaryCombinator g) f1 f2 ran _ _) a | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] = ArrayT do
-  -- Both are singleton arrays, or empty.
-  (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-  fr2 <- runArrayT (interpret f1 a)
-  case head fr1, head fr2 of
-    Just fr1h, Just fr2h -> if range f1 `eq` range f2
-      then do
-        (result :: Array String) <- (performNumericOperation'
-          g
-          ran
-          (unsafePartial mapNumericOperator g ran)
-          [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
-          [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
-          )
-        pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
-          , mainPath: Nothing
-          , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
-          }]
-      else if isDateOrTime (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
-        then do 
-          (result :: Array String) <- (performNumericOperation'
-            g
-            ran
-            (unsafePartial mapDurationOperator g (range f2))
-            [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
-            [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
-            )
-          pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
-            , mainPath: Nothing
-            , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
-            }]
-        else do 
-          (result :: Array String) <- (performNumericOperation'
-            g
-            ran
-            (unsafePartial mapDurationOperator g (range f1))
-            [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
-            [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
-            )
-          pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
-            , mainPath: Nothing
-            , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
-            }]
-
-    _, _ -> pure []
-  
 interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = ArrayT
   case f2 of
     -- f2 results from the expression that follows `>>=` (must have been: "sum", "product", etc.).
@@ -398,6 +308,94 @@ interpretBQD (BQD _ (BinaryCombinator ComposeSequenceF) f1 f2 ran _ _) a = Array
             , mainPath: Just $ singleton (V (show fname) (Value $ show (minimum nrs)))
             , supportingPaths: concat (allPaths <$> result)
             }]
+
+interpretBQD (BQD _ (BinaryCombinator fun) f1 f2 ran _ _) a = case fun of 
+
+  -- The compiler only allows f1 and f2 if they're functional.
+  g | isJust $ elemIndex g [EqualsF, NotEqualsF] -> ArrayT do
+    -- Both are singleton arrays, or empty.
+    (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f1 a)
+    unsafePartial $ case g of
+      EqualsF -> case head fr1, head fr2 of
+        Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x == y)) fr1h fr2h]
+        _, _ -> pure []
+      NotEqualsF -> case head fr1, head fr2 of
+        Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x `notEq` y)) fr1h fr2h]
+        _, _ -> pure []
+
+  -- The Description Compiler makes sure we only have Value types that can be ordered, here.
+  -- It also ensures the f1 and f2 are functional.
+  g | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] -> ArrayT do
+    -- Both are singleton arrays, or empty.
+    (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f1 a)
+    case head fr1, head fr2 of
+      Just fr1h, Just fr2h -> unsafePartial $ case ran of
+        VDOM PString _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
+        VDOM PBool _ -> pure [unsafePartial applyValueFunction (functionOnBooleans (orderFunction g)) fr1h fr2h]
+        VDOM PNumber _ -> pure [unsafePartial $ applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Number x) (value2Number y))) fr1h fr2h]
+        VDOM PDate _ -> pure [unsafePartial applyValueFunction (\x y -> bool2Value ((orderFunction g) (value2Date x) (value2Date y))) fr1h fr2h] 
+        VDOM PEmail _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
+      _, _ -> pure []
+
+  -- The Description Compiler ensuers we have only PBool Value types and that both f1 and f2 are functional.
+  g | isJust $ elemIndex g [AndF, OrF] -> ArrayT do
+      -- Both are singleton arrays, or empty.
+      (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+      fr2 <- runArrayT (interpret f2 a)
+      case head fr1, head fr2 of
+        Just fr1h, Just fr2h -> do
+          bfunction <- if g == AndF then pure (&&) else pure (||)
+          pure [unsafePartial applyValueFunction (functionOnBooleans bfunction) fr1h fr2h]
+        _, _ -> pure []
+
+  -- The Description Compiler ensures we have only Value types on which these operations are valid and that both f1 and f2 are functional.
+  g | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] -> ArrayT do
+    -- Both are singleton arrays, or empty.
+    (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f1 a)
+    case head fr1, head fr2 of
+      Just fr1h, Just fr2h -> if range f1 `eq` range f2
+        then do
+          (result :: Array String) <- (performNumericOperation'
+            g
+            ran
+            (unsafePartial mapNumericOperator g ran)
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+            [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+            )
+          pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+            , mainPath: Nothing
+            , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+            }]
+        else if isDateOrTime (unsafePartial domain2PropertyRange $ range f1) && isPDuration (unsafePartial domain2PropertyRange $ range f2)
+          then do 
+            (result :: Array String) <- (performNumericOperation'
+              g
+              ran
+              (unsafePartial mapDurationOperator g (range f2))
+              [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+              [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+              )
+            pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+              , mainPath: Nothing
+              , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+              }]
+          else do 
+            (result :: Array String) <- (performNumericOperation'
+              g
+              ran
+              (unsafePartial mapDurationOperator g (range f1))
+              [(unwrap $ unsafePartial dependencyToValue $ _.head fr2h)]
+              [(unwrap $ unsafePartial dependencyToValue $ _.head fr1h)]
+              )
+            pure [{ head: (V (show g) (Value $ unsafePartial fromJust $ head result))
+              , mainPath: Nothing
+              , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
+              }]
+
+  _ -> ArrayT $ pure []
 
 -----------------------------------------------------------
 -- MQD
