@@ -86,20 +86,21 @@ domain model://perspectives.domains#BrokerServices
       property Exchange (mandatory, String)
       -- For mycontexts this is "https://mycontexts.com/rbmq/".
       property ManagementEndpoint (mandatory, String)
-        pattern = "^https://[^\\/]+\\/rbmq$" "A url with the https scheme, ending on '/rbmq/'"
+        pattern = "^https://[^\\/]+\\/rbmq\\/$" "A url with the https scheme, ending on '/rbmq/'"
       -- For mycontexts this is "https://mycontexts.com/rbsr/".
       property SelfRegisterEndpoint (mandatory, String)
-        pattern = "^https://[^\\/]+\\/rbmq$" "A url with the https scheme, ending on '/rbsr/'"
-
+        pattern = "^https://[^\\/]+\\/rbmq\\/$" "A url with the https scheme, ending on '/rbsr/'"
+  
       
     user Administrator filledBy sys:PerspectivesSystem$User
       -- The credentials of Administrator for the remote RabbitMQ server.
       property AdminUserName (String)
       property AdminPassword (String)
 
-      perspective on Accounts
-        only (CreateAndFill, Remove)
-        props(LastNameOfAccountHolder) verbs (Consult)
+      state WithCredentials = (exists AdminUserName) and (exists AdminPassword)
+        perspective on Accounts
+          only (CreateAndFill, Remove)
+          props(LastNameOfAccountHolder) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
         props (AdminUserName, AdminPassword) verbs (SetPropertyValue)

@@ -107,6 +107,7 @@ domain model://perspectives.domains#System
       on entry
         do for Initializer
           letA
+            -- PDRDEPENDENCY
             keyholder <- (sys:MySystem >> callExternal util:ContextIdentifier() returns String) + "_KeyHolder"
             -- The identifier of this role must be available on startup, before any instance has been created, 
             -- because it is the author of all instances created in this installation.
@@ -204,12 +205,13 @@ domain model://perspectives.domains#System
       view ShowLibraries (ShowLibraries)
 
     -- PDRDEPENDENCY
-    -- To fill other user roles: require User if one want to synchronize with the natural person 
+    -- To fill other user roles: require User if one wants to synchronize with the natural person 
     -- represented by that User. Require SocialEnvironment$Persons otherwise.
     -- Why fill User with Persons? Whenever we have a PerspectivesSystem$User instance, there is, 
     -- by construction, a PerspectivesUsers behind it. We do not need the extra indirection here.
     -- However, to be able to use Persons effectively when we don't care whether or not there is 
     -- a PerspectivesUsers behind it, we have to have Persons for PerspectivesUsers, too.
+    -- TODO. WHAT ABOUT SOCIALENVIRONMENT$ME?
     user User (mandatory) filledBy Persons
       -- This will happen on importing SocialEnvironment and Me from another installation.
       -- If we import a peer's data, we will get a User instance that is already filled.
@@ -311,6 +313,7 @@ domain model://perspectives.domains#System
 
     -- Note that some of these may be NonPerspectivesUsers.
     user Contacts = SocialEnvironment >> binding >> context >> Persons
+    -- user Contacts = sys:MySocialEnvironment >> Persons
 
     -- PDRDEPENDENCY
     user Installer

@@ -149,7 +149,6 @@ domain model://perspectives.domains#CouchdbManagement
   -- The PDR looks for credentials in either role and should find them just once.
   case CouchdbServer
     aspect acc:Body
-    --storage public
     external
       -- The location of the CouchdbServer_. 
       property ServerUrl (functional) = binder CouchdbServers >> Url
