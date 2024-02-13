@@ -150,6 +150,7 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
     user Me filledBy PerspectivesUsers
+      indexed sys:SocialMe
       property MyIdentity (File)
       property MyPublicKey (functional) = binder PerspectivesUsers >> PublicKey
     user SystemUser = sys:Me

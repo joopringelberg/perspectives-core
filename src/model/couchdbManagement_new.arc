@@ -159,21 +159,10 @@ domain model://perspectives.domains#CouchdbManagement
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
       state AddReceivedServer = not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin
-        -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
-        perspective of Accounts 
-          perspective on extern >> binder CouchdbServers
-            only (Create, Fill)
         perspective of Admin 
           perspective on extern >> binder CouchdbServers
             only (Create, Fill)
         on entry
-          -- When a peer assigns the current user to the Accounts role,
-          -- we make sure that the current user has the CouchdbServer bound
-          -- in the CouchdbManagementApp.
-          do for Accounts
-            bind origin to CouchdbServers in cm:MyCouchdbApp
-          notify Accounts
-            "You now have an account with CouchdbServer {Name}"
           do for Admin
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Admin
@@ -264,7 +253,22 @@ domain model://perspectives.domains#CouchdbManagement
               -- NOTICE: we do not check whether UserName is already a registered user of the Couchdb installation at serverurl.
               callEffect cdb:CreateUser( serverurl, UserName, Password )
               callEffect cdb:MakeWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+          do for Accounts
               callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
+        state ThisIsMe = origin filledBy sys:SocialMe
+          -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
+          perspective of Accounts 
+            perspective on extern >> binder CouchdbServers
+              only (Create, Fill)
+          on entry
+            -- When a peer assigns the current user to the Accounts role,
+            -- we make sure that the current user has the CouchdbServer bound
+            -- in the CouchdbManagementApp.
+            do for Accounts
+              bind context >> extern to CouchdbServers in cm:MyCouchdbApp
+            notify Accounts
+              "You now have an account with CouchdbServer {context >> extern >> Name}"
+
       on exit
         do for Admin
           letA
