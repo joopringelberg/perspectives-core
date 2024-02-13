@@ -56,15 +56,15 @@ import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (contextType, filledBy, fills_, getActiveStates_)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, fills_, getActiveStates_)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstances, roleFunctionFromQfd)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..), externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), externalRole)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
@@ -177,11 +177,11 @@ enteringState contextId stateId = do
 
   -- NOTE. We have a compiled version of the object, too.
   State {object} <- lift $ getState stateId
-  me <- lift getUserIdentifier
+  me <- lift getPerspectivesUser
   case object of
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, isSelfPerspective} -> do
-      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (RoleInstance me))))
+      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) ((COMB.not' (filledBy (Filler_ me))) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
         Just u' -> serialiseRoleInstancesAndProperties
@@ -198,9 +198,9 @@ enteringState contextId stateId = do
 
 whenRightUser :: ContextInstance -> RoleType -> (Array RoleInstance -> Updater ContextInstance) -> MonadPerspectivesTransaction Unit
 whenRightUser contextId allowedUser updater = do
-  me <- lift getUserIdentifier
+  me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
-  actorsThatAreMe <- lift (filterA (fills_ (RoleInstance me)) currentactors)
+  actorsThatAreMe <- lift (filterA ((fills_ (Filler_ me)) <<< Filled_) currentactors)
   if null actorsThatAreMe
     then pure unit
     else updater actorsThatAreMe contextId

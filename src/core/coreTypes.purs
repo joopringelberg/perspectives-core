@@ -431,10 +431,10 @@ infix 0 evalMonadPerspectivesQueryToMaybeObject as ##>
 ------------------------------------------------------------------------------------------------------------------------
 -- OBTAIN A SINGLE RESULT OR AN ERROR (##>>) FROM TRACKINGOBJECTSGETTER
 ------------------------------------------------------------------------------------------------------------------------
-runMonadPerspectivesQueryToObject :: forall s o. Newtype s String => s -> (s ~~> o) -> (MonadPerspectives) o
+runMonadPerspectivesQueryToObject :: forall s o. Show s => s -> (s ~~> o) -> (MonadPerspectives) o
 runMonadPerspectivesQueryToObject id tog = evalMonadPerspectivesQuery id tog >>= \objects ->
   case head objects of
-  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (unwrap id) <> "' (look for `##>>`)."
+  Nothing -> throwError $ error $ "ObjectsGetter returns no values for '" <> (show id) <> "' (look for `##>>`)."
   (Just obj) -> pure obj
 
 infix 0 runMonadPerspectivesQueryToObject as ##>>

@@ -31,7 +31,7 @@ import Data.Iterable (toArray)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (unwrap, ala)
+import Data.Newtype (class Newtype, ala, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -67,7 +67,7 @@ import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (filledRolesFilter, roleFromContextFilter)
-import Prelude (bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (class Show, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -405,9 +405,11 @@ notIsMe = isMe >=> pure <<< not
 type Filler = RoleInstance
 type Filled = RoleInstance
 
+-- | Is Filled (ultimately) filled by Filler?
+-- | Recursively checks each filler of filled until filler is found or the bottom has been reached.
 -- | filled `filledBy_` filler
-filledBy_ :: Filled -> Filler -> MP Boolean
-filledBy_ filled filler =
+filledBy_ :: Filled_ -> Filler_ -> MP Boolean
+filledBy_ (Filled_ filled) (Filler_ filler) =
   if filled == filler
     then pure true
     else do
@@ -415,12 +417,12 @@ filledBy_ filled filler =
       mfiller <- binding_ filled
       case mfiller of 
         Nothing -> pure false
-        Just nextFilled -> nextFilled `filledBy_` filler
+        Just nextFilled -> (Filled_ nextFilled) `filledBy_` (Filler_ filler)
 
 -- | filled ##= filledBy filler
 -- | equals:
 -- | filled `filledBy_` filler
-filledBy :: Filler -> Filled ~~> Boolean
+filledBy :: Filler_ -> Filled_ ~~> Boolean
 filledBy filler filled = ArrayT $ do
   b <- lift (filled `filledBy_` filler)
   pure [b]
@@ -435,24 +437,39 @@ filledByOperator sourceOfFilledRoles sourceOfFillerRoles = fillsOperator sourceO
 fillsCombinator :: (RoleInstance ~~> Filled) ->
   (Filler ~~> Value)
 fillsCombinator sourceOfFilledRoles filler = ArrayT do
-  (bools :: Array Boolean) <- runArrayT $ (sourceOfFilledRoles >=> filledBy filler) filler
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfFilledRoles >=> filledBy (Filler_ filler) <<< Filled_) filler
   -- If there are no bindingRoles, this function must return false.
   if null bools
     then pure [Value $ show false]
     else pure [Value $ show $ ala Conj foldMap bools]
 
+-- | Is Filled (ultimately) filled by Filler?
+-- | Recursively checks each filler of filled until filler is found or the bottom has been reached.
 -- | filler `fills_` filled
-fills_ :: Filler -> Filled -> MP Boolean
+fills_ :: Filler_ -> Filled_ -> MP Boolean
 fills_ = flip filledBy_
 
+-- firstArg `infixedFunction` secondArg
+
 -- | filler ##= fills filled
--- | equals:
--- | fillef `fills` filled
-fills :: Filler -> Filled ~~> Boolean
+-- | should read as:
+-- | filler `fills` filled
+-- | Recursively checks fillers.
+fills :: Filler_ -> Filled_ ~~> Boolean
 fills filler filled = ArrayT $ do
-  b <- lift (filled `fills_` filler)
+  b <- lift (filler `fills_` filled)
   pure [b]
+
+newtype Filler_ = Filler_ RoleInstance
+derive instance Newtype Filler_ _
+instance Show Filler_ where show (Filler_ s) = show s
+
+newtype Filled_  = Filled_ RoleInstance
+derive instance Newtype Filled_ _
+instance Show Filled_ where show (Filled_ s) = show s
   
+-- | A boolean operator for Arc expressions.
+-- | Is true if the (first) filler ultimately fills the (first) filled.
 fillsOperator :: (RoleInstance ~~> Filled) ->
   (RoleInstance ~~> Filler) ->
   (RoleInstance ~~> Value)
@@ -461,7 +478,7 @@ fillsOperator sourceOfFillerRoles sourceOfFilledRoles originRole = ArrayT do
   filledRoles <- runArrayT (sourceOfFilledRoles originRole)
   case head fillerRoles, head filledRoles of
     Just fillerRole, Just filledRole | length fillerRoles == 1 && length filledRoles == 1 -> do
-      result <- (unsafePartial fromJust <<< head) <$> (runArrayT $ (fills filledRole) fillerRole)
+      result <- (unsafePartial fromJust <<< head) <$> (runArrayT $ (fills (Filler_ fillerRole)) (Filled_ filledRole))
       pure [Value $ show result]
     _, _ -> pure [Value $ show false]
 
@@ -469,7 +486,7 @@ fillsOperator sourceOfFillerRoles sourceOfFilledRoles originRole = ArrayT do
 filledByCombinator :: (RoleInstance ~~> Filled) ->
   (Filler ~~> Value)
 filledByCombinator sourceOfFillerRoles filled = ArrayT do
-  (bools :: Array Boolean) <- runArrayT $ (sourceOfFillerRoles >=> fills filled) filled
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfFillerRoles >=> filledBy (Filler_ filled) <<< Filled_) filled
   -- If there are no bindingRoles, this function must return false.
   if null bools
     then pure [Value $ show false]

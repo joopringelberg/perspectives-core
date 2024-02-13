@@ -56,7 +56,7 @@ import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, externalRole, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), binding, binding_, context, contextModelName, contextType, externalRole, filledBy, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, parseNumber, value2Date, value2Number)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (lookupIndexedRole)
@@ -108,29 +108,30 @@ interpretUQD (UQD _ WithFrame f1 _ _ _) a = do
 interpretUQD (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   pure $ (consOnMainPath (V "ExistsF" $ Value (show $ null r))) <$> r
-interpretUQD (UQD _ (UnaryCombinator FilledByF) f1 _ _ _) a = do
-  (boundRoleL :: DependencyPath) <- interpret f1 a
+interpretUQD (UQD _ (UnaryCombinator FilledByF) sourceOfFillerRoles _ _ _) a = do
+  (fillerRoleL :: DependencyPath) <- interpret sourceOfFillerRoles a
   -- If the head boundRole is a RoleInstance and (a `bindsRole` head boundRole) is true,
   -- add V (Value "true") to boundRole
-  case a.head, boundRoleL.head of
-    (R bindingRole), (R boundRole) -> do
-      b <- lift $ lift (boundRole ##>> fills bindingRole)
+  case a.head, fillerRoleL.head of
+    (R filledRole), (R fillerRole) -> do
+      -- b <- lift $ lift (boundRole ##>> fills bindingRole)
+      b <- lift $ lift ((Filled_ filledRole) ##>> filledBy (Filler_ fillerRole))
       if b
-        then pure (consOnMainPath (V "FilledByF" (Value "true")) boundRoleL)
-        else pure (consOnMainPath (V "FilledByF" (Value "false")) boundRoleL)
-    _, _ -> pure (consOnMainPath (V "FilledByF" (Value "false")) boundRoleL)
+        then pure (consOnMainPath (V "FilledByF" (Value "true")) fillerRoleL)
+        else pure (consOnMainPath (V "FilledByF" (Value "false")) fillerRoleL)
+    _, _ -> pure (consOnMainPath (V "FilledByF" (Value "false")) fillerRoleL)
 
-interpretUQD (UQD _ (UnaryCombinator FillsF) f1 _ _ _) a =  do
-  (boundRoleL :: DependencyPath) <- interpret f1 a
+interpretUQD (UQD _ (UnaryCombinator FillsF) sourceOfFilledRoles _ _ _) a =  do
+  (filledRoleL :: DependencyPath) <- interpret sourceOfFilledRoles a
   -- If the head boundRole is a RoleInstance and a `bindsRole` head boundRole is true,
   -- cons V (Value "true") op boundRole
-  case a.head, boundRoleL.head of
-    (R bindingRole), (R boundRole) -> do
-      b <- lift $ lift (boundRole ##>> fills bindingRole)
+  case a.head, filledRoleL.head of
+    (R fillerRole), (R filledRole) -> do
+      b <- lift $ lift ((Filled_ filledRole) ##>> fills (Filler_ fillerRole))
       if b
-        then pure (consOnMainPath (V "FillsF" (Value "true")) boundRoleL)
-        else pure (consOnMainPath (V "FillsF" (Value "false")) boundRoleL)
-    _, _ -> pure (consOnMainPath (V "FillsF" (Value "false")) boundRoleL)
+        then pure (consOnMainPath (V "FillsF" (Value "true")) filledRoleL)
+        else pure (consOnMainPath (V "FillsF" (Value "false")) filledRoleL)
+    _, _ -> pure (consOnMainPath (V "FillsF" (Value "false")) filledRoleL)
 
 interpretUQD (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
@@ -191,21 +192,21 @@ interpretBQD (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f2 a
   pure (l `union` r)
 
-interpretBQD (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) a = ArrayT do
-  (bindingRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
-  (boundRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfBindingRoles a
-  -- bindingRoles and boundRoles must be functional.
-  case head bindingRoles, head boundRoles of
-    Just bindingRolesh, Just boundRolesh | length bindingRoles <= 1 && length boundRoles <= 1 ->
-      case bindingRolesh.head, boundRolesh.head of
+interpretBQD (BQD _ (BinaryCombinator FilledByF) sourceOfFilledRoles sourceOfFillerRoles _ _ _) a = ArrayT do
+  (filledRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfFilledRoles a
+  (fillerRoles :: Array DependencyPath) <- runArrayT $ interpret sourceOfFillerRoles a
+  -- filledRoles and fillerRoles must be functional.
+  case head filledRoles, head fillerRoles of
+    Just filledRolesh, Just fillerRolesh | length filledRoles <= 1 && length fillerRoles <= 1 ->
+      case filledRolesh.head, fillerRolesh.head of
         R filled, R filler -> do
-          result <- lift (filler ##>> (fills filled))
+          result <- lift ((Filled_ filled) ##>> (filledBy (Filler_ filler)))
           pure [{ head: (V "" (Value $ show result))
                 , mainPath: Nothing
-                , supportingPaths: allPaths bindingRolesh `union` allPaths boundRolesh
+                , supportingPaths: allPaths filledRolesh `union` allPaths fillerRolesh
                 }]
-        _, _ -> throwError (error $ "'binds' expects two roles, but got: " <> show bindingRolesh.head <> " and " <> show boundRolesh.head)
-    Just bindingRolesh, Just boundRolesh -> throwError (error $ "'binds' expects at most a single role instance on both the left and right side")
+        _, _ -> throwError (error $ "'binds' expects two roles, but got: " <> show filledRolesh.head <> " and " <> show fillerRolesh.head)
+    Just filledRolesh, Just fillerRolesh -> throwError (error $ "'binds' expects at most a single role instance on both the left and right side")
     _, _ -> pure [{ head: (V "" (Value "false"))
                 , mainPath: Nothing
                 , supportingPaths: []

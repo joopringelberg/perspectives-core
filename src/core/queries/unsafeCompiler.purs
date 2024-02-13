@@ -336,9 +336,9 @@ compileFunction (BQD _ (BinaryCombinator IntersectionF) f1 f2 _ _ _) = do
   f2' <- compileFunction f2
   pure $ Combinators.intersection f1' f2'
 
-compileFunction (BQD _ (BinaryCombinator FilledByF) sourceOfBindingRoles sourceOfBoundRoles _ _ _) = do
-  sourceOfFilledRoles' <- compileFunction sourceOfBindingRoles
-  sourceOfFillerRoles' <- compileFunction sourceOfBoundRoles
+compileFunction (BQD _ (BinaryCombinator FilledByF) sourceOfFilledRoles sourceOfFillerRoles _ _ _) = do
+  sourceOfFilledRoles' <- compileFunction sourceOfFilledRoles
+  sourceOfFillerRoles' <- compileFunction sourceOfFillerRoles
   pure $ (unsafeCoerce filledByOperator (unsafeCoerce sourceOfFilledRoles') (unsafeCoerce sourceOfFillerRoles'))
 
 compileFunction (BQD _ (BinaryCombinator UnionF) f1 f2 _ _ _) = do
@@ -399,13 +399,13 @@ compileFunction (UQD _ (UnaryCombinator ExistsF) f1 _ _ _) = do
   f1' <- compileFunction f1
   pure (unsafeCoerce $ exists f1')
 
-compileFunction (UQD _ (UnaryCombinator FilledByF) sourceOfBoundRoles _ _ _) = do
-  sourceOfBoundRoles' <- compileFunction sourceOfBoundRoles
-  pure (unsafeCoerce $ filledByCombinator (unsafeCoerce sourceOfBoundRoles'))
+compileFunction (UQD _ (UnaryCombinator FilledByF) sourceOfFillerRoles _ _ _) = do
+  sourceOfFillerRoles' <- compileFunction sourceOfFillerRoles
+  pure (unsafeCoerce $ filledByCombinator (unsafeCoerce sourceOfFillerRoles'))
 
-compileFunction (UQD _ (UnaryCombinator FillsF) f1 _ _ _) = do
-  f1' <- compileFunction f1
-  pure (unsafeCoerce $ fillsCombinator (unsafeCoerce f1'))
+compileFunction (UQD _ (UnaryCombinator FillsF) sourceOfFilledRoles _ _ _) = do
+  sourceOfFilledRoles' <- compileFunction sourceOfFilledRoles
+  pure (unsafeCoerce $ fillsCombinator (unsafeCoerce sourceOfFilledRoles'))
 
 compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
   f1' <- compileFunction f1

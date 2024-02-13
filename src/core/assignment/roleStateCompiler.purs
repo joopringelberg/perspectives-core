@@ -57,15 +57,15 @@ import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspecti
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (contextType, filledBy, fills_, getActiveRoleStates_)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, fills_, getActiveRoleStates_)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
@@ -159,7 +159,7 @@ enteringRoleState roleId stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  me <- lift getUserIdentifier
+  me <- lift getPerspectivesUser
   mySystem <- lift $ getMySystem
   forWithIndex_ automaticOnEntry \(allowedUser :: RoleType) {updater, contextGetter} -> whenRightUser 
     roleId
@@ -190,7 +190,7 @@ enteringRoleState roleId stateId = do
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
       currentcontext <- lift $ (roleId ##>> contextGetter)
-      userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (RoleInstance me))))
+      userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (Filler_ me)) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
         -- As the user gets a new perspective, he should have the corresonding resources. Hence we serialise them as Deltas and 
@@ -210,10 +210,10 @@ enteringRoleState roleId stateId = do
 whenRightUser :: RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleType -> (Array RoleInstance -> ContextInstance -> Updater RoleInstance) -> MonadPerspectivesTransaction Unit
 whenRightUser roleId contextGetter allowedUser updater = do
   contextId <- lift $ (roleId ##>> contextGetter)
-  me <- lift getUserIdentifier
+  me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
   -- Find the actor(s) that the system user ultimately fills.
-  actorsThatAreMe <- lift (filterA (fills_ (RoleInstance me)) currentactors)
+  actorsThatAreMe <- lift (filterA ((fills_ (Filler_ me)) <<< Filled_) currentactors)
   if null actorsThatAreMe
     then pure unit
     else updater actorsThatAreMe contextId roleId
@@ -276,7 +276,6 @@ exitingRoleState roleId stateId = do
   -- It may happen that during the transaction, the end user is put into another role (too).
   -- So we really should compute the userRoleType only now - or check if the end user (sys:Me) ultimately
   -- fills the allowdUser RoleType.
-  me <- lift getUserIdentifier
   forWithIndex_ automaticOnExit \(allowedUser :: RoleType) {updater, contextGetter} -> whenRightUser 
     roleId
     contextGetter 
