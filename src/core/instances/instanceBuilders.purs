@@ -37,7 +37,7 @@ module Perspectives.Instances.Builders
   )
   where
 
-import Control.Monad.Error.Class (try)
+import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
 import Data.Array.NonEmpty (NonEmptyArray, toArray)
@@ -50,20 +50,20 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Aff.AVar (put)
 import Effect.Aff.Class (liftAff)
-import Foreign.Object (empty)
+import Foreign.Object (empty, insert)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
 import Perspectives.ContextAndRole (changeRol_isMe, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=), IndexedResource(..))
 import Perspectives.Deltas (addCreatedContextToTransaction, deltaIndex, insertDelta)
-import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
-import Perspectives.Names (expandDefaultNamespaces)
+import Perspectives.Instances.ObjectGetters (isMe)
+import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Persistent (getPerspectEntiteit, getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
+import Perspectives.Persistent (getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (getIndexedResourceToCreate)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
@@ -82,68 +82,72 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
-constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = do
-  contextInstanceId <- case id of
-    Nothing -> ContextInstance <$> (lift $ createResourceIdentifier (CType $ ContextType ctype))
-    Just cname -> ContextInstance <$> (lift $ createResourceIdentifier' (CType $ ContextType ctype) cname)
-  localName <- lift $ lift $ guid (unwrap contextInstanceId)
-  (mc :: Maybe PerspectContext) <- lift $ lift $ tryGetPerspectEntiteit contextInstanceId
-  case mc of
-    Just _ -> pure contextInstanceId
-    Nothing -> do
-      -- RULE TRIGGERING
-      PerspectContext{universeContextDelta, buitenRol} <- constructEmptyContext contextInstanceId ctype localName externeProperties mbindingRoleType
-      -- Get the number of deltas in the transaction. Insert the
-      -- UniverseContextDelta and the UniverseRoleDelta after that point.
-      i <- lift deltaIndex
-      -- Add instances for each role type to the new empty context.
-      (Tuple rolInstances users) <- runWriterT $ forWithIndex rollen \rolTypeId rolDescriptions -> do
-        -- Construct all instances of this type without binding first, then add them to the context.
-        (rolInstances' :: NonEmptyArray (Tuple RolSerialization RoleInstance)) <- forWithIndex
-          (unwrap rolDescriptions)
-          (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId))
-        -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta, also sets isMe.
-        -- CURRENTUSER
-        for_ rolInstances' addBindingToRoleInstance
-        -- Add the completed Role instances to the context.
-        -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
-        for_ rolInstances'
-          \rolInstance -> lift $ lift $ addRoleInstanceToContext
-            contextInstanceId
-            (EnumeratedRoleType rolTypeId)
-            (Tuple (snd rolInstance) Nothing)
-        pure $ toArray (snd <$> rolInstances')
+constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = lookupOrCreateContextInstance  (ContextType ctype) 
+  do
+    contextInstanceId <- case id of
+      Nothing -> ContextInstance <$> (lift $ createResourceIdentifier (CType $ ContextType ctype))
+      Just cname -> ContextInstance <$> (lift $ createResourceIdentifier' (CType $ ContextType ctype) cname)
+    localName <- lift $ lift $ guid (unwrap contextInstanceId)
+    (mc :: Maybe PerspectContext) <- lift $ lift $ tryGetPerspectEntiteit contextInstanceId
+    case mc of
+      Just _ -> pure contextInstanceId
+      Nothing -> do
+        -- RULE TRIGGERING
+        PerspectContext{universeContextDelta, buitenRol} <- constructEmptyContext contextInstanceId ctype localName externeProperties mbindingRoleType
+        -- Get the number of deltas in the transaction. Insert the
+        -- UniverseContextDelta and the UniverseRoleDelta after that point.
+        i <- lift deltaIndex
+        -- Add instances for each role type to the new empty context.
+        (Tuple rolInstances users) <- runWriterT $ forWithIndex rollen \rolTypeId rolDescriptions -> do
+          -- Construct all instances of this type without binding first, then add them to the context.
+          (rolInstances' :: NonEmptyArray (Tuple RolSerialization RoleInstance)) <- forWithIndex
+            (unwrap rolDescriptions)
+            \ind ser -> lift $ lift $ lookupOrCreateRoleInstance 
+              (EnumeratedRoleType rolTypeId) 
+              (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId) ind ser)
+              >>= pure <<< Tuple ser
+          -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta, also sets isMe.
+          -- CURRENTUSER
+          for_ rolInstances' addBindingToRoleInstance
+          -- Add the completed Role instances to the context.
+          -- SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
+          for_ rolInstances'
+            \rolInstance -> lift $ lift $ addRoleInstanceToContext
+              contextInstanceId
+              (EnumeratedRoleType rolTypeId)
+              (Tuple (snd rolInstance) Nothing)
+          pure $ toArray (snd <$> rolInstances')
 
-      lift $ lift $ void $ saveEntiteit contextInstanceId
-      -- Add a UniverseRoleDelta to the Transaction for the external role.
-      -- As we've just constructed the context and its external role, no need to
-      -- catch errors rising from not being able to exchange the identifier for the
-      -- resources.
-      PerspectRol{universeRoleDelta, contextDelta} <- lift $ lift $ getPerspectRol buitenRol
-      lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
-      -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
-      lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
-      -- Add the ContextDelta for the external role to the transaction.
-      lift $ insertDelta (DeltaInTransaction{ users, delta: contextDelta}) (i + 2)
-      -- Add the context as a createdContext to the transaction
-      lift $ addCreatedContextToTransaction contextInstanceId
-      -- If the context type has a public role, create an instance of its proxy.
-      publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
-      for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) 
-        \t -> (do 
-          mproxy <- lift $ createAndAddRoleInstance 
-            t 
-            (unwrap contextInstanceId) 
-            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
-          case mproxy of 
-            -- As the proxy of the public role is just another user, we have to make sure it will receive all deltas necessary
-            -- according to its perspectives.
-            Just proxy -> lift (contextInstanceId `serialisedAsDeltasFor` proxy)
-            -- This will never happen.
-            Nothing -> pure unit
-            )
-      lift $ createIndexedContext (ContextType ctype) contextInstanceId
-      pure contextInstanceId 
+        lift $ lift $ void $ saveEntiteit contextInstanceId
+        -- Add a UniverseRoleDelta to the Transaction for the external role.
+        -- As we've just constructed the context and its external role, no need to
+        -- catch errors rising from not being able to exchange the identifier for the
+        -- resources.
+        PerspectRol{universeRoleDelta, contextDelta} <- lift $ lift $ getPerspectRol buitenRol
+        lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
+        -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
+        lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
+        -- Add the ContextDelta for the external role to the transaction.
+        lift $ insertDelta (DeltaInTransaction{ users, delta: contextDelta}) (i + 2)
+        -- Add the context as a createdContext to the transaction
+        lift $ addCreatedContextToTransaction contextInstanceId
+        -- If the context type has a public role, create an instance of its proxy.
+        publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
+        for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) 
+          \t -> (do 
+            mproxy <- lift $ createAndAddRoleInstance 
+              t 
+              (unwrap contextInstanceId) 
+              (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+            case mproxy of 
+              -- As the proxy of the public role is just another user, we have to make sure it will receive all deltas necessary
+              -- according to its perspectives.
+              Just proxy -> lift (contextInstanceId `serialisedAsDeltasFor` proxy)
+              -- This will never happen.
+              Nothing -> pure unit
+              )
+        lift $ createIndexedContext (ContextType ctype) contextInstanceId
+        pure contextInstanceId 
   where
 
 
@@ -153,16 +157,16 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
       EnumeratedRoleType ->
       Int ->
       RolSerialization ->
-      (WriterT (Array RoleInstance) (ExceptT PerspectivesError MonadPerspectivesTransaction)) (Tuple RolSerialization RoleInstance)
+      MonadPerspectivesTransaction RoleInstance
     constructSingleRoleInstance contextInstanceId roleType i s@(RolSerialization{id:mid, properties, binding}) = do
-      localName <- lift $ lift $ lift $ guid (unwrap contextInstanceId)
-      binding' <- lift  $ lift $ lift (traverse expandDefaultNamespaces binding)
+      localName <- lift $ guid (unwrap contextInstanceId)
+      binding' <-  lift (traverse expandDefaultNamespaces binding)
       roleInstanceId <- case mid of
-        Nothing -> RoleInstance <$> (lift $ lift $ createResourceIdentifier (RType roleType))
-        Just rid -> RoleInstance <$> (lift $ lift $ createResourceIdentifier' (RType roleType) rid)
-      void $ lift $ lift $ constructEmptyRole contextInstanceId roleType i roleInstanceId
-      lift $ lift $ createIndexedRole roleType roleInstanceId
-      pure $ Tuple s roleInstanceId
+        Nothing -> RoleInstance <$> (createResourceIdentifier (RType roleType))
+        Just rid -> RoleInstance <$> (createResourceIdentifier' (RType roleType) rid)
+      void $ constructEmptyRole contextInstanceId roleType i roleInstanceId
+      createIndexedRole roleType roleInstanceId
+      pure $ roleInstanceId
 
     -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta.
     addBindingToRoleInstance :: (Tuple RolSerialization RoleInstance) -> (WriterT (Array RoleInstance) (ExceptT PerspectivesError MonadPerspectivesTransaction)) Unit
@@ -185,13 +189,14 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
 -- | The contextId may be prefixed with a default namespace: it will be expanded.
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Maybe RoleInstance)
-createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSerialization{binding}) = case binding of
-  Nothing -> createAndAddRoleInstance_ roleType contextId r false
-  Just b -> (lift $ try $ getPerspectEntiteit (RoleInstance b)) >>=
-    handlePerspectRolError' "createAndAddRoleInstance" Nothing
-      \(PerspectRol{isMe}) -> createAndAddRoleInstance_ roleType contextId r isMe
+createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSerialization{binding}) =
+  case binding of
+      Nothing -> Just <$> lookupOrCreateRoleInstance roleType (createAndAddRoleInstance_ roleType contextId r false)
+      Just b -> do 
+        me <- lift (isMe $ RoleInstance b)
+        Just <$> lookupOrCreateRoleInstance roleType (createAndAddRoleInstance_ roleType contextId r false)
 
-createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction (Maybe RoleInstance)
+createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = do
     contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId) 
     rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
@@ -223,7 +228,7 @@ createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSeri
         setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
 
     createIndexedRole roleType roleInstance
-    pure $ Just roleInstance
+    pure roleInstance
 
 -- | Iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
 -- | Also sets the Name property.
@@ -262,3 +267,33 @@ scheduleIndexedResourceCreation ir = do
   -- Put the resource into it. Notice that this blocks; however, there is a fiber continuously waiting 
   -- and it will take the IndexedResourece out of the AVar as soon as possible.
   liftAff $ put ir av
+
+lookupOrCreateRoleInstance :: EnumeratedRoleType -> MonadPerspectivesTransaction RoleInstance -> MonadPerspectivesTransaction RoleInstance
+lookupOrCreateRoleInstance rtype roleConstructor = do
+  mindexedName <- lift $ indexedRoleName rtype
+  case mindexedName of
+    Nothing -> roleConstructor
+    Just indexedName -> do
+      mrole <- lift $ lookupIndexedRole (unwrap indexedName)
+      case mrole of 
+        Nothing -> do
+          rid <- roleConstructor
+          lift $ modify \ps -> ps {indexedRoles = insert (unwrap indexedName) rid ps.indexedRoles}
+          pure rid
+        Just r -> pure r
+
+lookupOrCreateContextInstance :: ContextType -> 
+  ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance -> 
+  ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
+lookupOrCreateContextInstance ctype contextConstructor = do
+  mindexedName <- lift $ lift $ indexedContextName ctype 
+  case mindexedName of 
+    Nothing -> contextConstructor
+    Just indexedName -> do
+      minst <- lift $ lift $ lookupIndexedContext (unwrap indexedName)
+      case minst of
+        Nothing -> do
+          cid <- contextConstructor
+          lift $ lift $ modify \ps -> ps {indexedContexts = insert (unwrap indexedName) cid ps.indexedContexts}
+          pure cid
+        Just i -> pure i

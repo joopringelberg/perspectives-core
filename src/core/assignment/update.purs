@@ -69,23 +69,21 @@ import Perspectives.Identifiers (startsWithSegments, typeUri2LocalName_, typeUri
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, roleType, roleType_)
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
-import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
-import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistence.API (toFile)
 import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectEntiteit, getPerspectRol)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
 import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, indexedContextName, indexedRoleName, isUnlinked_, propertyAliases)
+import Perspectives.Types.ObjectGetters (getRoleAspectSpecialisations, hasPerspectiveOnRole, isUnlinked_, propertyAliases)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
 import Simple.JSON (class WriteForeign, writeJSON)
 
@@ -709,37 +707,3 @@ roleContextualisations ctxt qualifiedRoleIdentifier = do
   (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
   -- Filter the object role types, keeping only those that the user role type has a perspective on.
   lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) roleTypesToCreate')
-
--- | If the role type is indexed, adds the instance to the indexed roles in PerspectivesState.
-lookupOrCreateRoleInstance :: EnumeratedRoleType -> MonadPerspectivesTransaction String -> MonadPerspectivesTransaction String
-lookupOrCreateRoleInstance rtype roleConstructor = do
-  mindexedName <- lift $ indexedRoleName rtype
-  case mindexedName of
-    Nothing -> roleConstructor
-    Just indexedName -> do
-      mrole <- lift $ lookupIndexedRole (unwrap indexedName)
-      case mrole of 
-        Nothing -> do
-          rid <- roleConstructor
-          lift $ modify \ps -> ps {indexedRoles = insert (unwrap indexedName) (RoleInstance rid) ps.indexedRoles}
-          pure rid
-        Just i -> pure (unwrap i)
-
--- | If the context type is indexed, look it up. 
--- | If it isn't yet registered, create it and add an entry to the table of indexed contexts in perspectives state (overwriting previous values).
-lookupOrCreateContextInstance :: ContextType -> MonadPerspectivesTransaction (Either PerspectivesError String) -> MonadPerspectivesTransaction (Either PerspectivesError String)
-lookupOrCreateContextInstance ctype contextConstructor = do
-  mindexedName <- lift $ indexedContextName ctype 
-  case mindexedName of 
-    Nothing -> contextConstructor
-    Just indexedName -> do
-      minst <- lift $ lookupIndexedContext (unwrap indexedName)
-      case minst of
-        Nothing -> do
-          mcid <- contextConstructor
-          case mcid of
-            Left e -> pure $ Left e
-            Right s -> do
-              lift $ modify \ps -> ps {indexedContexts = insert (unwrap indexedName) (ContextInstance s) ps.indexedContexts}
-              pure $ Right s
-        Just i -> pure $ Right (unwrap i)

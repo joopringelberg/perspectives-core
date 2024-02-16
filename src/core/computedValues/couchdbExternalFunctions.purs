@@ -37,7 +37,7 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Iterable (toArray)
 import Data.Map (empty) as Map
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
 import Data.Nullable (toMaybe)
@@ -435,16 +435,14 @@ initSystem = do
       -- Now create the user role (the instance of sys:PerspectivesSystem$User; it is cached automatically).
       -- This will also create the IndexedRole in the System instance, filled with the new User instance.
       userId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.sysUser) (sysId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
-      mme <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.sysUser) systemId
+      me <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.sysUser) systemId
         (RolSerialization 
           { id: Just userId
           , properties: PropertySerialization empty
           , binding: Nothing
           })
         true
-      case mme of 
-        Nothing -> logPerspectivesError (Custom "Could not create User role of PerspectivesSystem.")
-        Just me -> roleIsMe me system
+      roleIsMe me system
       isFirstInstallation <- lift $ AMA.gets (_.isFirstInstallation <<< _.runtimeOptions)
       if isFirstInstallation
         then do
@@ -465,21 +463,15 @@ initSystem = do
                 Left e -> logPerspectivesError (Custom (show e))
                 Right world@(ContextInstance worldId) -> do 
                   puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) (sysId <> "_KeyHolder")
-                  muser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
+                  puser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
                     (RolSerialization 
                       { id: Just puserId
                       , properties: PropertySerialization (singleton perspectivesUsersPublicKey [publicKey])
                       , binding: Nothing
                       })
                       true
-                  case muser of 
-                    Nothing -> logPerspectivesError (Custom "Could not create the PerspectivesUsers instance for this installation.")
-                    Just puser -> roleIsMe puser world
-                  -- Add the new indexed resources to state.
-                  void $ lift $ AMA.modify \ps -> ps 
-                    { indexedContexts = fromFoldable [Tuple DEP.mySystem (ContextInstance systemId), Tuple DEP.theWorld world]
-                    , indexedRoles = insert DEP.sysMe (unsafePartial fromJust mme) ps.indexedRoles
-                    }
+                  roleIsMe puser world
+                  pure unit
             Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
         else pure unit
 

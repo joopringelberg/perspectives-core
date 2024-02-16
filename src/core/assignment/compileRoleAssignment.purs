@@ -43,7 +43,7 @@ import Foreign (unsafeToForeign)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..), defaultContextSerializationRecord)
-import Perspectives.Assignment.Update (addProperty, deleteProperty, lookupOrCreateContextInstance, lookupOrCreateRoleInstance, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, saveFile, setProperty)
+import Perspectives.Assignment.Update (addProperty, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, roleContextualisations, saveFile, setProperty)
 import Perspectives.CoreTypes (type (~~>), MP, MPT, MonadPerspectivesTransaction, Updater, (###>>), (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.Error.Boundaries (handlePerspectRolError)
@@ -399,10 +399,9 @@ compileRoleAssignment (UQD _ (QF.CreateRole qualifiedRoleIdentifier) contextGett
     for_ ctxts \ctxt -> do
       roleTypesToCreate <- roleContextualisations ctxt qualifiedRoleIdentifier
       -- If the role type is indexed, adds the created instance to the indexed roles in PerspectivesState.
-      for_ roleTypesToCreate \qualifiedRoleIdentifier' -> lookupOrCreateRoleInstance
-        qualifiedRoleIdentifier'
-        (unwrap <<< unsafePartial fromJust <$> createAndAddRoleInstance qualifiedRoleIdentifier' (unwrap ctxt) 
-          (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing}))
+      for_ roleTypesToCreate \qualifiedRoleIdentifier' -> unwrap <<< unsafePartial fromJust <$> 
+        createAndAddRoleInstance qualifiedRoleIdentifier' (unwrap ctxt) 
+          (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing})
 
 
 compileContextAssignmentFromRole :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (Updater RoleInstance)
@@ -421,9 +420,7 @@ compileContextAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeId
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
         -- Calculated Roles cannot be specialised, and there is no way to model a specialised embedded context type.
-        CR calculatedType -> void $ lookupOrCreateContextInstance
-          qualifiedContextTypeIdentifier
-          do 
+        CR calculatedType -> void do 
             contextCreationResult <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
               { ctype = unwrap qualifiedContextTypeIdentifier
               })
@@ -446,24 +443,22 @@ compileContextAssignmentFromRole (UQD _ (QF.CreateContext qualifiedContextTypeId
             contextTypesToCreate' <- if length contextTypesToCreate > 1 
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate
-            for contextTypesToCreate' \contextTypeToCreate -> void $ lookupOrCreateContextInstance 
-              contextTypeToCreate
-              do 
-                contextIdentifier <- createResourceIdentifier (CType contextTypeToCreate)
-                r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                  { id = Just contextIdentifier
-                  , ctype = unwrap contextTypeToCreate
-                  })
-                case r of
-                  Left e -> do
-                    logPerspectivesError e
-                    pure $ Left e
-                  Right (ContextInstance newContext) -> do 
-                    void $ createAndAddRoleInstance roleTypeToCreate (unwrap ctxt) (RolSerialization
-                      { id: Nothing
-                      , properties: PropertySerialization empty
-                      , binding: Just $ buitenRol newContext })
-                    pure $ Right contextIdentifier
+            for contextTypesToCreate' \contextTypeToCreate -> void do 
+              contextIdentifier <- createResourceIdentifier (CType contextTypeToCreate)
+              r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
+                { id = Just contextIdentifier
+                , ctype = unwrap contextTypeToCreate
+                })
+              case r of
+                Left e -> do
+                  logPerspectivesError e
+                  pure $ Left e
+                Right (ContextInstance newContext) -> do 
+                  void $ createAndAddRoleInstance roleTypeToCreate (unwrap ctxt) (RolSerialization
+                    { id: Nothing
+                    , properties: PropertySerialization empty
+                    , binding: Just $ buitenRol newContext })
+                  pure $ Right contextIdentifier
 
 compileContextAssignmentFromRole (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier) contextGetterDescription _ _ _) mnameGetterDescription = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextGetterDescription
@@ -477,18 +472,16 @@ compileContextAssignmentFromRole (UQD _ (QF.CreateRootContext qualifiedContextTy
       localName <- case mNameGetter of
         Just nameGetter -> lift $ Just <$> (roleId ##>> nameGetter)
         Nothing -> pure Nothing
-      for_ ctxts \ctxt -> lookupOrCreateContextInstance 
-        qualifiedContextTypeIdentifier
-        do
-          r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-            { ctype = unwrap qualifiedContextTypeIdentifier
-            , id = localName
-            })
-          case r of
-            Left e -> do 
-              logPerspectivesError e
-              pure $ Left e
-            Right (ContextInstance newContext) -> pure $ Right newContext
+      for_ ctxts \ctxt -> do
+        r <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+          { ctype = unwrap qualifiedContextTypeIdentifier
+          , id = localName
+          })
+        case r of
+          Left e -> do 
+            logPerspectivesError e
+            pure $ Left e
+          Right (ContextInstance newContext) -> pure $ Right newContext
 
 compileContextAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifier) roleGetterDescription _ _ _) mnameGetterDescription = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleGetterDescription
@@ -510,22 +503,20 @@ compileContextAssignmentFromRole (UQD _ (QF.CreateContext_ qualifiedContextTypeI
       -- Arbitrarily, we choose the first context type:
       case head contextTypesToCreate of
         Nothing -> pure unit
-        Just contextTypeToCreate -> void $ lookupOrCreateContextInstance 
-          qualifiedContextTypeIdentifier
-          do 
-            newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
-              { ctype = unwrap contextTypeToCreate
-              , id = localName
-              })
-            -- now bind it in the role instance.
-            case newContext of 
-              Left e -> do
-                logPerspectivesError e
-                pure $ Left e
-              Right (ContextInstance ctxtId) -> do 
-                -- now bind it in the role instance.
-                void $ setFirstBinding roleInstance (RoleInstance $ buitenRol ctxtId) Nothing
-                pure $ Right ctxtId
+        Just contextTypeToCreate -> void do 
+          newContext <- runExceptT $ constructContext (Just $ ENR roleTypeToFill) (ContextSerialization defaultContextSerializationRecord
+            { ctype = unwrap contextTypeToCreate
+            , id = localName
+            })
+          -- now bind it in the role instance.
+          case newContext of 
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right (ContextInstance ctxtId) -> do 
+              -- now bind it in the role instance.
+              void $ setFirstBinding roleInstance (RoleInstance $ buitenRol ctxtId) Nothing
+              pure $ Right ctxtId
 
 makeUQD :: Partial => QueryFunctionDescription -> QueryFunctionDescription
 makeUQD (BQD dom qf contextGetterDescription _ ran fun man) =
@@ -571,15 +562,13 @@ compileRoleCreatingAssignments (UQD _ (QF.CreateRole qualifiedRoleIdentifier) co
         Just nameGetter -> lift $ Just <$> (roleId ##>> nameGetter)
         Nothing -> pure Nothing
       for roleTypesToCreate
-        \roleTypeToCreate -> lookupOrCreateRoleInstance
-          roleTypeToCreate
-          do 
-            roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance 
-              roleTypeToCreate 
-              (unwrap ctxt) 
-              (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing})
-            -- No need to handle retrieval errors as we've just created the role.
-            pure (unwrap roleIdentifier)
+        \roleTypeToCreate -> do 
+          roleIdentifier <- unsafePartial $ fromJust <$> createAndAddRoleInstance 
+            roleTypeToCreate 
+            (unwrap ctxt) 
+            (RolSerialization {id: localName, properties: PropertySerialization empty, binding: Nothing})
+          -- No need to handle retrieval errors as we've just created the role.
+          pure (unwrap roleIdentifier)
 
 
 compileContextCreatingAssignments :: Partial => QueryFunctionDescription -> Maybe QueryFunctionDescription -> MP (RoleInstance -> MonadPerspectivesTransaction (Array String))
@@ -598,18 +587,16 @@ compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeI
       case qualifiedRoleIdentifier of
         -- calculatedType is guaranteed by the statementcompiler to be a DBQ role.
         -- Create a context without binding contextrole.
-        CR calculatedType -> singleton <$> lookupOrCreateContextInstance 
-          qualifiedContextTypeIdentifier
-          do
-            r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
-              { id = localName
-              , ctype = unwrap qualifiedContextTypeIdentifier
-              })
-            case r of
-              Left e -> do
-                logPerspectivesError e
-                pure $ Left e
-              Right ci -> pure $ Right $ unwrap ci
+        CR calculatedType -> singleton <$> do
+          r <- runExceptT $ constructContext (Just qualifiedRoleIdentifier) (ContextSerialization defaultContextSerializationRecord
+            { id = localName
+            , ctype = unwrap qualifiedContextTypeIdentifier
+            })
+          case r of
+            Left e -> do
+              logPerspectivesError e
+              pure $ Left e
+            Right ci -> pure $ Right $ unwrap ci
 
         ENR enumeratedType -> do
           -- Get the contextualised versions of the role type that we should create.
@@ -623,23 +610,21 @@ compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeI
             contextTypesToCreate' <- if length contextTypesToCreate > 1 
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate
-            for contextTypesToCreate' \contextTypeToCreate -> lookupOrCreateContextInstance
-              contextTypeToCreate
-              do
-                r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
-                  { ctype = unwrap contextTypeToCreate
-                  })
-                case r of
-                  Left e -> do
-                    logPerspectivesError e
-                    pure $ Left e
-                  Right (ContextInstance contextIdentifier) -> (Right <<< unwrap <<< unsafePartial fromJust) <$> createAndAddRoleInstance
-                    roleTypeToCreate 
-                    (unwrap ctxt)
-                    (RolSerialization
-                      { id: Nothing
-                      , properties: PropertySerialization empty
-                      , binding: Just $ buitenRol contextIdentifier })
+            for contextTypesToCreate' \contextTypeToCreate -> do
+              r <- runExceptT $ constructContext (Just $ ENR roleTypeToCreate) (ContextSerialization defaultContextSerializationRecord
+                { ctype = unwrap contextTypeToCreate
+                })
+              case r of
+                Left e -> do
+                  logPerspectivesError e
+                  pure $ Left e
+                Right (ContextInstance contextIdentifier) -> (Right <<< unwrap <<< unsafePartial fromJust) <$> createAndAddRoleInstance
+                  roleTypeToCreate 
+                  (unwrap ctxt)
+                  (RolSerialization
+                    { id: Nothing
+                    , properties: PropertySerialization empty
+                    , binding: Just $ buitenRol contextIdentifier })
     pure $ catMaybes (hush <$> results)
 
 compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextTypeIdentifier) contextGetterDescription _ _ _) mnameGetterDescription = do
@@ -654,18 +639,16 @@ compileContextCreatingAssignments (UQD _ (QF.CreateRootContext qualifiedContextT
       localName <- case mNameGetter of
         Just nameGetter -> lift $ Just <$> (roleId ##>> nameGetter)
         Nothing -> pure Nothing
-      r <- for ctxts \ctxt -> lookupOrCreateContextInstance 
-        qualifiedContextTypeIdentifier
-        do
-          contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
-            { ctype = unwrap qualifiedContextTypeIdentifier
-            , id = localName
-            })
-          case contextCreationResult of
-            Left e -> do
-              logPerspectivesError e
-              pure $ Left e
-            Right (ContextInstance ctxtId) -> pure $ Right ctxtId
+      r <- for ctxts \ctxt -> do
+        contextCreationResult <- runExceptT $ constructContext Nothing (ContextSerialization defaultContextSerializationRecord
+          { ctype = unwrap qualifiedContextTypeIdentifier
+          , id = localName
+          })
+        case contextCreationResult of
+          Left e -> do
+            logPerspectivesError e
+            pure $ Left e
+          Right (ContextInstance ctxtId) -> pure $ Right ctxtId
       modify (over Transaction \t -> t {authoringRole = originalRole})
       pure $ catMaybes (hush <$> r)
 
