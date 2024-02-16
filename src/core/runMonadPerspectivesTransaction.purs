@@ -280,10 +280,11 @@ runSterileTransaction a =
 -- | This is the case, for example, when we want to parse an ARC file, or when we want to add another model
 -- | to the installation.
 runEmbeddedTransaction :: forall o.
+  Boolean ->
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runEmbeddedTransaction authoringRole a = do
+runEmbeddedTransaction share authoringRole a = do
   t <- transactionFlag
   flagIsDown <- isNothing <$> (lift $ tryRead t)
   if flagIsDown
@@ -297,7 +298,7 @@ runEmbeddedTransaction authoringRole a = do
           -- 2. Run the transaction (this will lower and raise the flag again, setting it to 1).
           -- runMonadPerspectivesTransaction has an internal Error Boundary that guarantees the flag is handled.
           -- In other words, it is guaranteed to be up again when it is finished. But it may throw!
-          result <- runMonadPerspectivesTransaction authoringRole a
+          result <- runMonadPerspectivesTransaction' share authoringRole a
           -- 2. Lower it again.
           log "Ending embedded transaction."
           _ <- lift $ take t

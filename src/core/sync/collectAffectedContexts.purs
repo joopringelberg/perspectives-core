@@ -133,7 +133,7 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance contextInstance runForw
       then handleBackwardQuery roleInstance iq >>= runForwardsComputation roleInstance iq
       else handleBackwardQuery roleInstance iq >>= pure <<< join <<< map snd
       ) >>= pure <<< join
-  pure $ nub $ union users1 users2
+  lift $ filterA notIsMe (nub $ union users1 users2)
 
 type ContextWithUsers = Tuple ContextInstance (Array RoleInstance)
 
@@ -201,6 +201,7 @@ isForSelfOnly (InvertedQuery{selfOnly}) = selfOnly
 -- | The user role instances have a perspective on roles in their context.
 -- | Perspectives are conditional on states (valid in some states and not in others). The users we return are guaranteed
 -- | to have at least one valid perspective, even in the case of object state.
+-- | The 'own' user is not one of them.
 -- | INVARIANT TO RESPECT: both the backward- and forward part of the InvertedQuery should have been compiled.
 -- TODO. Fix the error that backwardsCompiled can be Nothing.
 handleBackwardQuery :: RoleInstance -> InvertedQuery -> MonadPerspectivesTransaction (Array ContextWithUsers)
@@ -326,7 +327,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
                 State.Cnt _ -> throwError (error $ "fromRoleResults.computeUsersFromState: context states should not occur.")
                 -- The role we've been lead back to is a user role. Check whether it is in the required state.
                 State.Srole _ -> (lift $ roleIsInState stateId rid) >>= if _
-                  then lift (rid ##>> OG.context) >>= \cid -> pure $ cons (Tuple cid [rid]) accumulatedUsers
+                  then lift (rid ##>> OG.context) >>= (\cid -> pure $ cons (Tuple cid [rid]) accumulatedUsers)
                   else pure accumulatedUsers
                 -- The role we've been lead back to is an object role. If it is in the required state,
                 -- compute the users having a perspective from its context.
@@ -433,7 +434,7 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
             Nothing -> pure []
             Just calculations -> concat <$> for calculations (handleBackwardQuery oldFiller))
         otherwise -> pure []
-      pure (nub $ union users1 (users2 `union` users3))
+      lift $ filterA notIsMe (nub $ union users1 (users2 `union` users3))
 
 -----------------------------------------------------------
 -- RE-EVALUATE CONSEQUENCES OF CHANGES TO PUBLIC FILLERS
@@ -728,8 +729,13 @@ magic ctxt roleInstances rtype users =  do
 -- this role instance.
 -- Note we don't evaluate any forward part; it is not needed, so it may be Nothing.
 aisInPropertyDelta :: RoleInstance -> EnumeratedPropertyType -> EnumeratedPropertyType -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
-aisInPropertyDelta id property replacementProperty eroleType = do
-  -- We must handle both the original property type and its replacement (if any).
+aisInPropertyDelta 
+  id                    -- Identifies the role instance that actually bears the property
+  property              -- the name of the property taken from the assignemnt statement
+  replacementProperty   -- the actual name of the property on the role instance that bears it
+  eroleType             -- the type of the role instance that actually bears the property.
+  = do
+  -- Collect inverted queries registered at both the original property type and its replacement (if any). Make sure they are compiled.
   calculations <- if property == replacementProperty
     then lift $ compileDescriptions' property
     else do
@@ -738,8 +744,8 @@ aisInPropertyDelta id property replacementProperty eroleType = do
       pure (calculations `OBJ.union` calculations')
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
-  -- We must use all types of the role to look up calculations.
-  allKeys <- lift $ runtimeIndexForPropertyQueries eroleType
+  -- We must use all types of the role to look up calculations. `allkeys` represents all types of the actual role instance.
+  (allKeys :: Array String) <- lift $ runtimeIndexForPropertyQueries eroleType
   allCalculations <- pure $ foldl
     (\cumulatedCalculations nextKey -> case lookup nextKey calculations of
       Nothing -> cumulatedCalculations

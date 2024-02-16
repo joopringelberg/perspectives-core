@@ -70,7 +70,7 @@ parseAndCompileArc arcSource_ _ = try
     Just arcSource -> catchError
       do
         lift $ lift $ resetWarnings
-        r <- lift $ lift $ runEmbeddedTransaction (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
+        r <- lift $ lift $ runEmbeddedTransaction true (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
         case r of
           Left errs -> ArrayT $ pure (Value <<< show <$> errs)
           -- Als er meldingen zijn, geef die dan terug.

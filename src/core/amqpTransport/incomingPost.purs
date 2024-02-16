@@ -89,7 +89,7 @@ incomingPost = do
             TypeMismatch "receipt" docId -> void $ lift $ deleteDocument postDB docId Nothing
             _ -> log ("Perspectives.AMQP.IncomingPost.transactionConsumer: " <> show me)
           Right {body, ack} -> do
-            -- NOTE. Transaction execution seems to be so slow, that the connection can be last before we acknowledge.
+            -- NOTE. Transaction execution seems to be so slow, that the connection can be lOst before we acknowledge.
             -- In that case, the broker resends the message.
             -- That is why we acknowledge first.
             -- The risk is that the PDR may not handle the message fully and then it is lost.

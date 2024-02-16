@@ -23,14 +23,11 @@ domain model://perspectives.domains#CouchdbManagement
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           couchdbapp <- create context CouchdbManagementApp
-          indexedcontext <- create role IndexedContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
           bind couchdbapp >> extern to StartContexts in sys:MySystem
           Name = "Couchdb Management App" for couchdbapp >> extern
-          bind_ couchdbapp >> extern to indexedcontext
-          IndexedContexts$Name = couchdbapp >> indexedName for indexedcontext
 
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -255,7 +252,7 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:MakeWritingMemberOf( serverurl, "cw_servers_and_repositories", UserName ) -- UserName is the ID of the PerspectivesSystem$User.
           do for Accounts
               callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
-        state ThisIsMe = origin filledBy sys:SocialMe
+        state ThisIsMe = origin filledBy sys:SocialMe >> binding
           -- Accounts needs this perspective to be able to add the CouchdbServer to his cm:MyCouchdbApp!
           perspective of Accounts 
             perspective on extern >> binder CouchdbServers
@@ -731,7 +728,7 @@ domain model://perspectives.domains#CouchdbManagement
           LastChangeDT = (callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime) for extern
           Build = extern >> Build + 1 for extern
         notify Author
-          "Version {extern >> External$Version} has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace >>= first}."
+          "Version {extern >> External$Version} (build {extern >> Build}) has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace >>= first}."
 
     external
       aspect sys:VersionedModelManifest$External

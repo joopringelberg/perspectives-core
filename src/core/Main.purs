@@ -37,27 +37,30 @@ import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
-import Effect.Aff.AVar (AVar, empty, new, put, take)
+import Effect.Aff.AVar (AVar, empty, new, put, take, read)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Now (now)
 import Foreign (Foreign)
-import Foreign.Object (fromFoldable)
+import Foreign.Object (fromFoldable, singleton)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Authenticate (getPrivateKey)
-import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
+import Perspectives.CoreTypes (IndexedResource(..), JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, modelsDatabaseName, roleInstancesFromCouchdb)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.Identifiers (buitenRol)
+import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
-import Perspectives.ModelDependencies (indexedContext, indexedRole, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
+import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
@@ -68,16 +71,16 @@ import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, saveMark
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.Repetition (Duration, fromDuration)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
-import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (reSetupUser, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.SystemClocks (forkedSystemClocks)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
-import Simple.JSON (read)
+import Simple.JSON (read) as JSON
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -116,7 +119,8 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
       brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService
+      indexedResourceToCreate <- empty
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService indexedResourceToCreate
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -126,6 +130,8 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
 
       -- Fork aff to save to the database
       void $ forkAff $ forkDatabasePersistence state
+
+      void $ forkAff $ forkCreateIndexedResources indexedResourceToCreate state
 
       runPerspectivesWithState (do
         addAllExternalFunctions
@@ -277,6 +283,43 @@ forkDatabasePersistence state = do
     Right _ -> pure unit
   forkDatabasePersistence state
 
+forkCreateIndexedResources :: AVar IndexedResource -> AVar PerspectivesState -> Aff Unit
+forkCreateIndexedResources av state = do
+  -- take the contents of the AVar that holds an IndexedResource
+  ir <- read av
+  (try $ runPerspectivesWithState (create ir) state) >>= 
+    case _ of 
+      Left e -> do 
+        logPerspectivesError (Custom $ "Error on creating indexedResource : " <> show e)
+        void $ take av
+      Right _ -> void $ take av
+  forkCreateIndexedResources av state
+  where 
+    create :: IndexedResource -> MonadPerspectives Unit
+    create ir = case ir of 
+      IndexedContext (ContextInstance cid) iName -> do
+        mysystem <- getMySystem
+        void $ runEmbeddedTransaction
+          false -- We do not share IndexedRole or IndexedContext.
+          (ENR $ EnumeratedRoleType sysUser)
+          (createAndAddRoleInstance (EnumeratedRoleType indexedContext) mysystem
+            (RolSerialization
+              { id: Nothing
+              , binding: Just $ buitenRol cid
+              , properties: PropertySerialization (singleton indexedContextName [iName])
+              }))
+      IndexedRole (RoleInstance rid) iName -> do
+        mysystem <- getMySystem
+        void $ runEmbeddedTransaction 
+          false
+          (ENR $ EnumeratedRoleType sysUser)
+          (createAndAddRoleInstance (EnumeratedRoleType indexedRole) mysystem
+            (RolSerialization 
+              { id: Nothing
+              , binding: Just rid
+              , properties: PropertySerialization (singleton indexedRoleName [iName])
+              }))
+
 forkJustInTimeModelLoader :: AVar JustInTimeModelLoad -> AVar PerspectivesState -> Aff Unit
 forkJustInTimeModelLoader modelToLoadAVar state = run
   where
@@ -334,12 +377,15 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions brokerService
+      indexedResourceToCreate <- empty
+      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Fork aff to save to the database
       -- TODO: beeindig database persistence.
       void $ forkAff $ forkDatabasePersistence state
+      -- Fork aff to create indexed roles and contexts.
+      void $ forkAff $ forkCreateIndexedResources indexedResourceToCreate state
       -- Set up.
       runPerspectivesWithState
         (do
@@ -372,7 +418,8 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService
+        indexedResourceToCreate <- empty
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService indexedResourceToCreate
         runPerspectivesWithState
           (do
             -- Clear the databases.
@@ -408,7 +455,8 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options brokerService
+        indexedResourceToCreate <- empty
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options brokerService indexedResourceToCreate
         runPerspectivesWithState
           (do
             (catchError do
@@ -502,7 +550,8 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions brokerService
+        indexedResourceToCreate <- empty
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions brokerService indexedResourceToCreate
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -553,7 +602,8 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions brokerService
+        indexedResourceToCreate <- empty 
+        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions brokerService indexedResourceToCreate
         runPerspectivesWithState
           (do
             addAllExternalFunctions
@@ -561,7 +611,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
             {rows:allModels} <- documentsInDatabase modelsDb includeDocs
             -- As doc is still uninterpreted, we can only rely on the rows.id member of the PouchdbAllDocs record. These, however, are DomeinFileIdentifiers.
             -- We do not have a useful test on the form of such identifiers.
-            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case JSON.read <$> doc of
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
@@ -569,7 +619,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
               false
               (ENR $ EnumeratedRoleType sysUser)
               (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
-            case r of 
+            case r of
               Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) *> pure false
               Right success -> do 
                 saveMarkedResources

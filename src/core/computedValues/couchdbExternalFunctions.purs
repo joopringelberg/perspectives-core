@@ -24,8 +24,7 @@
 
 module Perspectives.Extern.Couchdb where
 
-import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.AvarMonadAsk (modify) as AMA
+import Control.Monad.AvarMonadAsk (modify, gets) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.State (State, execState, modify)
@@ -38,7 +37,7 @@ import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Iterable (toArray)
 import Data.Map (empty) as Map
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
 import Data.Nullable (toMaybe)
@@ -52,14 +51,14 @@ import Effect.Aff.AVar (read)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty, fromFoldable, insert, lookup)
+import Foreign.Object (empty, fromFoldable, insert, lookup, singleton)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
+import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
-import Perspectives.Authenticate (signDelta)
-import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_context, rol_id)
+import Perspectives.Authenticate (getMyPublicKey, signDelta)
+import Perspectives.ContextAndRole (context_id, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, rev)
@@ -72,14 +71,14 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
-import Perspectives.Instances.Builders (createAndAddRoleInstance)
+import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
-import Perspectives.ModelDependencies (invitation, systemModelName)
+import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.ModelDependencies as DEP
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase)
 import Perspectives.Persistence.API (deleteDocument) as Persistence
@@ -91,9 +90,10 @@ import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, roleCache)
-import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
@@ -156,12 +156,12 @@ pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = try 
   (ArrayT $ lift do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Just invitation)
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Just DEP.invitation)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       cachedRoles <- lift $ traverse read cachedRoleAvars
-      pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType invitation) cachedRoles
+      pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType DEP.invitation) cachedRoles
       )
     pure $ filledRolesInDatabase `union` filledRolesInCache)
   >>= handleExternalFunctionError "model://perspectives.domains#Couchdb$PendingInvitations"
@@ -219,7 +219,7 @@ updateModel arrWithModelName arrWithDependencies versions = try
       addModelToLocalStore (DomeinFileId modelName) isUpdate
       DomeinFile dfr <- lift $ getDomeinFile $ (DomeinFileId unversionedModelname)
       -- Find all models in use.
-      models' <- lift (allModelsInUse >>= traverse getDomeinFile)
+      models' <- lift (allModelsInUse >>= traverse getDomeinFile) -- MODELS IS LEEG
       -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
       -- These are the 'incoming' InvertedQueries: those that are attached to types of this model.
       lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
@@ -231,7 +231,8 @@ updateModel arrWithModelName arrWithDependencies versions = try
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)
     allModelsInUse = do
       system <- getMySystem
-      values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType DEP.modelsInUse) >=> getPropertyFromTelescope (EnumeratedPropertyType DEP.modelURI))
+      propGetter <- getDynamicPropertyGetter DEP.modelURI (ST (EnumeratedRoleType DEP.modelsInUse))
+      values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType DEP.modelsInUse) >=> propGetter)
       pure $ DomeinFileId <<< unwrap <$> values
 
 
@@ -263,11 +264,11 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
     Nothing -> pure {patch: "0", build: "0"}
     Just {versionedModelManifest} -> lift $ getPatchAndBuild versionedModelManifest
   -- TODO. msversion is geen Maybe waarde!
-  msversion <- lift (toMaybe <$> gets (_.useSystemVersion <<< _.runtimeOptions))
+  msversion <- lift (toMaybe <$> AMA.gets (_.useSystemVersion <<< _.runtimeOptions))
   version' <- case modelUriVersion modelname of
       Just v -> pure $ Just v
       Nothing -> pure $ _.semver <$> x
-  version <- if unversionedModelname == systemModelName
+  version <- if unversionedModelname == DEP.systemModelName
     then case msversion of
       Nothing -> pure version'
       Just v -> pure $ Just v
@@ -299,7 +300,14 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
 
 
   if isInitialLoad'
-    then createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x) referredModels
+    then do 
+      createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x)
+            -- Add new dependencies.
+      for_ referredModels \dfid -> do
+        mmodel <- lift $ tryGetPerspectEntiteit dfid
+        case mmodel of
+          Nothing -> addModelToLocalStore' dfid
+          Just _ -> pure unit
     else pure unit
 
   -- Distribute the SeparateInvertedQueries over the other domains.
@@ -329,8 +337,8 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
           -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
 
-createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> Array DomeinFileId -> MonadPerspectivesTransaction Unit
-createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest referredModels = do
+createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
+createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest = do
   -- If and only if the model we load is model:System, create both the system context and the system user.
   -- This is part of the installation routine.
   if unversionedModelname == DEP.systemModelName
@@ -361,8 +369,8 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
     0
     (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
 
-  -- Fill the installerRole with sys:Me (all these operations cache the roles that are involved).
-  me <- RoleInstance <$> (lift $ getUserIdentifier)
+  -- Fill the installerRole with the PerspectivesUser that represents the end user (all these operations cache the roles that are involved).
+  me <- lift $ getPerspectivesUser
   lift ((identifier installerRole) `filledPointsTo` me)
   lift (me `fillerPointsTo` (identifier installerRole))
   roleIsMe (identifier installerRole) (rol_context installerRole)
@@ -407,53 +415,77 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
               , Tuple DEP.installedBuild [build]])
           , binding: unwrap <$> versionedModelManifest})
 
-  -- Add new dependencies.
-  for_ referredModels \dfid -> do
-    mmodel <- lift $ tryGetPerspectEntiteit dfid
-    case mmodel of
-      Nothing -> addModelToLocalStore' dfid
-      Just _ -> pure unit
-
 initSystem :: MonadPerspectivesTransaction Unit
 initSystem = do
   lift $ saveMarkedResources
-  -- TODO. Create the instance of PerspectivesUser that holds the private key.
-  
-  -- Create the system instance      
+  -- Create the system instance (the instance of sys:PerspectivesSystem for this installation).
+  -- This will also create an instance of IndexedContext in the new system instance, filled with itself.
   sysId <- lift getSystemIdentifier
-  cid <- createResourceIdentifier' (CType $ ContextType DEP.theSystem) sysId
-  r <- runExceptT $ constructEmptyContext 
-    (ContextInstance cid)
-    DEP.theSystem
-    "My System"
-    (PropertySerialization empty)
-    Nothing
-  case r of 
-    Left e -> logPerspectivesError (Custom (show e))
-    Right (system :: PerspectContext) -> do 
-      lift $ void $ saveEntiteit_ (identifier system) system
-      addCreatedContextToTransaction (identifier system)
+  sysresult <- runExceptT $ constructContext Nothing 
+    (ContextSerialization
+      { id: Just sysId
+      , prototype: Nothing
+      , ctype: DEP.theSystem
+      , rollen: empty
+      , externeProperties: (PropertySerialization empty)
+      } ) 
+  case sysresult of
+    Left se -> logPerspectivesError (Custom (show se))
+    Right system@(ContextInstance systemId) -> do 
+      -- Now create the user role (the instance of sys:PerspectivesSystem$User; it is cached automatically).
+      -- This will also create the IndexedRole in the System instance, filled with the new User instance.
+      userId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.sysUser) (sysId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
+      mme <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.sysUser) systemId
+        (RolSerialization 
+          { id: Just userId
+          , properties: PropertySerialization empty
+          , binding: Nothing
+          })
+        true
+      case mme of 
+        Nothing -> logPerspectivesError (Custom "Could not create User role of PerspectivesSystem.")
+        Just me -> roleIsMe me system
+      isFirstInstallation <- lift $ AMA.gets (_.isFirstInstallation <<< _.runtimeOptions)
+      if isFirstInstallation
+        then do
+          mpublicKey <- lift getMyPublicKey
+          case mpublicKey of 
+            Just publicKey -> do
+              -- Create TheWorld, complete with the PerspectivesUser role of TheWorld that represents the identity 
+              -- of the natural person setting up this installation.
+              worldresult <- runExceptT $ constructContext Nothing 
+                (ContextSerialization
+                  { id: Just "TheWorld"
+                  , prototype: Nothing
+                  , ctype: DEP.theWorld
+                  , rollen: empty
+                  , externeProperties: (PropertySerialization empty)
+                  } )
+              case worldresult of 
+                Left e -> logPerspectivesError (Custom (show e))
+                Right world@(ContextInstance worldId) -> do 
+                  puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) (sysId <> "_KeyHolder")
+                  muser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
+                    (RolSerialization 
+                      { id: Just puserId
+                      , properties: PropertySerialization (singleton perspectivesUsersPublicKey [publicKey])
+                      , binding: Nothing
+                      })
+                      true
+                  case muser of 
+                    Nothing -> logPerspectivesError (Custom "Could not create the PerspectivesUsers instance for this installation.")
+                    Just puser -> roleIsMe puser world
+                  -- Add the new indexed resources to state.
+                  void $ lift $ AMA.modify \ps -> ps 
+                    { indexedContexts = fromFoldable [Tuple DEP.mySystem (ContextInstance systemId), Tuple DEP.theWorld world]
+                    , indexedRoles = insert DEP.sysMe (unsafePartial fromJust mme) ps.indexedRoles
+                    }
+            Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
+        else pure unit
 
-      -- Now create the user role (it is cached automatically).
-      -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-      -- it would introduce module import circularity.
-      (me :: PerspectRol) <- constructEmptyRole
-        (identifier system)
-        (EnumeratedRoleType DEP.sysUser)
-        0
-        (RoleInstance (identifier_ system <> "$" <> (typeUri2LocalName_ DEP.sysUser)))
-      lift $ void $ saveEntiteit_ (identifier me) (changeRol_isMe me true)
-      -- The user role is not filled.
-      -- And now add to the context.
-      addRoleInstanceToContext (identifier system) (EnumeratedRoleType DEP.sysUser) (Tuple (identifier me) Nothing)
 
-      -- Add the new indexed resources.
-      void $ lift $ AMA.modify \ps -> ps 
-        { indexedContexts = insert DEP.mySystem (identifier system) ps.indexedContexts
-        , indexedRoles = insert DEP.sysMe (identifier me) ps.indexedRoles
-        }
-      -- Add the base repository:
-      void $ createAndAddRoleInstance (EnumeratedRoleType DEP.baseRepository) (identifier_ system)
+      -- Add the base repository to system:
+      void $ createAndAddRoleInstance (EnumeratedRoleType DEP.baseRepository) systemId
         (RolSerialization 
           { id: Nothing 
           , properties: PropertySerialization empty

@@ -126,7 +126,9 @@ setRevision id r = do
     Nothing -> pure unit
     Just avar -> do
       entity <- liftAff $ take avar
-      liftAff $ put (changeRevision r entity) avar
+      if r > rev entity 
+      then liftAff $ put (changeRevision r entity) avar
+      else liftAff $ put entity avar
 
 -----------------------------------------------------------
 -- INSTANCES

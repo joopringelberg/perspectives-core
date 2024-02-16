@@ -37,6 +37,7 @@ module Perspectives.CoreTypes
   , ContextPropertyValueGetter
   , CryptoKey'
   , DomeinCache
+  , IndexedResource(..)
   , InformedAssumption(..)
   , JustInTimeModelLoad(..)
   , MP
@@ -66,7 +67,6 @@ module Perspectives.CoreTypes
   , class Cacheable
   , class Persistent
   , dbLocalName
-  , resourceToBeStored
   , evalMonadPerspectivesQuery
   , evalMonadPerspectivesQueryToMaybeObject
   , execMonadPerspectivesQuery
@@ -75,6 +75,7 @@ module Perspectives.CoreTypes
   , liftToInstanceLevel
   , removeInternally
   , representInternally
+  , resourceToBeStored
   , retrieveInternally
   , runMonadPerspectivesQuery
   , runMonadPerspectivesQueryToObject
@@ -187,6 +188,8 @@ type PerspectivesExtraState =
 
   -- We treat the entities as Foreign here and force them to be instances of i in Persistent when we store them into the database.
   , entitiesToBeStored :: Array ResourceToBeStored
+
+  , indexedResourceToCreate :: AVar IndexedResource
 
   )
 
@@ -481,6 +484,13 @@ instance eqOrderedDelta :: Eq OrderedDelta where
 
 instance ordOrderedDelta :: Ord OrderedDelta where
   compare (OrderedDelta _ i) (OrderedDelta _ j) = compare i j
+
+-----------------------------------------------------------
+-- INDEXEDRESOURCE
+-----------------------------------------------------------
+data IndexedResource = 
+  IndexedContext ContextInstance String |
+  IndexedRole RoleInstance String
 
 -----------------------------------------------------------
 -- CLASS CACHEABLE

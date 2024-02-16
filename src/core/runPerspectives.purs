@@ -37,10 +37,11 @@ import Prelude (bind, show, ($), (<>))
 runPerspectives :: forall a. String -> String -> String -> String -> Int -> MonadPerspectives a
   -> Aff a
 runPerspectives userName password systemId host port mp = do
-  transactionFlag <- new 0 
+  transactionFlag <- new 1
   brokerService <- empty
   transactionWithTiming <- empty
   modelToLoad <- empty
+  indexedResourceToCreate <- empty
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
@@ -52,7 +53,8 @@ runPerspectives userName password systemId host port mp = do
       transactionWithTiming
       modelToLoad
       defaultRuntimeOptions
-      brokerService) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
+      brokerService
+      indexedResourceToCreate) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

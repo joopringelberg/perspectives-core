@@ -14,6 +14,12 @@ module Perspectives.ModelDependencies  where
 perspectivesUsers :: String
 perspectivesUsers = "model://perspectives.domains#System$TheWorld$PerspectivesUsers" 
 
+theWorld :: String
+theWorld = "model://perspectives.domains#System$TheWorld" 
+
+perspectivesUsersCancelled :: String
+perspectivesUsersCancelled = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$Cancelled" 
+
 perspectivesUsersPublicKey :: String
 perspectivesUsersPublicKey = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$PublicKey" 
 

@@ -24,7 +24,7 @@ module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, modify, put)
-import Data.Array (catMaybes, concat, elemIndex, foldl, head, insertAt, length, nub, snoc, union)
+import Data.Array (catMaybes, concat, elemIndex, foldl, head, insertAt, length, nub, null, snoc, union, filterA)
 import Data.DateTime.Instant (toDateTime)
 import Data.Map (insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -44,9 +44,9 @@ import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, 
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (getProperty, perspectivesUsersRole_, roleType_)
+import Perspectives.Instances.ObjectGetters (getProperty, notIsMe, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel, perspectivesUsers) as DEP
-import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
+import Perspectives.ModelDependencies (perspectivesUsersCancelled, perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabaseName)
@@ -175,33 +175,45 @@ computeUserRoleBottoms rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= 
   then pure $ [Tuple rid [rid]]
   else perspectivesUsersRole_ rid >>= case _ of 
     Nothing -> pure []
-    Just r -> pure [Tuple rid [r]]
+    Just r -> (rid ##> getProperty (EnumeratedPropertyType perspectivesUsersCancelled)) >>= case _ of 
+      Just (Value "true") -> pure []
+      _ -> pure [Tuple rid [r]]
 
--- | Add the delta at the end of the array, unless it is already in the transaction!
+-- | Add the delta at the end of the array, unless it is already in the transaction or there are no users (and ignore the own user).
 -- | Only include 
 -- |    * public roles
 -- |    * instances of sys:PerspectivesSystem$User, but not the one that equals the local sys:Me.
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
-addDelta dt@(DeltaInTransaction{users}) = do
-  newUserBottoms <- lift (concat <$> for users computeUserRoleBottoms)
-  AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
-    { deltas =
-      if isJust $ elemIndex dt deltas
-        then deltas
-        else snoc deltas dt
-    , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
-    })
+addDelta dt@(DeltaInTransaction{users}) = do 
+  -- NOTE. Even though we try not to create deltas with roles that represent me, on system installation this can go wrong.
+  users' <- lift $ filterA notIsMe users
+  if null users'
+    then pure unit
+    else do
+      newUserBottoms <- lift (concat <$> for users' computeUserRoleBottoms)
+      AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
+        { deltas =
+          if isJust $ elemIndex dt deltas
+            then deltas
+            else snoc deltas dt
+        , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
+        })
 
--- | Insert the delta at the index, unless it is already in the transaction.
+-- | Insert the delta at the index, unless it is already in the transaction or there are no users (and ignore the own user).
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
 insertDelta dt@(DeltaInTransaction{users}) i = do
-  newUserBottoms <- lift (concat <$> for users computeUserRoleBottoms)
-  AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
-    { deltas =
-      if isJust $ elemIndex dt deltas
-        then deltas
-        else unsafePartial $ fromJust $ insertAt i dt deltas
-    , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms})
+  -- NOTE. Even though we try not to create deltas with roles that represent me, on system installation this can go wrong.
+  users' <- lift $ filterA notIsMe users
+  if null users'
+    then pure unit
+    else do
+      newUserBottoms <- lift (concat <$> for users' computeUserRoleBottoms)
+      AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
+        { deltas =
+          if isJust $ elemIndex dt deltas
+            then deltas
+            else unsafePartial $ fromJust $ insertAt i dt deltas
+        , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms})
 
 -- | Instrumental for QUERY UPDATES.
 addCorrelationIdentifiersToTransactie :: Array CorrelationIdentifier -> MonadPerspectivesTransaction Unit

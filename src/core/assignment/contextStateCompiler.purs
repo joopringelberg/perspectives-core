@@ -56,7 +56,7 @@ import Perspectives.CompileTimeFacets (addTimeFacets)
 import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, fills_, getActiveStates_)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveStates_, isMe)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -200,7 +200,7 @@ whenRightUser :: ContextInstance -> RoleType -> (Array RoleInstance -> Updater C
 whenRightUser contextId allowedUser updater = do
   me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
-  actorsThatAreMe <- lift (filterA ((fills_ (Filler_ me)) <<< Filled_) currentactors)
+  actorsThatAreMe <- lift (filterA isMe currentactors)
   if null actorsThatAreMe
     then pure unit
     else updater actorsThatAreMe contextId

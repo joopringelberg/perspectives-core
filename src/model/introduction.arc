@@ -17,14 +17,11 @@ domain model://perspectives.domains#Introduction
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context IntroductionApp
-          indexedcontext <- create role IndexedContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
           bind app >> extern to StartContexts in sys:MySystem
           Name = "Introduction App" for app >> extern
-          bind_ app >> extern to indexedcontext
-          IndexedContexts$Name = app >> indexedName for indexedcontext
   
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -75,7 +72,7 @@ domain model://perspectives.domains#Introduction
         only (Create, Fill, Remove, CreateAndFill)
         props (FirstName, LastName) verbs (Consult)
 
-    user Introducee (relational) filledBy sys:PerspectivesSystem$User
+    user Introducee (relational) filledBy sys:SocialEnvironment$Persons
       perspective on Introducer
         props (FirstName, LastName) verbs (Consult)
       perspective on Introducee

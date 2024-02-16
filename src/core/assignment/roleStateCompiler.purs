@@ -57,7 +57,7 @@ import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspecti
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, fills_, getActiveRoleStates_)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveRoleStates_, isMe)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
@@ -213,7 +213,7 @@ whenRightUser roleId contextGetter allowedUser updater = do
   me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
   -- Find the actor(s) that the system user ultimately fills.
-  actorsThatAreMe <- lift (filterA ((fills_ (Filler_ me)) <<< Filled_) currentactors)
+  actorsThatAreMe <- lift (filterA isMe currentactors)
   if null actorsThatAreMe
     then pure unit
     else updater actorsThatAreMe contextId roleId

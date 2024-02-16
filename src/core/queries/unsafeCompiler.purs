@@ -794,6 +794,7 @@ pushCurrentObject f roleId = do
 
 -- | From a PropertyType, retrieve or construct a function to get values for that Property from a Role instance.
 -- | Caches the result.
+-- | The resulting function only works as expected when applied to an instance of the rol on which the property is defined!
 getterFromPropertyType :: PropertyType -> MP (RoleInstance ~~> Value)
 getterFromPropertyType (ENP ep@(EnumeratedPropertyType id)) = case lookupPropertyValueGetterByName id of
   Nothing -> do
@@ -825,6 +826,7 @@ getDynamicPropertyGetter p adt = do
       -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
       if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
         then getterFromPropertyType pt
+        -- THIS ONLY WORKS AS EXPECTED IN SITUATIONS WHERE THE FILLER IS OF EXACTLY THE TYPE REQUIRED IN THE MODEL!
         else pure (binding >=> f)
     ENP eprop -> pure $ getPropertyFromTelescope eprop
   where

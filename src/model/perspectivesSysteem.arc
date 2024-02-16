@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2022, 2023
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2022, 2023, 2024
 
 -- PDRDEPENDENCY
 domain model://perspectives.domains#System
@@ -13,31 +13,13 @@ domain model://perspectives.domains#System
   -- That precondition obviously fails for this model.
   -- Consequently, we create both in code. 
   -- We also create their indexed names, so we can refer to them below.
-  -- Yet, we still have to create instances of IndexedRoles and IndexedContexts and provide the indexed names for them,
-  -- otherwise sys:Me and sys:MySystem will be lost as the initial session ends.
-  -- The initialisation routine below therefore is somewhat simpler.
-
+  -- The instance of TheWorld and the instance of PerspectivesUsers that represents the person that creates this installation,
+  -- has to be created in the PDR as well. We also add the public key of the end user.
   on entry
     do for sys:PerspectivesSystem$Installer
-      letA
-        -- Installer has sufficient perspectives on IndexedContexts, IndexedRoles and StartContexts.
-        indexedsystem <- create role IndexedContexts in sys:MySystem
-        indexedworld <- create role IndexedContexts in sys:MySystem
-        indexedrole <- create role IndexedRoles in sys:MySystem
-        -- TheWorld must be re-created for each installation. The model context of System is entered only once in an installation.
-        -- Received delta's for re-creating the world are probably never executed, but since each user creates the same resource,
-        -- this is no problem.
-        theworld <- create context TheWorld named "TheWorld"
-      in 
-        bind sys:MySystem >> extern to StartContexts in sys:MySystem
-        Name = "My System" for sys:MySystem >> extern
-        bind_ sys:MySystem >> extern to indexedsystem
-        -- TODO. Zonder kwalificatie zegt de compiler dat "Name" niet bestaat voor IndexedContexts. Maar er is een naamconflict met RootContext$Extern$Name
-        IndexedContexts$Name = sys:MySystem >> indexedName for indexedsystem
-        bind_ sys:Me to indexedrole
-        Name = sys:Me >> indexedName for indexedrole
-        -- Equivalently:
-        -- Name = "model://perspectives.domains#System$Me"
+      bind sys:MySystem >> extern to StartContexts in sys:MySystem
+      Name = "My System" for sys:MySystem >> extern
+
 
         -- NOTE that the following line only compiles correctly when
         --    * the referred Repository and the type describing its model (model://perspectives.domains/CouchdbManagement) are available;
@@ -49,24 +31,15 @@ domain model://perspectives.domains#System
         -- Add the perspectives.domains repository as BaseRepository:
         -- bind publicrole pub:https://perspectives.domains/cw_servers_and_repositories/#perspectives_domains$External to BaseRepository in sys:MySystem
 
-        bind_ theworld >> extern to indexedworld
-        IndexedContexts$Name = sys:TheWorld >> indexedName for indexedworld
-  
   state FirstInstallation = (callExternal util:SystemParameter( "IsFirstInstallation" ) returns Boolean) and (exists sys:TheWorld >> PerspectivesUsers)
     on entry
       do for sys:PerspectivesSystem$Installer
         letA
           -- When a Person is used to fill a user role, SocialEnvironment will be shared with peers.
           mysocialenvironment <- create context SocialEnvironment named "TheSocialEnvironment"
-          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
-          indexedsocialenvironment <- create role IndexedContexts in sys:MySystem
         in 
           -- notice that there is a state in User that is entered as soon as we have 
           -- SocialEnvironment$Me, on entry of which we fill sys:Me.
-          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
-          bind_ mysocialenvironment >> extern to indexedsocialenvironment
-          -- Installer has a sufficient perspective on IndexedContexts to justify this creation.
-          IndexedContexts$Name = sys:MySocialEnvironment >> indexedName for indexedsocialenvironment
           bind mysocialenvironment >> extern to SocialEnvironment in sys:MySystem
 
   -- PDRDEPENDENCY
@@ -98,36 +71,26 @@ domain model://perspectives.domains#System
   user Identifiable
       property LastName (mandatory, String)
       property FirstName (mandatory, String)
+      -- If cancelled, the user's peers will stop synchronizing with him/her.
+      -- PDRDEPENDENCY
+      property Cancelled (Boolean)
+      -- Having a PublicKey is a proxy for having an installation.
+      -- A Persons instance without a keypair can fill User roles, but does not
+      -- participate (yet) in the Perspectives Universe.
+      -- the private key is never available in Perspectives data, only as an object in IndexedDB.
+      -- PDRDEPENDENCY
+      property PublicKey (String)
 
   -- TheWorld is shared by everyone. It is identified by def:#TheWorld.
   case TheWorld
     indexed sys:TheWorld
     aspect sys:RootContext
-    state NoPerspectivesUsers = not exists PerspectivesUsers
-      on entry
-        do for Initializer
-          letA
-            -- PDRDEPENDENCY
-            keyholder <- (sys:MySystem >> callExternal util:ContextIdentifier() returns String) + "_KeyHolder"
-            -- The identifier of this role must be available on startup, before any instance has been created, 
-            -- because it is the author of all instances created in this installation.
-            user <- create role PerspectivesUsers named keyholder
-          in
-            PublicKey = callExternal util:SystemParameter( "PublicKey" ) returns String for user
 
     -- PDRDEPENDENCY
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
-      -- Having a PublicKey is a proxy for having an installation.
-      -- A Persons instance without a keypair can fill User roles, but does not
-      -- participate (yet) in the Perspectives Universe.
-      property PublicKey (String)
-      -- the private key is never available in Perspectives data, only as an object in IndexedDB.
     user NonPerspectivesUsers (relational)
       aspect sys:Identifiable
-    user Initializer = sys:Me
-      perspective on PerspectivesUsers
-        only (Create)
   
   -- MySocialEnvironment is the same on all of my devices.
     -- PDRDEPENDENCY
@@ -157,15 +120,18 @@ domain model://perspectives.domains#System
       perspective on Me
         only (Create, Fill)
         props (FirstName, LastName, PublicKey, MyIdentity) verbs (Consult)
-        props (MyIdentity) verbs (SetPropertyValue)
+        props (MyIdentity, Cancelled) verbs (SetPropertyValue, Consult)
         action ExportForAnotherInstallation
           letA
             text <- callExternal ser:SerialiseFor( [role model://perspectives.domains#System$SocialEnvironment$SystemUser], context >> extern ) returns String
           in
             create file ("identity_of_" + LastName + ".json") as "text/json" in MyIdentity for origin
               text
+        action Cancel
+          Cancelled = true
       perspective on Persons
         only (Create, Fill)
+        props (Cancelled) verbs (Consult)
         props (FirstName, LastName) verbs (SetPropertyValue, Consult)
       -- Use this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
       -- that previously was filled by a NonPerspectivesUsers instance.
@@ -341,7 +307,7 @@ domain model://perspectives.domains#System
 
     -- PDRDEPENDENCY
     context ModelsInUse (relational) filledBy sys:VersionedModelManifest
-      -- Includes a semantic version number.
+      -- Includes a semantic version number. The PDR will set this value.
       -- PDRDEPENDENCY
       property ModelToRemove (String)
       -- PDRDEPENDENCY
