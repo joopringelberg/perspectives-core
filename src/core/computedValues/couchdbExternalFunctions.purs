@@ -471,7 +471,13 @@ initSystem = do
                       })
                       true
                   roleIsMe puser world
-                  pure unit
+                  void $ createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
+                    (RolSerialization 
+                      { id: Just "def:#serializationuser"
+                      , properties: PropertySerialization empty
+                      , binding: Nothing
+                      })
+                      true
             Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
         else pure unit
 
