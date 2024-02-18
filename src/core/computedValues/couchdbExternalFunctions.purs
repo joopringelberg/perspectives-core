@@ -56,7 +56,7 @@ import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
-import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject)
+import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject, withAuthoringRole)
 import Perspectives.Authenticate (getMyPublicKey, signDelta)
 import Perspectives.ContextAndRole (context_id, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
@@ -76,7 +76,7 @@ import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
-import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
+import Perspectives.ModelDependencies (perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -92,14 +92,14 @@ import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspect
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
@@ -463,21 +463,22 @@ initSystem = do
                 Left e -> logPerspectivesError (Custom (show e))
                 Right world@(ContextInstance worldId) -> do 
                   puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) (sysId <> "_KeyHolder")
-                  puser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
-                    (RolSerialization 
-                      { id: Just puserId
-                      , properties: PropertySerialization (singleton perspectivesUsersPublicKey [publicKey])
-                      , binding: Nothing
-                      })
-                      true
-                  roleIsMe puser world
-                  void $ createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
-                    (RolSerialization 
-                      { id: Just "def:#serializationuser"
-                      , properties: PropertySerialization empty
-                      , binding: Nothing
-                      })
-                      true
+                  withAuthoringRole (CR $ CalculatedRoleType theWorldInitializer) do
+                    puser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
+                      (RolSerialization 
+                        { id: Just puserId
+                        , properties: PropertySerialization (singleton perspectivesUsersPublicKey [publicKey])
+                        , binding: Nothing
+                        })
+                        true
+                    roleIsMe puser world
+                    void $ createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
+                      (RolSerialization 
+                        { id: Just "def:#serializationuser"
+                        , properties: PropertySerialization empty
+                        , binding: Nothing
+                        })
+                        true
             Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
         else pure unit
 

@@ -17,11 +17,14 @@ perspectivesUsers = "model://perspectives.domains#System$TheWorld$PerspectivesUs
 theWorld :: String
 theWorld = "model://perspectives.domains#System$TheWorld" 
 
+theWorldInitializer :: String
+theWorldInitializer = "model://perspectives.domains#System$TheWorld$Initializer" 
+
 perspectivesUsersCancelled :: String
 perspectivesUsersCancelled = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$Cancelled" 
 
 perspectivesUsersPublicKey :: String
-perspectivesUsersPublicKey = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$PublicKey" 
+perspectivesUsersPublicKey = "model://perspectives.domains#System$Identifiable$PublicKey" 
 
 socialEnvironment :: String
 socialEnvironment = "model://perspectives.domains#System$SocialEnvironment" 
@@ -34,9 +37,6 @@ socialEnvironmentPersons = "model://perspectives.domains#System$SocialEnvironmen
 
 socialEnvironmentMe :: String
 socialEnvironmentMe = "model://perspectives.domains#System$SocialEnvironment$Me" 
-
-socialEnvironmentMePublicKey :: String
-socialEnvironmentMePublicKey = "model://perspectives.domains#System$SocialEnvironment$Me$MyPublicKey" 
 
 systemIdentityValues :: String
 systemIdentityValues = "model://perspectives.domains#System$TheWorld$SystemIdentities" 

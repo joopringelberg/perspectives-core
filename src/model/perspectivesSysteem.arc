@@ -92,12 +92,11 @@ domain model://perspectives.domains#System
     user NonPerspectivesUsers (relational)
       aspect sys:Identifiable
 
-    -- ONLY USED FOR BACKWARD COMPATIBILITY IN TESTING PER feb 17 2024.  
+    -- PDRDEPENDENCY
     user Initializer = sys:Me
       perspective on PerspectivesUsers
         only (Create)
-        -- LET OP. De compiler klaagt niet, maar maakt PerspectivesUsers$PublicKey en die bestaat niet; wel Identifiable$PublicKey
-        props (Identifiable$PublicKey) verbs (SetPropertyValue, AddPropertyValue)
+        props (Identifiable$PublicKey) verbs (SetPropertyValue)
  
   -- MySocialEnvironment is the same on all of my devices.
     -- PDRDEPENDENCY

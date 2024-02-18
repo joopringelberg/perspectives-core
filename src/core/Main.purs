@@ -420,6 +420,8 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
         modelToLoad <- empty
         indexedResourceToCreate <- empty
         state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService indexedResourceToCreate
+        -- Fork aff to create indexed roles and contexts.
+        void $ forkAff $ forkCreateIndexedResources indexedResourceToCreate state
         runPerspectivesWithState
           (do
             -- Clear the databases.
