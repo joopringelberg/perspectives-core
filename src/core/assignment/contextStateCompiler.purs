@@ -198,7 +198,6 @@ enteringState contextId stateId = do
 
 whenRightUser :: ContextInstance -> RoleType -> (Array RoleInstance -> Updater ContextInstance) -> MonadPerspectivesTransaction Unit
 whenRightUser contextId allowedUser updater = do
-  me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
   actorsThatAreMe <- lift (filterA isMe currentactors)
   if null actorsThatAreMe

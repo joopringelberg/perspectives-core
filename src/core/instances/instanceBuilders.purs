@@ -50,6 +50,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Aff.AVar (put)
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log)
 import Foreign.Object (empty, insert)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
@@ -73,7 +74,7 @@ import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourc
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Types.ObjectGetters (indexedContextName, indexedRoleName, publicUserRole)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (>>=), (<>))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
@@ -191,13 +192,14 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
 createAndAddRoleInstance :: EnumeratedRoleType -> String -> RolSerialization -> MonadPerspectivesTransaction (Maybe RoleInstance)
 createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSerialization{binding}) =
   case binding of
-      Nothing -> Just <$> lookupOrCreateRoleInstance roleType (createAndAddRoleInstance_ roleType contextId r false)
+      Nothing -> Just <$> (createAndAddRoleInstance_ roleType contextId r false)
       Just b -> do 
         me <- lift (isMe $ RoleInstance b)
-        Just <$> lookupOrCreateRoleInstance roleType (createAndAddRoleInstance_ roleType contextId r false)
+        Just <$> (createAndAddRoleInstance_ roleType contextId r false)
 
 createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
-createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = do
+createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = lookupOrCreateRoleInstance roleType
+  do
     contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId) 
     rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
     -- SYNCHRONISATION by UniverseRoleDelta
@@ -278,6 +280,7 @@ lookupOrCreateRoleInstance rtype roleConstructor = do
       case mrole of 
         Nothing -> do
           rid <- roleConstructor
+          liftAff $ log $ "Adding indexed role " <> (unwrap indexedName)
           lift $ modify \ps -> ps {indexedRoles = insert (unwrap indexedName) rid ps.indexedRoles}
           pure rid
         Just r -> pure r
@@ -294,6 +297,7 @@ lookupOrCreateContextInstance ctype contextConstructor = do
       case minst of
         Nothing -> do
           cid <- contextConstructor
+          liftAff $ log $ "Adding indexed context " <> (unwrap indexedName)
           lift $ lift $ modify \ps -> ps {indexedContexts = insert (unwrap indexedName) cid ps.indexedContexts}
           pure cid
         Just i -> pure i

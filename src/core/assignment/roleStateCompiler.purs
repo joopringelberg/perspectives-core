@@ -210,7 +210,6 @@ enteringRoleState roleId stateId = do
 whenRightUser :: RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleType -> (Array RoleInstance -> ContextInstance -> Updater RoleInstance) -> MonadPerspectivesTransaction Unit
 whenRightUser roleId contextGetter allowedUser updater = do
   contextId <- lift $ (roleId ##>> contextGetter)
-  me <- lift getPerspectivesUser
   currentactors <- lift $ (contextId ##= (getRoleInstances allowedUser))
   -- Find the actor(s) that the system user ultimately fills.
   actorsThatAreMe <- lift (filterA isMe currentactors)
