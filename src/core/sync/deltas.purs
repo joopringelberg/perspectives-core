@@ -175,7 +175,7 @@ computeUserRoleBottoms rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= 
   then pure $ [Tuple rid [rid]]
   else perspectivesUsersRole_ rid >>= case _ of 
     Nothing -> pure []
-    Just r -> (rid ##> getProperty (EnumeratedPropertyType perspectivesUsersCancelled)) >>= case _ of 
+    Just r -> (r ##> getProperty (EnumeratedPropertyType perspectivesUsersCancelled)) >>= case _ of 
       Just (Value "true") -> pure []
       _ -> pure [Tuple rid [r]]
 

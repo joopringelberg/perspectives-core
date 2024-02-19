@@ -21,7 +21,7 @@ theWorldInitializer :: String
 theWorldInitializer = "model://perspectives.domains#System$TheWorld$Initializer" 
 
 perspectivesUsersCancelled :: String
-perspectivesUsersCancelled = "model://perspectives.domains#System$TheWorld$PerspectivesUsers$Cancelled" 
+perspectivesUsersCancelled = "model://perspectives.domains#System$Identifiable$Cancelled" 
 
 perspectivesUsersPublicKey :: String
 perspectivesUsersPublicKey = "model://perspectives.domains#System$Identifiable$PublicKey" 

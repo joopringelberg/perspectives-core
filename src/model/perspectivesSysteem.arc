@@ -118,6 +118,8 @@ domain model://perspectives.domains#System
     -- Persons will be synchronized between peers because they will have a perspective on properties of sys:Identifiable
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
+      perspective on Me
+        props (Cancelled) verbs (Consult)
     user Me filledBy PerspectivesUsers
       indexed sys:SocialMe
       property MyIdentity (File)
