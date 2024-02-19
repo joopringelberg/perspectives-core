@@ -427,7 +427,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- The filler provides autentication on Couchdb_.
     -- Should also be able to give them read access to the repo,
     -- and to retract that again.
-    -- NOTE: later, not only CouchdbServer$Admin is allowed to fill this role.
+    -- NOTE: later, CouchdbServer$Accounts will also be allowed to fill this role.
     user Admin filledBy CouchdbServer$Admin
       aspect acc:Body$Admin
         -- WithCredentials$SpecificUserName

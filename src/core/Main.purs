@@ -59,7 +59,7 @@ import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
-import Perspectives.Instances.ObjectGetters (context, externalRole, getProperty)
+import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -69,7 +69,7 @@ import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
-import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction, getterFromPropertyType)
+import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
@@ -642,9 +642,9 @@ retrieveAllCredentials = do
   (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)
   userNameGetter <- getterFromPropertyType (CP $ CalculatedPropertyType userWithCredentialsUsername)
   rows :: Array (Tuple String Credential) <- foldM
-    (\rows' roleId -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
+    (\rows' roleId -> (try (roleId ##>> getPropertyFromTelescope (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
       handlePerspectRolError' "retrieveAllCredentials_Password" rows' 
-        \pw -> (try (roleId ##>> getProperty (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
+        \pw -> (try (roleId ##>> getPropertyFromTelescope (EnumeratedPropertyType userWithCredentialsAuthorizedDomain))) >>=
           handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 
             (\authorizedDomain ->  (try (roleId ##>> userNameGetter)) >>=
               handlePerspectRolError' "retrieveAllCredentials_Username" rows' 
