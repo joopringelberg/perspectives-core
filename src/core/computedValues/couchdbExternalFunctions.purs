@@ -478,7 +478,7 @@ initSystem = do
                         , properties: PropertySerialization empty
                         , binding: Nothing
                         })
-                        true
+                        false
             Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
         else pure unit
 
