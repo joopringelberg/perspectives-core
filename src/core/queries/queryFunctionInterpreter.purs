@@ -316,7 +316,7 @@ interpretBQD (BQD _ (BinaryCombinator fun) f1 f2 ran _ _) a = case fun of
   g | isJust $ elemIndex g [EqualsF, NotEqualsF] -> ArrayT do
     -- Both are singleton arrays, or empty.
     (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-    fr2 <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f2 a)
     unsafePartial $ case g of
       EqualsF -> case head fr1, head fr2 of
         Just fr1h, Just fr2h -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show (x == y)) fr1h fr2h]
@@ -330,7 +330,7 @@ interpretBQD (BQD _ (BinaryCombinator fun) f1 f2 ran _ _) a = case fun of
   g | isJust $ elemIndex g [LessThanF, LessThanEqualF, GreaterThanF, GreaterThanEqualF] -> ArrayT do
     -- Both are singleton arrays, or empty.
     (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-    fr2 <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f2 a)
     case head fr1, head fr2 of
       Just fr1h, Just fr2h -> unsafePartial $ case ran of
         VDOM PString _ -> pure [unsafePartial applyValueFunction (functionOnStrings \x y -> show $ (orderFunction g) x y) fr1h fr2h]
@@ -355,7 +355,7 @@ interpretBQD (BQD _ (BinaryCombinator fun) f1 f2 ran _ _) a = case fun of
   g | isJust $ elemIndex g [AddF, SubtractF, DivideF, MultiplyF] -> ArrayT do
     -- Both are singleton arrays, or empty.
     (fr1 :: Array DependencyPath) <- runArrayT (interpret f1 a)
-    fr2 <- runArrayT (interpret f1 a)
+    fr2 <- runArrayT (interpret f2 a)
     case head fr1, head fr2 of
       Just fr1h, Just fr2h -> if range f1 `eq` range f2
         then do

@@ -226,7 +226,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (ServerUrl, Name) verbs (Consult)
               --props (Name) verbs (SetPropertyValue)
           row
-            form Admin
+            form "Admin" Admin
         tab "Repositories"
           row 
             table Repositories
@@ -292,7 +292,7 @@ domain model://perspectives.domains#CouchdbManagement
           row
             form External
           row
-            form Admin
+            form "Admin" Admin
           row
             table Accounts
         tab "Repositories"
@@ -500,7 +500,7 @@ domain model://perspectives.domains#CouchdbManagement
         only (Create, Fill)
       
       perspective on Authors
-        only (Create, Fill)
+        only (Create, Fill, Remove)
         props (FirstName, LastName)
       
       -- Moet in staat zijn om een instantie toe te voegen aan Accounts.
@@ -547,6 +547,9 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
+      
+      perspective on Authors
+        props (FirstName, LastName)
 
       screen "Repository"
         tab "This repository"
