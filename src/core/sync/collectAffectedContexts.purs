@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, cons, difference, filterA, foldM, foldl, head, nub, null, union, filter)
+import Data.Array (concat, cons, difference, filter, filterA, foldM, foldMap, foldl, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Lens (Traversal', Lens', over, preview, traversed)
@@ -35,7 +35,8 @@ import Data.Lens.Record (prop)
 import Data.List (head) as List
 import Data.Map (isEmpty)
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
-import Data.Newtype (unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Newtype (ala, unwrap)
 import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
 import Data.Tuple (Tuple(..), snd)
@@ -859,9 +860,7 @@ compileRoleInvertedQueries ct@(ContextType ctxtType) = do
 areCompiled :: Object (Array InvertedQuery) -> Boolean
 areCompiled ar = case head $ values ar of
   Nothing -> true
-  Just iqs -> case head iqs of
-    Nothing -> true
-    Just (InvertedQuery{backwardsCompiled}) -> isJust backwardsCompiled
+  _ -> (ala Conj foldMap) <<< map ((ala Conj foldMap) <<< map (\(InvertedQuery{backwardsCompiled}) -> isJust backwardsCompiled)) $ values ar
 
 compileBoth :: InvertedQuery -> MP InvertedQuery
 compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompiled}) = case backwardsCompiled of
