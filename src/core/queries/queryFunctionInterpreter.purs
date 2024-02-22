@@ -395,6 +395,10 @@ interpretBQD (BQD _ (BinaryCombinator fun) f1 f2 ran _ _) a = case fun of
               , mainPath: Nothing
               , supportingPaths: (allPaths fr1h) `union` (allPaths fr2h)
               }]
+      Just fr1h, Nothing -> pure fr1
+      Nothing, Just fr2h -> pure fr2
+      Nothing, Nothing -> pure [a]
+
 
   _ -> ArrayT $ pure []
 
