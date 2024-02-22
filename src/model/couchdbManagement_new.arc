@@ -178,8 +178,9 @@ domain model://perspectives.domains#CouchdbManagement
       do for Admin
         delete context bound to Repositories
 
-    -- This role should be in public space insofar that e.g. acc:Body$Guest should be able to see it.
     -- Admin in Couchdb of a particular server.
+    -- This role requires credentials for the ServerUrl, because it updates CouchdbServer and creates and updates Repositories and Accounts.
+    -- It requires write access to cw_servers_and_repositories.
     -- TODO Hernoem dit naar ServerAdmin.
     user Admin filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
@@ -234,6 +235,8 @@ domain model://perspectives.domains#CouchdbManagement
           row
             table Accounts
 
+    -- This role requires credentials for the ServerUrl, because it can remove itself.
+    -- It requires write access to cw_servers_and_repositories.
     user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
       -- WithCredentials$Password
       -- WithCredentials$SpecificUserName
@@ -245,6 +248,7 @@ domain model://perspectives.domains#CouchdbManagement
             letA
               serverurl <- context >> extern >> ServerUrl
             in
+              -- This will set the properties of the object in transition, i.e. the Accounts instance; NOT the Admin instance!
               Password = callExternal util:GenSym() returns String
               AuthorizedDomain = serverurl
               -- NOTICE: we do not check whether UserName is already a registered user of the Couchdb installation at serverurl.
@@ -396,6 +400,12 @@ domain model://perspectives.domains#CouchdbManagement
     aspect acc:Body
     aspect sys:ManifestCollection
 
+    state Endorsed = extern >> binder Repositories >> AdminEndorses
+      perspective of Admin
+        perspective on Authors
+          only (Create, Fill, Remove)
+          props (FirstName, LastName)
+
     -- Embedded contexts are not removed automatically with their embedder!
     on exit
       do for Admin
@@ -409,7 +419,9 @@ domain model://perspectives.domains#CouchdbManagement
       property IsPublic (mandatory, Boolean)
       -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
       property NameSpace (functional) = binder Repositories >> Repositories$NameSpace
+      -- Rename to ModelsDatabase
       property ReadModels = "models_" + NameSpace_
+      -- Rename to InstancesDatabase
       property ReadInstances = "cw_" + NameSpace_
       -- The location of the CouchdbServer_. 
       property ServerUrl (functional) = binder Repositories >> context >> extern >> ServerUrl
@@ -424,9 +436,10 @@ domain model://perspectives.domains#CouchdbManagement
         props (FirstName, LastName, Password, UserName) verbs (Consult)
         props (AuthorizedDomain) verbs (SetPropertyValue)
 
-    -- The filler provides autentication on Couchdb_.
-    -- Should also be able to give them read access to the repo,
-    -- and to retract that again.
+    -- This role requires credentials for the ServerUrl. It 'inherits' them from its filler.
+    -- It also requires credentials for the RepositoryUrl, because it creates and updates Manifests.
+    -- It requires write access to cw_servers_and_repositories and to cw_RepositoryUrl. 
+    -- The latter is guaranteed as it is DatabaseAdmin of both databases. 
     -- NOTE: later, CouchdbServer$Accounts will also be allowed to fill this role.
     user Admin filledBy CouchdbServer$Admin
       aspect acc:Body$Admin
@@ -499,10 +512,6 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Manifests >> binding >> context >> Author
         only (Create, Fill)
       
-      perspective on Authors
-        only (Create, Fill, Remove)
-        props (FirstName, LastName)
-      
       -- Moet in staat zijn om een instantie toe te voegen aan Accounts.
       -- perspective on Accounts
 
@@ -519,15 +528,26 @@ domain model://perspectives.domains#CouchdbManagement
           row
             table Authors
       
+    -- This role requires credentials for the ServerUrl. It 'inherits' them from its filler.
+    -- It also requires credentials for the RepositoryUrl, because it creates and updates Manifests.
+    -- It requires write access to cw_servers_and_repositories and to cw_RepositoryUrl.
+    -- It actually does not require write access to models_RepositoryUrl, but as Authors fill ModelManifest$Author
+    -- (and that role actually requires write access to models_RepositoryUrl), this is a convenient place to arrange that.
     user Authors (relational) filledBy CouchdbServer$Accounts
+      aspect acc:Body$Accounts
       state Filled = exists binding
         on entry
           do for ServerAdmin
             letA
               serverurl <- context >> extern >> ServerUrl
             in
+              AuthorizedDomain = context >> extern >> RepositoryUrl
               callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
               callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+        state Domain = exists AuthorizedDomain
+          on entry
+            do
+              callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
         on exit
           do for ServerAdmin
             letA
@@ -549,18 +569,20 @@ domain model://perspectives.domains#CouchdbManagement
         only (Create, Fill)
       
       perspective on Authors
-        props (FirstName, LastName)
+        props (FirstName, LastName, AuthorizedDomain)
 
       screen "Repository"
         tab "This repository"
           row 
             form "Repository information" External
               props (RepositoryUrl) verbs (Consult)
+          row 
+            table "Authors" Authors
         tab "Manifests"
           row
             table Manifests
     
-    -- Levert een pattern match failure in Perspectives.Representation.Perspective (line 220, column 29 - line 220, column 51): CP
+    
     user Accounts (relational, unlinked) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
 
     -- The instances of Repository are published in the cw_servers_and_repositories database.
@@ -595,6 +617,15 @@ domain model://perspectives.domains#CouchdbManagement
               bind currentactor to Author in origin >> binding >> context
               DomeinFileName = manifestname + ".json" for origin >> binding
 
+          do for Authors
+            letA 
+              manifestname <- (context >> extern >> NameSpace_ + "-" + LocalModelName)
+            in
+              -- As the PDR derives this name from the modelURI, we have to name the ModelManifest with its LocalModelName.
+              create_ context ModelManifest named manifestname bound to origin
+              bind currentactor to Author in origin >> binding >> context
+              DomeinFileName = manifestname + ".json" for origin >> binding
+
   case ModelManifest 
     aspect sys:ModelManifest
 
@@ -614,10 +645,11 @@ domain model://perspectives.domains#CouchdbManagement
       -- so we can create ModelManifest with a user-defined name. 
       -- The Model URI (the 'logical name' of the model), e.g. model://perspectives.domains#System.
       property ModelURI (functional) = "model://" + context >> Repository >> Repository$External$NameSpace + "#" + binder Manifests >> LocalModelName >>= first
-      -- The location of the CouchdbServer_. 
-      property ServerUrl (functional) = binder Manifests >> context >> extern >> ServerUrl
-      -- The location where we publish ModelManifest and its versions.
-      property PublicUrl = ServerUrl + context >> Repository >> ReadInstances + "/"
+      -- The URL of the Repository (and it will refer to the ServerUrl).
+      property RepositoryUrl (functional) = binder Manifests >> context >> extern >> RepositoryUrl
+      -- The URL of the Instances database of the Repository.
+      -- Rename to InstancesURL
+      property PublicUrl = RepositoryUrl + context >> Repository >> ReadInstances + "/"
       -- The highest version number
       property HighestVersion = context >> Versions >> Versions$Version >>= maximum
       -- The version recommended by the Author
@@ -636,6 +668,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- The external role of the Repository.
     context Repository (functional) = extern >> binder Manifests >> context >> extern
 
+    -- Inherits credentials for the ServerUrl and RepositoryUrl, and write access to the ModelsDatabase and the InstancesDatabase of the Repository.
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
         props (Description, IsLibrary, VersionToInstall) verbs (SetPropertyValue)

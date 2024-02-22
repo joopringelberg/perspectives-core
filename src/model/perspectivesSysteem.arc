@@ -53,7 +53,7 @@ domain model://perspectives.domains#System
   -- PDRDEPENDENCY
   user WithCredentials filledBy sys:PerspectivesSystem$User
     -- | The role identifier of the filler of SocialEnvironment$Me - that is, the unique identifier of this user
-    -- | in the Perspectives Universe.
+    -- | in the Perspectives Universe (a PerspectivesUsers instance).
     -- | This includes the storage scheme!
     -- | A consequence of this design is that every account with an external service obtained through a Perspectives model
     -- | will have this identifier as user name.
