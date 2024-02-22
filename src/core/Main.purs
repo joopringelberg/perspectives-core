@@ -73,6 +73,7 @@ import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyF
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
@@ -639,6 +640,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
 
 retrieveAllCredentials :: MonadPerspectives Unit
 retrieveAllCredentials = do
+  -- All instances with type model://perspectives.domains#System$WithCredentials.
   (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)
   userNameGetter <- getterFromPropertyType (CP $ CalculatedPropertyType userWithCredentialsUsername)
   rows :: Array (Tuple String Credential) <- foldM
@@ -648,7 +650,7 @@ retrieveAllCredentials = do
           handlePerspectRolError' "retrieveAllCredentials_AuthorizedDomain" rows' 
             (\authorizedDomain ->  (try (roleId ##>> userNameGetter)) >>=
               handlePerspectRolError' "retrieveAllCredentials_Username" rows' 
-                (\username -> pure $ cons (Tuple (unwrap authorizedDomain) (Credential (unwrap username) (unwrap pw))) rows')))
+                (\username -> pure $ cons (Tuple (unwrap authorizedDomain) (Credential (takeGuid (unwrap username)) (unwrap pw))) rows')))
     []
     roleInstances
   modify \s@{couchdbCredentials} -> s {couchdbCredentials = couchdbCredentials <> fromFoldable rows}

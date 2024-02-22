@@ -100,7 +100,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvert
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
@@ -831,10 +831,11 @@ resetPassword databaseUrls userNames passwords _ = try
   
 -- | Add credentials to the current session. Once persisted in the User's local storage, they will be retrieved on each session.
 -- | Notice that this function causes a change in PerspectivesState but not in the Perspectives Universe.
+-- | The username MAY be with a storage scheme; we discard it.
 addCredentials :: Array Url -> Array UserName -> Array Password -> RoleInstance -> MonadPerspectivesTransaction Unit
 addCredentials urls usernames passwords _ = try 
   (case head urls, head usernames, head passwords of 
-    Just url, Just username, Just password -> lift $ Authentication.addCredentials url username password
+    Just url, Just username, Just password -> lift $ Authentication.addCredentials url (takeGuid username) password
     _, _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#AddCredentials"
 
