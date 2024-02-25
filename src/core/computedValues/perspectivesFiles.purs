@@ -20,6 +20,7 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (typeUri2couchdbFilename)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.Persistence.API (fromBlob, getAttachment)
+import Perspectives.Persistent (entitiesDatabaseName)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -31,6 +32,12 @@ fileText fileInfo_ _ = try
       Right {propertyType, roleFileName, database, mimeType} -> if isATextType mimeType
         then case roleFileName, database of 
           Just rid, Just db -> do
+            (ma :: Maybe Foreign) <- lift $ getAttachment db rid (typeUri2couchdbFilename $ unwrap propertyType)
+            case ma of
+              Nothing -> pure []
+              Just a -> (lift $ lift $ fromBlob a) >>= pure <<< singleton
+          Just rid, Nothing -> do 
+            db <- lift $ entitiesDatabaseName
             (ma :: Maybe Foreign) <- lift $ getAttachment db rid (typeUri2couchdbFilename $ unwrap propertyType)
             case ma of
               Nothing -> pure []
