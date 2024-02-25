@@ -419,10 +419,8 @@ domain model://perspectives.domains#CouchdbManagement
       property IsPublic (mandatory, Boolean)
       -- The toplevel domain with at least one subdomain, such as perspectives.domains or professional.joopringelberg.nl.
       property NameSpace (functional) = binder Repositories >> Repositories$NameSpace
-      -- Rename to ModelsDatabase
-      property ReadModels = "models_" + NameSpace_
-      -- Rename to InstancesDatabase
-      property ReadInstances = "cw_" + NameSpace_
+      property ModelsDatabase = "models_" + NameSpace_
+      property InstancesDatabase = "cw_" + NameSpace_
       -- The location of the CouchdbServer_. 
       property ServerUrl (functional) = binder Repositories >> context >> extern >> ServerUrl
       property RepositoryUrl = "https://" + NameSpace + "/"
@@ -466,10 +464,10 @@ domain model://perspectives.domains#CouchdbManagement
             in
               -- models
               -- callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteModels, UserName )
-              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadModels, UserName )
+              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ModelsDatabase, UserName )
               -- instances
               -- callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> WriteInstances, UserName )
-              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> ReadInstances, UserName )
+              callEffect cdb:MakeAdminOfDb( serverurl, context >> extern >> InstancesDatabase, UserName )
               -- Make authentication details available to the PDR (in fact only useful when the filler of Admin is not CouchdbServer$Admin)
               AuthorizedDomain = context >> extern >> RepositoryUrl
         
@@ -486,10 +484,10 @@ domain model://perspectives.domains#CouchdbManagement
             in
               -- models
               -- callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteModels, UserName )
-              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadModels, UserName )
+              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ModelsDatabase, UserName )
               -- instances
               -- callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> WriteInstances, UserName )
-              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> ReadInstances, UserName )
+              callEffect cdb:RemoveAsAdminFromDb( serverurl, context >> extern >> InstancesDatabase, UserName )
 
       on exit 
         notify "You are no longer the administrator of the repository { context >> extern >> NameSpace_ }."
@@ -499,7 +497,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
 
         action CompileRepositoryModels
-          callEffect p:CompileRepositoryModels( RepositoryUrl + ReadModels, RepositoryUrl + ReadInstances )
+          callEffect p:CompileRepositoryModels( RepositoryUrl + ModelsDatabase, RepositoryUrl + InstancesDatabase )
 
       -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
@@ -542,8 +540,8 @@ domain model://perspectives.domains#CouchdbManagement
               serverurl <- context >> extern >> ServerUrl
             in
               AuthorizedDomain = context >> extern >> RepositoryUrl
-              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
-              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ModelsDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> InstancesDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
         state Domain = exists AuthorizedDomain
           on entry
             do
@@ -553,8 +551,8 @@ domain model://perspectives.domains#CouchdbManagement
             letA
               serverurl <- context >> extern >> ServerUrl
             in
-              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadModels, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
-              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ReadInstances, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ModelsDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> InstancesDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
 
       perspective on External
         props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
@@ -649,7 +647,7 @@ domain model://perspectives.domains#CouchdbManagement
       property RepositoryUrl (functional) = binder Manifests >> context >> extern >> RepositoryUrl
       -- The URL of the Instances database of the Repository.
       -- Rename to InstancesURL
-      property PublicUrl = RepositoryUrl + context >> Repository >> ReadInstances + "/"
+      property PublicUrl = RepositoryUrl + context >> Repository >> InstancesDatabase + "/"
       -- The highest version number
       property HighestVersion = context >> Versions >> Versions$Version >>= maximum
       -- The version recommended by the Author
