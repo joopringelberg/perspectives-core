@@ -41,7 +41,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, roleAndBinding)
+import Perspectives.Representation.Class.Role (bindingOfADT, bindingOfRole, kindOfRole, roleAndBinding)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -134,4 +134,7 @@ checkBinding filledType filler = do
       -- These restrictions can be modeled with the filledType itself, but
       -- the restrictions of all of its Aspects count as well.
       (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
-      filledTypeAllowedFiller `lessThanOrEqualTo` fillerADT
+      -- Take the transitive closure over binding.
+      fillers' <- bindingOfADT fillerADT
+      filleds' <- bindingOfADT filledTypeAllowedFiller
+      filleds' `lessThanOrEqualTo` fillers'
