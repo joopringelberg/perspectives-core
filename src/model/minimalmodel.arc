@@ -1,6 +1,6 @@
 domain model://joopringelberg.nl#MinimalModel
   use sys for model://perspectives.domains#System
-  use joop for model://joopringelberg.nl#MinimalModel
+  use mm for model://joopringelberg.nl#MinimalModel
 
   -------------------------------------------------------------------------------
   ---- SETTING UP
@@ -33,5 +33,4 @@ domain model://joopringelberg.nl#MinimalModel
     external
       aspect sys:RootContext$External
     
-    -- Without a role this context could never be opened.
     user Manager = sys:Me
