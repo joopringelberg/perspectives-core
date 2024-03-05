@@ -60,7 +60,7 @@ import Perspectives.Instances.ObjectGetters (binding, context, roleType_)
 import Perspectives.Instances.Values (writePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError)
-import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction, context2context, context2propertyValue, context2role, context2string, getRoleInstances, typeTimeOnly)
@@ -165,7 +165,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
       (roles :: Array RoleInstance) <- lift (contextId ##= roleGetter)
       case head roles of
         Nothing -> pure unit
-        Just role ->  try (lift $ getPerspectEntiteit role) >>=
+        Just role ->  try (lift $ getPerspectRol role) >>=
           handlePerspectRolError "compileAssignment, Move"
             (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
 
@@ -177,7 +177,7 @@ compileAssignment (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = do
           (roles :: Array RoleInstance) <- lift (contextId ##= roleGetter)
           case head roles of
             Nothing -> pure unit
-            Just role ->  try (lift $ getPerspectEntiteit role) >>=
+            Just role ->  try (lift $ getPerspectRol role) >>=
               handlePerspectRolError "compileAssignment, Move"
                 (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
 

@@ -49,7 +49,7 @@ import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Authenticate (getPrivateKey)
-import Perspectives.CoreTypes (IndexedResource(..), JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
+import Perspectives.CoreTypes (IndexedResource(..), IntegrityFix(..), JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -70,6 +70,7 @@ import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
+import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
@@ -121,13 +122,25 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
       transactionWithTiming <- empty
       modelToLoad <- empty
       indexedResourceToCreate <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService indexedResourceToCreate
+      missingResource <- empty
+      state <- new $ newPerspectivesState
+        pouchdbUser 
+        transactionFlag 
+        transactionWithTiming 
+        modelToLoad 
+        options 
+        brokerService 
+        indexedResourceToCreate
+        missingResource
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
 
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
+
+      -- Fork aff to restore referential integrity
+      void $ forkAff $ forkReferentialIntegrityFixer missingResource state
 
       -- Fork aff to save to the database
       void $ forkAff $ forkDatabasePersistence state
@@ -355,6 +368,38 @@ forkJustInTimeModelLoader modelToLoadAVar state = run
         -- Other cases should not happen; we just ignore them here.
         _ -> run
 
+forkReferentialIntegrityFixer :: AVar IntegrityFix -> AVar PerspectivesState -> Aff Unit
+forkReferentialIntegrityFixer missingResourceAVar state = run
+  where
+    run :: Aff Unit
+    run = do
+      -- Create an AVar for communication between the requester and the fiber we'll fork shortly:
+      hotline <- empty
+      integrityFix <- take missingResourceAVar
+      case integrityFix of 
+        Missing missingResource -> do 
+          -- Return the hotline to the requester. It will take it from the missingResourceAVar and stop execution until we put something in the HotLine.
+          put (FixingHotLine hotline) missingResourceAVar
+          -- now fork a process that will actually load the model (and it will use the HotLine to 
+          -- return the results to the requester):
+          fixingProcess <- forkAff $ do
+            runPerspectivesWithState 
+              (fixReferences missingResource)
+              state
+          -- This blocks until the fiber completes.
+          result <- try (joinFiber fixingProcess)
+          case result of 
+            Left e -> do
+              logPerspectivesError $ Custom $ "Fixing referential integrity failed, because: " <> show e
+              liftAff $ put (FixFailed $ show e) hotline
+            -- Report back to the caller on the Aff level, i.e. when the fixing on the level of
+            -- MonadPerspectives has been executed.
+            Right _ -> liftAff $ put FixSucceeded hotline
+          -- and repeat
+          run
+        -- This we never send, currently.
+        StopFixing -> pure unit
+        _ -> run
 
 handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
@@ -379,7 +424,16 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       transactionWithTiming <- empty
       modelToLoad <- empty
       indexedResourceToCreate <- empty
-      state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate
+      missingResource <- empty
+      state <- new $ newPerspectivesState 
+        pouchdbUser 
+        transactionFlag 
+        transactionWithTiming 
+        modelToLoad 
+        runtimeOptions 
+        brokerService 
+        indexedResourceToCreate 
+        missingResource
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Fork aff to save to the database
@@ -387,6 +441,9 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
       void $ forkAff $ forkDatabasePersistence state
       -- Fork aff to create indexed roles and contexts.
       void $ forkAff $ forkCreateIndexedResources indexedResourceToCreate state
+      -- Fork aff to restore referential integrity
+      void $ forkAff $ forkReferentialIntegrityFixer missingResource state
+
       -- Set up.
       runPerspectivesWithState
         (do
@@ -420,9 +477,20 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
         transactionWithTiming <- empty
         modelToLoad <- empty
         indexedResourceToCreate <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad options brokerService indexedResourceToCreate
+        missingResource <- empty
+        state <- new $ newPerspectivesState 
+          pouchdbUser 
+          transactionFlag 
+          transactionWithTiming 
+          modelToLoad 
+          options 
+          brokerService 
+          indexedResourceToCreate 
+          missingResource
         -- Fork aff to create indexed roles and contexts.
         void $ forkAff $ forkCreateIndexedResources indexedResourceToCreate state
+        -- Fork aff to restore referential integrity
+        void $ forkAff $ forkReferentialIntegrityFixer missingResource state
         runPerspectivesWithState
           (do
             -- Clear the databases.
@@ -459,7 +527,16 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
         transactionWithTiming <- empty
         modelToLoad <- empty
         indexedResourceToCreate <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  options brokerService indexedResourceToCreate
+        missingResource <- empty
+        state <- new $ newPerspectivesState 
+          pouchdbUser 
+          transactionFlag 
+          transactionWithTiming 
+          modelToLoad 
+          options 
+          brokerService 
+          indexedResourceToCreate
+          missingResource
         runPerspectivesWithState
           (do
             (catchError do
@@ -554,7 +631,16 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
         transactionWithTiming <- empty
         modelToLoad <- empty
         indexedResourceToCreate <- empty
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad  defaultRuntimeOptions brokerService indexedResourceToCreate
+        missingResource <- empty
+        state <- new $ newPerspectivesState 
+          pouchdbUser 
+          transactionFlag 
+          transactionWithTiming 
+          modelToLoad 
+          defaultRuntimeOptions 
+          brokerService 
+          indexedResourceToCreate
+          missingResource
         runPerspectivesWithState
           do
             -- Get all Channels
@@ -606,8 +692,17 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
         transactionWithTiming <- empty
         modelToLoad <- empty
         indexedResourceToCreate <- empty 
-        state <- new $ newPerspectivesState pouchdbUser transactionFlag transactionWithTiming modelToLoad defaultRuntimeOptions brokerService indexedResourceToCreate
-        runPerspectivesWithState
+        missingResource <- empty
+        state <- new $ newPerspectivesState
+          pouchdbUser 
+          transactionFlag 
+          transactionWithTiming 
+          modelToLoad 
+          defaultRuntimeOptions 
+          brokerService 
+          indexedResourceToCreate
+          missingResource
+        runPerspectivesWithState 
           (do
             addAllExternalFunctions
             modelsDb <- modelsDatabaseName
@@ -638,7 +733,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback e
 
-retrieveAllCredentials :: MonadPerspectives Unit
+retrieveAllCredentials :: MonadPerspectives Unit 
 retrieveAllCredentials = do
   -- All instances with type model://perspectives.domains#System$WithCredentials.
   (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)

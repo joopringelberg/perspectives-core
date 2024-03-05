@@ -47,7 +47,7 @@ import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransac
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.Time (date2String, string2Date, string2Time, time2String, wholeHour)
 
-forkedSystemClocks :: AVar PerspectivesState -> Aff Unit
+forkedSystemClocks :: AVar PerspectivesState -> Aff Unit 
 forkedSystemClocks state = do 
   -- At system startup, always make sure the clocks are correct.
   runPerspectivesWithState 

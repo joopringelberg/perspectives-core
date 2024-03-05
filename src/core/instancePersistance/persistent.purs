@@ -49,7 +49,7 @@ module Perspectives.Persistent
   , saveEntiteit
   , saveEntiteit_
   , saveMarkedResources
-  , tryFetchEntiteit
+  , tryGetPerspectContext
   , tryGetPerspectEntiteit
   , tryRemoveEntiteit
   , updateRevision
@@ -59,8 +59,10 @@ module Perspectives.Persistent
 import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
+import Control.Monad.Error.Class (try)
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, delete, elemIndex)
+import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType)
@@ -68,11 +70,11 @@ import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Effect.Aff.AVar (AVar, kill, put, read)
+import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (error)
+import Effect.Exception (Error, error)
 import Persistence.Attachment (class Attachment)
-import Perspectives.CoreTypes (class Persistent, MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally)
+import Perspectives.CoreTypes (class Persistent, IntegrityFix(..), MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally, typeOfInstance)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -81,15 +83,22 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (AttachmentName, AuthoritySource(..), MonadPouchdb, addDocument, deleteDocument, ensureAuthentication, getDocument, retrieveDocumentVersion)
 import Perspectives.Persistence.API (addAttachment) as P
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.Class.Cacheable (class Revision, Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache)
+import Perspectives.PerspectivesState (getMissingResource)
+import Perspectives.Representation.Class.Cacheable (Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache)
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
 import Simple.JSON (class WriteForeign)
 
-getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
-getPerspectEntiteit id =
+fix :: Boolean
+fix = true
+
+doNotFix :: Boolean
+doNotFix = false
+
+getPerspectEntiteit :: forall a i. Attachment a => Persistent a i => Boolean -> i -> MonadPerspectives a
+getPerspectEntiteit tryToFix id =
   do
     (av :: Maybe (AVar a)) <- retrieveInternally id
     case av of
@@ -100,7 +109,7 @@ getPerspectEntiteit id =
         if isInPublicScheme (unwrap id)
           then addPublicResource id
           else pure unit
-        fetchEntiteit id
+        fetchEntiteit tryToFix id
 
 entitiesDatabaseName :: forall f. MonadPouchdb f String
 entitiesDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_entities")
@@ -112,23 +121,26 @@ modelDatabaseName :: MonadPerspectives String
 modelDatabaseName = dbLocalName (DomeinFileId "model://perspectives.domains#System")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
-getPerspectContext = getPerspectEntiteit
+getPerspectContext = getPerspectEntiteit fix
+
+tryGetPerspectContext :: ContextInstance -> MonadPerspectives (Either Error  PerspectContext)
+tryGetPerspectContext id = try $ getPerspectEntiteit doNotFix id
 
 getPerspectRol :: RoleInstance -> MP PerspectRol
-getPerspectRol = getPerspectEntiteit
+getPerspectRol = getPerspectEntiteit fix
 
 -- | Argument should have form model:ModelName (not the new model:some.domain/ModelName form).
 getDomeinFile :: DomeinFileId -> MP DomeinFile
-getDomeinFile = getPerspectEntiteit
+getDomeinFile = getPerspectEntiteit doNotFix
 
 tryGetPerspectEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives (Maybe a)
-tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit id) >>= (pure <<< Just))
+tryGetPerspectEntiteit id = catchError ((getPerspectEntiteit doNotFix id) >>= (pure <<< Just))
   \e -> do 
     -- logPerspectivesError (Custom $ show e)
     pure Nothing
 
 entityExists :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Boolean
-entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true))
+entityExists id = catchError ((getPerspectEntiteit doNotFix id) >>= (pure <<< const true))
   \e ->  do 
     -- logPerspectivesError (Custom $ show e)
     pure false
@@ -136,7 +148,7 @@ entityExists id = catchError ((getPerspectEntiteit id) >>= (pure <<< const true)
 -- | Remove from Couchdb if possible and remove from the cache, too.
 removeEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
 removeEntiteit entId = do
-  entiteit <- getPerspectEntiteit entId
+  entiteit <- getPerspectEntiteit fix entId
   removeEntiteit_ entId entiteit
 
 removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
@@ -160,8 +172,8 @@ tryRemoveEntiteit entId = do
     Just entiteit -> void $ removeEntiteit_ entId entiteit
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
-fetchEntiteit :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives a
-fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchError
+fetchEntiteit :: forall a i. Attachment a => Persistent a i => Boolean -> i -> MonadPerspectives a
+fetchEntiteit tryToFix id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchError
   do
     v <- representInternally id
 
@@ -175,29 +187,29 @@ fetchEntiteit id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchErro
     pure doc
 
   \e -> do
-    (mav :: Maybe (AVar a)) <- removeInternally id
-    case mav of
-      Nothing -> pure unit
-      Just av -> liftAff $ kill (error ("Cound not find " <> unwrap id)) av
     if test decodingErrorRegex (show e)
-      then logPerspectivesError (Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e))
-      else pure unit
-    throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb. " <> show e)
+      then logPerspectivesError (Custom ("fetchEntiteit: failed to decode resource " <> unwrap id <> ". Parser message: " <> show e))
+      -- Try to fix referential integrity
+      else if tryToFix
+        then do 
+          logPerspectivesError 
+            (Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb: " <> show e))
+          missingResourceAVar <- getMissingResource
+          liftAff $ put (Missing $ typeOfInstance id) missingResourceAVar
+          response <- liftAff $ take missingResourceAVar
+          case response of 
+            FixingHotLine av -> do 
+              result <- liftAff $ take av
+              case result of 
+                FixFailed s -> logPerspectivesError (Custom "fetchEntiteit: cannot fix references.")
+                FixSucceeded -> logPerspectivesError (Custom "fetchEntiteit: succesfully removed all references to missing resource.")
+                _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
+            _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
+        else pure unit
+    throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb.")
   where
     decodingErrorRegex :: Regex
     decodingErrorRegex = unsafeRegex "error in decoding result" noFlags
-
-
--- | Fetch the definition of a document if it can be found. DOES NOT CACHE THE ENTITY!
-tryFetchEntiteit :: forall a i. Attachment a => Revision a => Persistent a i => i -> MonadPerspectives (Maybe a)
-tryFetchEntiteit id = do
-  {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
-  catchError (Just <$> getDocument database documentName)
-    \e -> pure Nothing
-
-  -- dbName <- dbLocalName id
-  -- catchError (Just <$> getDocument dbName (couchdbResourceIdentifier $ unwrap id))
-  --   \e -> pure Nothing
 
 -- | Saves a previously cached entity.
 -- | NOTE: the entity may not be saved immediately, due to the scheme of periodic saving.
@@ -277,7 +289,7 @@ addAttachment :: forall a i attachmentType. Attachment a => Persistent a i =>  i
 addAttachment i attachmentName attachment mimetype = do
   saveMarkedResources
   -- The resource identified by i is now in Couchdb and the revision number in cache equals that in couchdb.
-  a :: a <- getPerspectEntiteit i
+  a :: a <- getPerspectEntiteit fix i
   {database, documentName} <- resourceIdentifier2DocLocator (identifier_ a)
   DeleteCouchdbDocument {ok} <- P.addAttachment database documentName (rev a) attachmentName attachment mimetype
   -- The document in Couchdb now has a higher revision (unless the operation failed, which throws an exception not caught here).

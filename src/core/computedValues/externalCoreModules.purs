@@ -55,7 +55,7 @@ coreModules = fromFoldable
   , Tuple "model://perspectives.domains#Files" File.externalFunctions
   ]
 
-addAllExternalFunctions :: forall m. Monad m => m Unit
+addAllExternalFunctions :: forall m. Monad m => m Unit 
 addAllExternalFunctions = do
   addExternalFunctions ExternalCouchdb.externalFunctions
   addExternalFunctions Serialise.externalFunctions

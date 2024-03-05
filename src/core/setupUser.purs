@@ -30,7 +30,7 @@ import Perspectives.ModelDependencies (bodiesWithAccountsModelName, couchdbManag
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SetupCouchdb (setContextSpecialisationsView, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
+import Perspectives.SetupCouchdb (setContextFromRoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFilledRolesView, setFillerRoleView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView, setRolesFromContextView)
 import Prelude (Unit, bind, discard, void, ($), (>>=))
 
 modelDirectory :: String
@@ -48,6 +48,10 @@ setupUser = do
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
   entitiesDatabaseName >>= setFilledRolesView
+  entitiesDatabaseName >>= setFillerRoleView
+  entitiesDatabaseName >>= setContextFromRoleView
+  entitiesDatabaseName >>= setRolesFromContextView
+
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView 
   -- Finally, upload model:System to perspect_models.
@@ -62,6 +66,9 @@ reSetupUser = do
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
   entitiesDatabaseName >>= setFilledRolesView
+  entitiesDatabaseName >>= setFillerRoleView
+  entitiesDatabaseName >>= setContextFromRoleView
+  entitiesDatabaseName >>= setRolesFromContextView
   DomeinFile {referredModels} <- getDomeinFile (DomeinFileId systemModelName)
   -- INSTALLATION / MODEL DEPENDENCY HERE: we assume these models will have been installed.
   void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser)

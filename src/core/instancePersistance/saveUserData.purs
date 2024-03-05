@@ -43,6 +43,7 @@ module Perspectives.SaveUserData
   , setFirstBinding
   , stateEvaluationAndQueryUpdatesForContext
   , stateEvaluationAndQueryUpdatesForRole
+  , severeBindingLinks
   )
   where
 
@@ -57,7 +58,7 @@ import Data.Traversable (for, for_, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
-import Perspectives.Assignment.Update (getAuthor, getSubject, cacheAndSave)
+import Perspectives.Assignment.Update (cacheAndSave, deleteProperty, getAuthor, getSubject)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
@@ -66,16 +67,17 @@ import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
-import Perspectives.Identifiers (deconstructBuitenRol, typeUri2ModelUri, isExternalRole)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getUnlinkedRoleInstances, isMe, roleType_)
-import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol, removeEntiteit)
+import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getRoleOnClipboard, getUnlinkedRoleInstances, isMe, roleType_)
+import Perspectives.ModelDependencies (cardClipBoard, sysUser)
+import Perspectives.Names (getMySystem)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
@@ -105,10 +107,19 @@ scheduleRoleRemoval id = do
   roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
   if contextIsScheduledToBeRemoved || roleIsUntouchable
     then pure unit
-    else modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
-      { rolesToExit = rolesToExit `union` [id]
-      , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
-      })
+    else do 
+      modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+        { rolesToExit = rolesToExit `union` [id]
+        , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
+        })
+      clipboard <- lift getRoleOnClipboard
+      case clipboard of 
+        Nothing -> pure unit
+        Just r -> if r == id
+          then do 
+            s <- lift $ getMySystem
+            deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard)
+          else pure unit
 
 -- | Schedules all roles in the context, including its external role, for removal.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.
@@ -351,7 +362,7 @@ removeAllRoleInstances et cid = do
 -- the bound role. SYNCHRONISATION should be taken care of by a RoleBindingDelta.
 -----------------------------------------------------------
 setBinding :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-setBinding roleId newBindingId msignedDelta = (lift $ try $ getPerspectEntiteit roleId) >>=
+setBinding roleId newBindingId msignedDelta = (lift $ try $ getPerspectRol roleId) >>=
   handlePerspectRolError' "setBinding" []
     \(filled :: PerspectRol) -> if isJust $ rol_binding filled
       then replaceBinding roleId newBindingId msignedDelta
@@ -368,7 +379,7 @@ setBinding roleId newBindingId msignedDelta = (lift $ try $ getPerspectEntiteit 
 -- | QUERY UPDATES for `binding <roleId`, `binder <TypeOfRoleId>` for both the old binding and the new binding.
 -- | CURRENTUSER for roleId and its context.
 replaceBinding :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-replaceBinding roleId (newBindingId :: RoleInstance) msignedDelta = (lift $ try $ getPerspectEntiteit roleId) >>=
+replaceBinding roleId (newBindingId :: RoleInstance) msignedDelta = (lift $ try $ getPerspectRol roleId) >>=
   handlePerspectRolError' "replaceBinding" []
     \(originalRole :: PerspectRol) -> do
       if (rol_binding originalRole == Just newBindingId)
@@ -387,11 +398,11 @@ replaceBinding roleId (newBindingId :: RoleInstance) msignedDelta = (lift $ try 
 -- | STATE EVALUATION
 -- | This function is idempotent: if the role is already filled with the filler, nothing changes.
 setFirstBinding :: RoleInstance -> RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit filled) >>=
+setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled) >>=
   handlePerspectRolError' "setFirstBinding, filled" []
     \(filledRole :: PerspectRol) -> if rol_binding filledRole == Just filler
       then pure []
-      else  (lift $ try $ getPerspectEntiteit filler) >>=
+      else  (lift $ try $ getPerspectRol filler) >>=
         handlePerspectRolError' "setFirstBinding, filler" []
           \fillerRole@(PerspectRol{isMe, pspType:fillerType}) -> do
             loadModel fillerType
@@ -440,7 +451,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectEntiteit f
             -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
 
             -- PERSISTENCE
-            (modifiedFilled :: PerspectRol) <- lift $ getPerspectEntiteit filled
+            (modifiedFilled :: PerspectRol) <- lift $ getPerspectRol filled
             lift $ cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
 
             pure users
@@ -484,7 +495,7 @@ removeBinding roleId = do
 -- | STATE EVALUATION
 -- | SYNCHRONISATION
 removeBinding_ :: RoleInstance -> Maybe RoleInstance -> Maybe SignedDelta -> MonadPerspectivesTransaction (Array RoleInstance)
-removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit filled) >>=
+removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectRol filled) >>=
   handlePerspectRolError' "removeBinding_" []
     \(originalFilled :: PerspectRol) -> case rol_binding originalFilled of
       Nothing -> pure []
@@ -544,7 +555,7 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectEntiteit
 -- | PERSISTENCE of binding role and old binding.
 -- | CURRENTUSER for roleId and its context.
 changeRoleBinding :: RoleInstance -> (Maybe RoleInstance) -> MonadPerspectivesTransaction Unit
-changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectEntiteit filledId) >>=
+changeRoleBinding filledId mNewFiller = (lift $ try $ getPerspectRol filledId) >>=
   handlePerspectRolError' "changeRoleBinding" unit
     \(filled :: PerspectRol) -> do
       roleWillBeRemoved <- gets \(Transaction{untouchableRoles}) -> isJust $ elemIndex filledId untouchableRoles

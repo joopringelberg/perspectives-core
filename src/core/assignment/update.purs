@@ -70,7 +70,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, roleType, roleType_)
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Persistence.API (toFile)
-import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectRol)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
@@ -318,7 +318,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
       mrid <- lift $ getPropertyBearingRoleInstance propertyName rid'
       case mrid of
         Nothing -> pure unit
-        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectEntiteit rid) >>= handlePerspectRolError "addProperty"
+        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>= handlePerspectRolError "addProperty"
           \(pe :: PerspectRol) -> do
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
             users <- aisInPropertyDelta rid propertyName replacementProperty (rol_pspType pe)
@@ -395,7 +395,7 @@ removeProperty rids propertyName values = case ARR.head rids of
       mrid <- lift $ getPropertyBearingRoleInstance propertyName rid'
       case mrid of
         Nothing -> pure unit
-        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectEntiteit rid) >>=
+        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
           handlePerspectRolError "removeProperty"
           \(pe :: PerspectRol) -> do
             users <- aisInPropertyDelta rid propertyName replacementProperty (rol_pspType pe)
@@ -434,7 +434,7 @@ deleteProperty rids propertyName = case ARR.head rids of
       mrid <- lift $ getPropertyBearingRoleInstance propertyName rid'
       case mrid of
         Nothing -> pure unit
-        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectEntiteit rid) >>=
+        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
             handlePerspectRolError
             "deleteProperty"
             \(pe@(PerspectRol{properties, pspType})) -> do
@@ -496,7 +496,7 @@ saveFile r property arrayBuf mimeType = do
     -- This may go wrong when we actually have no property value yet but it should NOT be represented on the given instance.
     Nothing -> pure $ RoleProp r property
     Just x -> pure x
-  roleInstance :: PerspectRol <- lift $ getPerspectEntiteit rid
+  roleInstance :: PerspectRol <- lift $ getPerspectRol rid
       -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
   users <- aisInPropertyDelta rid property replacementProperty (rol_pspType roleInstance)
   subject <- getSubject

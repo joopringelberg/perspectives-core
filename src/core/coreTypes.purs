@@ -53,6 +53,7 @@ module Perspectives.CoreTypes
   , PropertyValueGetter
   , RepeatingTransaction(..)
   , ResourceToBeStored(..)
+  , IntegrityFix(..)
   , RolInstances
   , RoleGetter
   , RuntimeOptions
@@ -76,6 +77,7 @@ module Perspectives.CoreTypes
   , removeInternally
   , representInternally
   , resourceToBeStored
+  , typeOfInstance
   , retrieveInternally
   , runMonadPerspectivesQuery
   , runMonadPerspectivesQueryToObject
@@ -190,6 +192,8 @@ type PerspectivesExtraState =
   , entitiesToBeStored :: Array ResourceToBeStored
 
   , indexedResourceToCreate :: AVar IndexedResource
+
+  , missingResource :: AVar IntegrityFix
 
   )
 
@@ -510,6 +514,9 @@ class (Cacheable v i, WriteForeign v, ReadForeign v) <= Persistent v i | i -> v,
   dbLocalName :: i -> MP String
   addPublicResource :: i -> MonadPerspectives Unit
   resourceToBeStored :: v -> ResourceToBeStored
+  typeOfInstance :: i -> ResourceToBeStored
+
+data IntegrityFix = Missing ResourceToBeStored | FixSucceeded | FixFailed String | StopFixing | FixingHotLine (AVar IntegrityFix)
 
 data ResourceToBeStored = 
   Ctxt ContextInstance |
@@ -575,14 +582,18 @@ instance persistentInstanceDomeinFile :: Persistent DomeinFile DomeinFileId wher
   dbLocalName (DomeinFileId id) = pouchdbDatabaseName id
   addPublicResource _ = pure unit
   resourceToBeStored df = Dfile $ identifier df
+  typeOfInstance dfid = Dfile dfid
+
 
 instance persistentInstancePerspectContext :: Persistent PerspectContext ContextInstance where
   dbLocalName (ContextInstance id) = pouchdbDatabaseName id
   addPublicResource _ = pure unit
   resourceToBeStored ct = Ctxt $ identifier ct
+  typeOfInstance cid = Ctxt cid
 
 instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance where
   dbLocalName (RoleInstance id) = pouchdbDatabaseName id
   addPublicResource rid = modify \s -> s {publicRolesJustLoaded = cons rid s.publicRolesJustLoaded}
   resourceToBeStored rl = Rle $ identifier rl
+  typeOfInstance rid = Rle rid
 

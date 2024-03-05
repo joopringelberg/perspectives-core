@@ -32,7 +32,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
@@ -40,8 +40,8 @@ import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=))
 
-newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> PerspectivesState
-newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate =
+newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> AVar IntegrityFix -> PerspectivesState
+newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate missingResource =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -70,6 +70,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , runtimeOptions
   , entitiesToBeStored: []
   , indexedResourceToCreate
+  , missingResource
   }
 
 defaultRuntimeOptions :: RuntimeOptions
@@ -151,6 +152,9 @@ clearPublicRolesJustLoaded = modify \s -> s {publicRolesJustLoaded = []}
 
 getIndexedResourceToCreate :: MonadPerspectives (AVar IndexedResource)
 getIndexedResourceToCreate = gets _.indexedResourceToCreate
+
+getMissingResource :: MonadPerspectives (AVar IntegrityFix)
+getMissingResource = gets _.missingResource
 
 -----------------------------------------------------------
 -- RESETTING CACHES

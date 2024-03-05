@@ -32,7 +32,7 @@ import Perspectives.DependencyTracking.Dependency (findMeRequests)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (contextType)
-import Perspectives.Persistent (getPerspectContext, getPerspectEntiteit, getPerspectRol)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (Unit, bind, discard, pure, unit, ($), (>>=))
@@ -81,9 +81,9 @@ roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
 -- | This function takes care of
 -- | PERSISTENCE
 fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
-fillerNoLongerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) >>=
+fillerNoLongerPointsTo fillerId filledId = (try $ getPerspectRol fillerId) >>=
   handlePerspectRolError' "fillerNoLongerPointsTo" unit
-    \(filler :: PerspectRol) -> (try $ getPerspectEntiteit filledId) >>=
+    \(filler :: PerspectRol) -> (try $ getPerspectRol filledId) >>=
       handlePerspectRolError "fillerNoLongerPointsTo"
       \(filled :: PerspectRol) -> do
         filledContextType <- rol_context filled ##>> contextType
@@ -98,9 +98,9 @@ fillerNoLongerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) 
 -- | This function takes care of
 -- | PERSISTENCE
 fillerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
-fillerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) >>=
+fillerPointsTo fillerId filledId = (try $ getPerspectRol fillerId) >>=
   handlePerspectRolError' "fillerPointsTo" unit
-    \(filler :: PerspectRol) -> (try $ getPerspectEntiteit filledId) >>=
+    \(filler :: PerspectRol) -> (try $ getPerspectRol filledId) >>=
       handlePerspectRolError' "fillerPointsTo" unit
       \(filled :: PerspectRol) -> do
         filledContextType <- rol_context filled ##>> contextType
@@ -113,7 +113,7 @@ fillerPointsTo fillerId filledId = (try $ getPerspectEntiteit fillerId) >>=
 -- | (Remove the binding, in other words: change filled. Also removes the bindingDelta.)
 -- | NOTE: the second argument is currently useless, but we anticipate with it on multiple fillers.
 filledNoLongerPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
-filledNoLongerPointsTo filledId fillerId = (try $ getPerspectEntiteit filledId) >>=
+filledNoLongerPointsTo filledId fillerId = (try $ getPerspectRol filledId) >>=
   handlePerspectRolError' "filledNoLongerPointsTo" unit
     \(filled :: PerspectRol) -> cacheAndSave filledId (removeRol_binding filled)
 
@@ -122,6 +122,6 @@ filledNoLongerPointsTo filledId fillerId = (try $ getPerspectEntiteit filledId) 
 -- | Not the other way round!
 -- | (Insert the binding, in other words: change filled)
 filledPointsTo :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
-filledPointsTo filledId fillerId = (try $ getPerspectEntiteit filledId) >>=
+filledPointsTo filledId fillerId = (try $ getPerspectRol filledId) >>=
   handlePerspectRolError' "filledPointsTo" unit
     \(filled :: PerspectRol) -> cacheAndSave filledId (changeRol_binding fillerId filled)

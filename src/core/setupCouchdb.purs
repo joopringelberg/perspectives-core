@@ -24,8 +24,11 @@ module Perspectives.SetupCouchdb where
 
 import Data.Array (elemIndex)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Monoid.Disj (Disj(..))
+import Data.Newtype (unwrap)
 import Effect.Aff (Aff)
-import Perspectives.ContextAndRole (context_allTypes, rol_allTypes, rol_binding, rol_context)
+import Foreign.Object (foldMap)
+import Perspectives.ContextAndRole (context_allTypes, context_iedereRolInContext, rol_allTypes, rol_binding, rol_context, rol_gevuldeRollen)
 import Perspectives.Couchdb (SecurityDocument(..), User)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, runMonadPouchdb)
@@ -212,7 +215,8 @@ foreign import credentials :: String
 
 -----------------------------------------------------------
 -- THE VIEW 'FILLEDROLESVIEW'
--- This view collects instances of roles that are filled by the given role.
+-- This view is a table [filler;filled]
+-- Use it by selecting on filler to obtain those roles that are filled by it.
 -----------------------------------------------------------
 setFilledRolesView :: forall f. String -> MonadPouchdb f Unit
 setFilledRolesView dbname = void $ addViewToDatabase dbname "defaultViews" "filledRolesView" ({map: filledRoles, reduce: Nothing})
@@ -220,5 +224,55 @@ setFilledRolesView dbname = void $ addViewToDatabase dbname "defaultViews" "fill
 -- | Import the view definition as a String.
 foreign import filledRoles :: String
 
+-- | Does the RoleInstance instance fill the PerspectRol?
 filledRolesFilter :: RoleInstance -> PerspectRol -> Boolean
 filledRolesFilter rid role = Just rid == rol_binding role 
+
+-----------------------------------------------------------
+-- THE VIEW 'FILLERROLEVIEW'
+-- This view is a table [filled;filler]
+-- Use it by selecting on filled to obtain the role that fills it.
+-----------------------------------------------------------
+setFillerRoleView :: forall f. String -> MonadPouchdb f Unit
+setFillerRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "fillerRoleView"
+  ({map: fillerRole, reduce: Nothing})
+
+foreign import fillerRole :: String
+
+-- | Is the RoleInstance filled by the PerspectRol?
+fillerRoleFilter :: RoleInstance -> PerspectRol -> Boolean
+fillerRoleFilter rid role = unwrap (foldMap
+    (\ctype filleds -> foldMap 
+      (\rtype filleds' -> Disj $ isJust $ elemIndex rid filleds')
+      filleds)
+    (rol_gevuldeRollen role))
+
+-----------------------------------------------------------
+-- THE VIEW 'CONTEXTFROMROLEVIEW'
+-- This view is a table [role;context]
+-- Use it by selecting on role to obtain its context.
+-----------------------------------------------------------
+setContextFromRoleView :: forall f. String -> MonadPouchdb f Unit
+setContextFromRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "contextFromRoleView"
+  ({map: contextFromRole, reduce: Nothing})
+
+foreign import contextFromRole :: String
+
+contextFromRoleFilter :: RoleInstance -> PerspectContext -> Boolean
+contextFromRoleFilter rid context = unwrap (foldMap
+  (\rtype roles -> Disj $ isJust $ elemIndex rid roles)
+  (context_iedereRolInContext context))
+
+-----------------------------------------------------------
+-- THE VIEW 'ROLESFROMCONTEXTVIEW'
+-- This view is a table [context; role]
+-- Use it by selecting on context to obtain its roles.
+-----------------------------------------------------------
+setRolesFromContextView :: forall f. String -> MonadPouchdb f Unit
+setRolesFromContextView dbname = void $ addViewToDatabase dbname "defaultViews" "rolesFromContextView"
+  ({map: rolesFromContext, reduce: Nothing})
+
+foreign import rolesFromContext :: String
+
+rolesFromContextFilter :: ContextInstance -> PerspectRol -> Boolean
+rolesFromContextFilter cid prol = cid == rol_context prol

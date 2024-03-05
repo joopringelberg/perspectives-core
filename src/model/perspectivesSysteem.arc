@@ -168,6 +168,7 @@ domain model://perspectives.domains#System
       aspect sys:RootContext$External
       -- PDRDEPENDENCY
       property ConnectedToAMQPBroker (Boolean)
+      -- PDRDEPENDENCY
       property CardClipBoard (String)
       property ShowLibraries (Boolean)
       property MyContextsVersion = callExternal util:SystemParameter( "MyContextsVersion" ) returns String

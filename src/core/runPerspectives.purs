@@ -42,6 +42,7 @@ runPerspectives userName password systemId host port mp = do
   transactionWithTiming <- empty
   modelToLoad <- empty
   indexedResourceToCreate <- empty
+  missingResource <- empty
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
@@ -54,7 +55,8 @@ runPerspectives userName password systemId host port mp = do
       modelToLoad
       defaultRuntimeOptions
       brokerService
-      indexedResourceToCreate) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
+      indexedResourceToCreate
+      missingResource) { indexedRoles = singleton sysMe (RoleInstance $ "model://perspectives.domains#System$" <> userName) })
   runReaderT mp rf
 
 runPerspectivesWithState :: forall a. MonadPerspectives a -> (AVar PerspectivesState) -> Aff a

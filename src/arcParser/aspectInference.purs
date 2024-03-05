@@ -40,7 +40,7 @@ import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder)
 import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, withDomeinFile)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.QueryTypes (roleInContext2Role)
 import Perspectives.Representation.ADT (product)
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -71,7 +71,7 @@ inferFromAspectRoles = do
         (filter (flip startsWithSegments namespace) <<< (map (unwrap <<< roleInContext2Role) <<< _.roleAspects <<< unwrap))
         (values enumeratedRoles)
         (inferCardinality >=> inferMandatoriness >=> inferBinding >=> lift <<< lift <<< modifyEnumeratedRoleInDomeinFile id)
-      (DomeinFile dfr') <- lift $ lift $ getPerspectEntiteit id
+      (DomeinFile dfr') <- lift $ lift $ getDomeinFile id
       modifyDF \_ -> dfr'
 
     inferCardinality :: EnumeratedRole -> PhaseThree EnumeratedRole

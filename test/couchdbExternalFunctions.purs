@@ -23,7 +23,7 @@ import Perspectives.Identifiers (isModelUri, modelUri2ModelUrl)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (tryGetDocument_)
 import Perspectives.Persistence.Types (Credential(..))
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile)
 import Perspectives.PerspectivesState (domeinCache)
 import Perspectives.Query.UnsafeCompiler (getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -64,7 +64,7 @@ uploadToRepository :: DomeinFileId -> MonadPerspectives Unit
 uploadToRepository dfId@(DomeinFileId domeinFileName) = do
   if isModelUri domeinFileName
     then do
-      mdf <- try $ getPerspectEntiteit dfId
+      mdf <- try $ getDomeinFile dfId
       case mdf of
         Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err) 
         Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df

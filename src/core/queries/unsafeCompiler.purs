@@ -61,7 +61,7 @@ import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupRoleGetterByName, propertyGetterCacheInsert)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
-import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2PropertyRange, domain2contextType, range, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
@@ -840,7 +840,7 @@ getDynamicPropertyGetter p adt = do
 -- | The function [getDynamicPropertyGetter](Perspectives.Query.UnsafeCompiler.html#t:getDynamicPropertyGetter)
 -- | will compute the Values for a PropertyType (Enumerated or Calculated).
 getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
-getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectEntiteit r) >>=
+getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
   handlePerspectRolError' "getPropertyFromTelescope" []
     \((PerspectRol{properties, binding: bnd, pspType:roleType}) :: PerspectRol) -> do
       -- We must take aliases of the actual role type into account. An alias is another name for an Aspect Property that 

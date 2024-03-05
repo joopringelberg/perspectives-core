@@ -24,14 +24,14 @@ module Perspectives.ContextRolAccessors where
 
 import Perspectives.CoreTypes (class Persistent, MonadPerspectives)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistent (getPerspectEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (pure, (>=>), (<<<))
 
 -- Can we safely assume that the PerspectContext will exist? If it does not because there is no model holding it,
 -- this function will break. Callers must handle errors.
 getContextMember :: forall a. Persistent PerspectContext ContextInstance => (PerspectContext -> a) -> (ContextInstance -> MonadPerspectives a)
-getContextMember f = getPerspectEntiteit >=> pure <<< f
+getContextMember f = getPerspectContext >=> pure <<< f
 
 getRolMember :: forall a. (PerspectRol -> a) -> (RoleInstance -> MonadPerspectives a)
-getRolMember f = getPerspectEntiteit >=> pure <<< f
+getRolMember f = getPerspectRol >=> pure <<< f

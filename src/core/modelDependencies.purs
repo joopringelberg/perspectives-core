@@ -74,6 +74,9 @@ currentSystemHour = "model://perspectives.domains#System$PerspectivesSystem$Exte
 currentSystemDate :: String
 currentSystemDate = "model://perspectives.domains#System$PerspectivesSystem$External$CurrentDate"
 
+cardClipBoard :: String
+cardClipBoard = "model://perspectives.domains#System$PerspectivesSystem$External$CardClipBoard"
+
 userChannel :: String
 userChannel = "model://perspectives.domains#System$PerspectivesSystem$User$Channel"
 

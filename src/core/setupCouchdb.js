@@ -38,20 +38,20 @@ exports.contextView = (function (doc)
 // the part of the context identifier following the hash (#).
 exports.roleFromContextView = (function (doc)
  {
-    function takeGuid(s)
-    {
-      return s.substring( s.lastIndexOf("#") + 1 );
-    }
-   // a proxy for being a role:
-   if (doc.universeRoleDelta)
-   {
-     doc.allTypes.forEach(
-       function(typeId)
-       {
-         emit([typeId, takeGuid( doc.context )], doc.id);
-       }
-     );
-   }
+  function takeGuid(s)
+  {
+    return s.substring( s.lastIndexOf("#") + 1 );
+  }
+  // a proxy for being a role:
+  if (doc.universeRoleDelta)
+  {
+    doc.allTypes.forEach(
+      function(typeId)
+      {
+        emit([typeId, takeGuid( doc.context )], doc.id);
+      }
+    );
+  }
  }.toString())
 
 //  This is a view in the models database.
@@ -98,12 +98,70 @@ exports.contextSpecialisations = (function( doc )
     }
  }).toString();
 
- // Emit the filler of the role.
-exports.filledRoles = (function(doc)
+////// REFERENTIAL INTEGRITY
+
+// This view is a table [filler; filled]
+// Use it by selecting on filler to obtain those roles that are filled by it.
+exports.filledRoles = (function(filled)
   {
     // a proxy for being a role:
-    if (doc.universeRoleDelta)
+    if (filled.universeRoleDelta)
     {
-      emit(doc.binding, doc.id);
+      emit(filled.binding, filled.id);
     }
   }).toString();
+
+// This view is a table [filled; filler].
+// Use it by selecting on filled to obtain the role that fills it.
+exports.fillerRole = (function(filler)
+{
+  // a proxy for being a role:
+  if (filler.universeRoleDelta)
+  {
+    Object.keys( filler.filledRoles ).forEach(
+      function( contextType )
+      {
+        const contextGroup = filler.filledRoles[contextType];
+        Object.keys( contextGroup ).forEach(
+          function( roleType )
+          {
+            contextGroup[roleType].forEach(
+              function(filledRole)
+              {
+                emit(filledRole, {filler: filler.id, filledContextType: contextType, filledRoleType: roleType});
+              });
+          });
+      }
+    );
+  }
+}).toString();
+
+// This view is a table [role; context].
+// Use it by selecting on role to obtain its context.
+exports.contextFromRole = (function(role)
+{
+  // a proxy for being a role:
+  if (role.universeRoleDelta)
+  {
+    emit( role.id, role.context);
+  }
+}).toString()
+
+// This view is a table [context; role]
+// Use it by selecting on context to obtain its roles.
+exports.rolesFromContext = (function(context)
+{
+  // a proxy for being a context.
+  if (context.universeContextDelta)
+  {
+    Object.values( context.rolInContext ).forEach(
+      function(roles)
+      {
+        roles.forEach( function(role)
+        {
+          emit(context.id, role);
+        })
+      }
+    );
+  }
+}).toString()

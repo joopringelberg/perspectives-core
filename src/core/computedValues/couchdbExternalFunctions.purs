@@ -88,7 +88,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -103,7 +103,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceTy
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
-import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextView, setCredentialsView, setFilledRolesView, setPendingInvitationView, setRoleFromContextView, setRoleView)
+import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextFromRoleView, setContextView, setCredentialsView, setFilledRolesView, setFillerRoleView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRolesFromContextView)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -390,7 +390,7 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
   signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes $ delta)
 
   -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
-  (installerRole' :: PerspectRol) <- lift $ getPerspectEntiteit (identifier installerRole)
+  (installerRole' :: PerspectRol) <- lift $ getPerspectRol (identifier installerRole)
   lift $ cacheAndSave (identifier installerRole) 
     (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
 
@@ -643,6 +643,9 @@ createEntitiesDatabase databaseUrls databaseNames _ = try
         setContextView dbName
         setCredentialsView dbName
         setFilledRolesView dbName
+        setFillerRoleView dbName
+        setContextFromRoleView dbName
+        setRolesFromContextView dbName
         )
     _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#CreateEntitiesDatabase"
