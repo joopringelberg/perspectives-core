@@ -44,6 +44,7 @@ import Effect.Class.Console (log)
 import Effect.Now (now)
 import Foreign (Foreign)
 import Foreign.Object (fromFoldable, singleton)
+import IDBKeyVal (idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
@@ -55,6 +56,7 @@ import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, modelsDatabaseName, roleInstancesFromCouchdb)
+import Perspectives.Extern.Utilities (pdrVersion)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
@@ -419,6 +421,9 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pouchdbUser :: PouchdbUser) -> do
+      -- Set the current PDR version.
+      idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
+      
       transactionFlag <- new 0
       brokerService <- empty
       transactionWithTiming <- empty
