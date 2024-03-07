@@ -54,7 +54,6 @@ import Data.ArrayBuffer.Types (ArrayBuffer, Int8Array, Uint8Array)
 import Data.Either (Either(..))
 import Data.Int (hexadecimal, toStringAs)
 import Data.Maybe (Maybe(..))
-import Data.Nullable (Nullable, toMaybe)
 import Data.String (length)
 import Data.Traversable (for)
 import Data.UInt (fromInt)
@@ -63,6 +62,7 @@ import Effect.Aff (Aff, error, throwError)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
+import IDBKeyVal (idbGet)
 import Perspectives.CoreTypes (MonadPerspectives, (##>))
 import Perspectives.Instances.ObjectGetters (getProperty)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
@@ -149,7 +149,7 @@ deserializeJWK rawKey = do
 getPrivateKey :: MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPrivateKey = do
   sysId <- getSystemIdentifier
-  privateKey <- toMaybe <$> (lift $ getCryptoKey $ sysId <> privateKeyString)
+  privateKey <- lift $ getCryptoKey $ sysId <> privateKeyString
   pure privateKey
 
 -- | Get my public key. This will only be used on setting up an installation.
@@ -157,7 +157,7 @@ getPrivateKey = do
 getMyPublicKey :: MonadPerspectives (Maybe String)
 getMyPublicKey = do
   sysId <- getSystemIdentifier
-  publicKey <- toMaybe <$> (lift $ getCryptoKey $ sysId <> publicKeyString)
+  publicKey <- lift $ getCryptoKey $ sysId <> publicKeyString
   for publicKey
     \key -> lift $ do 
       jwk <- CryptoTypes.exportKey CryptoTypes.jwk key
@@ -166,18 +166,14 @@ getMyPublicKey = do
       -- export format JWK a JSON object is returned. This is what we observe. We therefore use unsafeStringify rather then writeJSON
       pure $ unsafeStringify jwk
 
+getCryptoKey :: String -> Aff (Maybe CryptoKey)
+getCryptoKey = unsafeCoerce idbGet
+
 publicKeyString :: String
 publicKeyString = "_publicKey"
 
 privateKeyString :: String
 privateKeyString = "_privateKey"
-
-foreign import getCryptoKeyImpl :: EffectFn1 String (Promise (Nullable CryptoKey))
-getCryptoKey :: String -> Aff (Nullable CryptoKey)
-getCryptoKey = getCryptoKeyImpl_ >>> toAffE
-
-getCryptoKeyImpl_ :: String -> Effect (Promise (Nullable CryptoKey))
-getCryptoKeyImpl_ = runEffectFn1 getCryptoKeyImpl
 
 string2buff :: String -> Effect ArrayBuffer
 string2buff s = do

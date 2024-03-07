@@ -1,8 +1,4 @@
 
-const idbKeyval = require('idb-keyval')
-
-exports.getCryptoKeyImpl = idbKeyval.get;
-
 exports.bytesToBase64DataUrlImpl = function (bytes) {
   const type = "application/octet-stream";
   return new Promise((resolve, reject) => 
