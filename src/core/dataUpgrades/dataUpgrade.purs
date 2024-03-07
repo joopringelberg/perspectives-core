@@ -29,39 +29,56 @@ module Perspectives.DataUpgrade  where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
+import Foreign (unsafeToForeign)
 import IDBKeyVal (idbGet, idbSet)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Extern.Utilities (pdrVersion)
+import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.SetupCouchdb (setContext2RoleView, setFilled2FillerView, setFiller2FilledView, setRole2ContextView)
 import Unsafe.Coerce (unsafeCoerce)
 
 type PDRVersion = String
 
-runDataUpgrades :: Aff Unit
+runDataUpgrades :: MonadPerspectives Unit
 runDataUpgrades = do
   -- Get the current version
-  mcurrentVersion <- idbGet "CurrentPDRVersion"
-  case mcurrentVersion of
-    Just currentVersion -> do
-      ----------------------------------------------------------------------------------------
-      ------- PDR VERSION 0.23
-      ----------------------------------------------------------------------------------------
-      runUpgrade (unsafeCoerce currentVersion) "0.23" addFixingUpdates
+  mcurrentVersion <- liftAff $ idbGet "CurrentPDRVersion"
+  (installedVersion :: String) <- case mcurrentVersion of
+    Just installedVersion -> pure (unsafeCoerce installedVersion)
+    Nothing -> do 
+      -- This mechanism was introduced during development of version 0.25.
+      -- Installations existing prior to 0.25 will be brought to heel with these instructions.
+      liftAff $ idbSet "CurrentPDRVersion" (unsafeToForeign "0.24")
+      pure "0.24"
+
+  ----------------------------------------------------------------------------------------
+  ------- PDR VERSION 0.24.1
+  ------- In this version, we add views for automatic referential integrity fixing.
+  ----------------------------------------------------------------------------------------
+  runUpgrade installedVersion "0.24.1" addFixingUpdates 
 
 
 
-      -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
-      ----------------------------------------------------------------------------------------
-      ------- SET CURRENT VERSION
-      ----------------------------------------------------------------------------------------
-      idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
-    _ -> pure unit
-
-runUpgrade :: PDRVersion -> PDRVersion -> Aff Unit -> Aff Unit
-runUpgrade currentVersion upgradeVersion upgrade = if upgradeVersion <= currentVersion && pdrVersion < upgradeVersion
-    -- Run the upgrade
-    then upgrade
+  -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
+  ----------------------------------------------------------------------------------------
+  ------- SET CURRENT VERSION
+  ----------------------------------------------------------------------------------------
+  if installedVersion < pdrVersion
+    then liftAff $ idbSet "CurrentPDRVersion" (unsafeToForeign pdrVersion)
     else pure unit
 
-addFixingUpdates :: Aff Unit
-addFixingUpdates = pure unit
+runUpgrade :: PDRVersion -> PDRVersion -> MonadPerspectives Unit -> MonadPerspectives Unit
+runUpgrade installedVersion upgradeVersion upgrade = if installedVersion < upgradeVersion && upgradeVersion <= pdrVersion
+  -- Run the upgrade
+  then upgrade
+  else pure unit
+
+addFixingUpdates :: MonadPerspectives Unit
+addFixingUpdates = do
+  db <- entitiesDatabaseName
+  setFiller2FilledView db
+  setFilled2FillerView db
+  setContext2RoleView db
+  setRole2ContextView db
 

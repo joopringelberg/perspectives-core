@@ -52,6 +52,7 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Authenticate (getPrivateKey)
 import Perspectives.CoreTypes (IndexedResource(..), IntegrityFix(..), JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
+import Perspectives.DataUpgrade (runDataUpgrades)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -134,6 +135,9 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
         brokerService 
         indexedResourceToCreate
         missingResource
+
+      -- Start by running data upgrades.
+      runPerspectivesWithState runDataUpgrades state
       
       -- Fork aff to capture transactions to run.
       void $ forkAff $ forkTimedTransactions transactionWithTiming state
@@ -423,7 +427,7 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
     Right (pouchdbUser :: PouchdbUser) -> do
       -- Set the current PDR version.
       idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
-      
+
       transactionFlag <- new 0
       brokerService <- empty
       transactionWithTiming <- empty
@@ -439,6 +443,7 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
         brokerService 
         indexedResourceToCreate 
         missingResource
+      
       -- Fork aff to load models just in time.
       void $ forkAff $ forkJustInTimeModelLoader modelToLoad state
       -- Fork aff to save to the database

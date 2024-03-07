@@ -472,6 +472,9 @@ derive newtype instance ReadForeign DesignDocument
 -----------------------------------------------------------
 -- ADDVIEWTODATABASE
 -----------------------------------------------------------
+-- | Adding a view leaves the indices already built for views that had been added before, intact.
+-- | If a new definition is given for a view, its index will be rebuilt.
+-- | A new definition for a view with the same viewname just replaces the original definition in the document.
 addViewToDatabase :: forall f. DatabaseName -> DocumentName -> ViewName -> View -> MonadPouchdb f Revision_
 addViewToDatabase dbName docname viewname view = do
   (mddoc :: Maybe DesignDocument) <- tryGetDocument_ dbName ("_design/" <> docname)
