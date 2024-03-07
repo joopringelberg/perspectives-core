@@ -30,7 +30,7 @@ import Perspectives.ModelDependencies (bodiesWithAccountsModelName, couchdbManag
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SetupCouchdb (setContextFromRoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFilledRolesView, setFillerRoleView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView, setRolesFromContextView)
+import Perspectives.SetupCouchdb (setContext2RoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView, setRole2ContextView)
 import Prelude (Unit, bind, discard, void, ($), (>>=))
 
 modelDirectory :: String
@@ -47,10 +47,10 @@ setupUser = do
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
-  entitiesDatabaseName >>= setFilledRolesView
-  entitiesDatabaseName >>= setFillerRoleView
-  entitiesDatabaseName >>= setContextFromRoleView
-  entitiesDatabaseName >>= setRolesFromContextView
+  entitiesDatabaseName >>= setFiller2FilledView
+  entitiesDatabaseName >>= setFilled2FillerView
+  entitiesDatabaseName >>= setContext2RoleView
+  entitiesDatabaseName >>= setRole2ContextView
 
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView 
@@ -65,10 +65,10 @@ reSetupUser = do
   entitiesDatabaseName >>= setPendingInvitationView
   entitiesDatabaseName >>= setContextView
   entitiesDatabaseName >>= setCredentialsView
-  entitiesDatabaseName >>= setFilledRolesView
-  entitiesDatabaseName >>= setFillerRoleView
-  entitiesDatabaseName >>= setContextFromRoleView
-  entitiesDatabaseName >>= setRolesFromContextView
+  entitiesDatabaseName >>= setFiller2FilledView
+  entitiesDatabaseName >>= setFilled2FillerView
+  entitiesDatabaseName >>= setContext2RoleView
+  entitiesDatabaseName >>= setRole2ContextView
   DomeinFile {referredModels} <- getDomeinFile (DomeinFileId systemModelName)
   -- INSTALLATION / MODEL DEPENDENCY HERE: we assume these models will have been installed.
   void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser)

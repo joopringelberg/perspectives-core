@@ -30,7 +30,7 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.State (State, execState, modify)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (cons, filter, foldl, head, union)
+import Data.Array (catMaybes, cons, filter, foldl, head, union)
 import Data.Array (union, delete) as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -47,7 +47,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Aff.AVar (read)
+import Effect.Aff.AVar (tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
@@ -103,7 +103,7 @@ import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceTy
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
-import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContextFromRoleView, setContextView, setCredentialsView, setFilledRolesView, setFillerRoleView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRolesFromContextView)
+import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContext2RoleView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRole2ContextView)
 import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -129,7 +129,7 @@ roleInstancesFromCouchdb roleTypes _ = try
         instancesInCache <- lift (do
           cache <- roleCache
           cachedRoleAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
-          cachedRoles <- lift $ traverse read cachedRoleAvars
+          cachedRoles <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
           pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType rt) cachedRoles
           )
         pure $ instancesInCouchdb `union` instancesInCache)    
@@ -146,7 +146,7 @@ contextInstancesFromCouchdb contextTypeArr _ = try
         instancesInCache <- lift (do
           cache <- contextCache
           cachedContextAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
-          cachedContexts <- lift $ traverse read cachedContextAvars
+          cachedContexts <- catMaybes <$> (lift $ traverse tryRead cachedContextAvars)
           pure $ context_id <$> filter (contextViewFilter $ ContextType ct) cachedContexts
           )
         pure $ instancesInCouchdb `union` instancesInCache)
@@ -160,7 +160,7 @@ pendingInvitations _ = try
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
-      cachedRoles <- lift $ traverse read cachedRoleAvars
+      cachedRoles <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType DEP.invitation) cachedRoles
       )
     pure $ filledRolesInDatabase `union` filledRolesInCache)
@@ -642,10 +642,10 @@ createEntitiesDatabase databaseUrls databaseNames _ = try
         setPendingInvitationView dbName
         setContextView dbName
         setCredentialsView dbName
-        setFilledRolesView dbName
-        setFillerRoleView dbName
-        setContextFromRoleView dbName
-        setRolesFromContextView dbName
+        setFiller2FilledView dbName
+        setFilled2FillerView dbName
+        setContext2RoleView dbName
+        setRole2ContextView dbName
         )
     _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#CreateEntitiesDatabase"

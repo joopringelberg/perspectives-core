@@ -46,7 +46,7 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
-import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, getFilledRolesFromDatabase_, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, filler2filledFromDatabase_, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -211,7 +211,7 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
           lift $ addBinding "currentcontext" [unwrap cid]
           -- TODO. add binding for "currentobject" or "currentsubject"?!
           -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
-          catchError (evaluateRoleState roleId stateId)
+          catchError (evaluateRoleState roleId stateId) 
             \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
           lift $ restoreFrame oldFrame
       -- If the new transaction is not empty, run again.
@@ -495,5 +495,5 @@ detectPublicStateChanges = do
   where 
     f :: RoleInstance -> MonadPerspectivesTransaction Unit 
     f rid = do 
-      (candidates :: Array RoleInstance) <- lift $ getFilledRolesFromDatabase_ rid 
+      (candidates :: Array RoleInstance) <- lift $ filler2filledFromDatabase_ rid 
       for_ candidates (flip reEvaluatePublicFillerChanges rid)

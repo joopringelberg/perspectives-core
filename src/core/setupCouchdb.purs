@@ -214,65 +214,65 @@ setCredentialsView dbname = void $ addViewToDatabase dbname "defaultViews" "cred
 foreign import credentials :: String
 
 -----------------------------------------------------------
--- THE VIEW 'FILLEDROLESVIEW'
+-- THE VIEW 'FILLER2FILLEDVIEW'
 -- This view is a table [filler;filled]
 -- Use it by selecting on filler to obtain those roles that are filled by it.
 -----------------------------------------------------------
-setFilledRolesView :: forall f. String -> MonadPouchdb f Unit
-setFilledRolesView dbname = void $ addViewToDatabase dbname "defaultViews" "filledRolesView" ({map: filledRoles, reduce: Nothing})
+setFiller2FilledView :: forall f. String -> MonadPouchdb f Unit
+setFiller2FilledView dbname = void $ addViewToDatabase dbname "defaultViews" "filler2filledView" ({map: filler2filledView, reduce: Nothing})
 
 -- | Import the view definition as a String.
-foreign import filledRoles :: String
+foreign import filler2filledView :: String
 
 -- | Does the RoleInstance instance fill the PerspectRol?
-filledRolesFilter :: RoleInstance -> PerspectRol -> Boolean
-filledRolesFilter rid role = Just rid == rol_binding role 
+filler2filledFilter :: RoleInstance -> PerspectRol -> Boolean
+filler2filledFilter rid role = Just rid == rol_binding role 
 
 -----------------------------------------------------------
 -- THE VIEW 'FILLERROLEVIEW'
--- This view is a table [filled;filler]
+-- This view is a table [filled; {filler, filledContextType, filledRoleType}].
 -- Use it by selecting on filled to obtain the role that fills it.
 -----------------------------------------------------------
-setFillerRoleView :: forall f. String -> MonadPouchdb f Unit
-setFillerRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "fillerRoleView"
-  ({map: fillerRole, reduce: Nothing})
+setFilled2FillerView :: forall f. String -> MonadPouchdb f Unit
+setFilled2FillerView dbname = void $ addViewToDatabase dbname "defaultViews" "filled2fillerView"
+  ({map: filled2fillerView, reduce: Nothing})
 
-foreign import fillerRole :: String
+foreign import filled2fillerView :: String
 
 -- | Is the RoleInstance filled by the PerspectRol?
-fillerRoleFilter :: RoleInstance -> PerspectRol -> Boolean
-fillerRoleFilter rid role = unwrap (foldMap
+filled2fillerFilter :: RoleInstance -> PerspectRol -> Boolean
+filled2fillerFilter rid role = unwrap (foldMap
     (\ctype filleds -> foldMap 
       (\rtype filleds' -> Disj $ isJust $ elemIndex rid filleds')
       filleds)
     (rol_gevuldeRollen role))
 
 -----------------------------------------------------------
--- THE VIEW 'CONTEXTFROMROLEVIEW'
--- This view is a table [role;context]
--- Use it by selecting on role to obtain its context.
+-- THE VIEW 'CONTEXT2ROLEVIEW'
+-- This view is a table [context;role]
+-- Use it by selecting on context to obtain its roles.
 -----------------------------------------------------------
-setContextFromRoleView :: forall f. String -> MonadPouchdb f Unit
-setContextFromRoleView dbname = void $ addViewToDatabase dbname "defaultViews" "contextFromRoleView"
-  ({map: contextFromRole, reduce: Nothing})
+setContext2RoleView :: forall f. String -> MonadPouchdb f Unit
+setContext2RoleView dbname = void $ addViewToDatabase dbname "defaultViews" "context2RoleView"
+  ({map: context2roleView, reduce: Nothing})
 
-foreign import contextFromRole :: String
+foreign import context2roleView :: String
 
-contextFromRoleFilter :: RoleInstance -> PerspectContext -> Boolean
-contextFromRoleFilter rid context = unwrap (foldMap
+context2RoleFilter :: RoleInstance -> PerspectContext -> Boolean
+context2RoleFilter rid context = unwrap (foldMap
   (\rtype roles -> Disj $ isJust $ elemIndex rid roles)
   (context_iedereRolInContext context))
 
 -----------------------------------------------------------
--- THE VIEW 'ROLESFROMCONTEXTVIEW'
--- This view is a table [context; role]
--- Use it by selecting on context to obtain its roles.
+-- THE VIEW 'ROLE2CONTEXTVIEW'
+-- This view is a table [role; context]
+-- Use it by selecting on role to obtain its context.
 -----------------------------------------------------------
-setRolesFromContextView :: forall f. String -> MonadPouchdb f Unit
-setRolesFromContextView dbname = void $ addViewToDatabase dbname "defaultViews" "rolesFromContextView"
-  ({map: rolesFromContext, reduce: Nothing})
+setRole2ContextView :: forall f. String -> MonadPouchdb f Unit
+setRole2ContextView dbname = void $ addViewToDatabase dbname "defaultViews" "role2ContextView"
+  ({map: role2contextView, reduce: Nothing})
 
-foreign import rolesFromContext :: String
+foreign import role2contextView :: String
 
-rolesFromContextFilter :: ContextInstance -> PerspectRol -> Boolean
-rolesFromContextFilter cid prol = cid == rol_context prol
+role2ContextFilter :: ContextInstance -> PerspectRol -> Boolean
+role2ContextFilter cid prol = cid == rol_context prol

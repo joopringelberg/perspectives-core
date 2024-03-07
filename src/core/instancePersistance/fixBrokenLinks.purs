@@ -40,25 +40,28 @@ where
 import Prelude
 
 import Control.Monad.Error.Class (try)
-import Data.Array (delete)
+import Control.Monad.Writer (execWriterT, lift, tell)
+import Data.Array (concat, delete)
 import Data.Maybe (Maybe(..))
-import Data.Traversable (for_)
+import Data.Traversable (for, for_)
 import Foreign.Object (mapWithKey)
 import Perspectives.Assignment.Update (cacheAndSave, deleteProperty)
-import Perspectives.ContextAndRole (changeContext_me, context_me, removeRol_gevuldeRollen)
-import Perspectives.CoreTypes (MonadPerspectives, ResourceToBeStored(..))
-import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
+import Perspectives.ContextAndRole (changeContext_me, context_me, removeRol_gevuldeRollen, rol_binding, rol_gevuldeRollen, setRol_gevuldeRollen)
+import Perspectives.ContextStateCompiler (evaluateContextState)
+import Perspectives.CoreTypes (MonadPerspectives, ResourceToBeStored(..), MonadPerspectivesTransaction)
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError')
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol)
-import Perspectives.Instances.ObjectGetters (getContextFromDatabase_, getContextRolesFromDatabase_, getFilledRolesFromDatabase_, getFillerFromDatabase_, getRoleOnClipboard)
+import Perspectives.Instances.ObjectGetters (context2roleFromDatabase_, contextType_, filled2fillerFromDatabase_, filler2filledFromDatabase_, getRoleOnClipboard, role2contextFromDatabase_, roleType_)
 import Perspectives.ModelDependencies (cardClipBoard, sysUser)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveMarkedResources)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
-import Perspectives.RoleAssignment (filledNoLongerPointsTo)
+import Perspectives.RoleAssignment (filledNoLongerPointsTo) as RA
+import Perspectives.RoleStateCompiler (evaluateRoleState)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary)
-import Perspectives.SaveUserData (severeBindingLinks)
+import Perspectives.Types.ObjectGetters (contextGroundState, roleGroundState)
 
 fixReferences :: ResourceToBeStored -> MonadPerspectives Unit
 fixReferences (Ctxt cid) = fixContextReferences cid
@@ -75,13 +78,36 @@ fixContextReferences cid = do
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
   saveMarkedResources
-  referringRoles <- getContextRolesFromDatabase_ cid
-  for_ referringRoles \roleId -> (try $ (getPerspectRol roleId)) >>= handlePerspectRolError "fixContextReferences"
+  -- These are roles that refer to the missing context as their context. They must be removed.
+  referringRoles <- context2roleFromDatabase_ cid
+  rolesToEvaluate <- concat <$> for referringRoles \roleId -> (try $ (getPerspectRol roleId)) >>= handlePerspectRolError' "fixContextReferences" []
     \role -> do
-      severeBindingLinks role
+      -- The role that possibly refers to it as one that it fills, loses that reference.
+      affectedRoles <- execWriterT do 
+        case rol_binding role of 
+          Nothing -> pure unit
+          Just filler -> do 
+            lift (filler `fillerNoLongerPointsTo_` roleId)
+            tell [filler]
+        -- And any roles filled by roleId must no longer refer to it as their filler (binding).
+        for_ (rol_gevuldeRollen role) \roleMap ->
+          for_ roleMap (\filledRoles' ->
+            for_ filledRoles' \filled -> do 
+              lift (filled `RA.filledNoLongerPointsTo` roleId)
+              tell [filled])
       -- PERSISTENCE (finally remove the role instance from cache and database).
-      removeEntiteit roleId
+      void $ removeEntiteit roleId
+      pure affectedRoles
+  -- Now recompute the states of these roles.
+  runEmbeddedIfNecessary doNotShareWithPeers (ENR $ EnumeratedRoleType sysUser)
+    (for_ rolesToEvaluate reEvaluateRoleStates)
   saveMarkedResources
+
+reEvaluateRoleStates :: RoleInstance -> MonadPerspectivesTransaction Unit
+reEvaluateRoleStates rid = (lift $ roleType_ rid) >>= evaluateRoleState rid <<< roleGroundState
+
+reEvaluateContextStates :: ContextInstance -> MonadPerspectivesTransaction Unit
+reEvaluateContextStates cid = (lift $ contextType_ cid) >>= evaluateContextState cid <<< contextGroundState
 
 -- | Apply this function when a reference to a role has been found that cannot be retrieved.
 -- | All references from other roles and from its context must be removed.
@@ -90,19 +116,25 @@ fixRoleReferences roleId = do
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
   saveMarkedResources
-  ctxts <- getContextFromDatabase_ roleId
+  ctxts <- role2contextFromDatabase_ roleId
   -- If the role type is unlinked, we will find no contexts.
   for_ ctxts removeRoleInstanceFromContext
   -- Retrieve all roles that still refer to roleId as their filler.
-  filledRoles <- getFilledRolesFromDatabase_ roleId
+  filledRoles <- filler2filledFromDatabase_ roleId
   -- Remove this role from all other roles that point to it as their filler.
-  for_ filledRoles (flip filledNoLongerPointsTo roleId)
+  for_ filledRoles (flip RA.filledNoLongerPointsTo roleId)
   --- Retrieve the filler that still refers to roleId.
-  fillerRoles <- getFillerFromDatabase_ roleId
+  fillerRoles <- filled2fillerFromDatabase_ roleId
   for_ fillerRoles 
-    \({filler, filledContextType, filledRoleType}) ->  (fillerNoLongerPointsTo filler roleId filledContextType filledRoleType)
+    \({filler, filledContextType, filledRoleType}) -> (fillerNoLongerPointsTo filler roleId filledContextType filledRoleType)
   -- Now check the clipboard. It may hold a reference to the role that can no longer be found.
   clearClipboard
+  -- Now recompute the states of these roles.
+  runEmbeddedIfNecessary doNotShareWithPeers (ENR $ EnumeratedRoleType sysUser)
+    (do 
+      for_ (filledRoles <> (_.filler <$> fillerRoles)) reEvaluateRoleStates
+      for_ ctxts reEvaluateContextStates
+    )
   saveMarkedResources
 
   where
@@ -135,12 +167,29 @@ fixRoleReferences roleId = do
             (deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard))
         else pure unit
 
-  -- This version only changes the administration in the filler; the full version in Perspectives.RoleAssignment changes both sides.
-  fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> ContextType -> EnumeratedRoleType -> MonadPerspectives Unit
-  fillerNoLongerPointsTo fillerId filledId filledContextType filledRoleType = (try $ getPerspectRol fillerId) >>=
-    handlePerspectRolError' "fillerNoLongerPointsTo" unit
-      \(filler :: PerspectRol) -> do
-        filler' <- pure $ (removeRol_gevuldeRollen filler filledContextType filledRoleType filledId)
-        cacheAndSave fillerId filler'
+-- This version only changes the administration in the filler; the full version in Perspectives.RoleAssignment changes both sides.
+fillerNoLongerPointsTo :: RoleInstance -> RoleInstance -> ContextType -> EnumeratedRoleType -> MonadPerspectives Unit
+fillerNoLongerPointsTo fillerId filledId filledContextType filledRoleType = (try $ getPerspectRol fillerId) >>=
+  handlePerspectRolError' "fillerNoLongerPointsTo" unit
+    \(filler :: PerspectRol) -> do
+      filler' <- pure $ (removeRol_gevuldeRollen filler filledContextType filledRoleType filledId)
+      cacheAndSave fillerId filler'
+
+fillerNoLongerPointsTo_ :: RoleInstance -> RoleInstance -> MonadPerspectives Unit
+fillerNoLongerPointsTo_ fillerId filledId = (try $ getPerspectRol fillerId) >>=
+  handlePerspectRolError' "fillerNoLongerPointsTo_" unit
+    \(filler :: PerspectRol) -> do
+      -- As the context of the filled role has been deleted, we cannot establish its type.
+      -- Instead of indexing, we have to filter the entire structure in search of fillerId.
+      cacheAndSave 
+        fillerId
+        (setRol_gevuldeRollen 
+          filler
+          (mapWithKey 
+            (\ctype typeGroup -> mapWithKey 
+              (\rtype filleds -> delete filledId filleds)
+              typeGroup)
+            (rol_gevuldeRollen filler)))
+
 
 

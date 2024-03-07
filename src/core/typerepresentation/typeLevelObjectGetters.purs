@@ -800,3 +800,12 @@ getContextAction actionName userRoleType = do
       Nothing -> OBJ.lookup actionName stateDepActions)
     Nothing
     (Map.values stateActionMap)
+
+----------------------------------------------------------------------------------------
+------- FUNCTIONS FOR STATES
+----------------------------------------------------------------------------------------
+roleGroundState :: EnumeratedRoleType -> StateIdentifier
+roleGroundState (EnumeratedRoleType id) = StateIdentifier id
+
+contextGroundState :: ContextType -> StateIdentifier
+contextGroundState (ContextType id) = StateIdentifier id

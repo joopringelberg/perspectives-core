@@ -68,7 +68,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
-import Perspectives.SetupCouchdb (contextFromRoleFilter, filledRolesFilter, fillerRoleFilter, roleFromContextFilter, rolesFromContextFilter)
+import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
 import Prelude (class Show, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
 
@@ -279,43 +279,43 @@ getAllFilledRoles rid = (try $ getPerspectRol rid) >>=
 -- | Is especially useful for a public filler, as that carries no inverse administration of the (private) roles it fills.
 getFilledRolesFromDatabase :: RoleInstance ~~> RoleInstance
 getFilledRolesFromDatabase rid = ArrayT $ try 
-  (lift $ getFilledRolesFromDatabase_ rid)
+  (lift $ filler2filledFromDatabase_ rid)
   >>=
   handlePerspectRolError' "getFilledRolesFromDatabase" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Filler rid]) *> pure roles
 
 -- | Select by providing a filler and retrieve all roles that still refer to it as their filler.
 -- | Only useful when the filler itself can no longer be retrieved.
-getFilledRolesFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInstance)
-getFilledRolesFromDatabase_ rid = try 
+filler2filledFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInstance)
+filler2filledFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filledRolesView" (Just $ unwrap rid)
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Just $ unwrap rid)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
-      pure $ rol_id <$> filter (filledRolesFilter rid) cachedRoles
+      pure $ rol_id <$> filter (filler2filledFilter rid) cachedRoles
       )
     pure $ filledRolesInDatabase `union` filledRolesInCache
   )
   >>=
-  handlePerspectRolError' "getFilledRolesFromDatabase_" []
+  handlePerspectRolError' "filler2filledFromDatabase_" []
     \(roles :: Array RoleInstance) -> pure roles
 
 -- | Select by providing a filled and retrieve the filler that still refers to it.
 -- | Only useful when the filled itself can no longer be retrieved.
-getFillerFromDatabase_ :: RoleInstance -> MonadPerspectives (Array FillerInfo)
-getFillerFromDatabase_ rid = try 
+filled2fillerFromDatabase_ :: RoleInstance -> MonadPerspectives (Array FillerInfo)
+filled2fillerFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    fillerRolesInDatabase :: Array FillerInfo <- getViewOnDatabase db "defaultViews/fillerRoleView" (Just $ unwrap rid)
+    fillerRolesInDatabase :: Array FillerInfo <- getViewOnDatabase db "defaultViews/filled2fillerView" (Just $ unwrap rid)
     fillerRoleInCache :: Array FillerInfo <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       -- There may be empty AVars.
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
-      for (filter (fillerRoleFilter rid) cachedRoles)
+      for (filter (filled2fillerFilter rid) cachedRoles)
         (\(PerspectRol{id, pspType, context:cid}) -> do
           filledContextType <- contextType_ cid 
           pure {filler: id, filledRoleType: pspType, filledContextType}) 
@@ -323,42 +323,42 @@ getFillerFromDatabase_ rid = try
     pure $ fillerRolesInDatabase `union` fillerRoleInCache
   )
   >>=
-  handlePerspectRolError' "getFillerFromDatabase_" []
+  handlePerspectRolError' "filled2fillerFromDatabase_" []
     \(infos :: Array FillerInfo) -> pure infos
 
 type FillerInfo = {filler :: RoleInstance, filledContextType :: ContextType, filledRoleType :: EnumeratedRoleType}
 
 -- | Select by providing a role and retrieve the context that (still) refers to it.
 -- | Only useful when the role itself can no longer be retrieved.
-getContextFromDatabase_ :: RoleInstance -> MonadPerspectives (Array ContextInstance)
-getContextFromDatabase_ rid = try 
+role2contextFromDatabase_ :: RoleInstance -> MonadPerspectives (Array ContextInstance)
+role2contextFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    contextInDatabase :: Array ContextInstance <- getViewOnDatabase db "defaultViews/contextFromRoleView" (Just $ unwrap rid)
+    contextInDatabase :: Array ContextInstance <- getViewOnDatabase db "defaultViews/role2ContextView" (Just $ unwrap rid)
     contextInCache :: Array ContextInstance <- (do 
       cache <- contextCache
       cachedContextAvars :: Array (AVar IP.PerspectContext) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       cachedContexts :: Array IP.PerspectContext <- catMaybes <$> (lift $ traverse tryRead cachedContextAvars)
-      pure $ context_id <$> filter (contextFromRoleFilter rid) cachedContexts
+      pure $ context_id <$> filter (context2RoleFilter rid) cachedContexts
       )
     pure $ contextInDatabase `union` contextInCache
   )
   >>=
-  handlePerspectContextError' "getContextFromDatabase_" []
+  handlePerspectContextError' "role2contextFromDatabase_" []
     \(contexts :: Array ContextInstance) -> pure contexts
 
 -- | Select by providing a context and retrieve all roles that still refer to it as their context.
 -- | Only useful when the context itself can no longer be retrieved.
-getContextRolesFromDatabase_ :: ContextInstance -> MonadPerspectives (Array RoleInstance)
-getContextRolesFromDatabase_ cid = try 
+context2roleFromDatabase_ :: ContextInstance -> MonadPerspectives (Array RoleInstance)
+context2roleFromDatabase_ cid = try 
   (do
     db <- entitiesDatabaseName
-    contextRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/rolesFromContextView" (Just $ unwrap cid)
+    contextRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/context2RoleView" (Just $ unwrap cid)
     contextRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
-      pure $ rol_id <$> filter (rolesFromContextFilter cid) cachedRoles
+      pure $ rol_id <$> filter (role2ContextFilter cid) cachedRoles
       )
     pure $ contextRolesInDatabase `union` contextRolesInCache
   )

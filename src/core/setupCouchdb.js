@@ -102,7 +102,7 @@ exports.contextSpecialisations = (function( doc )
 
 // This view is a table [filler; filled]
 // Use it by selecting on filler to obtain those roles that are filled by it.
-exports.filledRoles = (function(filled)
+exports.filler2filledView = (function(filled)
   {
     // a proxy for being a role:
     if (filled.universeRoleDelta)
@@ -111,9 +111,9 @@ exports.filledRoles = (function(filled)
     }
   }).toString();
 
-// This view is a table [filled; filler].
+// This view is a table [filled; {filler, filledContextType, filledRoleType}].
 // Use it by selecting on filled to obtain the role that fills it.
-exports.fillerRole = (function(filler)
+exports.filled2fillerView = (function(filler)
 {
   // a proxy for being a role:
   if (filler.universeRoleDelta)
@@ -136,20 +136,20 @@ exports.fillerRole = (function(filler)
   }
 }).toString();
 
-// This view is a table [role; context].
+// This view is a table [context; role].
 // Use it by selecting on role to obtain its context.
-exports.contextFromRole = (function(role)
+exports.context2roleView = (function(role)
 {
   // a proxy for being a role:
   if (role.universeRoleDelta)
   {
-    emit( role.id, role.context);
+    emit( role.context, role.id);
   }
 }).toString()
 
-// This view is a table [context; role]
+// This view is a table [role; context]
 // Use it by selecting on context to obtain its roles.
-exports.rolesFromContext = (function(context)
+exports.role2contextView = (function(context)
 {
   // a proxy for being a context.
   if (context.universeContextDelta)
@@ -159,7 +159,7 @@ exports.rolesFromContext = (function(context)
       {
         roles.forEach( function(role)
         {
-          emit(context.id, role);
+          emit(role, context.id);
         })
       }
     );
