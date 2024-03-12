@@ -1,0 +1,32 @@
+initial,
+Initialize:
+  entry/ User becomes AccountHolder,
+CanRegister:
+  entry/ Registered = rabbit:SelfRegister,
+Registered:
+  entry/Set: 
+  - UseExpiresOn 
+  - GracePeriodExpiresOn
+  - TerminatesOn
+{
+  ExpiresSoon:
+    entry/ Notify AccountHolder,
+  Suspended:
+    entry/ Notify AccountHolder, 
+  Terminated,
+  ExtensionPending;
+
+  Registered => ExpiresSoon: [CurrentDate > UseExpiresSoon];
+  ExpiresSoon => Suspended: [CurrentDate > GracePeriodEndsOn];
+  Suspended => Terminated: [CurrentDate > TerminatesOn];
+  Registered => ExtensionPending;
+  ExtensionPending => Registered;
+};
+
+initial => Initialize;
+Initialize => CanRegister: User fills Administrator [exists AccountHolder && exists Administrator];
+# This is an automatic transition 
+# as Registered is computed on entry 
+# of CanRegister.
+CanRegister => Registered: [Registered];
+

@@ -33,7 +33,7 @@
 
 
 -- END LICENSE
-module Perspectives.ReferentialIntegrity  
+module Perspectives.ReferentialIntegrity
   (fixReferences)
 where
 
@@ -44,6 +44,7 @@ import Control.Monad.Writer (execWriterT, lift, tell)
 import Data.Array (concat, delete)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for, for_)
+import Effect.Class.Console (log)
 import Foreign.Object (mapWithKey)
 import Perspectives.Assignment.Update (cacheAndSave, deleteProperty)
 import Perspectives.ContextAndRole (changeContext_me, context_me, removeRol_gevuldeRollen, rol_binding, rol_gevuldeRollen, setRol_gevuldeRollen)
@@ -75,6 +76,7 @@ fixReferences (Dfile did) = pure unit
 -- | Notice that we do not synchronize the changes.
 fixContextReferences :: ContextInstance -> MonadPerspectives Unit
 fixContextReferences cid = do
+  log ("fixContextReferences: " <> show cid)
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
   saveMarkedResources
@@ -113,6 +115,8 @@ reEvaluateContextStates cid = (lift $ contextType_ cid) >>= evaluateContextState
 -- | All references from other roles and from its context must be removed.
 fixRoleReferences :: RoleInstance -> MonadPerspectives Unit
 fixRoleReferences roleId = do
+  log ("fixRoleReferences: " <> show roleId)
+
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
   saveMarkedResources

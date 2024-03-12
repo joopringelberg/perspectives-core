@@ -20,10 +20,10 @@
 
 -- END LICENSE
 
--- | A 'data-upgrade' is a procudure that is carried out on stored data of an installation, in order to ensure
+-- | A 'data-upgrade' is a procedure that is carried out on stored data of an installation, in order to ensure
 -- | that they can be handled by a new version of the PDR.
 
-module Perspectives.DataUpgrade  where
+module Perspectives.DataUpgrade where
 
 
 import Prelude

@@ -64,13 +64,13 @@ import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, delete, elemIndex)
 import Data.Either (Either)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, isNothing, maybe)
 import Data.MediaType (MediaType)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Effect.Aff.AVar (AVar, put, read, take)
+import Effect.Aff.AVar (AVar, put, read, take, tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Persistence.Attachment (class Attachment)
@@ -173,40 +173,43 @@ tryRemoveEntiteit entId = do
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
 fetchEntiteit :: forall a i. Attachment a => Persistent a i => Boolean -> i -> MonadPerspectives a
-fetchEntiteit tryToFix id = ensureAuthentication (Resource $ unwrap id) $ \_ -> catchError
-  do
-    v <- representInternally id
+fetchEntiteit tryToFix id = ensureAuthentication (Resource $ unwrap id) $ \_ -> 
+  do 
+  v <- representInternally id
+  catchError
+    do
+      {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
+      doc <- getDocument database documentName
+      -- Returns either the local database name or a URL.
+      lift $ put doc v
+      pure doc
 
-    {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
-    doc <- getDocument database documentName
-
-    -- Returns either the local database name or a URL.
-    -- dbName <- dbLocalName id
-    -- doc <- getDocument dbName (couchdbResourceIdentifier $ unwrap id)
-    lift $ put doc v
-    pure doc
-
-  \e -> do
-    if test decodingErrorRegex (show e)
-      then logPerspectivesError (Custom ("fetchEntiteit: failed to decode resource " <> unwrap id <> ". Parser message: " <> show e))
-      -- Try to fix referential integrity
-      else if tryToFix
-        then do 
-          logPerspectivesError 
-            (Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb: " <> show e))
-          missingResourceAVar <- getMissingResource
-          liftAff $ put (Missing $ typeOfInstance id) missingResourceAVar
-          response <- liftAff $ take missingResourceAVar
-          case response of 
-            FixingHotLine av -> do 
-              result <- liftAff $ take av
-              case result of 
-                FixFailed s -> logPerspectivesError (Custom "fetchEntiteit: cannot fix references.")
-                FixSucceeded -> logPerspectivesError (Custom "fetchEntiteit: succesfully removed all references to missing resource.")
-                _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
-            _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
+    \e -> do
+      if test decodingErrorRegex (show e)
+        then logPerspectivesError (Custom ("fetchEntiteit: failed to decode resource " <> unwrap id <> ". Parser message: " <> show e))
+        -- Try to fix referential integrity
+        else if tryToFix
+          then do 
+            logPerspectivesError 
+              (Custom ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb: " <> show e))
+            missingResourceAVar <- getMissingResource
+            liftAff $ put (Missing $ typeOfInstance id) missingResourceAVar
+            response <- liftAff $ take missingResourceAVar
+            case response of 
+              FixingHotLine av -> do 
+                result <- liftAff $ take av
+                case result of 
+                  FixFailed s -> logPerspectivesError (Custom "fetchEntiteit: cannot fix references.")
+                  FixSucceeded -> logPerspectivesError (Custom "fetchEntiteit: succesfully removed all references to missing resource.")
+                  _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
+              _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
+          else pure unit
+      -- Do not leave an empty AVar.
+      me <- lift $ tryRead v
+      if isNothing me
+        then void $ removeInternally id
         else pure unit
-    throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb.")
+      throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb.")
   where
     decodingErrorRegex :: Regex
     decodingErrorRegex = unsafeRegex "error in decoding result" noFlags

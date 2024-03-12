@@ -117,7 +117,7 @@ retrieveDomeinFile domeinFileId@(DomeinFileId modelUri) = tryGetPerspectEntiteit
     modelToLoadAVar <- getModelToLoad
     liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
     result <- liftAff $ take modelToLoadAVar
-    -- Now the forking process waits (blocks) untiel retrieveFromDomeinFile fills it with another LoadModel request.
+    -- Now the forking process waits (blocks) until retrieveFromDomeinFile fills it with another LoadModel request.
     case result of 
       -- We now take up communication with the forked process that actually loads the model:
       HotLine hotline -> do 
