@@ -33,14 +33,14 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService)
 import Perspectives.AMQP.RabbitMQManagement (AdminPassword, AdminUserName, BrokerServiceUrl, QueueName, createBinding, createUser, deleteQueue, deleteUser, runRabbitState', selfRegisterWithRabbitMQ_, setPermissions, virtualHost)
-import Perspectives.CoreTypes (MonadPerspectivesTransaction)
-import Perspectives.Error.Boundaries (handleExternalStatementError)
+import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectivesQuery)
+import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>), (>>=))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>), (>>=), (*>))
 import Unsafe.Coerce (unsafeCoerce)
 
 type AccountName = String
@@ -93,7 +93,7 @@ selfRegisterWithRabbitMQ ::
   Array AccountPassword ->
   Array QueueName -> 
   RoleInstance ->
-  MonadPerspectivesTransaction Unit
+  MonadPerspectivesQuery Boolean
 selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
   (case 
       head url_, 
@@ -101,12 +101,12 @@ selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
       head accountPassword_, 
       head queueName_ of
     Just brokerServiceUrl, Just userName, Just password, Just queueName -> do
-      r <- try $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
+      r <- try $ lift $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
       case r of 
-        Left e -> logPerspectivesError $ Custom $ show e
-        Right _ -> pure unit
+        Left e -> (logPerspectivesError $ Custom $ show e) *> pure false
+        Right _ -> pure true
     _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount.")
-  >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ"
+  >>= handleExternalFunctionError "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ"
 
 
 -- | Creates the binding between a user identifier and a queue, so peers can push transactions
@@ -200,7 +200,18 @@ setPermissionsForAMQPaccount ::
   Array QueueName ->
   RoleInstance ->
   MonadPerspectivesTransaction Unit
-setPermissionsForAMQPaccount url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = try
+setPermissionsForAMQPaccount = setPermissionsForAMQPaccount_ \queueName -> {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
+
+setPermissionsForAMQPaccount_ ::
+  (String -> {configure :: String, write :: String, read :: String}) ->
+  Array BrokerServiceUrl -> 
+  Array AdminUserName -> 
+  Array AdminPassword -> 
+  Array AccountName -> 
+  Array QueueName ->
+  RoleInstance ->
+  MonadPerspectivesTransaction Unit
+setPermissionsForAMQPaccount_ permissionsf url_ adminUserName_ adminPassword_ accountName_ queueName_ _ = try
   (case 
       head url_, 
       head adminUserName_, 
@@ -209,12 +220,23 @@ setPermissionsForAMQPaccount url_ adminUserName_ adminPassword_ accountName_ que
       head queueName_ of
     Just brokerServiceUrl, Just adminUserName, Just adminPassword, Just accountName, Just queueName -> do
         r <- try $ lift $ runRabbitState' {virtualHost, brokerServiceUrl, adminUserName, adminPassword } do
-          setPermissions accountName {configure: queueName, write: queueName <> "|amq\\.topic", read: queueName <> "|amq\\.topic"}
+          setPermissions accountName (permissionsf queueName)
         case r of 
           Left e -> logPerspectivesError $ Custom $ show e
           Right _ -> pure unit
     _, _, _, _, _ -> throwError $ error "Missing some arguments in SetPermissionsForAMQPaccount.")
   >>= handleExternalStatementError "model://perspectives.domains#RabbitMQ$SetPermissionsForAMQPaccount"
+
+-- | Sets the read permissions for the Account's queue to '^$', effectively stops him from reading it.
+preventAMQPaccountFromReading ::
+  Array BrokerServiceUrl -> 
+  Array AdminUserName -> 
+  Array AdminPassword -> 
+  Array AccountName -> 
+  Array QueueName ->
+  RoleInstance ->
+  MonadPerspectivesTransaction Unit
+preventAMQPaccountFromReading = setPermissionsForAMQPaccount_ \queueName -> {configure: queueName, write: queueName <> "|amq\\.topic", read: "^$"}
 
 startListening :: RoleInstance -> MonadPerspectivesTransaction Unit
 startListening _ = try (lift retrieveBrokerService)
