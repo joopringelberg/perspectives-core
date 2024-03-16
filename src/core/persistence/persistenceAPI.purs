@@ -262,15 +262,6 @@ type PouchdbAllDocs =
 addDocument :: forall d f. Attachment d => WriteForeign d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
 addDocument dbName doc docName = withDatabase dbName
   \db -> do
-    -- Because generic encoding results in a json document having this shape:
-    -- {
-    --   "contents": {
-    --     ...
-    --     },
-    --   "tag": "PerspectRol"
-    -- }
-    -- but Couchdb needs the "id_" and "rev_" members, we have to add them here.
-    -- The same holds for attachments, if any.
     doc' <- pure $ write doc
     catchError
       do

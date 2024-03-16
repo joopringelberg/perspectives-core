@@ -64,13 +64,13 @@ import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, delete, elemIndex)
 import Data.Either (Either)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), isJust, isNothing, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Effect.Aff.AVar (AVar, put, read, take, tryRead)
+import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (Error, error)
 import Persistence.Attachment (class Attachment)
@@ -90,7 +90,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator)
 import Simple.JSON (class WriteForeign)
-
+ 
 fix :: Boolean
 fix = true
 
@@ -155,7 +155,7 @@ removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
 removeEntiteit_ entId entiteit =
   ensureAuthentication (Resource $ unwrap entId) $ \_ ->
     case (rev entiteit) of
-      Nothing -> pure entiteit
+      Nothing -> removeInternally entId *> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
         -- If on the list of items to be saved, remove!
@@ -172,15 +172,16 @@ tryRemoveEntiteit entId = do
     Just entiteit -> void $ removeEntiteit_ entId entiteit
 
 -- | Fetch the definition of a resource asynchronously. It will have the same version in cache as in Couchdb.
+-- | This function must only be called when there is no AVar in cache to represent the resource.
+-- | As an invariant side effect: there is either an AVar that holds the resource, or there is no AVar.
 fetchEntiteit :: forall a i. Attachment a => Persistent a i => Boolean -> i -> MonadPerspectives a
 fetchEntiteit tryToFix id = ensureAuthentication (Resource $ unwrap id) $ \_ -> 
-  do 
-  v <- representInternally id
   catchError
     do
       {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
       doc <- getDocument database documentName
       -- Returns either the local database name or a URL.
+      v <- representInternally id
       lift $ put doc v
       pure doc
 
@@ -204,11 +205,6 @@ fetchEntiteit tryToFix id = ensureAuthentication (Resource $ unwrap id) $ \_ ->
                   _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
               _ -> logPerspectivesError (Custom "fetchEntiteit: received unexpected message from fixer.")
           else pure unit
-      -- Do not leave an empty AVar.
-      me <- lift $ tryRead v
-      if isNothing me
-        then void $ removeInternally id
-        else pure unit
       throwError $ error ("fetchEntiteit: failed to retrieve resource " <> unwrap id <> " from couchdb.")
   where
     decodingErrorRegex :: Regex
@@ -264,9 +260,6 @@ saveCachedEntiteit entId = do
   entiteit <- takeEntiteitFromCache entId
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap $ identifier entiteit)
   (rev :: Revision_) <- addDocument database entiteit documentName
-  
-  -- -- couchdbResourceIdentifier is either a local identifier in the model:User namespace, or a segmented name (in the case of a public resource).
-  -- (rev :: Revision_) <- addDocument dbName entiteit (couchdbResourceIdentifier $ unwrap entId)
   entiteit' <- pure (changeRevision rev entiteit)
   void $ cacheEntity (identifier entiteit) entiteit'
   pure entiteit'

@@ -70,7 +70,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, contextType, getProperty, roleType, roleType_)
 import Perspectives.Instances.Values (parsePerspectivesFile, writePerspectivesFile)
 import Perspectives.Persistence.API (toFile)
-import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectRol)
+import Perspectives.Persistent (addAttachment, getPerspectContext, getPerspectRol, saveEntiteit_)
 import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
@@ -134,11 +134,11 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
               then if isDefaultContextDelta contextDelta
                 then f role pe unlinked 
                 -- Apparently we've constructed a real ContextDelta before, so do not add a second time.
-                else pure unit
+                else void $ lift $ saveEntiteit_ roleId role
 
               else (lift $ context_rolInContext pe rolName) >>= \(Tuple _ roles) -> 
                 if isJust $ elemIndex roleId roles
-                  then pure unit
+                  then void $ lift $ saveEntiteit_ roleId role
                   else f role pe unlinked
 
   where

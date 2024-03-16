@@ -95,6 +95,7 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
     --  * the verb Create, in case another role is created.
     AddRoleInstancesToContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
+      -- Takes care of PERSISTENCE of both context and role.
       Right _ -> addRoleInstanceToContext contextInstance roleType (Tuple roleInstance (Just signedDelta))
     -- NOTE: the perspective should always include the Delete verb.
     MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
@@ -210,7 +211,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                 , universeContextDelta = signedDelta
                 , states = [StateIdentifier $ unwrap contextType]
                 })
-            lift $ void $ cacheEntity id contextInstance
+            lift $ void $ saveEntiteit_ id contextInstance
             (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
             addCreatedContextToTransaction id
           else pure unit
@@ -224,6 +225,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
   case deltaType of
     ConstructEmptyRole -> do
       -- We have to check this case: a user is allowed to create himself.
+      -- The role is cached, but not saved. However, when it is added to its context, it will be saved.
       if userCreatesThemselves
         then constructAnotherRole_
         else do
@@ -236,7 +238,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- Notice that merely constructing a role has no consequences for the responsibilities
       -- QUERY UPDATES, RULE TRIGGERING, PERSISTENCE or CURRENTUSER.
       -- If roleType has the aspect model:System$RootContext$External, it can stand alone. These roles can
-      -- be created by any user and usually will be created by parsing a CRL file.
+      -- be created by any user.
+      -- PERSISTENCE is handled here.
       lift (roleType ###>> hasAspect (EnumeratedRoleType rootContext)) >>= if _
         then constructExternalRole
         else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
@@ -297,6 +300,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
             pure true
           else pure false
 
+      -- PERSISTENCE
       constructExternalRole  :: MonadPerspectivesTransaction Unit
       constructExternalRole = do
         externalRole <- pure (head $ toNonEmptyArray roleInstances)
@@ -398,6 +402,9 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 -- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
 -- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
 -- | that specific url.
+-- | As an INVARIANT, all these (public) resources are de-cached, so we ensure that they are freshly retrieved from the database prior to executing 
+-- | a delta on them. This is so we mitigate the risk of a peer having written the resource while we have an older version in cache.
+-- | However, if the resource isn't present in the database, we don't delete it from the cache.
 -- | All deltas in this transaction have either been sent to this installation and thus have been verified before, or
 -- | they are created by this installation so verification is meaningless.
 expandDeltas :: TransactionForPeer -> String -> MonadPerspectivesTransaction (Array Delta)
