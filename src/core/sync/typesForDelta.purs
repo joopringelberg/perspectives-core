@@ -31,9 +31,10 @@ import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, over, unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (for_, traverse)
+import Decacheable (decache)
 import Foreign (unsafeToForeign)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, removeInternally)
+import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl(..))
 import Perspectives.Instances.ObjectGetters (context', publicUrl)
 import Perspectives.Persistent (getPerspectContext, saveEntiteit)
@@ -94,7 +95,7 @@ instance StrippedDelta UniverseContextDelta where
     rec <- pure r
       { id = over ContextInstance (createPublicIdentifier curl) r.id
       }
-    void $ removeInternally rec.id
+    void $ decache rec.id
     pure $ UniverseContextDelta rec
 
 -----------------------------------------------------------
@@ -168,8 +169,8 @@ instance StrippedDelta UniverseRoleDelta where
       { id = over ContextInstance (createPublicIdentifier curl) r.id
       , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (createPublicIdentifier curl))) r.roleInstances
       }
-    void $ removeInternally rec.id
-    for_ (toArray rec.roleInstances) removeInternally
+    void $ decache rec.id
+    for_ (toArray rec.roleInstances) decache
     pure $ UniverseRoleDelta rec
 
 -----------------------------------------------------------
@@ -245,9 +246,9 @@ instance StrippedDelta ContextDelta where
         Just (ContextInstance dc), Just url' -> Just (ContextInstance (createPublicIdentifier url' dc))
         _, _ -> Nothing
       }
-    void $ removeInternally rec.contextInstance
-    void $ removeInternally rec.roleInstance
-    void $ traverse removeInternally rec.destinationContext
+    void $ decache rec.contextInstance
+    void $ decache rec.roleInstance
+    void $ traverse decache rec.destinationContext
     pure $ ContextDelta rec
 
 -----------------------------------------------------------
@@ -329,9 +330,9 @@ instance StrippedDelta RoleBindingDelta where
       , filler = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier fillerUrl))) r.filler
       , oldFiller = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier fillerUrl))) r.oldFiller
       }
-    void $ traverse removeInternally rec.filler
-    void $ removeInternally rec.filled
-    void $ traverse removeInternally rec.oldFiller
+    void $ traverse decache rec.filler
+    void $ decache rec.filled
+    void $ traverse decache rec.oldFiller
     pure $ RoleBindingDelta rec
   -----------------------------------------------------------
 -- ROLEBINDINGDELTATYPE
@@ -394,7 +395,7 @@ instance StrippedDelta RolePropertyDelta where
     url' <- getUrlForPublishing url ctxt
     rec <- pure r
         { id = over RoleInstance (createPublicIdentifier url') r.id }
-    void $ removeInternally rec.id
+    void $ decache rec.id
     pure $ RolePropertyDelta rec
 
 -----------------------------------------------------------
