@@ -33,7 +33,7 @@ domain model://joopringelberg.nl#TestFields --@1.0.0
     
     user Tester = sys:Me
       perspective on TestRole
-        props (Text, Bool, ADateTime, ANumber, AnEmail, WeekDay, Appel) verbs (Consult, SetPropertyValue)
+        props (Text, Bool, ADate, ANumber, AnEmail, WeekDay, Appel) verbs (Consult, SetPropertyValue)
         only (Remove, Create)
       perspective on TestTable
         defaults
@@ -41,7 +41,7 @@ domain model://joopringelberg.nl#TestFields --@1.0.0
         tab "Test"
           row
             form TestRole
-              props (Text, WeekDay, ADateTime) verbs (SetPropertyValue)
+              props (Text, WeekDay, ADate) verbs (SetPropertyValue)
               only (Create)
           row
             table "MyTable" TestTable
@@ -59,7 +59,7 @@ domain model://joopringelberg.nl#TestFields --@1.0.0
         minLength = 100
         maxLength = 200
       property Bool (Boolean)
-      property ADateTime (DateTime)
+      property ADate (Date)
         minInclusive = '2022-04-15'
       property ANumber (Number)
         minInclusive = 10
@@ -74,7 +74,7 @@ domain model://joopringelberg.nl#TestFields --@1.0.0
     thing TestTable (relational)
       property Text (mandatory, String)
       property Bool (Boolean)
-      property ADateTime (DateTime)
+      property ADate (DateTime)
       property ANumber (mandatory, Number)
       property AnEmail (Email)
-      view Limited (Text, ADateTime)
+      view Limited (Text, ADate)
