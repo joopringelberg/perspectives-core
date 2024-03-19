@@ -753,16 +753,6 @@ domain model://perspectives.domains#CouchdbManagement
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
     aspect sys:ContextWithNotification
-    state UploadToRepository = extern >> (ArcOK and SourcesChanged)
-      on entry
-        do for Author
-          callEffect p:UploadToRepository( extern >> VersionedModelManifest$External$VersionedModelURI, 
-            callExternal util:ReplaceR( "bind publicrole.*in sys:MySystem", "", extern >> ArcSource ) returns String)
-          SourcesChanged = false for extern
-          LastChangeDT = (callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime) for extern
-          Build = extern >> Build + 1 for extern
-        notify Author
-          "Version {extern >> External$Version} (build {extern >> Build}) has been uploaded to the repository for { extern >> binder Versions >> context >> Repository >> NameSpace >>= first}."
 
     external
       aspect sys:VersionedModelManifest$External
@@ -778,8 +768,6 @@ domain model://perspectives.domains#CouchdbManagement
       property ArcSource = callExternal files:FileText( ArcFile ) returns String
       property ArcFeedback (String)
         minLength = 81
-      property ArcOK = ArcFeedback matches regexp "^OK"
-      property SourcesChanged (Boolean)
       -- property DomeinFile (File)
       property PublicUrl (functional) = binder Versions >> context >> extern >> PublicUrl
       -- Only one VersionedModelManifest can be the recommended version at a time.
@@ -788,6 +776,12 @@ domain model://perspectives.domains#CouchdbManagement
       property LastChangeDT (DateTime)
       -- The readable date and time of the last upload.
       property LastUpload = callExternal util:FormatDateTime( LastChangeDT, "nl-NL", "{\"dateStyle\": \"short\", \"timeStyle\": \"short\"}" ) returns String
+      property MustUpload (Boolean)
+
+      on exit
+        do for Author
+          -- Delete the DomeinFile.
+          callEffect p:RemoveFromRepository( VersionedModelManifest$External$VersionedModelURI )
 
       state BecomesRecommended = IsRecommended
         on entry
@@ -800,36 +794,27 @@ domain model://perspectives.domains#CouchdbManagement
               -- Set the version to download.
               VersionToInstall = Version for binder Versions >> context >> extern
       
-      on exit
-        do for Author
-          -- Delete the DomeinFile.
-          callEffect p:RemoveFromRepository( VersionedModelManifest$External$VersionedModelURI )
-
-      state ReadyToCompile = (exists External$Version) and (exists ArcSource)
-      
-      state CompileAutomatically = (exists ArcSource) and callExternal sensor:ReadSensor("clock", "now") returns DateTime > LastChangeDT
+      state ProcessArc = (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT) or not exists LastChangeDT)
         on entry
           do for Author
-            delete property ArcFeedback
-
-      state ProcessArc = (exists ArcSource) and not exists ArcFeedback
-        on entry
-          do for Author
-            delete property SourcesChanged
             ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
-            SourcesChanged = true
-    
+            LastChangeDT = callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime
+            MustUpload = true
+
+      state UploadToRepository = (ArcFeedback matches regexp "^OK") and MustUpload
+        on entry
+          do for Author
+            callEffect p:UploadToRepository( VersionedModelManifest$External$VersionedModelURI, 
+              callExternal util:ReplaceR( "bind publicrole.*in sys:MySystem", "", ArcSource ) returns String)
+            Build = Build + 1
+            MustUpload = false
+          notify Author
+            "Version {External$Version} (build {Build}) has been uploaded to the repository for {binder Versions >> context >> Repository >> NameSpace >>= first}."
 
     user Author filledBy cm:ModelManifest$Author
       perspective on extern
-        props (DomeinFileName, Version, ArcOK, ArcSource, LastUpload) verbs (Consult)
+        props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
-
-        in object state ReadyToCompile
-          action RestoreState
-            ArcFeedback = "Explicitly restoring state"
-          action CompileArc
-            delete property ArcFeedback
       perspective on Manifest
         props (VersionToInstall) verbs (SetPropertyValue)
     
