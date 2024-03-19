@@ -48,7 +48,7 @@ domain model://perspectives.domains#Introduction
     user Manager = sys:Me
       perspective on Introductions
         only (CreateAndFill, Remove)
-        props (Title) verbs (SetPropertyValue)
+        props (Title) verbs (Consult, SetPropertyValue)
       perspective on IncomingIntroductions
         props (Title) verbs (Consult)
       screen "Introductions"

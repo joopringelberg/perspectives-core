@@ -47,7 +47,7 @@ domain model://joopringelberg.nl#TestFilter
     user Manager = sys:Me
       perspective on FilterTests
         all roleverbs
-        props (Name) verbs (SetPropertyValue)
+        props (Name) verbs (Consult, SetPropertyValue)
       perspective on FilterTests >> binding >> context >> ZietAlles
         all roleverbs
       perspective on IncomingFilterTests
@@ -67,7 +67,7 @@ domain model://joopringelberg.nl#TestFilter
     user ZietAlles filledBy sys:PerspectivesSystem$User
       perspective on AlleDingen
         all roleverbs
-        props (Naam, Zichtbaar) verbs (SetPropertyValue)
+        props (Naam, Zichtbaar) verbs (Consult, SetPropertyValue)
       perspective on SommigeDingen
         props (Naam) verbs (Consult)
       perspective on ZietMinder
@@ -78,7 +78,7 @@ domain model://joopringelberg.nl#TestFilter
       perspective on SommigeDingen
         props (Naam) verbs (Consult)
       perspective on ZietMinder
-        props (FirstName)
+        props (FirstName) verbs (Consult)
 
     thing AlleDingen (relational)
       property Naam (String)

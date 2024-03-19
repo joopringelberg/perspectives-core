@@ -59,7 +59,7 @@ import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
-import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding) 
+import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
 import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (addAspectsToExternalRoles, contextualisePerspectives)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', throwError, withDomeinFile, withFrame)
@@ -81,7 +81,7 @@ import Perspectives.Representation.Class.Role (Role(..), allProperties, displayN
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveMustBeSynchronized, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
@@ -1450,10 +1450,10 @@ invertPerspectiveObjects = do
 
       where
         perspectivesInEnumeratedRole :: EnumeratedRole -> PhaseThree Unit
-        perspectivesInEnumeratedRole (EnumeratedRole{id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (ENR id))
+        perspectivesInEnumeratedRole (EnumeratedRole{id, perspectives}) = for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (ENR id))
 
         perspectivesInCalculatedRole :: CalculatedRole -> PhaseThree Unit
-        perspectivesInCalculatedRole (CalculatedRole{id, perspectives}) = for_ perspectives (addInvertedQueriesForPerspectiveObject (CR id))
+        perspectivesInCalculatedRole (CalculatedRole{id, perspectives}) = for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (CR id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
         addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly}) = do

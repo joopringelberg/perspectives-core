@@ -1,9 +1,10 @@
+#https://state-machine-cat.js.org/
 initial,
 Initialize:
   entry/ User becomes AccountHolder,
 CanRegister:
   entry/ Registered = rabbit:SelfRegister,
-Registered:
+Active:
   entry/Set: 
   - UseExpiresOn 
   - GracePeriodExpiresOn
@@ -12,21 +13,41 @@ Registered:
   ExpiresSoon:
     entry/ Notify AccountHolder,
   Suspended:
-    entry/ Notify AccountHolder, 
-  Terminated,
-  ExtensionPending;
+    entry/ Notify AccountHolder
+      PreventAMQPaccountFromReading, 
+  ExtensionPending:
+    exit/ ExtensionRequested=false
+      SetPermissions;
 
-  Registered => ExpiresSoon: [CurrentDate > UseExpiresSoon];
+  Active => ExpiresSoon: [CurrentDate > UseExpiresSoon];
+
   ExpiresSoon => Suspended: [CurrentDate > GracePeriodEndsOn];
+
   Suspended => Terminated: [CurrentDate > TerminatesOn];
-  Registered => ExtensionPending;
-  ExtensionPending => Registered;
-};
+
+  # The AccountHolder 
+  #requests an extension.
+  ExpiresSoon => ExtensionPending: [ExtensionRequested];
+  Suspended => ExtensionPending: [ExtensionRequested];
+
+  # The Administrator sets
+  # the value of ExtensionRequested
+  # to false in order to restore the account.
+  ExtensionPending => Active: [not ExtensionRequested];
+},
+Terminated:
+  entry/ 
+  DeleteAMQPaccount 
+  DeleteQueue
+  Registered = false
+  exit/ 
+  PrepareAMQPaccount
+  Registered = true;
 
 initial => Initialize;
 Initialize => CanRegister: User fills Administrator [exists AccountHolder && exists Administrator];
 # This is an automatic transition 
 # as Registered is computed on entry 
 # of CanRegister.
-CanRegister => Registered: [Registered];
-
+CanRegister => Active: [Registered];
+Terminated => Active: RestoreAccount[Registered];

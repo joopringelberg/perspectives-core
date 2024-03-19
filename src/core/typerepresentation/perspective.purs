@@ -148,6 +148,16 @@ perspectiveSupportsProperty (Perspective {propertyVerbs}) property = find $ MAP.
         pva)
       pvs
 
+perspectiveSupportsPropertyVerb :: Perspective -> PropertyVerb -> Boolean
+perspectiveSupportsPropertyVerb (Perspective {propertyVerbs}) propertyVerb = find $ MAP.values $ unwrap propertyVerbs
+  where
+    find :: List (Array PropertyVerbs) -> Boolean
+    find pvs = isJust $ LST.findIndex
+      (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
+        (\(PropertyVerbs _ pverbs) -> isElementOf propertyVerb pverbs)
+        pva)
+      pvs
+
 -- | Regardless of state, does the perspective allow for the RoleVerb?
 perspectiveSupportsRoleVerb :: Perspective -> RoleVerb -> Boolean
 perspectiveSupportsRoleVerb (Perspective{roleVerbs}) verb = isJust $ LST.findIndex
@@ -163,6 +173,11 @@ perspectiveSupportsOneOfRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
 perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
   (\rvs -> hasOneOfTheVerbs verbs rvs)
   (MAP.values $ unwrap roleVerbs)
+
+perspectiveMustBeSynchronized :: Perspective -> Boolean
+perspectiveMustBeSynchronized p@(Perspective {roleVerbs, propertyVerbs}) = 
+  perspectiveSupportsOneOfRoleVerbs p [Remove, Delete] ||
+  perspectiveSupportsPropertyVerb p Consult
 
 -----------------------------------------------------------
 -- PROPERTYVERBS

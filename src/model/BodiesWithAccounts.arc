@@ -56,7 +56,7 @@ domain model://perspectives.domains#BodiesWithAccounts
         -- instance.
         perspective on Accounts
           only (Create, Fill)
-          props (FirstName, LastName)
+          props (FirstName, LastName) verbs (Consult)
           -- selfonly -- This has no effect; selfOnly only applies to self-perspectives.
           action RequestAccount
             bind currentactor to Accounts

@@ -404,7 +404,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective of Admin
         perspective on Authors
           only (Create, Fill, Remove)
-          props (FirstName, LastName)
+          props (FirstName, LastName) verbs (Consult)
 
     -- Embedded contexts are not removed automatically with their embedder!
     on exit
@@ -567,7 +567,7 @@ domain model://perspectives.domains#CouchdbManagement
         only (Create, Fill)
       
       perspective on Authors
-        props (FirstName, LastName, AuthorizedDomain)
+        props (FirstName, LastName, AuthorizedDomain) verbs (Consult)
 
       screen "Repository"
         tab "This repository"
@@ -669,10 +669,10 @@ domain model://perspectives.domains#CouchdbManagement
     -- Inherits credentials for the ServerUrl and RepositoryUrl, and write access to the ModelsDatabase and the InstancesDatabase of the Repository.
     user Author filledBy Repository$Authors, Repository$Admin
       perspective on extern
-        props (Description, IsLibrary, VersionToInstall) verbs (SetPropertyValue)
+        props (Description, IsLibrary, VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
-        props (Versions$Version, Description) verbs (SetPropertyValue)
+        props (Versions$Version, Description) verbs (Consult SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
         props (FirstName, LastName) verbs (Consult)
@@ -816,7 +816,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
       perspective on Manifest
-        props (VersionToInstall) verbs (SetPropertyValue)
+        props (VersionToInstall) verbs (Consult, SetPropertyValue)
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern

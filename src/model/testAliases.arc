@@ -64,7 +64,7 @@ domain TestAliases
         action ApproveLicense
           License = License + " Approved!"
       perspective on extern
-        props (Name) verbs (SetPropertyValue)
+        props (Name) verbs (Consult, SetPropertyValue)
       perspective on Schedules
         only (Remove, CreateAndFill, Create)
         props (VehicleName) verbs (Consult)
@@ -81,7 +81,7 @@ domain TestAliases
           in
             create_ context Schedule bound to role
       perspective on Passengers
-        props (Name) verbs (SetPropertyValue)
+        props (Name) verbs (Consult, SetPropertyValue)
         only (Create, Remove)
         action CreateAPassenger
           create role Passengers
@@ -144,13 +144,13 @@ domain TestAliases
       -- TESTS: CREATE CONTEXT CONTEXTUALISATION
       -- The test fails if the created schedule doesn't have properties IsInternational and IsCargoFlight.
       perspective on FlightSchedules
-        props (IsInternational, IsCargoFlight) verbs (SetPropertyValue)
+        props (IsInternational, IsCargoFlight) verbs (Consult, SetPropertyValue)
       
       -- TESTS: ASPECT STATE DEPENDENT PROPERTY VERBS
       -- Fails: ff Pilot cannot set NumberOfPassengers after he has a value for License.
       in state ta:Transport$Driver$HasLicense
         perspective on Plane
-          props (NumberOfPassengers) verbs (SetPropertyValue)
+          props (NumberOfPassengers) verbs (Consult, SetPropertyValue)
 
       on entry of ta:Transport$Driver$HasLicense
         notify Pilot
@@ -208,7 +208,7 @@ domain TestAliases
           -- The Captain can.
           -- TESTS: PROPERTY VERB ADDITION
           -- Fails if the Captain cannot set it.
-          props (NumberOfPassengers) verbs (SetPropertyValue)
+          props (NumberOfPassengers) verbs (Consult, SetPropertyValue)
         
         perspective on BoatPassenger
           props (Hut) verbs (Consult)
