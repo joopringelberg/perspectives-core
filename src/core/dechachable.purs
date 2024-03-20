@@ -25,6 +25,7 @@ module Decacheable where
 import Prelude
 
 import Data.Maybe (Maybe, isJust)
+import Data.Newtype (unwrap)
 import Persistence.Attachment (class Attachment)
 import Perspectives.CoreTypes (class Persistent, MonadPerspectives, removeInternally)
 import Perspectives.DomeinFile (DomeinFile)
@@ -32,6 +33,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (tryGetDocument)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId)
+import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
 
 class Persistent v i <= Decacheable v i | i -> v,  v -> i where
   decache :: i -> MonadPerspectives Unit
@@ -52,7 +54,7 @@ decache_ id = entityIsInDatabase id >>= if _
 
 entityIsInDatabase :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Boolean
 entityIsInDatabase id = do
-  {database, documentName} <- pure {database: "", documentName: ""} -- resourceIdentifier2DocLocator (unwrap id)
+  {database, documentName} <- resourceIdentifier2DocLocator (unwrap id)
   (mdoc :: Maybe a) <- tryGetDocument database documentName
   pure $ isJust mdoc
 
