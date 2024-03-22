@@ -47,6 +47,7 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectRolError')
 import Perspectives.Identifiers (areLastSegmentsOf, typeUri2ModelUri, endsWithSegments, isExternalRole, startsWithSegments)
+import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.ModelDependencies (rootUser)
@@ -248,6 +249,8 @@ publicUrlComputation ctype =
     Just (ENR r) -> publicUrl_ r
     _ -> pure Nothing
 
+externalRole :: ContextType -> MonadPerspectives EnumeratedRoleType
+externalRole = getPerspectType >=> pure <<< CTCLASS.externalRole
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON STATE
 ----------------------------------------------------------------------------------------

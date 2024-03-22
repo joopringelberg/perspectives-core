@@ -39,9 +39,10 @@ import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
 import Perspectives.Instances.Combinators (filter')
+import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding(..))
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, withFrame, throwError)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, getsDF, lift2, throwError, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -59,7 +60,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
+import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, externalRole, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, specialisesRoleType_)
 import Prelude (bind, discard, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=), (||))
 
 ------------------------------------------------------------------------------------
@@ -208,10 +209,16 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                   nameGetterDescription
                   (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType))
                   True
-                  True
-          Nothing -> case mnameGetterDescription of
-            Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte (CDOM $ ST qualifiedContextTypeIdentifier) True True
-            Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte nameGetterDescription (CDOM $ ST qualifiedContextTypeIdentifier) True True
+                  True          
+          Nothing -> do 
+          -- It is an error if qualifiedContextTypeIdentifier is not a specialisation of RootContext.
+            er <- lift $ lift $ externalRole qualifiedContextTypeIdentifier
+            allowed <- lift $ lift ((ENR er) `specialisesRoleType_` (ENR $ EnumeratedRoleType rootContext))
+            if allowed
+              then case mnameGetterDescription of
+                Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte (CDOM $ ST qualifiedContextTypeIdentifier) True True
+                Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte nameGetterDescription (CDOM $ ST qualifiedContextTypeIdentifier) True True
+              else throwError $ NotARootContext start end qualifiedContextTypeIdentifier
 
       CreateContext_ {contextTypeIdentifier, localName, roleExpression, start, end} -> do
         roleQfd <- ensureRole subjects roleExpression
