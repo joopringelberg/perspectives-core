@@ -44,7 +44,7 @@ import Effect.Class.Console (log)
 import Effect.Now (now)
 import Foreign (Foreign)
 import Foreign.Object (fromFoldable, singleton)
-import IDBKeyVal (idbSet)
+import IDBKeyVal (clear, idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
@@ -66,11 +66,11 @@ import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DatabaseName, Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
+import Perspectives.Persistence.API (DatabaseName, Keys(..), Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
-import Perspectives.Persistent (entitiesDatabaseName, postDatabaseName, saveMarkedResources)
+import Perspectives.Persistent (entitiesDatabaseName, invertedQueryDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.ReferentialIntegrity (fixReferences)
@@ -81,7 +81,7 @@ import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
-import Perspectives.SetupUser (reSetupUser, setupUser)
+import Perspectives.SetupUser (reSetupUser, setupInvertedQueryDatabase, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.SystemClocks (forkedSystemClocks)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
@@ -666,6 +666,8 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
             entitiesDatabaseName >>= deleteDb
             modelsDatabaseName >>= deleteDb
             postDatabaseName >>= deleteDb
+            invertedQueryDatabaseName >>= deleteDb
+            liftAff $ liftEffect clear
           state
   where
     handler :: Either Error Unit -> Effect Unit
@@ -723,6 +725,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
               Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
               Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
               Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
+            clearInvertedQueriesDatabase
             r <- runMonadPerspectivesTransaction'
               false
               (ENR $ EnumeratedRoleType sysUser)
@@ -743,11 +746,19 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback e
 
+    clearInvertedQueriesDatabase :: MonadPerspectives Unit
+    clearInvertedQueriesDatabase = do
+      db <- invertedQueryDatabaseName
+      deleteDatabase db
+      createDatabase db
+      setupInvertedQueryDatabase
+
+
 retrieveAllCredentials :: MonadPerspectives Unit 
 retrieveAllCredentials = do
   -- All instances with type model://perspectives.domains#System$WithCredentials.
-  (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (Nothing :: Maybe String)
-  userNameGetter <- getterFromPropertyType (CP $ CalculatedPropertyType userWithCredentialsUsername)
+  (roleInstances :: Array RoleInstance) <- entitiesDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/credentialsView" (NoKey :: Keys String)
+  userNameGetter <- getterFromPropertyType (CP $ CalculatedPropertyType userWithCredentialsUsername) 
   rows :: Array (Tuple String Credential) <- foldM
     (\rows' roleId -> (try (roleId ##>> getPropertyFromTelescope (EnumeratedPropertyType userWithCredentialsPassword))) >>= 
       handlePerspectRolError' "retrieveAllCredentials_Password" rows' 

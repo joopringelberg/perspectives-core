@@ -24,6 +24,7 @@ module Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries where
 
 import Control.Monad.Except (lift)
 import Control.Monad.Reader (ReaderT)
+import Data.Array (null)
 import Data.Foldable (for_)
 import Data.Map (Map) as Map
 import Data.Maybe (Maybe(..))
@@ -56,26 +57,28 @@ setInvertedQueries users statesPerProperty roleStates qfd selfOnly = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- lift $ invert qfd
 
-  for_ zqs \qwk@(ZQ backward forward) -> do
-
-      -- Store the QueryWithAKink.
+  if null users
+    -- This is a state query. The property access is part of the inversion.
+    then for_ zqs \qwk -> storeInvertedQuery qwk users roleStates statesPerProperty selfOnly
+    -- This is a perspective query. Access to properties is not included in the inverted query; it is just the perspective object.
+    else for_ zqs \qwk@(ZQ backward forward) -> do
+      -- `setInvertedQueriesForUserAndRole`, called below, does not store the InvertedQuery that we pass it, hence 
+      -- we store it here.
       storeInvertedQuery qwk users roleStates statesPerProperty selfOnly
-
-      -- If the original query represents the object of a perspective, we need to do more work
-      -- to handle the properties in the perspective.
+      -- We need to do more work to handle the properties in the perspective.
       -- We do this just for the full inversion of the object query, i.e. when there is no forward part.
-      -- To ensure we're not dealing with a property definition, we check that the Domain of the backwards part is
-      -- an RDOM (role) domain (the inversion of a property definition query would start with a VDOM (property) domain).
+      -- In that case, the domain of the backwards part is the perspective object itself.
+      -- From there, we work down its filler hierarchy to trace all the properties, extending the 
+      -- inverted query with filledBy steps that work back up the hierarchy.
       case forward, backward, domain <$> backward of
-        Nothing, Just bw, Just (RDOM role) ->
+        Nothing, Just bw, Just (RDOM roleADT) ->
           void $ unsafePartial $
             setInvertedQueriesForUserAndRole
               bw
               users
-              role
+              roleADT -- the domain of the backward query.
               statesPerProperty
               roleStates
               qwk
               selfOnly
         _, _, _ -> pure unit
-

@@ -165,3 +165,38 @@ exports.role2contextView = (function(context)
     );
   }
 }).toString()
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+////    INVERTED QUERY VIEWS
+// Inverted query documents have the following structure:
+// type StorableInvertedQuery = { keys :: Array RunTimeInvertedQueryKey, query :: InvertedQuery, model :: DomeinFileId }
+// RunTimeInvertedQueryKey is serialised as:
+// { keyType, fields}
+// where fields is the serialisation of the key proper.
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Emit the model identifier so we can quickly remove the query when the model is removed.
+  exports.modelView = (function(queryDoc)
+{
+  emit( queryDoc.model, queryDoc._id);
+}).toString();
+
+const invertedQueryViewTemplate = (function(queryDoc)
+{
+  if (queryDoc.keys[0].keyType == "KEYKIND")
+  {
+     queryDoc.keys.forEach( function(key)
+     {
+      // key.fields is the key proper, e.g.: {property, role}. However, we write the key as a string.
+      // emit( JSON.stringify( key.fields ), queryDoc._id);
+      emit( key.fields, queryDoc._id);
+     } )
+  }
+}).toString();
+
+exports.rTPropertyKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTPropertyKey");
+exports.rTRoleKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTRoleKey");
+exports.rTContextKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTContextKey");
+exports.rTFillerKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFillerKey");
+exports.rTFilledKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFilledKey");

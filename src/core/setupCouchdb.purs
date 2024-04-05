@@ -108,6 +108,8 @@ createUserDatabases user = do
   void $ databaseInfo $ user <> "_post"
   createDatabase $ user <> "_models"
   void $ databaseInfo $ user <> "_models"
+  createDatabase $ user <> "_invertedqueries"
+  void $ databaseInfo $ user <> "_invertedqueries"
   -- Now set the security document such that there is no role restriction for members.
   void $ withCouchdbUrl \url -> setSecurityDocument url (user <> "_models")
       (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
@@ -276,3 +278,56 @@ foreign import role2contextView :: String
 
 role2ContextFilter :: ContextInstance -> PerspectRol -> Boolean
 role2ContextFilter cid prol = cid == rol_context prol
+
+-----------------------------------------------------------
+-- THE VIEW 'modelView'
+-----------------------------------------------------------
+setModelView :: forall f. String -> MonadPouchdb f Unit
+setModelView dbname = void $ addViewToDatabase dbname "defaultViews" "modelView"
+  ({map: modelView, reduce: Nothing})
+
+foreign import modelView :: String
+-----------------------------------------------------------
+-- THE VIEW 'RTPropertyKeyView'
+-----------------------------------------------------------
+setRTPropertyKeyView :: forall f. String -> MonadPouchdb f Unit
+setRTPropertyKeyView dbname = void $ addViewToDatabase dbname "defaultViews" "RTPropertyKeyView"
+  ({map: rTPropertyKeyView, reduce: Nothing})
+
+foreign import rTPropertyKeyView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'RTRoleKeyView'
+-----------------------------------------------------------
+setRTRoleKeyView :: forall f. String -> MonadPouchdb f Unit
+setRTRoleKeyView dbname = void $ addViewToDatabase dbname "defaultViews" "RTRoleKeyView"
+  ({map: rTRoleKeyView, reduce: Nothing})
+
+foreign import rTRoleKeyView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'RTContextKey'
+-----------------------------------------------------------
+setRTContextKeyView :: forall f. String -> MonadPouchdb f Unit
+setRTContextKeyView dbname = void $ addViewToDatabase dbname "defaultViews" "RTContextKeyView"
+  ({map: rTContextKeyView, reduce: Nothing})
+
+foreign import rTContextKeyView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'RTFillerKey'
+-----------------------------------------------------------
+setRTFillerKeyView :: forall f. String -> MonadPouchdb f Unit
+setRTFillerKeyView dbname = void $ addViewToDatabase dbname "defaultViews" "RTFillerKeyView"
+  ({map: rTFillerKeyView, reduce: Nothing})
+
+foreign import rTFillerKeyView :: String
+
+-----------------------------------------------------------
+-- THE VIEW 'RTFilledKey'
+-----------------------------------------------------------
+setRTFilledKeyView :: forall f. String -> MonadPouchdb f Unit
+setRTFilledKeyView dbname = void $ addViewToDatabase dbname "defaultViews" "RTFilledKeyView"
+  ({map: rTFilledKeyView, reduce: Nothing})
+
+foreign import rTFilledKeyView :: String

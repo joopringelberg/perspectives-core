@@ -22,6 +22,7 @@
 
 module Perspectives.Query.Inversion where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, cons, head)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
@@ -34,7 +35,8 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..), isFunctionalFunction, isMandatoryFunction)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, PropertyType, RoleType(..))
-import Prelude (class Monoid, class Semigroup, pure, ($), (<$>), (<>), (<<<), bind)
+import Perspectives.Types.ObjectGetters (isRelational_)
+import Prelude (class Monoid, class Semigroup, bind, pure, ($), (<$>), (<>))
 
 -- | For each type of function that appears as a single step in a query, we compute the inverse step.
 invertFunction :: Domain -> QueryFunction -> Range -> PhaseThree (Maybe QueryFunction)
@@ -43,7 +45,13 @@ invertFunction dom qf ran = case qf of
     -- If we have the external role, use `DataTypeGetter ExternalRoleF`. That is, if the range is a Context.
     ContextF -> if isExternalRole dom
       then pure $ Just $ DataTypeGetter ExternalRoleF 
-      else Just <<< RolGetter <<< ENR <$> (unsafePartial $ domain2RoleType dom)
+      else do 
+        et <- unsafePartial $ domain2RoleType dom
+        -- If the role is relational, produce another getter!
+        relationalP <- lift $ lift $ isRelational_ et
+        if relationalP
+          then pure $ Just $ DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF (unwrap et)
+          else pure $ Just $ RolGetter $ ENR et
     -- FillerF is the `filledBy` step. So we have filled `filledBy` filler.
     -- Its inversion is filler `fills` filled, or: filler FilledF filled.
     -- We must qualify FilledF with the type that is filled.

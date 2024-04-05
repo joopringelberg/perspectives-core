@@ -47,11 +47,10 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectRolError')
 import Perspectives.Identifiers (areLastSegmentsOf, typeUri2ModelUri, endsWithSegments, isExternalRole, startsWithSegments)
-import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Instances.Combinators (closure_, conjunction, filter', some)
 import Perspectives.Instances.Combinators (filter', filter) as COMB
 import Perspectives.ModelDependencies (rootUser)
-import Perspectives.Persistence.API (getViewOnDatabase)
+import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
@@ -59,6 +58,7 @@ import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecial
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
+import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Representation.Class.PersistentType (DomeinFileId, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
 import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, roleKindOfRoleType, typeIncludingAspects)
 import Perspectives.Representation.Context (Context)
@@ -334,12 +334,12 @@ hasAspectWithLocalName localAspectName roleType = ArrayT do
   pure [isJust $ findIndex (test (unsafeRegex (localAspectName <> "$") noFlags)) (unwrap <$> aspects)]
 
 getRoleAspectSpecialisations :: EnumeratedRoleType  ~~~> EnumeratedRoleType
-getRoleAspectSpecialisations rn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/roleSpecialisationsView" (Just $ unwrap rn)) >>=
+getRoleAspectSpecialisations rn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/roleSpecialisationsView" (Key $ unwrap rn)) >>=
   handlePerspectRolError' "getAspectSpecialisations" []
     \(roles :: Array EnumeratedRoleType) -> pure roles
 
 getContextAspectSpecialisations :: ContextType  ~~~> ContextType
-getContextAspectSpecialisations cn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/contextSpecialisationsView" (Just $ unwrap cn)) >>=
+getContextAspectSpecialisations cn = ArrayT $ try (modelDatabaseName >>= \db -> getViewOnDatabase db "defaultViews/contextSpecialisationsView" (Key $ unwrap cn)) >>=
   handlePerspectRolError' "getContextAspectSpecialisations" []
     \(contexts :: Array ContextType) -> pure contexts
 

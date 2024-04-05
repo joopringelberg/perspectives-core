@@ -24,31 +24,23 @@ module Perspectives.Parsing.Arc.PhaseThree.StoreInvertedQueries where
 
 import Control.Monad.Except (lift)
 import Control.Monad.Reader (ReaderT, ask)
-import Data.Array (concat, foldl, fromFoldable, head, union)
+import Data.Array (concat, fromFoldable, head, union)
 import Data.Map (Map, values) as Map
 import Data.Maybe (Maybe(..), fromJust, maybe)
-import Data.Newtype (unwrap)
-import Data.Tuple (Tuple(..))
-import Foreign.Object (insert, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspective.InvertedQuery.Indices (compiletimeIndexForFillerQueries, compiletimeIndexForFilledQueries)
+import Perspective.InvertedQuery.Indices (typeLevelKeyForContextQueries, typeLevelKeyForFilledQueries, typeLevelKeyForFillerQueries, typeLevelKeyForPropertyQueries, typeLevelKeyForRoleQueries)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
-import Perspectives.DomeinFile (SeparateInvertedQuery(..), addInvertedQueryForDomain)
-import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, backwards, forwards)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', modifyDF, throwError)
+import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), backwards, forwards)
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', addStorableInvertedQuery, getsDF, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, domain2roleType, makeComposition, mandatory, range, roleDomain, roleInContext2Role, roleRange)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
-import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), InvertedQueryKey, addInvertedQueryIndexedByTripleKeys)
-import Perspectives.Representation.ExplicitSet (ExplicitSet)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, makeComposition, mandatory, range)
+import Perspectives.Representation.ADT (ADT(..), ArrayUnions(..), allLeavesInADT)
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (Unit, bind, discard, flip, pure, unit, ($), (<$>), (<>), (==))
 
@@ -117,6 +109,7 @@ setPathForStep :: Partial =>
   Maybe QueryFunctionDescription ->
   WithModificationSummary Unit
 setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly mfilter = do
+  model <- getsDF _.id
   {modifiesRoleInstancesOf, modifiesRoleBindingOf, modifiesPropertiesOf} <- ask
   case qf of
     -- The original property expression can never be the source in `filter source with criterium`, so we ignore mfilter.
@@ -125,9 +118,11 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       -- but really must ignore it.
       then pure unit
       else case pt of
-        ENP p -> modifyDF \dfr@{enumeratedProperties} -> case lookup (unwrap p) enumeratedProperties of
-          Nothing -> addInvertedQueryForDomain (unwrap p)
-            (InvertedQuery
+        ENP p -> do 
+          keys <- lift $ lift $ lift $ typeLevelKeyForPropertyQueries p qfd
+          lift $ addStorableInvertedQuery 
+            { keys 
+            , query: (InvertedQuery
               { description: qWithAK
               , backwardsCompiled: Nothing
               , forwardsCompiled: Nothing
@@ -141,30 +136,15 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               , states
               , selfOnly
               })
-            -- Maybe add modifiesPropertiesOf here; but do we then need to check on
-            -- synchronization on importing a model? I doubt it.
-            (OnPropertyDelta (allLeavesInADT $ roleInContext2Role <$> domain2roleType ran))
-            dfr
-          Just ep -> dfr {enumeratedProperties = insert
-            (unwrap p)
-            -- We add the InvertedQuery to the Property, indexed for all role types in the range.
-            (foldl
-              (\property (RoleInContext{role}) -> addPathToProperty
-                property
-                qWithAK
-                modifiesPropertiesOf
-                role)
-              ep
-              (allLeavesInADT $ domain2roleType ran))
-            enumeratedProperties}
-        -- CP _ -> throwError $ Custom "Implement the handling of Calculated Properties in setPathForStep."
+            , model}
         CP _ -> pure unit
 
     -- FILLED STEP
     -- filled step is stored in filledInvertedQueries of the filled role.
-    QF.FilledF enr ctxt -> do
+    QF.FilledF enr ctxt ->
       -- Compute the keys on the base of the original backwards query.
-      modifyDF \dfr -> let
+      -- The domain can be a complex ADT RoleInContext. The range is always an ST RoleInContext.
+      let 
         -- We remove the first step of the backwards path, because we apply it (runtime) not to the filler
         -- but to the filled. We skip the fills step because its cardinality is larger than one. It would
         -- cause a fan-out while we know, when applying the inverted query when handling a RoleBindingDelta, the exact
@@ -192,103 +172,72 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             oneStepLess
             (\ran' dom' man' -> SQD ran' (QF.DataTypeGetter FillerF) dom' True man')
             filter
-        in 
-          foldl
-            (\dfr'@{enumeratedRoles} (Tuple filledType keys) ->
-              case lookup (unwrap filledType) enumeratedRoles of
-                Nothing -> addInvertedQueryForDomain (unwrap filledType)
-                  (InvertedQuery
-                    { description
+      in 
+        do 
+          (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFilledQueries qfd
+          lift $ addStorableInvertedQuery
+            { keys
+            , query: (InvertedQuery
+                { description
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                -- Default value. Should be computed per case.
+                , modifies: false
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly}) 
+            , model }
+
+    -- FILLER STEP
+    -- filler step is stored in fillerInvertedQueries of the filled role.
+    QF.DataTypeGetter QF.FillerF -> do
+      (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFillerQueries qfd
+      oneStepLess <- pure $ removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
+      description <- pure $ case mfilter of 
+        -- We remove the first step of the backwards path, because we apply it (runtime) not to the filled
+        -- but to the filler. We skip the fills step because we can: we don't have to compute the filler from the 
+        -- filled, because it is already in the Delta.
+        -- We add the inverted query to the **FILLED** role, not the filler role.
+        Nothing -> case oneStepLess of
+          -- If backwards of oneStepLess is Nothing, the backwards step of qWithAK (== qfd) consisted of just
+          -- a single step and that was FillerF.
+          -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
+          -- is already the end result we want to obtain. Hence we put the Identity function in the place of backwards,
+          -- where the domain and range are the range of the backward step.
+          ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
+          x -> x
+        -- Add the FilledF step to the criterium of the FilterF step;
+        -- Prepend the modified filter to the backwards part.
+        Just filter -> preprendToCriterium 
+          oneStepLess
+          -- NOTICE. The domain, being an ADT, may have multiple RoleInContext combinations. But we can only use one of these
+          -- as parameters of FilledF. We arbitrarily choose the first.
+          (\ran' dom' man' -> 
+            let 
+              RoleInContext{context, role} = unsafePartial fromJust $ head $ allLeavesInADT (domain2roleInContext dom')
+            in
+              SQD ran' (FilledF role context) dom' True man')
+          filter
+      case dom of
+        (RDOM EMPTY) -> pure unit
+        _ -> lift $ addStorableInvertedQuery
+          { keys
+          , query: (InvertedQuery
+                    { description: description
                     , backwardsCompiled: Nothing
                     , forwardsCompiled: Nothing
                     , users
                     -- Default value. Should be computed per case.
                     , modifies: false
                     , statesPerProperty: EncodableMap statesPerProperty
+                    -- pas states aan als een stap is weggehaald. D.w.z. Verwijder de states van het oorspronkelijke domein van backwards, voeg als state toe de ground state van het nieuwe domein van backwards.
                     , states
-                    , selfOnly})
-                  -- Maybe add modifiesRoleBindingOf here; but do we then need to check on
-                  -- synchronization on importing a model? I doubt it.
-                  (FilledInvertedQuery keys)
-                  dfr'
-                Just en -> do
-                  dfr' {enumeratedRoles = insert
-                    (unwrap filledType)
-                    (addPathToFilledInvertedQueries
-                      en
-                      keys
-                      description
-                      modifiesRoleBindingOf)
-                    enumeratedRoles }
-                )
-            dfr
-            (compiletimeIndexForFilledQueries qfd) -- qfd is the ORIGINAL backward query.
-
-    -- FILLER STEP
-    -- filler step is stored in fillerInvertedQueries of the filled role.
-    QF.DataTypeGetter QF.FillerF -> do
-      keysForRole <- lift $ compiletimeIndexForFillerQueries qfd
-      modifyDF \dfr@{enumeratedRoles} -> let
-        oneStepLess = removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)
-        description = case mfilter of 
-          -- We remove the first step of the backwards path, because we apply it (runtime) not to the filled
-          -- but to the filler. We skip the fills step because we can: we don't have to compute the filler from the 
-          -- filled, because it is already in the Delta.
-          -- We add the inverted query to the **FILLED** role, not the filler role.
-          Nothing -> case oneStepLess of
-            -- If backwards of oneStepLess is Nothing, the backwards step of qWithAK (== qfd) consisted of just
-            -- a single step and that was FillerF.
-            -- Consequently, the role instance that we are going to apply the backwards part of the inverted query to,
-            -- is already the end result we want to obtain. Hence we put the Identity function in the place of backwards,
-            -- where the domain and range are the range of the backward step.
-            ZQ Nothing fwd -> ZQ (Just (SQD ran (QF.DataTypeGetter IdentityF) ran True True)) fwd
-            x -> x
-          -- Add the FilledF step to the criterium of the FilterF step;
-          -- Prepend the modified filter to the backwards part.
-          Just filter -> preprendToCriterium 
-            oneStepLess
-            -- NOTICE. The domain, being an ADT, may have multiple RoleInContext combinations. But we can only use one of these
-            -- as parameters of FilledF. We arbitrarily choose the first.
-            (\ran' dom' man' -> 
-              let 
-                RoleInContext{context, role} = unsafePartial fromJust $ head $ allLeavesInADT (domain2roleInContext dom')
-              in
-                SQD ran' (FilledF role context) dom' True man')
-            filter
-        in case dom of
-          (RDOM EMPTY) -> dfr
-          _ -> foldl
-              (\dfr' (Tuple filledType keys) ->
-                case lookup (unwrap filledType) enumeratedRoles of
-                  Nothing -> addInvertedQueryForDomain (unwrap filledType)
-                    (InvertedQuery
-                      { description: description
-                      , backwardsCompiled: Nothing
-                      , forwardsCompiled: Nothing
-                      , users
-                      -- Default value. Should be computed per case.
-                      , modifies: false
-                      , statesPerProperty: EncodableMap statesPerProperty
-                      -- pas states aan als een stap is weggehaald. D.w.z. Verwijder de states van het oorspronkelijke domein van backwards, voeg als state toe de ground state van het nieuwe domein van backwards.
-                      , states
-                      , selfOnly})
-                    -- Maybe add modifiesRoleBindingOf here; but do we then need to check on
-                    -- synchronization on importing a model? I doubt it.
-                    (FillerInvertedQuery keys)
-                    dfr'
-                  Just en -> dfr' {enumeratedRoles = insert
-                    (unwrap filledType)
-                    (addPathToFillerInvertedQueries
-                      en
-                      keys
-                      description
-                      modifiesRoleBindingOf)
-                    enumeratedRoles})
-              dfr
-              keysForRole
+                    , selfOnly}) 
+          , model }
 
     QF.RolGetter roleType -> case roleType of
-      ENR (EnumeratedRoleType roleName) -> modifyDF \dfr@{contexts} -> let
+      ENR role -> let
         -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
         -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
         -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
@@ -306,34 +255,23 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             (\ran' dom' man' -> SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
             filter
         in case description of
-          ZQ Nothing _ -> dfr
-          otherwise -> foldl
-            (\dfr' (RoleInContext{context, role}) -> case lookup (unwrap context) contexts of
-              Nothing -> addInvertedQueryForDomain (unwrap context)
-                (InvertedQuery
-                  { description
-                  , backwardsCompiled: Nothing
-                  , forwardsCompiled: Nothing
-                  , users
-                    -- Default value. But is not used while adding a model to an installation.
-                  , modifies: false
-                  , statesPerProperty: EncodableMap statesPerProperty
-                  , states
-                  , selfOnly
-                  })
-                (RoleInvertedQuery role)
-                dfr'
-              Just ctxt -> dfr' {contexts = insert
-                (unwrap context)
-                (addPathToRoleInvertedQueries
-                  ctxt
-                  description
-                  modifiesRoleInstancesOf
-                  role)
-                contexts}
-              )
-            dfr
-            (allLeavesInADT (roleRange qfd))
+          ZQ Nothing _ -> pure unit
+          left -> do
+            (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForRoleQueries qfd  
+            lift $ addStorableInvertedQuery
+              { keys
+              , query: (InvertedQuery
+                { description
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                  -- Default value. But is not used while adding a model to an installation.
+                , modifies: false
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly
+                })
+              , model}
       CR _ -> lift $ throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
 
     -- We could omit the first backwards step, as in runtime we have the context of a role instance at hand.
@@ -343,11 +281,10 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         Nothing -> pure qWithAK
         -- If there is a filter, prepend it to the backwards part.
         Just filter -> pure $ ZQ ((makeComposition filter) <$> backwards qWithAK) (forwards qWithAK)
-      modifyDF \dfr@{enumeratedRoles} -> foldl
-        (\dfr' ric@(RoleInContext{context, role}) ->
-            case lookup (unwrap role) enumeratedRoles of
-              Nothing -> addInvertedQueryForDomain (unwrap role)
-                (InvertedQuery
+      (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForContextQueries qfd
+      lift $ addStorableInvertedQuery
+        { keys
+        , query: (InvertedQuery
                   { description
                   , backwardsCompiled: Nothing
                   , forwardsCompiled: Nothing
@@ -358,17 +295,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                   , states
                   , selfOnly
                   })
-                (ContextInvertedQuery context)
-                dfr'
-              Just en -> dfr' {enumeratedRoles = insert (unwrap role)
-                (addPathToContextInvertedQueries
-                  en
-                  description
-                  modifiesRoleInstancesOf
-                  context)
-                enumeratedRoles})
-          dfr
-          (allLeavesInADT $ unsafePartial roleDomain qfd) -- qfd is the original backwards path.
+        , model}
 
     -- The query would be added to roleInvertedQueries of the context. Such inverse queries are run when a new
     -- instance of the role type is added to the context (or when it is removed). But the external role never changes,
@@ -382,73 +309,48 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
     -- for the External role.
     QF.DataTypeGetter QF.IdentityF -> pure unit
 
+    -- Exactly the same treatment as case RolGetter for ENR.
+    QF.DataTypeGetterWithParameter GetRoleInstancesForContextFromDatabaseF et -> let
+        -- We remove the first step of the backwards path, because we apply it runtime not to the context, but to
+        -- the new role instance. We skip the RolGetter step because its cardinality is larger than one.
+        -- Because the forward part will be applied to that same role (instead of the context), we have to compensate
+        -- for that by prepending it with the inversal of the first backward step - which is, by construction, a
+        -- `context` step.
+        oneStepLess = removeFirstBackwardsStep
+          qWithAK
+          (\ran' dom' man' -> Just $ SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
+        description = case mfilter of 
+          Nothing -> oneStepLess
+          -- Add the context step to the criterium of the FilterF step;
+          -- Prepend the modified filter to the backwards part.
+          Just filter -> preprendToCriterium 
+            oneStepLess 
+            (\ran' dom' man' -> SQD ran' (QF.DataTypeGetter ContextF) dom' True man')
+            filter
+        in case description of
+          ZQ Nothing _ -> pure unit
+          left -> do
+            (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForRoleQueries qfd  
+            lift $ addStorableInvertedQuery
+              { keys
+              , query: (InvertedQuery
+                { description
+                , backwardsCompiled: Nothing
+                , forwardsCompiled: Nothing
+                , users
+                  -- Default value. But is not used while adding a model to an installation.
+                , modifies: false
+                , statesPerProperty: EncodableMap statesPerProperty
+                , states
+                , selfOnly
+                })
+              , model}
+
     QF.RoleIndividual _ -> pure unit
 
     QF.ContextIndividual _ -> pure unit
 
     _ -> lift $ throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
-
-  where 
-    addPathToProperty :: EnumeratedProperty ->
-      QueryWithAKink ->
-      Map.Map EnumeratedRoleType (ExplicitSet EnumeratedPropertyType) ->
-      EnumeratedRoleType ->
-      EnumeratedProperty
-    addPathToProperty (EnumeratedProperty propRecord@{id, onPropertyDelta}) inverseQuery modifiesPropertiesOf eroleType = EnumeratedProperty propRecord {onPropertyDelta = addInvertedQueryToPropertyIndexedByRole (InvertedQuery
-      { description: inverseQuery
-      , backwardsCompiled: Nothing
-      , forwardsCompiled: Nothing
-      , users
-      , modifies:false
-      , statesPerProperty: EncodableMap statesPerProperty
-      , states
-      , selfOnly})
-      eroleType
-      onPropertyDelta
-      modifiesPropertiesOf
-      id
-    }
-
-    addPathToFilledInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFilledInvertedQueries (EnumeratedRole rolRecord@{id, filledInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {filledInvertedQueries =
-      addInvertedQueryIndexedByTripleKeys
-        (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-        keys
-        filledInvertedQueries
-        modifiesRoleBindingOf
-        id
-        }
-
-    addPathToFillerInvertedQueries :: EnumeratedRole -> Array InvertedQueryKey -> QueryWithAKink -> Array RoleInContext -> EnumeratedRole
-    addPathToFillerInvertedQueries (EnumeratedRole rolRecord@{id, fillerInvertedQueries}) keys inverseQuery modifiesRoleBindingOf = EnumeratedRole rolRecord {fillerInvertedQueries =
-      addInvertedQueryIndexedByTripleKeys
-        (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-        keys
-        fillerInvertedQueries
-        modifiesRoleBindingOf
-        id}
-
-    -- Add an inverted query to the set of inverted queries (contextInvertedQueries) on an EnumeratedRole type,
-    -- for the `context` step and therefore indexed by ContextType.
-    addPathToContextInvertedQueries :: EnumeratedRole -> QueryWithAKink -> Array RoleInContext -> ContextType -> EnumeratedRole
-    addPathToContextInvertedQueries (EnumeratedRole rolRecord@{id, contextInvertedQueries}) inverseQuery modifiesRoleInstancesOf embeddingContext = EnumeratedRole rolRecord {contextInvertedQueries = addInvertedQueryIndexedByContext
-      (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-      embeddingContext
-      contextInvertedQueries
-      modifiesRoleInstancesOf
-      id
-      }
-
-    -- Add an inverted query to the set of inverted queries on a Context type,
-    -- for the `role` step (and therefore indexed by EnumeratedRoleType).
-    addPathToRoleInvertedQueries :: Context -> QueryWithAKink -> Array RoleInContext -> EnumeratedRoleType -> Context
-    addPathToRoleInvertedQueries (Context contextRecord@{id, roleInvertedQueries}) inverseQuery modifiesRoleInstancesOf eRoleType = Context contextRecord {roleInvertedQueries = addInvertedQueryIndexedByRole
-      (InvertedQuery {description: inverseQuery, backwardsCompiled: Nothing, forwardsCompiled: Nothing, users, modifies:false, statesPerProperty: EncodableMap statesPerProperty, states, selfOnly})
-      eRoleType
-      roleInvertedQueries
-      modifiesRoleInstancesOf
-      id
-    }
 
 setPathForStep (MQD _ qf _ _ _ _) qWithAK users states statesPerProperty selfOnly mfilter = 
   case qf of

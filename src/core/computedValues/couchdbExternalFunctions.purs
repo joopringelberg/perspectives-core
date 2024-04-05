@@ -76,11 +76,12 @@ import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
+import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem, getPerspectivesUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase)
+import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase, Keys(..))
 import Perspectives.Persistence.API (deleteDocument) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
@@ -125,7 +126,7 @@ roleInstancesFromCouchdb roleTypes _ = try
       Nothing -> pure []
       Just rt -> do
         (tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance "def:AnyContext") (EnumeratedRoleType rt)])
-        instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (head roleTypes)
+        instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (maybe NoKey Key (head roleTypes))
         instancesInCache <- lift (do
           cache <- roleCache
           cachedRoleAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
@@ -142,7 +143,7 @@ contextInstancesFromCouchdb contextTypeArr _ = try
       Nothing -> pure []
       Just ct -> do
         -- push assumption!
-        instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/contextView" (head contextTypeArr)
+        instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/contextView" (maybe NoKey Key (head contextTypeArr))
         instancesInCache <- lift (do
           cache <- contextCache
           cachedContextAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
@@ -156,7 +157,7 @@ pendingInvitations :: ContextInstance ~~> RoleInstance
 pendingInvitations _ = try 
   (ArrayT $ lift do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Just DEP.invitation)
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Key DEP.invitation)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
@@ -184,21 +185,19 @@ updateModel arrWithModelName arrWithDependencies versions = try
 
   where
     updateModel' :: Boolean -> DomeinFileId -> MonadPerspectivesTransaction Unit
-    updateModel' withDependencies (DomeinFileId modelName) = do
+    updateModel' withDependencies dfid@(DomeinFileId modelName) = do
       {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelName
       DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDocument repositoryUrl documentName
       if withDependencies
         then for_ referredModels (updateModel' withDependencies)
         else pure unit
-        -- Untangle the InvertedQueries of the previous model.
+      -- Remove the inverted queries contributed by this model.
+      lift $ removeInvertedQueriesContributedByModel dfid
+      -- Get the inverted queries from the repository,
+      -- and add the inverted queries to the local database.
+      lift (getInvertedQueriesOfModel dfid >>= saveInvertedQueries)
+
       unversionedModelname <- pure $ unversionedModelUri modelName
-      forWithIndex_ invertedQueriesInOtherDomains
-        \domainName queries -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
-            handleDomeinFileError "updateModel'"
-            \(DomeinFile dfr) -> do
-              -- Here we must take care to preserve the screens.js attachment.
-              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries removeInvertedQuery) dfr))
       forWithIndex_ upstreamStateNotifications
         \domainName notifications -> do
           (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
@@ -217,16 +216,6 @@ updateModel arrWithModelName arrWithDependencies versions = try
       void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
       -- Install the new model, taking care of outgoing InvertedQueries.
       addModelToLocalStore (DomeinFileId modelName) isUpdate
-      DomeinFile dfr <- lift $ getDomeinFile $ (DomeinFileId unversionedModelname)
-      -- Find all models in use.
-      models' <- lift (allModelsInUse >>= traverse getDomeinFile) -- MODELS IS LEEG
-      -- For each model, look up in its invertedQueriesInOtherDomains those for this model (if any) and apply them.
-      -- These are the 'incoming' InvertedQueries: those that are attached to types of this model.
-      lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ models' \(DomeinFile{invertedQueriesInOtherDomains:invertedQueries}) ->
-        forWithIndex_ invertedQueries
-          \domainName queries -> if domainName == unversionedModelname
-            then for_ queries addInvertedQuery
-            else pure unit) dfr))
     
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)
     allModelsInUse = do
@@ -257,7 +246,7 @@ isInitialLoad = true
 
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
-addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
+addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   unversionedModelname <- pure $ unversionedModelUri modelname
   x :: (Maybe {semver :: String, versionedModelManifest :: RoleInstance}) <- lift $ getVersionToInstall (DomeinFileId unversionedModelname)
   {patch, build} <- case x of 
@@ -296,29 +285,22 @@ addModelToLocalStore (DomeinFileId modelname) isInitialLoad' = do
   mAttachment <- lift $ getAttachment repositoryUrl documentName "screens.js"
   case mAttachment of
     Nothing -> pure unit
-    Just attachment -> lift $ void $ P.addAttachment (DomeinFileId modelname) "screens.js" attachment (MediaType "text/ecmascript")
+    Just attachment -> lift $ void $ P.addAttachment dfid "screens.js" attachment (MediaType "text/ecmascript")
 
 
   if isInitialLoad'
     then do 
       createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x)
             -- Add new dependencies.
-      for_ referredModels \dfid -> do
-        mmodel <- lift $ tryGetPerspectEntiteit dfid
+      for_ referredModels \dfid' -> do
+        mmodel <- lift $ tryGetPerspectEntiteit dfid'
         case mmodel of
-          Nothing -> addModelToLocalStore' dfid
+          Nothing -> addModelToLocalStore' dfid'
           Just _ -> pure unit
     else pure unit
 
-  -- Distribute the SeparateInvertedQueries over the other domains.
-  forWithIndex_ invertedQueriesInOtherDomains
-    \domainName queries -> do
-      (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
-        handleDomeinFileError "addModelToLocalStore'"
-        \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
-          lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
-  
+  lift (getInvertedQueriesOfModel dfid >>= saveInvertedQueries)
+
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications
     \domainName notifications -> do

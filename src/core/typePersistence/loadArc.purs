@@ -35,6 +35,7 @@ import Perspectives.Checking.PerspectivesTypeChecker (checkDomeinFile)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -60,7 +61,7 @@ type Source = String
 
 -- | Parses and compiles the ARC file to a DomeinFile. Does neither cache nor store the DomeinFile.
 -- | However, will load, cache and store dependencies of the model.
-loadAndCompileArcFile_ :: Source -> MonadPerspectivesTransaction (Either (Array PerspectivesError) DomeinFile)
+loadAndCompileArcFile_ :: Source -> MonadPerspectivesTransaction (Either (Array PerspectivesError) (Tuple DomeinFile StoredQueries))
 loadAndCompileArcFile_ text = catchError
   do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ lift $ runIndentParser text domain
@@ -74,10 +75,10 @@ loadAndCompileArcFile_ text = catchError
             dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
             -- We should load referred models if they are missing (but not the model we're compiling!).
             for_ (delete id state.referredModels) (lift <<< retrieveDomeinFile)
-            (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
+            (x' :: (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> pure $ Left e
-              (Right correctedDFR@{referredModels:refModels}) -> do
+              (Right (Tuple correctedDFR@{referredModels:refModels} invertedQueries)) -> do
                 -- Run the type checker
                 typeCheckErrors <- lift $ checkDomeinFile (DomeinFile correctedDFR)
                 if null typeCheckErrors
@@ -89,7 +90,7 @@ loadAndCompileArcFile_ text = catchError
                       , _id = takeGuid $ unwrap id
                       }
                     -- void $ lift $ storeDomeinFileInCache id df
-                    pure $ Right df
+                    pure $ Right $ Tuple df invertedQueries
                   else pure $ Left typeCheckErrors
   \e -> pure $ Left [Custom (show e)]
 

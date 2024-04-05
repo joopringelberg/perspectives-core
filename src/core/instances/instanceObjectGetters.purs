@@ -56,7 +56,7 @@ import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistence.API (getViewOnDatabase)
+import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Representation.Action (Action)
@@ -96,7 +96,7 @@ getUnlinkedRoleInstances :: EnumeratedRoleType -> (ContextInstance ~~> RoleInsta
 getUnlinkedRoleInstances rn c = ArrayT $ try 
   (lift do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleFromContext" (Just $ [unwrap rn, takeGuid (unwrap c)])
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleFromContext" (Key [unwrap rn, takeGuid (unwrap c)])
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
@@ -290,7 +290,7 @@ filler2filledFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInsta
 filler2filledFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Just $ unwrap rid)
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Key $ unwrap rid)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
@@ -309,7 +309,7 @@ filled2fillerFromDatabase_ :: RoleInstance -> MonadPerspectives (Array FillerInf
 filled2fillerFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    fillerRolesInDatabase :: Array FillerInfo <- getViewOnDatabase db "defaultViews/filled2fillerView" (Just $ unwrap rid)
+    fillerRolesInDatabase :: Array FillerInfo <- getViewOnDatabase db "defaultViews/filled2fillerView" (Key $ unwrap rid)
     fillerRoleInCache :: Array FillerInfo <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
@@ -334,7 +334,7 @@ role2contextFromDatabase_ :: RoleInstance -> MonadPerspectives (Array ContextIns
 role2contextFromDatabase_ rid = try 
   (do
     db <- entitiesDatabaseName
-    contextInDatabase :: Array ContextInstance <- getViewOnDatabase db "defaultViews/role2ContextView" (Just $ unwrap rid)
+    contextInDatabase :: Array ContextInstance <- getViewOnDatabase db "defaultViews/role2ContextView" (Key $ unwrap rid)
     contextInCache :: Array ContextInstance <- (do 
       cache <- contextCache
       cachedContextAvars :: Array (AVar IP.PerspectContext) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
@@ -353,7 +353,7 @@ context2roleFromDatabase_ :: ContextInstance -> MonadPerspectives (Array RoleIns
 context2roleFromDatabase_ cid = try 
   (do
     db <- entitiesDatabaseName
-    contextRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/context2RoleView" (Just $ unwrap cid)
+    contextRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/context2RoleView" (Key $ unwrap cid)
     contextRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)

@@ -36,7 +36,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (gets)
 import Data.Array (elemIndex, filter, foldM, foldMap, fromFoldable, head, length, null, uncons)
 import Data.Either (Either(..))
-import Data.Map (Map, empty, singleton)
+import Data.Map (empty)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
@@ -57,7 +57,7 @@ import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQuerie
 import Perspectives.Parsing.Arc.PhaseTwoDefs (CurrentlyCalculated(..), PhaseThree, addBinding, getsDF, isBeingCalculated, isIndexedContext, isIndexedRole, lift2, lookupVariableBinding, loopErrorMessage, throwError, withCurrentCalculation, withFrame)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, makeComposition, mandatory, productOfDomains, propertyOfRange, range, replaceContext, replaceRange, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), context2RoleInContextADT, domain, domain2roleType, equalDomainKinds, functional, makeComposition, mandatory, productOfDomains, range, replaceContext, replaceRange, roleInContext2Role, setCardinality, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
@@ -253,8 +253,8 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{id, role, pos}) consider
 ------------------------------------------------------------------------------------
 -- | Use `compileAndDistributeStep` to compile a parsed expression into a QueryFunctionDescription, and to
 -- | distribute inverted versions of it over all definitions of EnumeratedRoles and EnumeratedProperties that
--- | are visited during query traversal. These inverted versions are used to compute the users that should be
--- | informed of changes.
+-- | are visited during query traversal. These inverted versions are used to compute state changes only!
+-- | Only perspective objects are used to synchronize.
 -- | This function calls [compileStep](Perspectives.Query.ExpressionCompiler.html#t:compileStep).
 -- | It also has a side effect on the DomeinFileRecord that is kept in [PhaseTwoState](Perspectives.Parsing.Arc.PhaseTwoDefs.html#t:PhaseTwoState): it
 -- |  * changes EnumeratedRoles
@@ -271,20 +271,13 @@ compileAndSaveProperty dom step (CalculatedProperty cp@{id, role, pos}) consider
 compileAndDistributeStep ::
   Domain ->
   Step ->
-  Array RoleType ->
   Array StateIdentifier ->
   PhaseThree QueryFunctionDescription
-compileAndDistributeStep dom stp users stateIdentifiers = do
+compileAndDistributeStep dom stp stateIdentifiers = do
   -- log ("compileAndDistributeStep:\n" <> "  step = " <> show stp <> "\n  users = " <> show users <> "\n  stateIdentifiers = " <> show stateIdentifiers)
   descr <- compileExpression dom stp
-  -- logShow descr
-  -- The description may be a path and then should be seen as an implicit perspective on its results, like a CalculatedProperty (it could also be a constant, or it could result in a ContextInstance or a RoleInstance).
-  -- Hence we should create a Map of the PropertyType and the StateIdentifier.
-  (statesPerProperty :: Map PropertyType (Array StateIdentifier)) <- pure case propertyOfRange descr of
-    Nothing -> empty
-    Just p -> singleton p stateIdentifiers
   runReaderT
-    (setInvertedQueries users statesPerProperty stateIdentifiers descr notSelfOnly)
+    (setInvertedQueries [] empty stateIdentifiers descr notSelfOnly)
     { modifiesRoleInstancesOf: []
     , modifiesRoleBindingOf: []
     , modifiesPropertiesOf: empty

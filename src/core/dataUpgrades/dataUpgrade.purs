@@ -28,14 +28,30 @@ module Perspectives.DataUpgrade where
 
 import Prelude
 
+import Control.Monad.Except (runExceptT)
+import Data.Array (catMaybes)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Traversable (for)
 import Effect.Aff.Class (liftAff)
 import Foreign (unsafeToForeign)
 import IDBKeyVal (idbGet, idbSet)
+import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.Extern.Utilities (pdrVersion)
-import Perspectives.Persistent (entitiesDatabaseName)
+import Perspectives.External.CoreModules (addAllExternalFunctions)
+import Perspectives.ModelDependencies (sysUser)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (createDatabase, databaseInfo, documentsInDatabase, includeDocs)
+import Perspectives.Persistence.State (getSystemIdentifier)
+import Perspectives.Persistent (entitiesDatabaseName, saveMarkedResources)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SetupCouchdb (setContext2RoleView, setFilled2FillerView, setFiller2FilledView, setRole2ContextView)
+import Perspectives.SetupUser (setupInvertedQueryDatabase)
+import Simple.JSON (read)
 import Unsafe.Coerce (unsafeCoerce)
 
 type PDRVersion = String
@@ -57,6 +73,7 @@ runDataUpgrades = do
   ------- In this version, we add views for automatic referential integrity fixing.
   ----------------------------------------------------------------------------------------
   runUpgrade installedVersion "0.24.1" addFixingUpdates 
+  runUpgrade installedVersion "0.24.2" indexedQueries 
 
 
 
@@ -82,3 +99,28 @@ addFixingUpdates = do
   setContext2RoleView db
   setRole2ContextView db
 
+indexedQueries :: MonadPerspectives Unit
+indexedQueries = do
+  addAllExternalFunctions
+  user <- getSystemIdentifier
+  -- Create the indexedQueries database
+  createDatabase $ user <> "_invertedqueries"
+  void $ databaseInfo $ user <> "_invertedqueries"
+  -- set all the views
+  setupInvertedQueryDatabase
+  -- recompile local models.
+  modelsDb <- modelsDatabaseName
+  {rows:allModels} <- documentsInDatabase modelsDb includeDocs
+  -- As doc is still uninterpreted, we can only rely on the rows.id member of the PouchdbAllDocs record. These, however, are DomeinFileIdentifiers.
+  -- We do not have a useful test on the form of such identifiers.
+  uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case read <$> doc of
+    Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
+    Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
+    Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
+  r <- runMonadPerspectivesTransaction'
+    false
+    (ENR $ EnumeratedRoleType sysUser)
+    (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
+  case r of
+    Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors))
+    Right success -> saveMarkedResources

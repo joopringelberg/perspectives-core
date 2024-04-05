@@ -53,22 +53,31 @@ domain model://perspectives.domains#BrokerServices
     context ManagedBrokers (relational) filledBy BrokerService
       property StorageLocation (String)
         pattern = "^https://.*" "A url with the https scheme"
+      state HasStorageLocation = exists StorageLocation
+        on entry
+          do for Guest
+            create_ context BrokerService bound to origin
 
     -- The BrokerServices I use (have a contract with).
     context Contracts = sys:Me >> binder AccountHolder >> context >> extern
 
-    -- The BrokerServices I am the Administrator of.
-    context MyBrokers = sys:Me >> binder BrokerService$Administrator >> context >> extern
-
     user Guest = sys:Me
       perspective on ManagedBrokers
-        only (CreateAndFill, Remove)
+        only (Create, Fill, CreateAndFill, Remove)
         props (Name) verbs (Consult)
+        props (StorageLocation) verbs (Consult, SetPropertyValue)
       perspective on Contracts
         view BrokerContract$External$ForAccountHolder verbs (Consult)
-      perspective on MyBrokers
-        all roleverbs
-        props (Name) verbs (Consult)
+      
+      screen "Managing Broker Services and contracts"
+        tab "My Contracts"
+          row
+            table "My Contracts" Contracts
+        tab "Brokers"
+          row 
+            table ManagedBrokers
+              only (Create, Remove)
+
 
   -- A Managed service.
   -- PDRDEPENDENCY
@@ -120,7 +129,6 @@ domain model://perspectives.domains#BrokerServices
         props (Name, SelfRegisterEndpoint) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
-      -- LET OP!! De volgende drie perspectieven zijn te ruim, want hierdoor krijgt elke bezoeker alle contracten te zien.
       perspective on Accounts
         only (Create, Fill, CreateAndFill)
       perspective on Accounts >> binding >> context >> AccountHolder
@@ -163,7 +171,7 @@ domain model://perspectives.domains#BrokerServices
             AccountPassword = callExternal util:GenSym() returns String for AccountHolder
             QueueName = queueid for queue
             Registered = callExternal rabbit:SelfRegisterWithRabbitMQ(
-              extern >> ManagementEndpoint,
+              extern >> SelfRegisterEndpoint,
               AccountHolder >> AccountName,
               AccountHolder >> AccountPassword,
               queueid) returns Boolean for External
@@ -173,22 +181,23 @@ domain model://perspectives.domains#BrokerServices
           letA 
             now <- callExternal sensor:ReadSensor("clock", "now") returns DateTime
           in 
-            UseExpiresOn = now + Service >> ContractPeriod for External
-            GracePeriodExpiresOn = extern > UseExpiresOn + Service >> GracePeriod for External
-            TerminatesOn = extern > GracePeriodExpiresOn + Service >> TerminationPeriod for External
+            UseExpiresOn = (now + Service >> ContractPeriod) for External
+            GracePeriodExpiresOn = (extern >> UseExpiresOn + Service >> GracePeriod) for External
+            TerminatesOn = (extern >> GracePeriodExpiresOn + Service >> TerminationPeriod) for External
         notify AccountHolder
           "You now have an account at the BrokerService { extern >> Name }"
       state ExpiresSoon = callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> UseExpiresOn
         on entry
           notify AccountHolder
-            "Your lease of the BrokerService has ended. Within {Service >> extern >> GracePeriod} days, you will no longer be able to receive information from peers."
+            "Your lease of the BrokerService has ended. Within {Service >> GracePeriod} days, you will no longer be able to receive information from peers."
 
     external
       aspect sys:Invitation$External
-    -- PDRDEPENDENCY
+      -- PDRDEPENDENCY
       property Url = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Url
       property ManagementEndpoint = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> ManagementEndpoint
-    -- PDRDEPENDENCY
+      property SelfRegisterEndpoint = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> SelfRegisterEndpoint
+      -- PDRDEPENDENCY
       property Exchange = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
       property Name = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Name
       property FirstNameOfAccountHolder = context >> AccountHolder >> FirstName
@@ -201,7 +210,7 @@ domain model://perspectives.domains#BrokerServices
       property GracePeriodExpiresOn (DateTime)
       property TerminatesOn (DateTime)
 
-      view ForAccountHolder (Url, Exchange )
+      view ForAccountHolder (Name, UseExpiresOn)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
     
     -- PDRDEPENDENCY

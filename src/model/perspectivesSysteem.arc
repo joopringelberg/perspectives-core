@@ -105,6 +105,8 @@ domain model://perspectives.domains#System
     -- As we share SocialEnvironment over installations, this will happen only in the first installation.
     -- SocialEnvironment is created on condition of there being an instance of PerspectivesUsers.
     aspect sys:RootContext
+    external 
+      aspect sys:RootContext$External
     state InitMe = not exists Me 
       on entry
         do for SystemUser
@@ -327,7 +329,7 @@ domain model://perspectives.domains#System
       state InstallBuild = UpdateOnBuild and InstalledBuild < Build
         on entry
           notify User
-            "Installing a new build of { ModelName }."
+            "Installing build {Build} of { ModelName } (replacing {InstalledBuild})."
           do for User
             callEffect cdb:UpdateModel( ModelToRemove, false )
             InstalledBuild = Build

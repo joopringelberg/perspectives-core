@@ -93,7 +93,7 @@ theSuite = suite "Test.Query.Inversion" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{calculatedProperties}) -> do
+                (Right (Tuple correctedDFR@{calculatedProperties} _)) -> do
                   -- logShow correctedDFR
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
@@ -117,7 +117,7 @@ theSuite = suite "Test.Query.Inversion" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{calculatedProperties}) -> do
+                (Right (Tuple correctedDFR@{calculatedProperties} _)) -> do
                   -- logShow correctedDFR
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
@@ -151,7 +151,7 @@ theSuite = suite "Test.Query.Inversion" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{calculatedProperties}) -> do
+                (Right (Tuple correctedDFR@{calculatedProperties} _)) -> do
                   -- logShow correctedDFR
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false
@@ -189,7 +189,7 @@ theSuite = suite "Test.Query.Inversion" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{calculatedProperties}) -> do
+                (Right (Tuple correctedDFR@{calculatedProperties} _)) -> do
                   -- logShow correctedDFR
                   case lookup "model:Test$TestCase1$ARole$Prop1" calculatedProperties of
                     Nothing -> assert "The model should have property 'model:Test$TestCase1$ARole$Prop1'." false

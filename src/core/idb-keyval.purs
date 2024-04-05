@@ -24,7 +24,7 @@
 
 module IDBKeyVal  
 
-(idbGet, idbSet)
+(idbGet, idbSet, clear)
 
 where
 
@@ -54,3 +54,5 @@ setKeyValueImpl_ = runEffectFn2 setKeyValueImpl
 
 idbSet :: String -> Foreign -> Aff Unit
 idbSet key value = liftEffect (setKeyValueImpl_ key value)
+
+foreign import clear :: Effect Unit

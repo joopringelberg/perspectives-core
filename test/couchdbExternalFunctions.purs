@@ -67,7 +67,8 @@ uploadToRepository dfId@(DomeinFileId domeinFileName) = do
       mdf <- try $ getDomeinFile dfId
       case mdf of
         Left err -> logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" (show err) 
-        Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+        -- Notice that we  supply an empty array instead of the actually compiled InvertedQueries!
+        Right df -> uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df []
     else logPerspectivesError $ DomeinFileErrorBoundary "uploadToRepository" ("This modelURI is not well-formed: " <> domeinFileName)
 
 

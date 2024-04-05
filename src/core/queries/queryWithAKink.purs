@@ -26,10 +26,10 @@ import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, last, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust, isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
@@ -153,12 +153,18 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       [], _ -> pure rights
       _, [] -> pure lefts
       _, _ -> do 
-        comprehension <- pure $ comprehend lefts rights
+        comprehension <- pure (comprehend lefts rights)
         -- If the next step is a filter, just return the comprehension. This is because storeInvertedQueries will 
         -- re-create the lefts, but then with a condition.
+        -- TODO. I am not sure of the above.
         if hasFilter r
           then pure comprehension
-          else pure $ lefts <> comprehension
+          else append comprehension <$>  for lefts 
+            -- Add the original right part of the composition as the forward part of the qinked query.
+            \(ZQ_ bw fw) -> if isNothing fw
+              then pure $ ZQ_ bw (Just r)
+              -- This is likely never to happen; I don't yet know what we should do in these cases.
+              else throwError (Custom "Found non-empty forwards part in inversion of left term. This requires more thinking...")
   
   where
     comprehend :: Array QueryWithAKink_ -> Array QueryWithAKink_ -> Array QueryWithAKink_
@@ -178,7 +184,7 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
         _, _ -> false
       -- This is where we invert the order of the steps.
       -- That's obvious if both left and right were single steps.
-      -- Remember we have right-assoicativity: s1 >> (s2 >> s3).
+      -- Remember we have right-associativity: s1 >> (s2 >> s3).
       -- So when right has multiple steps, we receive them from the recursive call in reverse order: [s3, s2].
       -- We must then add the left step to the end of those steps: [s3, s2] <> [s1].
       pure $ ZQ_ (right_inverted_steps <> left_inverted_steps)

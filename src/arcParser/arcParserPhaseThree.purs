@@ -53,6 +53,7 @@ import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile, removeDomeinF
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
+import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
@@ -100,7 +101,7 @@ phaseThree ::
   DomeinFileRecord ->
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
-  MP (Either MultiplePerspectivesErrors DomeinFileRecord)
+  MP (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))
 phaseThree df@{id} postponedParts screens = do
   -- Store the DomeinFile in cache. If a prefix for the domain is defined in the file,
   -- phaseThree_ will try to retrieve it.
@@ -113,12 +114,12 @@ phaseThree_ ::
   DomeinFileRecord ->
   LIST.List AST.StateQualifiedPart ->
   LIST.List AST.ScreenE ->
-  MP (Either MultiplePerspectivesErrors DomeinFileRecord)
+  MP (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))
 phaseThree_ df@{id, referredModels} postponedParts screens = do
   -- We don't expect an error on retrieving the DomeinFile, as we've only just put it into cache!
   indexedContexts <- unions <$> traverse (getDomeinFile >=> pure <<< indexedContexts) referredModels
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
-  (Tuple ei {dfr}) <- runPhaseTwo_'
+  (Tuple ei {dfr, invertedQueries}) <- runPhaseTwo_' 
     (do
       checkAspectRoleReferences
       inferFromAspectRoles
@@ -148,7 +149,7 @@ phaseThree_ df@{id, referredModels} postponedParts screens = do
     postponedParts 
   case ei of
     (Left e) -> pure $ Left e
-    otherwise -> pure $ Right dfr
+    otherwise -> pure $ Right (Tuple dfr invertedQueries)
 
 getDF :: Unit -> PhaseThree DomeinFileRecord
 getDF _ = lift $ State.gets _.dfr
@@ -654,7 +655,7 @@ handlePostponedStateQualifiedParts = do
                       [ computeCurrentContext (transition2stateSpec transition) start
                       , computeOrigin (transition2stateSpec transition) start]
                       stp
-                    Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
+                    Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment states
                 case transition of
                   AST.Entry _ -> pure $ sr
                     { automaticOnEntry = EM.addAll
@@ -735,7 +736,7 @@ handlePostponedStateQualifiedParts = do
                         [ computeCurrentContext (transition2stateSpec transition) start
                         , computeOrigin (transition2stateSpec transition) start]
                         stp
-                      Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment [] states
+                      Q <$> compileAndDistributeStep currentDomain expressionWithEnvironment states
                   case transition of
                     AST.Entry _ -> pure $ sr
                       { notifyOnEntry = EM.addAll notification notifyOnEntry qualifiedUsers
@@ -1571,7 +1572,6 @@ compileStateQueries = do
                 -- safely formed from the lexical context of the EnumeratedRoleType in the StateFulObject.
                 roleInContext
                 expressionWithEnvironment
-                []
                 [id]
           pure $ State sr { query = compiledQuery }
 

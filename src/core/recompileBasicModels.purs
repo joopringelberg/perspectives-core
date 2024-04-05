@@ -41,30 +41,32 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..))
 import Effect.Aff (try)
 import Effect.Class.Console (log)
 import Perspectives.ContextAndRole (rol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction)
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, setRevision)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
-import Perspectives.Extern.Couchdb (addInvertedQuery)
+import Perspectives.InvertedQuery.Storable (saveInvertedQueries)
 import Perspectives.ModelDependencies (domeinFileName, modelManifest, versionToInstall)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Persistence.API (addAttachment, addDocument, documentsInDatabase, getAttachment, getViewOnDatabase, includeDocs)
+import Perspectives.Persistence.API (Keys(..), addAttachment, addDocument, documentsInDatabase, getAttachment, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile, getPerspectRol)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
-import Simple.JSON (class ReadForeign, read, read')
+import Simple.JSON (class ReadForeign, read, read', write)
 
 -- | Parse and compile the versions to install of all models found at the URL, e.g. https://perspectives.domains/models_perspectives_domains
 recompileModelsAtUrl :: Url -> Url -> MonadPerspectivesTransaction Unit
 recompileModelsAtUrl modelsDb manifestsDb = do
-  manifests <- lift $ getViewOnDatabase manifestsDb "defaultViews/roleView" (Just modelManifest)
+  manifests <- lift $ getViewOnDatabase manifestsDb "defaultViews/roleView" (Key modelManifest)
   versionsToCompile <- traverse getVersionedDomeinFileName manifests >>= pure <<< catMaybes
   {rows:allModels} <- lift $ documentsInDatabase modelsDb includeDocs
   uninterpretedDomeinFiles <- for (filter (isJust <<< (flip elemIndex versionsToCompile) <<< _.id) allModels) \({id, doc}) -> case read <$> doc of
@@ -83,14 +85,17 @@ recompileModelsAtUrl modelsDb manifestsDb = do
         r <- lift $ loadAndCompileArcFile_ arc
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
-          Right df@(DomeinFile dfr) -> lift $ lift do
+          Right (Tuple df@(DomeinFile dfr@{id}) invertedQueries) -> lift $ lift do
             log $  "Recompiled '" <> namespace <> "' succesfully (" <> namespace <> ")!"
+
             -- storeDomeinFileInCouchdbPreservingAttachments df
-            mattachment <- getAttachment modelsDb _id "screens.js"
+            mscreensAttachment <- getAttachment modelsDb _id "screens.js"
             _rev' <- addDocument modelsDb (setRevision _rev (DomeinFile dfr {_id = _id})) namespace
-            case mattachment of 
-              Nothing -> pure unit
-              Just attachment -> void $ addAttachment modelsDb _id _rev' "screens.js" attachment (MediaType "text/exmascript")
+            case mscreensAttachment of 
+              Nothing -> void $ addAttachment modelsDb _id _rev' "storedQueries.json" (write invertedQueries) (MediaType "application/json")
+              Just screensAttachment -> do
+                DeleteCouchdbDocument {rev} <- addAttachment modelsDb _id _rev' "screens.js" screensAttachment (MediaType "text/exmascript")
+                void $ addAttachment modelsDb _id rev "storedQueries.json" (write invertedQueries) (MediaType "application/json")
         pure model
     getVersionedDomeinFileName :: String -> MonadPerspectivesTransaction (Maybe String)
     getVersionedDomeinFileName rid = do 
@@ -107,20 +112,13 @@ recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
     r <- lift $ loadAndCompileArcFile_ arc
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
-      Right df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) -> lift $ lift do
+      Right (Tuple df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) invertedQueries) -> lift $ lift do
         log $  "Recompiled '" <> namespace <> "' succesfully!"
         -- We have to add the _id here manually.
         df' <- pure $ DomeinFile drf { _id = _id}
         storeDomeinFileInCouchdbPreservingAttachments df'
+        saveInvertedQueries invertedQueries
 
-        -- Distribute the SeparateInvertedQueries over the other domains.
-        forWithIndex_ invertedQueriesInOtherDomains
-          \domainName queries -> do
-            (try $ getDomeinFile (DomeinFileId domainName)) >>=
-              handleDomeinFileError "addModelToLocalStore'"
-              \(DomeinFile dfr) -> do
-                -- Here we must take care to preserve the screens.js attachment.
-                (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ queries addInvertedQuery) dfr))
         -- Distribute upstream state notifications over the other domains.
         forWithIndex_ upstreamStateNotifications
           \domainName notifications -> do

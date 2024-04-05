@@ -177,6 +177,33 @@ exports.addDocumentImpl = function ( database, doc ) {
   };
 };
 
+exports.bulkDocsImpl = function( database, docs, deleteP )
+{
+  let docs_ = docs;
+  if (deleteP)
+    {
+      docs_ = docs.map( doc => doc._deleted = true )
+    }
+  return function (onError, onSuccess){
+    database.bulkDocs( docs_, function( err, response)
+    {
+      if (err !== null)
+      {
+        onError( convertPouchError(err) ); // invoke the error callback in case of an error
+      }
+      else
+      {
+        onSuccess(response); // invoke the success callback with the reponse
+      }
+    // Return a canceler, which is just another Aff effect.
+    return function (cancelError, cancelerError, cancelerSuccess) {
+      // No way to cancel the request.
+      cancelerSuccess(); // invoke the success callback for the canceler
+      };
+    })
+  };
+}
+
 exports.deleteDocumentImpl = function ( database, docName, rev ) {
   return function (onError, onSuccess) {
     database.remove(docName, rev, function(err, response)
@@ -282,14 +309,19 @@ exports.getAttachmentImpl = function( database, docName, attachmentId )
   };
 }
 
-exports.getViewOnDatabaseImpl = function( database, viewname, key )
+exports.getViewOnDatabaseImpl = function( database, viewname, key, multipleKeys, includeDocs )
 {
   return function (onError, onSucces)
   {
-    if (key)
+    function notDeletedP(row)
+    {
+      return !(row.value && row.value.deleted);
+    }
+
+    if (multipleKeys)
     {
       database.query( viewname,
-        { key: key },
+        { keys: key, include_docs: includeDocs },
         function (err, result)
         {
           if (err != null)
@@ -298,13 +330,32 @@ exports.getViewOnDatabaseImpl = function( database, viewname, key )
           }
           else
           {
+            result.rows = result.rows.filter(notDeletedP);
+            onSucces( result );
+          }
+        });
+    }
+    else if (key != "")
+    {
+      database.query( viewname,
+        { key: key, include_docs: includeDocs },
+        function (err, result)
+        {
+          if (err != null)
+          {
+            onError( convertPouchError( err ))
+          }
+          else
+          {
+            result.rows = result.rows.filter(notDeletedP);
             onSucces( result );
           }
         });
     }
     else
     {
-      database.query( viewname,
+      database.query( viewname, 
+        {include_docs: includeDocs},
         function (err, result)
         {
           if (err != null)
@@ -313,6 +364,7 @@ exports.getViewOnDatabaseImpl = function( database, viewname, key )
           }
           else
           {
+            result.rows = result.rows.filter(notDeletedP);
             onSucces( result );
           }
         });
@@ -324,7 +376,6 @@ exports.getViewOnDatabaseImpl = function( database, viewname, key )
     };
   };
 }
-
 
 exports.toFileImpl = function( fileName, mimeType, arrayBuffer )
 {

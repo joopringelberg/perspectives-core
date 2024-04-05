@@ -213,6 +213,10 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Accounts
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
+      
+      perspective on BespokeDatabases
+        all roleverbs
+        props(OwnerName) verbs (Consult)
 
         -- This is currently not very useful, because a Repositories instance will not enter state WithoutManifests 
         -- when its last Manifest is deleted. Negation by failure breaks on removing instances!
@@ -234,6 +238,9 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Accounts"
           row
             table Accounts
+        tab "Bespoke databases"
+          row
+            table BespokeDatabases
 
     -- This role requires credentials for the ServerUrl, because it can remove itself.
     -- It requires write access to cw_servers_and_repositories.
@@ -290,6 +297,19 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on Repositories
         props (Repositories$NameSpace) verbs (Consult)
+      
+      perspective on BespokeDatabases
+        only (CreateAndFill, Remove)
+        props (Description) verbs (Consult, SetPropertyValue)
+
+      action RequestDatabase
+        letA
+          db <- create context BespokeDatabase bound to BespokeDatabases
+        in
+          bind (sys:Me >> binder CouchdbServer$Accounts >>= first) to Owner in db >> binding >> context 
+      
+      perspective on MyBespokeDatabases
+        props (Description) verbs (Consult)
 
       screen "Couchdb Server"
         tab "The server"
@@ -302,6 +322,9 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Repositories"
           row
             table Repositories
+        tab "My databases"
+          row
+            table MyBespokeDatabases
 
     -- The instance of CouchdbServer is published in the cw_servers_and_repositories database.
     -- TODO: als omkering van filtered queries volledig is, beperk dan het perspectief van Visitor tot PublicRepositories.
@@ -390,6 +413,51 @@ domain model://perspectives.domains#CouchdbManagement
         --     do for Admin
         --       -- create role Admin in binding >> context
         --       bind context >> Admin to Admin in binding >> context
+
+    context BespokeDatabases (relational) filledBy BespokeDatabase
+    context MyBespokeDatabases = filter BespokeDatabases with binding >> context >> Owner filledBy sys:Me
+  -------------------------------------------------------------------------------
+  ---- BESPOKEDATABASE
+  -------------------------------------------------------------------------------
+  case BespokeDatabase
+    external
+      property DatabaseLocation (String)
+      property DatabaseName (String)
+      property Endorsed (Boolean)
+      property BaseUrl = binder BespokeDatabases >> context >> extern >> ServerUrl
+      property OwnerName = context >> Owner >> LastName
+      property Description (String)
+      property Public (Boolean)
+      state CreateDb = Endorsed and exists context >> Owner
+        on entry
+          do for CBAdmin
+            DatabaseName = callExternal util:GenSym() returns String
+            callEffect cdb:CreateCouchdbDatabase( BaseUrl, DatabaseName )
+            DatabaseLocation = BaseUrl + DatabaseName
+            callEffect cdb:MakeAdminOfDb( BaseUrl, DatabaseName, context >> Owner >> UserName )
+      state IsPublic = Public
+        on entry
+          do for CBAdmin
+            callEffect cdb:MakeDatabasePublic( BaseUrl, DatabaseName )
+        -- on exit
+        --   do for CBAdmin
+        --     callEffect cdb:MakeDatabasePrivate( BaseUrl, DatabaseName )
+      on exit
+        do for CBAdmin
+          callEffect cdb:DeleteCouchdbDatabase( BaseUrl, DatabaseName )
+
+    user Owner filledBy CouchdbServer$Accounts
+      perspective on External
+        props (Public, Description) verbs (Consult, SetPropertyValue)
+        props (DatabaseLocation) verbs (Consult)
+
+    user CBAdmin = extern >> binder BespokeDatabases >> context >> Admin
+      perspective on External
+        props (DatabaseLocation, Endorsed) verbs (Consult, SetPropertyValue)
+        props (BaseUrl) verbs (Consult)
+      perspective on Owner
+        all roleverbs
+        props (LastName) verbs (Consult)
 
   -------------------------------------------------------------------------------
   ---- REPOSITORY
@@ -667,24 +735,31 @@ domain model://perspectives.domains#CouchdbManagement
     context Repository (functional) = extern >> binder Manifests >> context >> extern
 
     -- Inherits credentials for the ServerUrl and RepositoryUrl, and write access to the ModelsDatabase and the InstancesDatabase of the Repository.
-    user Author filledBy Repository$Authors, Repository$Admin
+    user Author (relational) filledBy Repository$Authors, Repository$Admin
       perspective on extern
         props (Description, IsLibrary, VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
-        props (Versions$Version, Description) verbs (Consult SetPropertyValue)
+        props (Versions$Version, Description) verbs (Consult, SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
+        props (FirstName, LastName) verbs (Consult)
+      perspective on Author
+        all roleverbs
         props (FirstName, LastName) verbs (Consult)
       action CreateVersion
         create role Versions
       
       screen "Model Manifest"
-        row 
-          form "This Manifest" External
-        row
-          table "Available Versions" Versions
-            only (Remove)
+        tab "Versions"
+          row 
+            form "This Manifest" External
+          row
+            table "Available Versions" Versions
+              only (Remove)
+        tab "Authors"
+          row
+            table "Authors" Author
     
     -- A public version of ModelManifest is available in the database cw_<NameSpace>.
     public Visitor at extern >> PublicUrl = sys:Me
@@ -724,12 +799,6 @@ domain model://perspectives.domains#CouchdbManagement
         row
           table "Model versions" Versions
 
-    -- In order to add this model to one's installation, one should become an ActiveUser of the Manifest.
-    -- BUT HOW?
-    user ActiveUser filledBy Repository$Accounts
-      perspective on Versions
-        props (Versions$Version, Description) verbs (Consult)
-
     context Versions (relational) filledBy VersionedModelManifest
       aspect sys:ModelManifest$Versions
       -- Version
@@ -759,6 +828,8 @@ domain model://perspectives.domains#CouchdbManagement
       -- VersionedModelManifest$External$Description
       -- VersionedModelManifest$External$DomeinFileName
       -- VersionedModelManifest$External$Version
+      -- VersionedModelManifest$External$Patch
+      -- VersionedModelManifest$External$Build
       -- The Version property is registered on ModelManifest$Versions so we can use it to create a DNS URN for it (it must be a public resource)
       -- PDRDEPENDENCY
       property ModelURI (functional) = binder Versions >> context >> extern >> ModelManifest$External$ModelURI
@@ -811,12 +882,22 @@ domain model://perspectives.domains#CouchdbManagement
           notify Author
             "Version {External$Version} (build {Build}) has been uploaded to the repository for {binder Versions >> context >> Repository >> NameSpace >>= first}."
 
-    user Author filledBy cm:ModelManifest$Author
+    user Author (relational) filledBy cm:ModelManifest$Author
       perspective on extern
         props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
+      perspective on Author
+        all roleverbs
+        props (FirstName, LastName) verbs (Consult)
+      screen "Model version"
+        tab "Version"
+          row
+            form External
+        tab "Authors"
+          row
+            table Author
     
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
@@ -830,14 +911,3 @@ domain model://perspectives.domains#CouchdbManagement
           form "All versions" Manifest 
 
     context Manifest (functional) = extern >> binder Versions >> context >> extern
-
-
-    user ActiveUser = extern >> binder Versions >> context >> ActiveUser
-      perspective on Author
-        props (FirstName, LastName) verbs (Consult)
-      perspective on extern
-        props (Version) verbs (Consult)
-
-      screen "Manifest"
-        row
-          form External

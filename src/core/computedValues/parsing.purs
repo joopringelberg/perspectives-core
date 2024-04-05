@@ -49,6 +49,7 @@ import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExterna
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
+import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment) as Persistence
@@ -59,6 +60,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
+import Simple.JSON (write)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
@@ -72,7 +74,7 @@ parseAndCompileArc arcSource_ _ = try
         lift $ lift $ resetWarnings
         r <- lift $ lift $ runEmbeddedTransaction true (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
         case r of
-          Left errs -> ArrayT $ pure (Value <<< show <$> errs)
+          Left errs -> ArrayT $ pure (Value <<< show <$> errs) 
           -- Als er meldingen zijn, geef die dan terug.
           Right _ -> do
             warnings <- lift $ lift $ getWarnings
@@ -96,18 +98,19 @@ uploadToRepository domeinFileName_ arcSource_ _ = try
       r <- loadAndCompileArcFile_ arcSource
       case r of
         Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
-        Right df@(DomeinFile {id, namespace}) -> do
+        -- Here we will have a tuple of the DomeinFile and an instance of StoredQueries.
+        Right (Tuple df@(DomeinFile {id, namespace}) invertedQueries) -> do
           -- lift $ void $ storeDomeinFileInCache id df
           -- lift $ void $ CDB.uploadToRepository (DomeinFileId id)
-          lift $ void $ uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df
+          lift $ void $ uploadToRepository_ (unsafePartial modelUri2ModelUrl domeinFileName) df invertedQueries
     _, _ -> logPerspectivesError $ Custom ("uploadToRepository lacks arguments"))
   >>= handleExternalStatementError "model://perspectives.domains#Parsing$UploadToRepository"
 
 type URL = String
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
-uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> MonadPerspectives Unit
-uploadToRepository_ splitName (DomeinFile df) = do 
+uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> StoredQueries -> MonadPerspectives Unit
+uploadToRepository_ splitName (DomeinFile df) invertedQueries = do 
   -- Get the attachment info
   (mremoteDf :: Maybe DomeinFile) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
   attachments <- case mremoteDf of
@@ -129,12 +132,16 @@ uploadToRepository_ splitName (DomeinFile df) = do
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
     -- next attachment.
     go :: URL -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
-    go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> case mattachment of
-      Nothing -> pure unit
-      Just attachment -> do
-        newRev <- get
-        DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
-        put rev
+    go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> do 
+      case mattachment of
+        Nothing -> pure unit
+        Just attachment -> do
+          newRev <- get
+          DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
+          put rev
+        -- Lastly, add the StoredQueries
+      newRev <- get
+      lift $ Persistence.addAttachment documentUrl documentName newRev "storedQueries.json" (write invertedQueries) (MediaType "application/json")
 
 removeFromRepository :: 
   Array ModelUri ->

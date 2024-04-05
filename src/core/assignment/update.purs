@@ -321,7 +321,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
         Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>= handlePerspectRolError "addProperty"
           \(pe :: PerspectRol) -> do
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-            users <- aisInPropertyDelta rid propertyName replacementProperty (rol_pspType pe)
+            users <- aisInPropertyDelta rid' rid propertyName replacementProperty (rol_pspType pe)
             deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
                 delta <- case msignedDelta of
                   Nothing -> do
@@ -398,7 +398,7 @@ removeProperty rids propertyName values = case ARR.head rids of
         Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
           handlePerspectRolError "removeProperty"
           \(pe :: PerspectRol) -> do
-            users <- aisInPropertyDelta rid propertyName replacementProperty (rol_pspType pe)
+            users <- aisInPropertyDelta rid' rid propertyName replacementProperty (rol_pspType pe)
             -- Create a delta for all values at once.
             delta <- pure $ RolePropertyDelta
               { id : rid
@@ -438,7 +438,7 @@ deleteProperty rids propertyName = case ARR.head rids of
             handlePerspectRolError
             "deleteProperty"
             \(pe@(PerspectRol{properties, pspType})) -> do
-              users <- aisInPropertyDelta rid propertyName replacementProperty pspType
+              users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
               -- Create a delta for all values.
               -- We must add the current values, otherwise a Transaction can only have a single 
               -- DeleteProperty delta.
@@ -497,8 +497,8 @@ saveFile r property arrayBuf mimeType = do
     Nothing -> pure $ RoleProp r property
     Just x -> pure x
   roleInstance :: PerspectRol <- lift $ getPerspectRol rid
-      -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-  users <- aisInPropertyDelta rid property replacementProperty (rol_pspType roleInstance)
+      -- Compute the users for this role (the property's value has no effect on this calculation). As a side effect, contexts are added to the transaction.
+  users <- aisInPropertyDelta r rid property replacementProperty (rol_pspType roleInstance)
   subject <- getSubject
   author <- getAuthor
   dbLoc <- lift $ databaseLocation $ unwrap rid

@@ -27,10 +27,10 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore', createInitialInstances)
 import Perspectives.ModelDependencies (bodiesWithAccountsModelName, couchdbManagementModelName, sysUser, systemModelName)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, modelDatabaseName)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, invertedQueryDatabaseName, modelDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
-import Perspectives.SetupCouchdb (setContext2RoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView, setRole2ContextView)
+import Perspectives.SetupCouchdb (setContext2RoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFilled2FillerView, setFiller2FilledView, setModelView, setPendingInvitationView, setRTContextKeyView, setRTFilledKeyView, setRTFillerKeyView, setRTPropertyKeyView, setRTRoleKeyView, setRole2ContextView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
 import Prelude (Unit, bind, discard, void, ($), (>>=))
 
 modelDirectory :: String
@@ -52,10 +52,21 @@ setupUser = do
   entitiesDatabaseName >>= setContext2RoleView
   entitiesDatabaseName >>= setRole2ContextView
 
+  setupInvertedQueryDatabase
+
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView 
   -- Finally, upload model:System to perspect_models.
   void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))
+
+setupInvertedQueryDatabase :: MonadPerspectives Unit
+setupInvertedQueryDatabase = do
+  invertedQueryDatabaseName >>= setModelView
+  invertedQueryDatabaseName >>= setRTPropertyKeyView
+  invertedQueryDatabaseName >>= setRTRoleKeyView
+  invertedQueryDatabaseName >>= setRTContextKeyView
+  invertedQueryDatabaseName >>= setRTFillerKeyView
+  invertedQueryDatabaseName >>= setRTFilledKeyView  
 
 reSetupUser :: MonadPerspectives Unit
 reSetupUser = do

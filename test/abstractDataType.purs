@@ -41,7 +41,7 @@ theSuite = suite  "Perspectives.Representation.ADT" do
               x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{enumeratedRoles, calculatedRoles}) -> do
+                (Right (Tuple correctedDFR@{enumeratedRoles, calculatedRoles} invertedQueries )) -> do
                   -- logShow correctedDFR
                   case lookup "model:MyTestDomain$Role" enumeratedRoles of
                     Nothing -> assert "There should be a role 'model:MyTestDomain$Role'" false

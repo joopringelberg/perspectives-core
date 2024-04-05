@@ -7,6 +7,7 @@ import Control.Monad.Free (Free)
 import Data.Array (null)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Tuple (Tuple(..))
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log, logShow)
@@ -43,7 +44,7 @@ theSuite = suite "Perspectives.loadArc" do
     -- logShow retrievedModel
     case r of
       Left e -> assert ("The same file loaded the second time fails: " <> show e) false
-      Right reParsedModel -> do
+      Right (Tuple reParsedModel _) -> do
         -- logShow (changeRevision Nothing reParsedModel)
         assert "The model reloaded from couchdb should equal the model loaded from file."
           (eq (changeRevision Nothing retrievedModel) (changeRevision Nothing reParsedModel))

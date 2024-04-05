@@ -42,12 +42,12 @@ import Data.Identity (Identity)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Monoid.Disj (Disj(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Set (fromFoldable, subset)
 import Data.Traversable (traverse)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, map, pure, show, ($), (&&), (/=), (<$>), (<<<), (<>), (==), (>>>))
+import Prelude (class Applicative, class Apply, class Bind, class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, join, map, pure, show, ($), (&&), (/=), (<$>), (<*>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL
@@ -208,6 +208,32 @@ instance reducibleToArray :: Eq b => Reducible a (Array b) where
   reduce f EMPTY = pure []
   --
   reduce f UNIVERSAL = pure []
+
+newtype ArrayUnions a = ArrayUnions (Array a)
+derive instance Newtype (ArrayUnions a) _
+instance Functor ArrayUnions where
+  map f (ArrayUnions arr) = ArrayUnions $ (map f arr)
+instance Apply ArrayUnions where
+  apply (ArrayUnions fs) (ArrayUnions arr) = ArrayUnions (fs <*> arr)
+instance Applicative ArrayUnions where 
+  pure = ArrayUnions <<< singleton
+instance Bind ArrayUnions where
+  bind (ArrayUnions arr) f = ArrayUnions $ concat (unwrap <$> (f <$> arr))
+
+instance Eq b => Reducible a (ArrayUnions b) where
+  reduce f (ST a) = f a
+  reduce f (SUM adts) = do
+    (arrays :: Array (ArrayUnions b)) <- traverse (reduce f) adts
+    case uncons arrays of
+      Nothing -> pure $ ArrayUnions []
+      Just {head, tail} -> pure $ foldl (\(ArrayUnions x) (ArrayUnions y) -> ArrayUnions (x `union` y)) head tail
+  reduce f (PROD adts) = do
+    (arrays :: Array (ArrayUnions b)) <- traverse (reduce f) adts
+    pure $ foldl (\(ArrayUnions x) (ArrayUnions y) -> ArrayUnions (x `union` y)) (ArrayUnions []) arrays
+  reduce f EMPTY = pure $ ArrayUnions []
+  --
+  reduce f UNIVERSAL = pure $ ArrayUnions []
+
 
 -- | Reduce an `ADT a` with `f :: a -> MP (ADT b)`.
 -- | `reduce f` then has type `ADT a -> MP (ADT b)`.

@@ -42,6 +42,7 @@ module Perspectives.Persistent
   , getPerspectContext
   , getPerspectEntiteit
   , getPerspectRol
+  , invertedQueryDatabaseName
   , modelDatabaseName
   , postDatabaseName
   , removeEntiteit
@@ -119,6 +120,9 @@ postDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_post")
 
 modelDatabaseName :: MonadPerspectives String
 modelDatabaseName = dbLocalName (DomeinFileId "model://perspectives.domains#System")
+
+invertedQueryDatabaseName :: MonadPerspectives String
+invertedQueryDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_invertedqueries")
 
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit fix

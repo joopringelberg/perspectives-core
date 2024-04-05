@@ -63,7 +63,7 @@ makeTest_ test title source errorHandler theTest = test title do
             x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
             case x of
               (Left e) -> for_ e errorHandler
-              (Right correctedDFR) -> theTest correctedDFR
+              (Right (Tuple correctedDFR _)) -> theTest correctedDFR
 
 makeTest :: String -> String -> (PerspectivesError -> Aff Unit) -> (DomeinFileRecord -> Aff Unit) -> Free TestF Unit
 makeTest = makeTest_ test

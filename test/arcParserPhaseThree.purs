@@ -71,7 +71,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right dr') -> do
+                  (Right (Tuple dr' _)) -> do
                     -- logShow dr'
                     ensureCRole "model:MyTestDomain$AnotherRole" dr' >>= exists
                     ensureERole "model:MyTestDomain$SomeUser" dr' >>=
@@ -93,7 +93,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right correctedDFR) -> do
+                  (Right (Tuple correctedDFR _)) -> do
                     -- logShow correctedDFR
                     ensureERole "model:MyTestDomain$Driver" correctedDFR >>=
                       ensurePerspectiveOn "model:MyTestDomain$External" >>=
@@ -132,7 +132,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right correctedDFR@{enumeratedRoles}) -> do
+                  (Right (Tuple correctedDFR@{enumeratedRoles} _)) -> do
                     -- logShow correctedDFR
                     case lookup "model:MyTestDomain$Binder" enumeratedRoles of
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
@@ -154,7 +154,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right correctedDFR@{enumeratedRoles}) -> do
+                  (Right (Tuple correctedDFR@{enumeratedRoles} _)) -> do
                     -- logShow correctedDFR
                     case lookup "model:MyTestDomain$Binder" enumeratedRoles of
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
@@ -176,7 +176,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right correctedDFR@{enumeratedRoles}) -> do
+                  (Right (Tuple correctedDFR@{enumeratedRoles} _)) -> do
                     -- logShow correctedDFR
                     case lookup "model:MyTestDomain$Binder" enumeratedRoles of
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
@@ -235,7 +235,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
                   (Left e) -> assert (show e) false
-                  (Right correctedDFR@{views}) -> do
+                  (Right (Tuple correctedDFR@{views} _)) -> do
                     -- logShow correctedDFR
                     case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
                       Nothing -> assert "There should be a View 'model:MyTestDomain$Feest$ViewOpFeest'" false
@@ -276,7 +276,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{views}) -> do
+                Right (Tuple correctedDFR@{views} _) -> do
                   -- logShow correctedDFR
                   -- Get the references from the view
                   case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
@@ -315,7 +315,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                Right dfr ->
+                Right (Tuple dfr _) ->
                   ensureERole "model:MyTestDomain$Guest" dfr >>=
                     ensurePerspectiveOn "model:MyTestDomain$Feest" >>=
                       ensurePropertyVerbsInState (SubjectState $ StateIdentifier "model:MyTestDomain$Guest") >>=
@@ -336,7 +336,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR@{views}) -> do
+                Right (Tuple correctedDFR@{views} _) -> do
                   -- logShow correctedDFR
                   -- get the action
                   case lookup "model:MyTestDomain$Feest$ViewOpFeest" views of
@@ -359,7 +359,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert ("PhaseThree error:" <> show e) false
-                (Right correctedDFR@{calculatedRoles}) -> do
+                (Right (Tuple correctedDFR@{calculatedRoles} _)) -> do
                   -- logShow correctedDFR
                   case lookup "model:MyTestDomain$MyRole" calculatedRoles of
                     Nothing -> assert "There should be a role 'MyRole'" false
@@ -389,7 +389,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 (Left e) -> assert (show e) false
-                (Right correctedDFR) -> do
+                (Right (Tuple correctedDFR _)) -> do
                   -- logShow correctedDFR
                   ensureERole "model:Test$Gast" correctedDFR >>=
                     ensurePerspectiveOn "model:Test$Party" >>=
@@ -410,7 +410,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> do
+                Right (Tuple correctedDFR _) -> do
                   -- logShow correctedDFR
                   ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
                     enumeratedPropertyIsFunctional true
@@ -436,7 +436,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> do
+                Right (Tuple correctedDFR _) -> do
                   -- logShow correctedDFR
                   ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
                     enumeratedPropertyIsFunctional true
@@ -462,7 +462,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> do
+                Right (Tuple correctedDFR _) -> do
                   -- logShow correctedDFR
                   ensureEnumeratedProperty "model:Test$Party$Prop1" correctedDFR >>=
                     enumeratedPropertyIsFunctional true
@@ -489,7 +489,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> do
+                Right (Tuple correctedDFR _) -> do
                   ensureState "model:Test$Gast$SomeState" correctedDFR >>=
                     ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Gast")) >>= pure <<< effectOfAction >>=
                       (case _ of
@@ -520,7 +520,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               x' <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x' of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR ->
+                Right (Tuple correctedDFR _) ->
                   ensureState "model:Test$Company$Gast$SomeState" correctedDFR >>=
                     ensureOnEntry (ENR (EnumeratedRoleType "model:Test$Company$Gast")) >>= pure <<< effectOfAction >>=
                       (case _ of
@@ -848,7 +848,7 @@ expectErrorX theTest testName modelText resultTester = do
               -- logShow dr'
               x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
-                Right r -> resultTester (Right r)
+                Right (Tuple r _) -> resultTester (Right r)
                 Left errs -> for_ errs (resultTester <<< Left)
               -- resultTester x
 
@@ -879,7 +879,7 @@ fileTestOnly testName fileName =
               x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> assert "OK" true
+                Right (Tuple correctedDFR _) -> assert "OK" true
 
 domainTestX ::
     (String -> Test -> TestSuite) ->
@@ -901,4 +901,4 @@ domainTestX theTest testName modelText domainTester = theTest testName do
               x <- runP $ phaseThree dr' state.postponedStateQualifiedParts Nil
               case x of
                 Left e -> assert ("PhaseThree error:" <> show e) false
-                Right correctedDFR -> domainTester correctedDFR
+                Right (Tuple correctedDFR _) -> domainTester correctedDFR

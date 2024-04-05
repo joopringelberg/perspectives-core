@@ -40,6 +40,7 @@ import Perspectives.DomeinCache (removeDomeinFileFromCache, storeDomeinFileInCac
 import Perspectives.DomeinFile (DomeinFile, DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.Instances.Environment (Environment, _pushFrame)
 import Perspectives.Instances.Environment (addVariable, empty, lookup) as ENV
+import Perspectives.InvertedQuery.Storable (StoredQueries, StorableInvertedQuery)
 import Perspectives.Names (defaultNamespaces, expandNamespaces)
 import Perspectives.Parsing.Arc.AST (ContextPart(..), ScreenE, StateQualifiedPart)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
@@ -69,6 +70,7 @@ type PhaseTwoState =
   , screens :: List ScreenE
   , perspectives :: MAP.Map (Tuple RoleType Step) Perspective
   , loopdetection :: LoopDetection
+  , invertedQueries :: StoredQueries
 }
 
 data CurrentlyCalculated = Prop CalculatedPropertyType | Role CalculatedRoleType
@@ -110,7 +112,8 @@ runPhaseTwo_' computation dfr indexedContexts indexedRoles postponedParts = runS
   , postponedStateQualifiedParts: postponedParts
   , screens: Nil
   , perspectives: MAP.empty
-  , loopdetection: []}
+  , loopdetection: []
+  , invertedQueries: []}
 
 -- | Run a computation in `PhaseTwo`, returning Errors or the result of the computation.
 -- | Used in the test modules.
@@ -130,6 +133,7 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
   , screens: Nil
   , perspectives: MAP.empty
   , loopdetection: []
+  , invertedQueries: []
   }
 
 -- type PhaseTwo a = PhaseTwo' a Identity
@@ -255,3 +259,6 @@ withDomeinFile ns df mpa = do
   lift2 $ removeDomeinFileFromCache ns
   pure r
 
+-- | Add a StorableInvertedQuery to PhaseTwo State.
+addStorableInvertedQuery :: StorableInvertedQuery -> PhaseThree Unit
+addStorableInvertedQuery siq = void $ modify \s@{invertedQueries} -> s {invertedQueries = cons siq invertedQueries}

@@ -37,6 +37,7 @@ import Node.Process (cwd)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (storeDomeinFileInCache, storeDomeinFileInCouchdb)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
+import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc (domain)
 import Perspectives.Parsing.Arc.AST (ContextE)
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
@@ -45,7 +46,6 @@ import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId)
- 
 import Prelude (bind, pure, show, ($), (*>), (<>))
 import Text.Parsing.Parser (ParseError(..))
 
@@ -61,14 +61,14 @@ import Text.Parsing.Parser (ParseError(..))
 
 -- | Load an Arc file from a directory relative to the active process. Parse the file completely.
 -- | Does neither cache nor save the model.
-loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
+loadAndCompileArcFile :: String -> String -> MonadPerspectives (Either MultiplePerspectivesErrors (Tuple DomeinFile StoredQueries))
 loadAndCompileArcFile fileName directoryName = do
   procesDir <- liftEffect cwd
   loadAndCompileArcFile_ (Path.concat [procesDir, directoryName, fileName <> ".arc"])
 
 type FilePath = String
 
-loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either MultiplePerspectivesErrors DomeinFile)
+loadAndCompileArcFile_ :: FilePath -> MonadPerspectives (Either MultiplePerspectivesErrors (Tuple DomeinFile StoredQueries))
 loadAndCompileArcFile_ filePath = catchError
   do
     text <- lift $ readTextFile UTF8 filePath
@@ -84,16 +84,17 @@ loadAndCompileArcFile_ filePath = catchError
             -- log (show dr')
             dr'' <- pure dr' {referredModels = state.referredModels}
             -- logShow state.referredModels
-            (x' :: (Either MultiplePerspectivesErrors DomeinFileRecord)) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
+            (x' :: (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))) <- phaseThree dr'' state.postponedStateQualifiedParts state.screens
             case x' of
               (Left e) -> do 
                 pure $ Left e
-              (Right correctedDFR@{referredModels}) -> do
+              (Right (Tuple correctedDFR@{referredModels:refModels} invertedQueries)) -> do
                 -- Remove the self-referral and add the source.
-                pure $ Right $ DomeinFile correctedDFR
-                  { referredModels = delete id referredModels
+                df <- pure $ DomeinFile correctedDFR
+                  { referredModels = delete id refModels
                   , arc = text
                   }
+                pure $ Right $ Tuple df invertedQueries
   \e -> pure $ Left [Custom (show e)]
 
 type Persister = DomeinFileId -> DomeinFile -> MonadPerspectives MultiplePerspectivesErrors
@@ -103,12 +104,13 @@ type CrlPath = String
 
 -- | Loads an .arc file and expects a .crl file with the same name. Adds the instances found in the .crl
 -- | file to the DomeinFile. Adds the model description instance. Persists that DomeinFile.
+-- | NOTICE THAT INVERTED QUERIES ARE NOT STORED!
 loadAndPersistArcFile :: Boolean -> Persister -> String -> String -> MonadPerspectives MultiplePerspectivesErrors
 loadAndPersistArcFile loadCRL persist fileName directoryName = do
   r <- loadAndCompileArcFile fileName directoryName
   case r of
     Left m -> pure m
-    Right df@(DomeinFile {id}) -> persist id df *> pure []
+    Right (Tuple df@(DomeinFile {id}) invertedQueries ) -> persist id df *> pure []
 
 -- | Load an Arc file from a directory. Parse the file completely. Cache it.
 -- | Loads an instance file, too. If not present, throws an error. Instances are added to the cache.
