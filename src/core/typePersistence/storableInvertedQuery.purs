@@ -28,19 +28,18 @@ import Prelude
 import Control.Monad.Error.Class (catchError)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InvertedQuery (InvertedQuery)
-import Perspectives.InvertedQueryKey (ContextKeyFields, FillerKeyFields, PropertyKeyFields, RoleKeyFields, RunTimeInvertedQueryKey(..), FilledKeyFields)
+import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey, serializeInvertedQueryKey)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (Keys(..), addDocuments, createDatabase, deleteDatabase, deleteDocuments, getAttachment, getViewWithDocs)
 import Perspectives.Persistent (invertedQueryDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
-import Simple.JSON (read, writeJSON)
+import Simple.JSON (read)
 
-type StorableInvertedQuery = { keys :: Array RunTimeInvertedQueryKey, query :: InvertedQuery, model :: DomeinFileId }
+type StorableInvertedQuery = { queryType :: String, keys :: Array String, query :: InvertedQuery, model :: DomeinFileId }
 
 type StoredQueries = Array StorableInvertedQuery
 
@@ -54,47 +53,32 @@ clearInvertedQueriesDatabase = do
 getPropertyQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
 getPropertyQueries qs = do 
   db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTPropertyKeyView" (Keys (qs <#> writeJSON <<< unsafePartial f))
+  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTPropertyKeyView" (Keys (qs <#> serializeInvertedQueryKey))
   pure (storedQueries <#> _.query)
-  where 
-    f :: Partial => RunTimeInvertedQueryKey -> PropertyKeyFields
-    f (RTPropertyKey fields) = fields
 
 getRoleQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
 getRoleQueries qs = do 
   db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTRoleKeyView" (Keys (qs <#> unsafePartial f))
+  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTRoleKeyView" (Keys (qs <#> serializeInvertedQueryKey))
   pure (storedQueries <#> _.query)
-  where 
-    f :: Partial => RunTimeInvertedQueryKey -> RoleKeyFields
-    f (RTRoleKey fields) = fields
 
 getContextQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
 getContextQueries qs = do 
   db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTContextKeyView" (Keys (qs <#> unsafePartial f))
+  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTContextKeyView" (Keys (qs <#> serializeInvertedQueryKey))
   pure (storedQueries <#> _.query)
-  where 
-    f :: Partial => RunTimeInvertedQueryKey -> ContextKeyFields
-    f (RTContextKey fields) = fields
 
 getFillerQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
 getFillerQueries qs = do 
   db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFillerKeyView" (Keys (qs <#> unsafePartial f))
+  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFillerKeyView" (Keys (qs <#> serializeInvertedQueryKey))
   pure (storedQueries <#> _.query)
-  where 
-    f :: Partial => RunTimeInvertedQueryKey -> FillerKeyFields
-    f (RTFillerKey fields) = fields
 
 getFilledQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
 getFilledQueries qs = do 
   db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFilledKeyView" (Keys (qs <#> unsafePartial f))
+  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFilledKeyView" (Keys (qs <#> serializeInvertedQueryKey))
   pure (storedQueries <#> _.query)
-  where 
-    f :: Partial => RunTimeInvertedQueryKey -> FilledKeyFields
-    f (RTFilledKey fields) = fields
 
 saveInvertedQueries :: StoredQueries -> MonadPerspectives Unit
 saveInvertedQueries queries = do 
@@ -113,7 +97,7 @@ getInvertedQueriesOfModel (DomeinFileId dfid) = do
 
 -- | Remove the inverted queries contributed from the local database.
 removeInvertedQueriesContributedByModel :: DomeinFileId -> MonadPerspectives Unit
-removeInvertedQueriesContributedByModel dfid = do 
+removeInvertedQueriesContributedByModel (DomeinFileId dfid) = do 
   db <- invertedQueryDatabaseName
   -- First retrieve all inverted queries from the local database contributed by the current model.
   (modelQueries :: Array {_id :: String, _rev :: String }) <- getViewWithDocs db "defaultViews/modelView" (Key dfid)

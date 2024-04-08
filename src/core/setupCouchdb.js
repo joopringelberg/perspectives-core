@@ -184,13 +184,13 @@ exports.role2contextView = (function(context)
 
 const invertedQueryViewTemplate = (function(queryDoc)
 {
-  if (queryDoc.keys[0].keyType == "KEYKIND")
+  if (queryDoc.queryType == "KEYKIND")
   {
      queryDoc.keys.forEach( function(key)
      {
       // key.fields is the key proper, e.g.: {property, role}. However, we write the key as a string.
       // emit( JSON.stringify( key.fields ), queryDoc._id);
-      emit( key.fields, queryDoc._id);
+      emit( key, queryDoc._id);
      } )
   }
 }).toString();

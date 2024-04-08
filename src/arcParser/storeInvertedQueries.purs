@@ -32,6 +32,7 @@ import Perspective.InvertedQuery.Indices (typeLevelKeyForContextQueries, typeLev
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), backwards, forwards)
+import Perspectives.InvertedQueryKey (serializeInvertedQueryKey)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', addStorableInvertedQuery, getsDF, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, makeComposition, mandatory, range)
@@ -121,7 +122,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         ENP p -> do 
           keys <- lift $ lift $ lift $ typeLevelKeyForPropertyQueries p qfd
           lift $ addStorableInvertedQuery 
-            { keys 
+            { keys: serializeInvertedQueryKey <$> keys 
+            , queryType: "RTPropertyKey"
             , query: (InvertedQuery
               { description: qWithAK
               , backwardsCompiled: Nothing
@@ -176,7 +178,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         do 
           (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFilledQueries qfd
           lift $ addStorableInvertedQuery
-            { keys
+            { keys: serializeInvertedQueryKey <$> keys 
+            , queryType: "RTFilledKey"
             , query: (InvertedQuery
                 { description
                 , backwardsCompiled: Nothing
@@ -222,7 +225,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
       case dom of
         (RDOM EMPTY) -> pure unit
         _ -> lift $ addStorableInvertedQuery
-          { keys
+          { keys: serializeInvertedQueryKey <$> keys 
+          , queryType: "RTFillerKey"
           , query: (InvertedQuery
                     { description: description
                     , backwardsCompiled: Nothing
@@ -259,7 +263,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
           left -> do
             (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForRoleQueries qfd  
             lift $ addStorableInvertedQuery
-              { keys
+              { keys: serializeInvertedQueryKey <$> keys 
+              , queryType: "RTRoleKey"
               , query: (InvertedQuery
                 { description
                 , backwardsCompiled: Nothing
@@ -283,7 +288,8 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         Just filter -> pure $ ZQ ((makeComposition filter) <$> backwards qWithAK) (forwards qWithAK)
       (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForContextQueries qfd
       lift $ addStorableInvertedQuery
-        { keys
+        { keys: serializeInvertedQueryKey <$> keys 
+        , queryType: "RTContextKey"
         , query: (InvertedQuery
                   { description
                   , backwardsCompiled: Nothing
@@ -331,8 +337,9 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
           ZQ Nothing _ -> pure unit
           left -> do
             (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForRoleQueries qfd  
-            lift $ addStorableInvertedQuery
-              { keys
+            lift $ addStorableInvertedQuery 
+              { keys: serializeInvertedQueryKey <$> keys 
+              , queryType: "RTRoleKey"
               , query: (InvertedQuery
                 { description
                 , backwardsCompiled: Nothing

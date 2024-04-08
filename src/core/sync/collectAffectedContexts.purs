@@ -711,19 +711,23 @@ magic ctxt roleInstances rtype users =  do
 -- Note we don't evaluate any forward part; it is not needed, so it may be Nothing.
 aisInPropertyDelta :: RoleInstance -> RoleInstance -> EnumeratedPropertyType -> EnumeratedPropertyType -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
 aisInPropertyDelta 
-  instanceOnPath        -- The role instance that occurs in the query path
-  id                    -- Identifies the role instance that actually bears the property
-  property              -- the name of the property taken from the assignment statement
-  replacementProperty   -- the actual name of the property on the role instance that bears it
-  eroleType             -- the type of the role instance that actually bears the property.
+  instanceOnPath            -- The role instance that occurs in the query path
+  propertyBearingInstance   -- Identifies the role instance that actually bears the property
+  property                  -- the name of the property taken from the assignment statement
+  replacementProperty       -- the actual name of the property on the role instance that bears it
+  propertyBearingType                 -- the type of the role instance that actually bears the property.
   = do
   typeOfInstanceOnpath <- lift $ roleType_ instanceOnPath
   -- `handleBackwardQuery` just passes on users that have at least one
   -- valid perspective, even if the condition is object state.
   -- We must use all types of the role to look up calculations. `allkeys` represents all types of the actual role instance.
-  (allKeys :: Array RunTimeInvertedQueryKey) <- lift $ runtimeIndexForPropertyQueries typeOfInstanceOnpath eroleType property replacementProperty
+  (allKeys :: Array RunTimeInvertedQueryKey) <- lift $ runtimeIndexForPropertyQueries 
+    typeOfInstanceOnpath 
+    propertyBearingType 
+    property 
+    replacementProperty
   allCalculations <- lift $ getPropertyQueries allKeys >>= traverse compileBoth
-  (cwu :: Array ContextWithUsers) <- join <$> for allCalculations (handleBackwardQuery id)
+  (cwu :: Array ContextWithUsers) <- join <$> for allCalculations (handleBackwardQuery propertyBearingInstance)
   lift $ filterA notIsMe (nub $ join $ snd <$> cwu)
 
 _fillerByInvertedQueries :: InvertedQueryMapsLens

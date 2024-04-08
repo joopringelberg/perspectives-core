@@ -39,7 +39,7 @@ domain model://joopringelberg.nl#TestQueries
         notify Manager
           "Entering State1"
       
-    -- This state has not seen to become active after setting Prop1.
+    -- This state has been seen to become active after setting Prop1.
     state State2 = TheEmbeddedContext >> Prop1
       on entry
         notify Manager

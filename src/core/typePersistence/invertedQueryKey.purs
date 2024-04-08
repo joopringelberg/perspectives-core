@@ -24,6 +24,7 @@ module Perspectives.InvertedQueryKey  where
 
 import Prelude
 
+import Data.Newtype (unwrap)
 import Foreign (ForeignError(..), fail, F)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType)
 import Simple.JSON (class ReadForeign, class WriteForeign, read', write)
@@ -97,3 +98,17 @@ instance Show RunTimeInvertedQueryKey where
   show (RTContextKey r) = "RTContextKey" <> show r
   show (RTFillerKey r) = "RTFillerKey" <> show r
   show (RTFilledKey r) = "RTFilledKey" <> show r
+
+-- | Construct a string out of a RuntimeInvertedQueryKey.
+-- | Use these keys for the Couchdb views.
+-- | Note that the keys must be unique PER VIEW, not in an absolute sense. 
+serializeInvertedQueryKey :: RunTimeInvertedQueryKey -> String
+serializeInvertedQueryKey (RTPropertyKey {property, role}) = unwrap property <> unwrap role
+serializeInvertedQueryKey (RTRoleKey {context_origin, role_destination}) = 
+  unwrap context_origin <> unwrap role_destination
+serializeInvertedQueryKey (RTContextKey {role_origin, context_destination}) = 
+  unwrap role_origin <> unwrap context_destination
+serializeInvertedQueryKey (RTFillerKey {filledRole_origin, filledContext_origin, fillerRole_destination, fillerContext_destination}) = 
+  unwrap filledRole_origin <> unwrap filledContext_origin <> unwrap fillerRole_destination <> unwrap fillerContext_destination
+serializeInvertedQueryKey (RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}) = 
+  unwrap fillerRole_origin <> unwrap fillerContext_origin <> unwrap filledRole_destination <> unwrap filledContext_destination

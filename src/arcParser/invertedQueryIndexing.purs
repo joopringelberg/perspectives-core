@@ -147,28 +147,30 @@ runtimeIndexForPropertyQueries typeOfInstanceOnPath typeOfPropertyBearingInstanc
     -- Assuming that we never fill a role type with itself.
     if typeOfInstanceOnPath == typeOfPropertyBearingInstance
       -- The property value is represented on the role instance on the path (1, 3, 5).
-      then if property `isAspectPropertyOf` typeOfInstanceOnPath
+      then if property `isAspectPropertyOf` typeOfPropertyBearingInstance
         -- The property is an Aspect property (3, 5).
         then if property /= replacementProperty
           -- A replacement was used for the aspect property (5).
           then pure 
-            [ RTPropertyKey { property: replacementProperty, role: typeOfInstanceOnPath }
+            [ RTPropertyKey { property: replacementProperty, role: typeOfPropertyBearingInstance }
             , RTPropertyKey { property, role: aspectRoleType} ]
           -- No replacement was used for the aspect property (it was not contextualized to the role bearing the Aspect) (3).
-          else pure [ RTPropertyKey { property, role: typeOfInstanceOnPath }
+          else pure [ RTPropertyKey { property, role: typeOfPropertyBearingInstance }
                     , RTPropertyKey { property, role: aspectRoleType }]
         -- The property is NOT an Aspect property (1)
-        else pure [RTPropertyKey {property, role:typeOfInstanceOnPath}]
+        else pure [RTPropertyKey {property, role:typeOfPropertyBearingInstance}]
       -- The property value is represented on a filler of the role instance on the path (2, 4, 6)
       else if property `isAspectPropertyOf` typeOfInstanceOnPath
         -- The property is an Aspect property (4, 6).
         then if property /= replacementProperty
           -- A replacement was used for the Aspect property (6)
-          then pure [RTPropertyKey {property: replacementProperty, role: typeOfInstanceOnPath}]
+          then pure [ RTPropertyKey {property: replacementProperty, role: typeOfPropertyBearingInstance} 
+                    , RTPropertyKey {property: property, role: aspectRoleType } ]
           -- No replacement was used for the aspect property (it was not contextualized to the role bearing the Aspect) (4).
-          else pure [RTPropertyKey {property, role: typeOfInstanceOnPath}]
+          else pure [ RTPropertyKey {property, role: typeOfPropertyBearingInstance}
+                    , RTPropertyKey {property, role: aspectRoleType} ]
         -- The property is NOT an aspect property (2)
-        else pure [RTPropertyKey {property, role: typeOfInstanceOnPath}]
+        else pure [RTPropertyKey {property, role: typeOfPropertyBearingInstance}]
   where
     isAspectPropertyOf :: EnumeratedPropertyType -> EnumeratedRoleType -> Boolean
     isAspectPropertyOf (EnumeratedPropertyType propId) (EnumeratedRoleType rtId) = not (propId `startsWithSegments` rtId)

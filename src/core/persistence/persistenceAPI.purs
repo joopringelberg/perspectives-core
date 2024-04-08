@@ -63,7 +63,7 @@ import Perspectives.Persistence.Errors (handleNotFound, handlePouchError)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff5, runEffectFnAff6)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
 import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, UserName, ViewName, Url, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
-import Simple.JSON (class ReadForeign, class WriteForeign, read, read', write, writeJSON)
+import Simple.JSON (class ReadForeign, class WriteForeign, read, read', write)
 
 -----------------------------------------------------------
 -- CREATE DATABASE
@@ -557,28 +557,21 @@ singleKey = false
 noKey :: Boolean
 noKey = false
 
-getViewWithDocs :: forall f doc key.
-  ReadForeign key =>
-  WriteForeign key =>
+getViewWithDocs :: forall f doc.
   ReadForeign doc =>
-  DatabaseName -> ViewName -> Keys key -> MonadPouchdb f (Array doc)
+  DatabaseName -> ViewName -> Keys String -> MonadPouchdb f (Array doc)
 getViewWithDocs dbName viewname keys = withDatabase dbName
   \db -> catchError
     do
       f <- case keys of 
         NoKey -> lift $ fromEffectFnAff $ runEffectFnAff5 getViewOnDatabaseImpl db viewname (write "") noKey includeDocs
-        Key k -> lift $ fromEffectFnAff $ runEffectFnAff5 getViewOnDatabaseImpl db viewname (write k) singleKey includeDocs
+        Key k -> lift $ fromEffectFnAff $ runEffectFnAff5 getViewOnDatabaseImpl db viewname (unsafeToForeign k) singleKey includeDocs
         -- We have to provide an Array String to the Pouchdb query function when using 'keys'.
-        Keys ks -> lift $ fromEffectFnAff $ runEffectFnAff5 getViewOnDatabaseImpl db viewname (unsafeToForeign (writeJSON <$> ks)) multipleKeys includeDocs
+        Keys ks -> lift $ fromEffectFnAff $ runEffectFnAff5 getViewOnDatabaseImpl db viewname (unsafeToForeign ks) multipleKeys includeDocs
       case read f of
         Left e -> throwError $ error ("getViewWithDocs : error in decoding result: " <> show e)
-        Right ((ViewDocResult{rows}) :: (ViewDocResult Foreign String)) -> do
-          (r :: F (Array doc)) <- pure $ traverse
-            (\(ViewDocResultRow{doc}) -> read' doc)
-            rows
-          case runExcept r of
-            Left e -> throwError (error ("getViewWithDocs: multiple errors: " <> show e))
-            Right results -> pure results
+        Right ((ViewDocResult{rows}) :: (ViewDocResult doc String)) -> do
+          pure (map (\(ViewDocResultRow{doc}) -> doc) rows)
     (handlePouchError "getViewWithDocs" viewname)
 
 

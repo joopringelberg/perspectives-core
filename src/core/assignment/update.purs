@@ -312,24 +312,29 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
     values <- pure $ fst <$> valuesAndDeltas
     subject <- getSubject
     author <- getAuthor
-    for_ rids \rid' -> do
+    for_ rids \roleInstanceOnpath -> do
       -- Look for the contextualised property first: if we find a replacement for the requested property on a role instance,
       -- that is the instance we will work with - and the (replacing) local property we will work with!
-      mrid <- lift $ getPropertyBearingRoleInstance propertyName rid'
+      mrid <- lift $ getPropertyBearingRoleInstance propertyName roleInstanceOnpath
       case mrid of
         Nothing -> pure unit
-        Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>= handlePerspectRolError "addProperty"
-          \(pe :: PerspectRol) -> do
+        Just (RoleProp propertyBearingInstance replacementProperty) -> (lift $ try $ getPerspectRol propertyBearingInstance) >>= handlePerspectRolError "addProperty"
+          \(propertyBearingInstanceRole :: PerspectRol) -> do
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-            users <- aisInPropertyDelta rid' rid propertyName replacementProperty (rol_pspType pe)
+            users <- aisInPropertyDelta 
+              roleInstanceOnpath 
+              propertyBearingInstance 
+              propertyName 
+              replacementProperty 
+              (rol_pspType propertyBearingInstanceRole)
             deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
                 delta <- case msignedDelta of
                   Nothing -> do
                     -- Create a delta for each value. The delta is in terms of the 
                     -- replacement property (if any), because that describes the structural change.
                     delta <- pure $ RolePropertyDelta
-                      { id : rid
-                      , roleType: rol_pspType pe
+                      { id : propertyBearingInstance
+                      , roleType: rol_pspType propertyBearingInstanceRole
                       , property: replacementProperty
                       , deltaType: AddProperty
                       , values: [value]
@@ -340,12 +345,17 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
             -- Look for requests for the original property AND the replacement property (if any).
-            (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
-            (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findPropertyRequests propertyBearingInstance propertyName) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findPropertyRequests propertyBearingInstance replacementProperty) >>= addCorrelationIdentifiersToTransactie
             -- Apply all changes to the role and then save it:
             --  - change the property values in one go
             --  - add all propertyDeltas.
-            lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (OBJ.union (fromFoldable deltas)) propertyDeltas}) (addRol_property pe replacementProperty values))
+            lift $ cacheAndSave 
+              propertyBearingInstance 
+              (over PerspectRol 
+                (\r@{propertyDeltas} -> 
+                  r {propertyDeltas = setDeltasForProperty replacementProperty (OBJ.union (fromFoldable deltas)) propertyDeltas}) 
+                (addRol_property propertyBearingInstanceRole replacementProperty values))
 
 -- | Get the property bearing role individual in the chain.
 -- | If the property is defined on role instance's type (either directly or by Aspect), return it; otherwise
