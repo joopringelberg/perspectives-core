@@ -161,10 +161,9 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
           then pure comprehension
           else append comprehension <$>  for lefts 
             -- Add the original right part of the composition as the forward part of the qinked query.
-            \(ZQ_ bw fw) -> if isNothing fw
-              then pure $ ZQ_ bw (Just r)
-              -- This is likely never to happen; I don't yet know what we should do in these cases.
-              else throwError (Custom "Found non-empty forwards part in inversion of left term. This requires more thinking...")
+            \(ZQ_ bw fw) -> case fw of
+              Nothing -> pure $ ZQ_ bw (Just r)
+              Just f -> pure $ ZQ_ bw (Just $ makeComposition f r)
   
   where
     comprehend :: Array QueryWithAKink_ -> Array QueryWithAKink_ -> Array QueryWithAKink_
