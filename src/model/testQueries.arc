@@ -45,12 +45,13 @@ domain model://joopringelberg.nl#TestQueries
         notify Manager
           "Entering State2"
     
-    -- This state has not seen to become active after creating Thing1.
+    -- This state has been seen to become active after creating Thing1.
     state State3 = exists TheEmbeddedContext >> binding >> context >> Thing1
       on entry
         notify Manager
           "Entering State3"
     
+    -- This state has been seen to become active after setting Prop2.
     state State4 = TheEmbeddedContext >> binding >> context >> Thing1 >> Prop2
       on entry
         notify Manager
@@ -69,5 +70,4 @@ domain model://joopringelberg.nl#TestQueries
     external 
       property Prop1 (Boolean)
     thing Thing1
-      -- Manager cannot set Prop2
       property Prop2 (Boolean)

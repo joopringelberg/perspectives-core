@@ -23,6 +23,7 @@
 
 module Perspectives.TypePersistence.PerspectiveSerialisation where
 
+import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, nub, null, uncons, union)
@@ -33,17 +34,18 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..), fst)
+import Effect.Exception (error)
 import Foreign.Object (Object, empty, fromFoldable, insert, isEmpty, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives, (##>>))
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives, (##>), (##>>))
 import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.Instances.ObjectGetters (binding_, context, contextType, getActiveRoleStates, getActiveStates, roleType_)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, domain2roleType, functional, mandatory, range, roleInContext2Role, roleRange)
-import Perspectives.Query.UnsafeCompiler (context2role, getDynamicPropertyGetter, getPublicUrl)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, isContextDomain, makeComposition, mandatory, queryFunction, range, roleInContext2Context, roleInContext2Role, roleRange)
+import Perspectives.Query.UnsafeCompiler (context2context, context2role, getDynamicPropertyGetter, getPublicUrl)
 import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -53,8 +55,9 @@ import Perspectives.Representation.Class.Role (allProperties, bindingOfADT, pers
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), expandPropSet, expandPropertyVerbs, expandVerbs)
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
-import Perspectives.Representation.ThreeValuedLogic (pessimistic)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid)
@@ -162,7 +165,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     >>= \as' -> pure $ nub as'
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
   cType <- lift (cid ##>> contextType)
-      
+  contextIdToAddRoleInstanceTo <- (unsafePartial computeContextFromPerspectiveObject object) >>= (lift <<< context2context) >>= \f -> lift (cid ##> f)
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
@@ -183,9 +186,33 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     , contextTypesToCreate
     , contextType: cType
+    , contextIdToAddRoleInstanceTo
     , identifyingProperty
     }
   where
+
+  -- The perspective object is by construction a role instance. However, there need not (yet) be one.
+  -- We must adapt the object so it becomes a query to construct the context we can create in.
+  -- A role can be reached from another role through the filled or filler operation, or from its context.
+  -- In the first two cases we have to take the context of the object, so we have to add the `context` step;
+  -- in the last case we have to remove the last step.
+    computeContextFromPerspectiveObject :: Partial => QueryFunctionDescription -> AssumptionTracking QueryFunctionDescription
+    computeContextFromPerspectiveObject qfd = case unsnoc qfd of 
+      Just {query, lastStep} -> case queryFunction lastStep of 
+        DataTypeGetterWithParameter FilledByF _ -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
+        DataTypeGetter FillerF -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
+        RolGetter _ -> pure query
+      Nothing -> if isContextDomain (domain qfd)
+        then pure $ SQD (domain qfd) (DataTypeGetter IdentityF) (domain qfd) True True
+        else throwError $ error "Programming error: Cannot compute a context domain from this perspective object."
+    
+    unsnoc :: QueryFunctionDescription -> Maybe {query :: QueryFunctionDescription, lastStep :: QueryFunctionDescription}
+    unsnoc (BQD _ (BinaryCombinator ComposeF) qfd1 qfd2 _ _ _) | queryFunction qfd2 == (BinaryCombinator ComposeF) = 
+      case unsnoc qfd2 of
+        Just {query, lastStep} -> Just { query: makeComposition qfd1 query, lastStep }
+        Nothing -> Nothing
+    unsnoc (BQD _ _ qfd1 qfd2 _ _ _ ) = Just {query: qfd1, lastStep: qfd2}
+    unsnoc _ = Nothing
 
     maybeAddIdentifier :: Array PropertyType -> Array PropertyType
     maybeAddIdentifier props = if null props then [CP $ CalculatedPropertyType roleWithId] else props

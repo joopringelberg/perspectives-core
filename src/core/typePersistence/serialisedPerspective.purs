@@ -54,7 +54,10 @@ type SerialisedPerspective' =
   ----
   ---- Instance properties
   ----
+  -- The context instance from which we compute the object; the context of the user role.
   , contextInstance :: ContextInstance
+  -- If the object of the perspective is outside the context of the user role, this is the context of that object.
+  , contextIdToAddRoleInstanceTo :: Maybe ContextInstance
   , roleInstances :: Object RoleInstanceWithProperties
   ----
   ---- State dependent properties

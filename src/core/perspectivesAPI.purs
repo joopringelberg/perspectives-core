@@ -394,21 +394,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         Just userRoleInstance -> do
           res <- (ContextInstance object) ##= getContextActions userRoleType userRoleInstance
           sendResponse (Result corrId (unwrap <$> res)) setter
-          
 
-    -- { request: "GetRolesWithProperties", object: ContextInstance, predicate: roleType}
-    -- Api.GetRolesWithProperties ->
-    --   registerSupportedEffect
-    --     corrId
-    --     setter
-    --     (getRolesWithProperties predicate)
-    --     (ContextInstance object)
-
-    -- {request: "CreateContext", subject: contextId, predicate: roleType, object: ContextType, contextDescription: contextDescription, authoringRole: myroletype}
+    -- { request: "CreateContext"
+    -- , subject: contextinstance                       the context instance to add a role instance to.
+    -- , predicate: roleType                            the qualified identifier of the role type to create.
+    -- , contextDescription: contextDescription
+    -- , authoringRole: myroletype },
+    --
     -- roleType may be a local name.
     -- The context type given in object must be described in a locally installed model.
-    Api.CreateContext -> withLocalName predicate (ContextType object)
-      \(qrolname :: RoleType) -> case qrolname of
+    Api.CreateContext -> do
+      qrolname <- getRoleType predicate
+      case qrolname of
         -- If a CalculatedRole AND a Database Query Role, do not create a role instance.
         (CR _) -> do
           isDBQ <- isDatabaseQueryRole qrolname
