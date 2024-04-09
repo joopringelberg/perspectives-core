@@ -34,14 +34,12 @@ module Perspectives.Parsing.Arc.InvertQueriesForBindings where
 import Prelude
 
 import Control.Monad.Reader (ReaderT, lift)
-import Data.Array (cons, elemIndex, fromFoldable, intersect)
+import Data.Array (cons, elemIndex, fromFoldable, head, intersect)
 import Data.Foldable (for_)
 import Data.Map (Map, filterKeys, isEmpty, singleton)
 import Data.Map (lookup) as Map
 import Data.Map.Internal (keys)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
-import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InvertedQuery (QueryWithAKink(..))
@@ -49,11 +47,12 @@ import Perspectives.Parsing.Arc.PhaseThree.StoreInvertedQueries (storeInvertedQu
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', lift2)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Kinked (invert)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext(..), addTermOnRight, domain, makeComposition)
-import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedRole)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext(..), addTermOnRight, domain, makeComposition, roleInContext2Role)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier)
 import Perspectives.Representation.Class.Property (getCalculation, getProperty, propertyTypeIsFunctional, propertyTypeIsMandatory, rangeOfPropertyType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, functional, mandatory) as RL
+import Perspectives.Representation.Class.Role (adtIsFunctional, adtIsMandatory, bindingOfADT)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties) as RL
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2threeValued)
@@ -86,9 +85,9 @@ setInvertedQueriesForUserAndRole :: Partial =>
   QueryWithAKink ->                                 -- The query inversion whose backwards leads up to the role of the third parameter.
   Boolean ->
   WithModificationSummary Unit
-setInvertedQueriesForUserAndRole backwards users bwDomain@(ST (RoleInContext{context, role})) statesPerProperty roleStates qWithAkink selfOnly = do
+setInvertedQueriesForUserAndRole backwards users bwDomain statesPerProperty roleStates qWithAkink selfOnly = do
   -- These are the properties that are on this role;
-  (propsOfRole :: Array PropertyType) <- lift3 $ RL.allLocallyRepresentedProperties (ST role)
+  (propsOfRole :: Array PropertyType) <- lift3 $ RL.allLocallyRepresentedProperties (roleInContext2Role <$> bwDomain)
   -- select from among them the ones we want in this perspective (as represented in statesPerProperty).
   propertiesOnThisLevel <- pure $ intersect (fromFoldable $ keys statesPerProperty) propsOfRole
   -- For all these properties (that are on this level in the fill network):
@@ -118,7 +117,7 @@ setInvertedQueriesForUserAndRole backwards users bwDomain@(ST (RoleInContext{con
             roleStates
             (singleton prop s)
             selfOnly
-  (adtOfBinding :: ADT RoleInContext) <- (lift3 $ getEnumeratedRole role) >>= pure <<< _.binding <<< unwrap
+  (adtOfBinding :: ADT RoleInContext) <- lift3 $ bindingOfADT bwDomain
   mapBelowThisLevel <- pure (filterKeys (isNothing <<< (flip elemIndex) propertiesOnThisLevel) statesPerProperty)
   if adtOfBinding == EMPTY
     then if isEmpty mapBelowThisLevel
@@ -165,9 +164,14 @@ setInvertedQueriesForUserAndRole backwards users bwDomain@(ST (RoleInContext{con
     -- This is a step from filler to filled
     addBindersStep :: ADT RoleInContext -> QueryWithAKink -> MP QueryWithAKink
     addBindersStep adtOfBinding (ZQ bw _) = do
-      fun <- getEnumeratedRole role >>= RL.functional
-      man <- getEnumeratedRole role >>= RL.mandatory
+      fun <- adtIsFunctional (roleInContext2Role <$> adtOfBinding)
+      man <- adtIsMandatory (roleInContext2Role <$> adtOfBinding)
+      -- We can choose an arbitrary RoleInContext from the leaves of the backward domain (parameter `bwDomain`). This is because in runtime,
+      -- we use the aliases administration on the role instance to map the chosen terms to canonical terms that have been used to actually
+      -- register the roles that are filled with the current role.
+      RoleInContext{context, role} <- pure $ fromJust $ head $ allLeavesInADT bwDomain
       -- We do not know whether the binding (filling role) is an Aspect in its embedding context.
+      -- How to select the role and context identifiers to perform the FilledF step?
       backwards' <- pure $ makeComposition
         (SQD 
           (RDOM adtOfBinding)               -- The domain of the new backwards query, being the filler of the original bwDomain
@@ -176,19 +180,6 @@ setInvertedQueriesForUserAndRole backwards users bwDomain@(ST (RoleInContext{con
           (bool2threeValued fun)
           (bool2threeValued man)) <$> bw
       pure $ ZQ backwards' Nothing
-
-setInvertedQueriesForUserAndRole backwards users (PROD terms) props roleStates invertedQ selfOnly = do
-  void $ traverse
-    (\t -> setInvertedQueriesForUserAndRole backwards users t props roleStates invertedQ selfOnly)
-    terms
-
-setInvertedQueriesForUserAndRole backwards users (SUM terms) props roleStates invertedQ selfOnly = do
-  void $ traverse
-    (\t -> setInvertedQueriesForUserAndRole backwards users t props roleStates invertedQ selfOnly)
-    terms
-
--- This handles the EMPTY and UNIVERSAL case.
-setInvertedQueriesForUserAndRole backwards users _ props roleStates invertedQ selfOnly = pure unit
 
 lift3 :: forall a. MonadPerspectives a -> WithModificationSummary a
 lift3 = lift <<< lift <<< lift

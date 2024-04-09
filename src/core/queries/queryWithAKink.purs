@@ -26,7 +26,7 @@ import Control.Alternative (guard)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, elemIndex, foldr, head, intercalate, last, snoc, unsnoc)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (for, traverse)
@@ -163,7 +163,7 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
             -- Add the original right part of the composition as the forward part of the qinked query.
             \(ZQ_ bw fw) -> case fw of
               Nothing -> pure $ ZQ_ bw (Just r)
-              Just f -> pure $ ZQ_ bw (Just $ makeComposition f r)
+              Just fw' -> pure $ ZQ_ bw (Just $ makeComposition fw' r)
   
   where
     comprehend :: Array QueryWithAKink_ -> Array QueryWithAKink_ -> Array QueryWithAKink_

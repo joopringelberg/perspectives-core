@@ -45,7 +45,6 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (<$>))
 --------------------------------------------------------------------------------------------------------------
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
 
--- | Modifies the DomeinFile in PhaseTwoState.
 setInvertedQueries ::
   Array RoleType ->
   Map.Map PropertyType (Array StateIdentifier) ->
