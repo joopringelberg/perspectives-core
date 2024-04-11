@@ -38,24 +38,40 @@ domain model://joopringelberg.nl#TestQueries
       on entry
         notify Manager
           "Entering State1"
+      on exit
+        notify Manager
+          "Leaving State1"
       
-    -- This state has been seen to become active after setting Prop1.
+    -- This state has been seen to become active after setting Prop1 to true.
+    -- It has also been seen to become inactive after setting Prop1 to false.
+    -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
     state State2 = TheEmbeddedContext >> Prop1
       on entry
         notify Manager
           "Entering State2"
+      on exit
+        notify Manager
+          "Leaving State2"
     
     -- This state has been seen to become active after creating Thing1.
+    -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
     state State3 = exists TheEmbeddedContext >> binding >> context >> Thing1
       on entry
         notify Manager
           "Entering State3"
+      on exit
+        notify Manager
+          "Leaving State3"
     
-    -- This state has been seen to become active after setting Prop2.
+    -- This state has been seen to become active after setting Prop2 to true.
+    -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
     state State4 = TheEmbeddedContext >> binding >> context >> Thing1 >> Prop2
       on entry
         notify Manager
           "Entering State4"
+      on exit
+        notify Manager
+          "Leaving State4"
 
     -- Without a role this context could never be opened.
     user Manager = sys:Me
@@ -63,11 +79,46 @@ domain model://joopringelberg.nl#TestQueries
         defaults
       perspective on TheEmbeddedContext >> binding >> context >> Thing1
         defaults
+      perspective on AnotherRole
+        defaults
 
     context TheEmbeddedContext filledBy EmbeddedContext
+      property Prop4 (Boolean)
+
+    thing AnotherRole
+      property Prop3 (Boolean)
 
   case EmbeddedContext
+    aspect sys:ContextWithNotification
     external 
       property Prop1 (Boolean)
+    
+    -- This state has been seen to become active after setting Prop4 to true.
+    -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
+    state EmbeddedState1 = extern >> binder TheEmbeddedContext >> Prop4
+      on entry
+        notify EmbeddedUser
+          "Entering EmbeddedState1"
+      on exit
+        notify EmbeddedUser
+          "Leaving EmbeddedState1"
+    
+    -- This state has been seen to become active after setting Prop4 to true.
+    -- It has also been seen to become inactive after setting Prop1 to false.
+    -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
+    state EmbeddedState2 = extern >> binder TheEmbeddedContext >> context >> AnotherRole >> Prop3
+      on entry
+        notify EmbeddedUser
+          "Entering EmbeddedState2"
+      on exit
+        notify EmbeddedUser
+          "Leaving EmbeddedState2"
+
     thing Thing1
       property Prop2 (Boolean)
+    
+    user EmbeddedUser = sys:Me
+      perspective on Thing1
+        defaults
+      perspective on extern
+        defaults

@@ -228,7 +228,7 @@ foreign import filler2filledView :: String
 
 -- | Does the RoleInstance instance fill the PerspectRol?
 filler2filledFilter :: RoleInstance -> PerspectRol -> Boolean
-filler2filledFilter rid role = Just rid == rol_binding role 
+filler2filledFilter filler role = Just filler == rol_binding role 
 
 -----------------------------------------------------------
 -- THE VIEW 'FILLERROLEVIEW'

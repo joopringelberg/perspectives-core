@@ -46,7 +46,7 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
-import Perspectives.Instances.ObjectGetters (context, contextType, getActiveRoleStates, getActiveStates, filler2filledFromDatabase_, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (Filler_(..), context, contextType, filler2filledFromDatabase_, getActiveRoleStates, getActiveStates, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -494,6 +494,6 @@ detectPublicStateChanges = do
   
   where 
     f :: RoleInstance -> MonadPerspectivesTransaction Unit 
-    f rid = do 
-      (candidates :: Array RoleInstance) <- lift $ filler2filledFromDatabase_ rid 
-      for_ candidates (flip reEvaluatePublicFillerChanges rid)
+    f filler = do 
+      (filledCandidates :: Array RoleInstance) <- lift $ filler2filledFromDatabase_ (Filler_ filler)
+      for_ filledCandidates (flip reEvaluatePublicFillerChanges filler)

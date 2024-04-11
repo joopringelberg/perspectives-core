@@ -279,23 +279,23 @@ getAllFilledRoles rid = (try $ getPerspectRol rid) >>=
 -- | Is especially useful for a public filler, as that carries no inverse administration of the (private) roles it fills.
 getFilledRolesFromDatabase :: RoleInstance ~~> RoleInstance
 getFilledRolesFromDatabase rid = ArrayT $ try 
-  (lift $ filler2filledFromDatabase_ rid)
+  (lift $ filler2filledFromDatabase_ (Filler_ rid))
   >>=
   handlePerspectRolError' "getFilledRolesFromDatabase" []
     \(roles :: Array RoleInstance) -> (tell $ ArrayWithoutDoubles [Filler rid]) *> pure roles
 
 -- | Select by providing a filler and retrieve all roles that still refer to it as their filler.
 -- | Only useful when the filler itself can no longer be retrieved.
-filler2filledFromDatabase_ :: RoleInstance -> MonadPerspectives (Array RoleInstance)
-filler2filledFromDatabase_ rid = try 
+filler2filledFromDatabase_ :: Filler_ -> MonadPerspectives (Array RoleInstance)
+filler2filledFromDatabase_ (Filler_ filler) = try 
   (do
     db <- entitiesDatabaseName
-    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Key $ unwrap rid)
+    filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Key $ unwrap filler)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
       cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
-      pure $ rol_id <$> filter (filler2filledFilter rid) cachedRoles
+      pure $ rol_id <$> filter (filler2filledFilter filler) cachedRoles
       )
     pure $ filledRolesInDatabase `union` filledRolesInCache
   )

@@ -520,7 +520,6 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectRol fill
                         _ -> fillerType
                       , oldFiller: (rol_binding originalFilled)
                       , oldFillerType
-                      -- TODO. Dit moet ook een ReplaceBinding kunnen zijn!
                       , deltaType: case mFillerId of
                         Nothing -> RemoveBinding
                         otherwise -> ReplaceBinding

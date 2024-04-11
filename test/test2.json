@@ -1,0 +1,56 @@
+{
+  "universeContextDelta": {
+      "signature": "data:application/octet-stream;base64,k/OFf5jJ8PvGQsT5F9viw5UADvT8dusWZGbhnNUaHSm1bJEeHpL4IV8yhZpifFT9Rn/Fogn6qei2jDimfMC+tUt5+fU1da5GrVdOdGNU0kMIUniwJRFDyhYxomsbh5Xi",
+      "encryptedDelta": "{\"subject\":{\"type\":\"ENR\",\"value\":\"model://perspectives.domains#CouchdbManagement$CouchdbServer$Admin\"},\"id\":\"joopringelberg_nl\",\"deltaType\":\"ConstructEmptyContext\",\"contextType\":\"model://perspectives.domains#CouchdbManagement$Repository\"}",
+      "author": "pub:https://perspectives.domains/cw_servers_and_repositories/#dev1_KeyHolder"
+  },
+  "states": [
+      "model://perspectives.domains#CouchdbManagement$Repository",
+      "model://perspectives.domains#System$ManifestCollection",
+      "model://perspectives.domains#BodiesWithAccounts$Body",
+      "model://perspectives.domains#BodiesWithAccounts$Body$NoAccounts"
+  ],
+  "rolInContext": {
+      "model://perspectives.domains#CouchdbManagement$Repository$Manifests": [
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#re2lfuiccu",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#p2ym0d32vz",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#v9zaxjmqbd",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#gmoq26t1w9",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#w6qjzgped1",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#f76u0m32tf",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#ntfmcwqeic",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#btfrua6nrl",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#zjuzjnjabc",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#iyurgmfsyp",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#dozfndd0jb",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#gxtjy0irk1",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#kozkuf38nf",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#hcup8jnp0j",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#so5d6ralk2",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#v23zng0qu7",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#pn1q18jeih",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#ic4l85quem",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#e0saelrju1",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#b5tl120dzg",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#ah8ijcuks9",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#dfp8vpki1t",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#l6dgsiptx9",
+          "pub:https://perspectives.domains/cw_servers_and_repositories/#uv0zytsj78"
+      ]
+  },
+  "pspType": "model://perspectives.domains#CouchdbManagement$Repository",
+  "preferredUserRoleType": {
+      "type": "CR",
+      "value": "model://perspectives.domains#CouchdbManagement$Repository$Visitor"
+  },
+  "id": "pub:https://perspectives.domains/cw_servers_and_repositories/#joopringelberg_nl",
+  "displayName": "pub:https://perspectives.domains/cw_servers_and_repositories/#joopringelberg_nl",
+  "buitenRol": "pub:https://perspectives.domains/cw_servers_and_repositories/#joopringelberg_nl$External",
+  "allTypes": [
+      "model://perspectives.domains#CouchdbManagement$Repository",
+      "model://perspectives.domains#System$ManifestCollection",
+      "model://perspectives.domains#BodiesWithAccounts$Body"
+  ],
+  "_rev": "28-bbeabdd992e469fcf20b9201b3a24a19",
+  "_id": "joopringelberg_nl"
+}
