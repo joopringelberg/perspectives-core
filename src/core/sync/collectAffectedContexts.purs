@@ -25,11 +25,10 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, cons, difference, filter, filterA, foldM, foldMap, foldl, head, nub, null, union)
+import Data.Array (concat, cons, difference, filter, filterA, foldM, foldMap, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Lens (Traversal', Lens', over, preview, traversed)
-import Data.Lens.At (at)
+import Data.Lens (Lens', over, preview)
 import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.List (head) as List
@@ -41,7 +40,7 @@ import Data.Symbol (SProxy(..))
 import Data.Traversable (for, for_, traverse, traverse_)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
-import Foreign.Object (Object, empty, lookup, values)
+import Foreign.Object (Object, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFillerQueries, runtimeIndexForFilledQueries, runtimeIndexForFilledQueries', runtimeIndexForPropertyQueries)
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
@@ -51,9 +50,7 @@ import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.Data.EncodableMap (empty, values) as EM
 import Perspectives.Deltas (addDelta)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (modifyDomeinFileInCache, retrieveDomeinFile)
-import Perspectives.DomeinFile (DomeinFile)
-import Perspectives.Error.Boundaries (handleDomeinFileError', handlePerspectContextError, handlePerspectRolError)
+import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
@@ -69,12 +66,12 @@ import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPa
 import Perspectives.Query.QueryTypes (isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
 import Perspectives.Representation.ADT (ArrayUnions(..))
-import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
+import Perspectives.Representation.Class.PersistentType (StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole, InvertedQueryMap)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (StateFulObject(..))
 import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
-import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
@@ -108,7 +105,6 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance contextInstance runForw
     -- No need to reflect on all Aspects of the roleType in runtime.
     -- We handle that by contextualizing Aspects in compile time. 
 
-    storedContextCalculations <- lift $ compileContextInvertedQueries roleType
     (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries roleType contextInstance >>= getContextQueries <<< unwrap >>= traverse compileBoth)
 
     -- If iq has the selfOnly modifier, we must apply a new algorithm to the roleInstance and the roleInstance.
@@ -122,7 +118,6 @@ usersWithPerspectiveOnRoleInstance roleType roleInstance contextInstance runForw
   -- ROLE STEP
   users2 <- do
     embeddingContextType <- lift (contextInstance ##>> contextType)
-    storedRoleCalculations <- lift $ compileRoleInvertedQueries embeddingContextType
     (roleCalculations :: (Array InvertedQuery)) <- lift (unsafePartial runTimeIndexForRoleQueries roleType contextInstance >>= getRoleQueries <<< unwrap >>= traverse compileBoth)
 
       -- Find all InvertedQueryResults, starting from the new role instance of the Delta.
@@ -766,52 +761,6 @@ compileInvertedQueryMap lens rt@(EnumeratedRoleType ert) = do
         Nothing -> true
         Just (InvertedQuery{backwardsCompiled}) -> isJust backwardsCompiled
 
--- | Compiles the two parts of the description of the inverted queries stored
--- | on an EnumeratedRole in the contextInvertedQueries member.
--- | stores the result in cache.
-compileContextInvertedQueries :: EnumeratedRoleType -> MonadPerspectives (Object (Array InvertedQuery))
-compileContextInvertedQueries rt@(EnumeratedRoleType ert) = do
-  modelName <- pure $ (DomeinFileId $ unsafePartial $ fromJust $ typeUri2ModelUri ert)
-  (try $ retrieveDomeinFile modelName) >>=
-    handleDomeinFileError' "compileDescriptions_" empty
-    \(df :: DomeinFile) -> do
-      -- Get the InvertedQueries.
-      (calculations :: Object (Array InvertedQuery)) <- pure $ unsafePartial $ fromJust $ preview (onDelta rt) df
-      -- Compile the descriptions.
-      if areCompiled calculations
-        then pure calculations
-        else do
-          (compiledCalculations :: Object (Array InvertedQuery)) <- traverse (traverse compileBoth) calculations
-          -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-          modifyDomeinFileInCache (over (onDelta rt) (const compiledCalculations)) modelName
-          pure compiledCalculations
-  where
-    onDelta :: EnumeratedRoleType -> Traversal' DomeinFile (Object (Array InvertedQuery))
-    onDelta (EnumeratedRoleType x) = _Newtype <<< prop (SProxy :: SProxy "enumeratedRoles") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "contextInvertedQueries")
-
--- | Compiles the two parts of the description of the inverted queries stored
--- | on a Context in the roleInvertedQueries member.
--- | stores the result in cache.
-compileRoleInvertedQueries :: ContextType -> MonadPerspectives (Object (Array InvertedQuery))
-compileRoleInvertedQueries ct@(ContextType ctxtType) = do
-  modelName <- pure $ (DomeinFileId $ unsafePartial $ fromJust $ typeUri2ModelUri ctxtType)
-  (try $ retrieveDomeinFile modelName) >>=
-    handleDomeinFileError' "compileDescriptions_" empty
-    \(df :: DomeinFile) -> do
-      -- Get the InvertedQueries.
-      (calculations :: Object (Array InvertedQuery)) <- pure $ unsafePartial $ fromJust $ preview (onDelta ct) df
-      -- Compile the descriptions.
-      if areCompiled calculations
-        then pure calculations
-        else do
-          (compiledCalculations :: Object (Array InvertedQuery)) <- traverse (traverse compileBoth) calculations
-          -- Put the compiledCalculations back in the DomeinFile in cache (not in Couchdb!).
-          modifyDomeinFileInCache (over (onDelta ct) (const compiledCalculations)) modelName
-          pure compiledCalculations
-  where
-    onDelta :: ContextType -> Traversal' DomeinFile (Object (Array InvertedQuery))
-    onDelta (ContextType x) = _Newtype <<< prop (SProxy :: SProxy "contexts") <<< at x <<< traversed <<< _Newtype <<< prop (SProxy :: SProxy "roleInvertedQueries")
-
 areCompiled :: Object (Array InvertedQuery) -> Boolean
 areCompiled ar = case head $ values ar of
   Nothing -> true
@@ -828,12 +777,3 @@ compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompi
       then logPerspectivesError (Custom $ "compileBoth: backwards is nothing for \n" <> prettyPrint description)
       else pure unit
     pure $ InvertedQuery iqr{backwardsCompiled = (map unsafeCoerce backwards'), forwardsCompiled = (map unsafeCoerce forwards')}
-
-lookupInvertedPropertyQueries :: EnumeratedRoleType -> Object (Array InvertedQuery) -> MonadPerspectivesTransaction (Array InvertedQuery)
-lookupInvertedPropertyQueries eroleType calculations = do
-  allRoletypes <- lift (eroleType ###= roleAspectsClosure)
-  pure $ foldl (\calcs nextEnumeratedType -> case lookup (unwrap nextEnumeratedType) calculations of
-    Nothing -> calcs
-    Just newCalcs -> calcs <> newCalcs)
-    []
-    allRoletypes
