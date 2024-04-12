@@ -45,6 +45,7 @@ domain model://joopringelberg.nl#TestQueries
     -- This state has been seen to become active after setting Prop1 to true.
     -- It has also been seen to become inactive after setting Prop1 to false.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
+    -- And it has been seen to become active again by filling it with the external role of an EmbeddedContext instance.
     state State2 = TheEmbeddedContext >> Prop1
       on entry
         notify Manager
@@ -55,6 +56,7 @@ domain model://joopringelberg.nl#TestQueries
     
     -- This state has been seen to become active after creating Thing1.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
+    -- TODO. Removing Thing1 does not exit this state.
     state State3 = exists TheEmbeddedContext >> binding >> context >> Thing1
       on entry
         notify Manager
@@ -65,6 +67,7 @@ domain model://joopringelberg.nl#TestQueries
     
     -- This state has been seen to become active after setting Prop2 to true.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
+    -- TODO. Removing Thing1 does not exit this state.
     state State4 = TheEmbeddedContext >> binding >> context >> Thing1 >> Prop2
       on entry
         notify Manager

@@ -32,13 +32,13 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (elemIndex, filterA, foldMap, null)
+import Data.Array (cons, elemIndex, filterA, foldMap, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, lookup, delete)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, unwrap)
+import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (for_, traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -50,10 +50,10 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SentenceCompiler (CompiledSentence, compileContextSentence)
 import Perspectives.Assignment.SerialiseAsDeltas (serialiseRoleInstancesAndProperties)
 import Perspectives.Assignment.StateCache (CompiledContextState, cacheCompiledContextState, retrieveCompiledContextState)
-import Perspectives.Assignment.Update (setActiveContextState, setInActiveContextState)
+import Perspectives.Assignment.Update (ConditionResult(..), isUndetermined, setActiveContextState, setInActiveContextState)
 import Perspectives.CompileAssignment (compileAssignment, withAuthoringRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, Updater, WithAssumptions, MonadPerspectivesTransaction, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
 import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveStates_, isMe)
@@ -67,6 +67,8 @@ import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), externalRole)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
+import Perspectives.ScheduledAssignment (StateEvaluation(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 
 compileState :: Partial => StateIdentifier -> MP CompiledContextState
@@ -119,21 +121,26 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateContextState :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateContextState contextId stateId = do
-  contextIsInState <- conditionSatisfied contextId stateId
-  if contextIsInState
-    then do
-      contextWasInState <- lift $ isActive stateId contextId
-      if contextWasInState
-        then do
-          log ("Already in context state " <> unwrap stateId <> ": " <> unwrap contextId)
-          subStates <- lift $ subStates_ stateId
-          for_ subStates (evaluateContextState contextId)
-        else enteringState contextId stateId
-    else do
-      contextWasInState <- lift $ isActive stateId contextId
-      if contextWasInState
-        then exitingState contextId stateId
-        else pure unit
+  contextIsInState' <- conditionSatisfied contextId stateId
+  case contextIsInState' of 
+    Determined contextIsInState -> if contextIsInState
+      then do
+        contextWasInState <- lift $ isActive stateId contextId
+        if contextWasInState
+          then do
+            log ("Already in context state " <> unwrap stateId <> ": " <> unwrap contextId)
+            subStates <- lift $ subStates_ stateId
+            for_ subStates (evaluateContextState contextId)
+          else enteringState contextId stateId
+      else do
+        contextWasInState <- lift $ isActive stateId contextId
+        if contextWasInState
+          then exitingState contextId stateId
+          else pure unit
+    Undetermined -> modify 
+      (\t -> over Transaction 
+        (\tr -> tr { postponedStateEvaluations = cons (ContextStateEvaluation stateId contextId) tr.postponedStateEvaluations }) 
+        t )
 
 -- | This function is only called (and should only be called) on states whose condition is valid.
 -- | On entering a state, we register that state with the context instance and trigger client query updates.
@@ -278,11 +285,14 @@ exitingState contextId stateId = do
       compiledSentence contextId 
       lift $ restoreFrame oldFrame
 
-conditionSatisfied :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
+conditionSatisfied :: ContextInstance -> StateIdentifier -> MonadPerspectivesTransaction ConditionResult
 conditionSatisfied contextId stateId = do
   compiledState <- getCompiledState stateId
-  (Tuple bools a0 :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery contextId compiledState.query
-  pure $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
+  (Tuple bools (ArrayWithoutDoubles a0) :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery contextId compiledState.query
+  d <- isUndetermined a0
+  if (not null a0) && d 
+    then pure Undetermined
+    else pure $ Determined $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
 
 getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledContextState
 getCompiledState stateId = case retrieveCompiledContextState stateId of

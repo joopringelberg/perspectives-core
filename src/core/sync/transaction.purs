@@ -43,7 +43,7 @@ import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), RoleType(..))
-import Perspectives.ScheduledAssignment (ScheduledAssignment)
+import Perspectives.ScheduledAssignment (ScheduledAssignment, StateEvaluation)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
@@ -74,6 +74,7 @@ newtype Transaction = Transaction (TransactionRecord
   , untouchableRoles :: Array RoleInstance
   -- A Map from any RoleInstance to its most deeply nested filler.
   , userRoleBottoms :: MAP.Map RoleInstance (Array RoleInstance)
+  , postponedStateEvaluations :: Array StateEvaluation
   ))
 
 type TransactionRecord f =
@@ -126,13 +127,14 @@ instance ReadForeign Transaction where
       , untouchableContexts: []
       , userRoleBottoms: MAP.empty
       , publicKeys: OBJ.empty
+      , postponedStateEvaluations: []
       }
 
 derive newtype instance ReadForeign Transaction'
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys})
-    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk}) = Transaction
+  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations})
+    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk, postponedStateEvaluations: pse}) = Transaction
       { author: author
       , timeStamp: timeStamp
       , deltas: deltas `union` ds
@@ -149,6 +151,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
       , userRoleBottoms: userRoleBottoms `MAP.union` urb
       , publicKeys: publicKeys `OBJ.union` pk
+      , postponedStateEvaluations: postponedStateEvaluations <> pse
     }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
@@ -184,10 +187,11 @@ createTransaction authoringRole author =
       , untouchableRoles: []
       , userRoleBottoms: MAP.empty
       , publicKeys: OBJ.empty
+      , postponedStateEvaluations: []
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys}) = Transaction
+cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations}) = Transaction
   { author
   , timeStamp
   , authoringRole
@@ -204,6 +208,7 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   , untouchableContexts
   , userRoleBottoms
   , publicKeys
+  , postponedStateEvaluations
 }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.

@@ -32,13 +32,13 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (elemIndex, filterA, foldMap, index, null)
+import Data.Array (cons, elemIndex, filterA, foldMap, index, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, delete, lookup)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (alaF, unwrap)
+import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (for_)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
@@ -50,10 +50,10 @@ import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.SentenceCompiler (CompiledSentence, compileRoleSentence)
 import Perspectives.Assignment.SerialiseAsDeltas (serialiseRoleInstancesAndProperties)
 import Perspectives.Assignment.StateCache (CompiledAutomaticAction, CompiledNotification, CompiledRoleState, CompiledStateDependentPerspective, cacheCompiledRoleState, retrieveCompiledRoleState)
-import Perspectives.Assignment.Update (setActiveRoleState, setInActiveRoleState)
+import Perspectives.Assignment.Update (ConditionResult(..), isUndetermined, setActiveRoleState, setInActiveRoleState)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole, withAuthoringRole)
 import Perspectives.CompileTimeFacets (addTimeFacets)
-import Perspectives.CoreTypes (type (~~>), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), MP, MonadPerspectives, MonadPerspectivesTransaction, Updater, WithAssumptions, liftToInstanceLevel, runMonadPerspectivesQuery, (##=), (##>>))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
@@ -68,8 +68,9 @@ import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
+import Perspectives.ScheduledAssignment (StateEvaluation(..))
+import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
-import Perspectives.Utilities (findM)
 
 -- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction,
 -- | and idem of Notification and StateDependentPerspective.
@@ -122,21 +123,27 @@ compileState stateId = do
 -- | Put an error boundary around this function.
 evaluateRoleState :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
 evaluateRoleState roleId stateId = do
-  roleIsInState <- conditionSatisfied roleId stateId
-  if roleIsInState
-    then do
-      roleWasInState <- lift $ isActive stateId roleId
-      if roleWasInState
-        then do
-          log ("Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
-          subStates <- lift $ subStates_ stateId
-          for_ subStates (evaluateRoleState roleId)
-        else enteringRoleState roleId stateId
-    else do
-      roleWasInState <- lift $ isActive stateId roleId
-      if roleWasInState
-        then exitingRoleState roleId stateId
-        else pure unit
+  roleIsInState' <- conditionSatisfied roleId stateId
+  case roleIsInState' of 
+    Determined roleIsInState -> if roleIsInState
+      then do
+        roleWasInState <- lift $ isActive stateId roleId
+        if roleWasInState
+          then do
+            log ("Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
+            subStates <- lift $ subStates_ stateId
+            for_ subStates (evaluateRoleState roleId)
+          else enteringRoleState roleId stateId
+      else do
+        roleWasInState <- lift $ isActive stateId roleId
+        if roleWasInState
+          then exitingRoleState roleId stateId
+          else pure unit
+    Undetermined -> modify 
+      (\t -> over Transaction
+        (\tr -> tr { postponedStateEvaluations = cons (RoleStateEvaluation stateId roleId) tr.postponedStateEvaluations }) 
+        t )
+
 
 -- | This function is only called (and should only be called) on states whose condition is valid.
 -- | On entering a state, we register that state with the role instance and trigger client query updates.
@@ -301,16 +308,15 @@ exitingRoleState roleId stateId = do
   
   -- (notify roleId me)
 
--- | Check all substates until one of them is found for which conditionSatisfied holds;
-findSatisfiedSubstate :: StateIdentifier -> RoleInstance -> MonadPerspectivesTransaction (Maybe StateIdentifier)
-findSatisfiedSubstate stateId roleId = (lift $ subStates_ stateId) >>= findM (conditionSatisfied roleId)
-
 -- | Absence of a condition result is interpreted as false.
-conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Boolean
+conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction ConditionResult
 conditionSatisfied roleId stateId = do
   compiledState <- getCompiledState stateId
-  (Tuple bools a0 :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery roleId compiledState.query
-  pure $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
+  (Tuple bools (ArrayWithoutDoubles a0) :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery roleId compiledState.query
+  d <- isUndetermined a0
+  if (not null a0) && d 
+    then pure Undetermined
+    else pure $ Determined $ (not null bools) && (alaF Conj foldMap (eq (Value "true")) bools)
 
 getCompiledState :: StateIdentifier -> MonadPerspectivesTransaction CompiledRoleState
 getCompiledState stateId = case retrieveCompiledRoleState stateId of

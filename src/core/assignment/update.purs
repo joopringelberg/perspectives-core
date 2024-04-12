@@ -37,17 +37,18 @@ module Perspectives.Assignment.Update where
 
 import Prelude
 
-import Control.Monad.AvarMonadAsk (gets, modify)
+import Control.Monad.AvarMonadAsk (get, gets, modify)
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, nub, null, snoc)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, foldMap, nub, null, snoc)
 import Data.Array (head) as ARR
 import Data.Array.NonEmpty (NonEmptyArray, head, toArray)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType(..))
-import Data.Newtype (over, unwrap)
+import Data.Monoid.Conj (Conj(..))
+import Data.Newtype (ala, over, unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect.Class (liftEffect)
@@ -60,7 +61,7 @@ import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (class Persistent, MonadPerspectives, MonadPerspectivesTransaction, Updater, (###=), (##=), (##>), (##>>))
+import Perspectives.CoreTypes (class Persistent, InformedAssumption(..), MonadPerspectives, Updater, MonadPerspectivesTransaction, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -717,3 +718,24 @@ roleContextualisations ctxt qualifiedRoleIdentifier = do
   (user :: RoleType) <- gets (_.authoringRole <<< unwrap)
   -- Filter the object role types, keeping only those that the user role type has a perspective on.
   lift $ concat <$> runArrayT (filterA (unsafePartial hasPerspectiveOnRole user) roleTypesToCreate')
+
+-- | A state condition may be fully determined, or it may not yet be determinable due to 
+-- | resource removal.
+data ConditionResult = Undetermined | Determined Boolean
+
+isUntouchable :: Array ContextInstance -> Array RoleInstance -> InformedAssumption -> Boolean
+-- We cannot say anything about a RoleAssumption. It is added when querying the database for instances of a particular role.
+isUntouchable ctxts rls (RoleAssumption c r) = false
+isUntouchable ctxts rls (Me c) = isJust $ elemIndex c ctxts
+isUntouchable ctxts rls (Filler rl) = isJust $ elemIndex rl rls
+isUntouchable ctxts rls (FilledRolesAssumption filler _ _) = isJust $ elemIndex filler rls
+isUntouchable ctxts rls (Property rl _) = isJust $ elemIndex rl rls
+isUntouchable ctxts rls (Context rl) = isJust $ elemIndex rl rls
+isUntouchable ctxts rls (External ct) = isJust $ elemIndex ct ctxts
+isUntouchable ctxts rls (State ct) = isJust $ elemIndex ct ctxts
+isUntouchable ctxts rls (RoleState rl) = isJust $ elemIndex rl rls
+
+isUndetermined :: Array InformedAssumption -> MonadPerspectivesTransaction Boolean
+isUndetermined assumptions = do
+  Transaction{untouchableContexts, untouchableRoles} <- get
+  pure $ ala Conj foldMap  (assumptions <#> isUntouchable untouchableContexts untouchableRoles)

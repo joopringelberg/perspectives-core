@@ -31,15 +31,15 @@ module Perspectives.ScheduledAssignment where
 import Prelude
 
 import Data.Array (filter)
-import Data.Generic.Rep (class Generic)
 import Data.Eq.Generic (genericEq)
-import Data.Show.Generic (genericShow)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
+import Data.Show.Generic (genericShow)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.TypeIdentifiers (RoleType)
+import Perspectives.Representation.TypeIdentifiers (RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta)
-import Perspectives.Utilities (class PrettyPrint)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 
 data ScheduledAssignment =
   -- The RoleType is the AuthorizedRole: a role of kind ContextRole that the modifying user is authorized for.
@@ -71,3 +71,24 @@ contextsToBeRemoved assignments = unsafePartial getContext <$> filter isContextR
     isContextRemoval :: ScheduledAssignment -> Boolean
     isContextRemoval (ContextRemoval _ _) = true
     isContextRemoval _ = false
+
+
+-----------------------------------------------------------
+-- STATE EXECUTION
+-----------------------------------------------------------
+-- | A StateEvaluation is a combination of an instance of a Context and a State type.
+data StateEvaluation =
+  ContextStateEvaluation StateIdentifier ContextInstance |
+  RoleStateEvaluation StateIdentifier RoleInstance
+
+derive instance genericStateEvaluation :: Generic StateEvaluation _
+
+instance eqStateEvaluation :: Eq StateEvaluation where
+  eq = genericEq
+
+instance showStateEvaluation :: Show StateEvaluation where
+  show = genericShow
+
+instance PrettyPrint StateEvaluation where
+  prettyPrint' t (ContextStateEvaluation s c) = "ContextStateEvaluation(" <> prettyPrint' t s <> "," <> prettyPrint' t c
+  prettyPrint' t (RoleStateEvaluation s c) = "RoleStateEvaluation(" <> prettyPrint' t s <> "," <> prettyPrint' t c

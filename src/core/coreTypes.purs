@@ -57,7 +57,6 @@ module Perspectives.CoreTypes
   , RolInstances
   , RoleGetter
   , RuntimeOptions
-  , StateEvaluation(..)
   , TrackingObjectsGetter
   , TypeLevelGetter
   , TypeLevelResults
@@ -280,23 +279,6 @@ instance eqInformedAssumption :: Eq InformedAssumption where
 instance showInformedAssumption :: Show InformedAssumption where
   show = genericShow
 
------------------------------------------------------------
--- STATE EXECUTION
------------------------------------------------------------
--- | A StateEvaluation is a combination of an instance of a Context, the user role type
--- | played in it by the current (own) user and a State type (its root state).
--- TODO. We don't use the user role type anymore.
-data StateEvaluation =
-  ContextStateEvaluation StateIdentifier ContextInstance RoleType |
-  RoleStateEvaluation StateIdentifier RoleInstance RoleType
-
-derive instance genericStateEvaluation :: Generic StateEvaluation _
-
-instance eqStateEvaluation :: Eq StateEvaluation where
-  eq = genericEq
-
-instance showStateEvaluation :: Show StateEvaluation where
-  show = genericShow
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES

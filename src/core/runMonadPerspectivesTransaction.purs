@@ -38,7 +38,7 @@ import Foreign.Object (empty, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CollectAffectedContexts (reEvaluatePublicFillerChanges)
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, StateEvaluation(..), MPT, liftToInstanceLevel, (##=), (##>), (##>>))
+import Perspectives.CoreTypes (MPT, MonadPerspectives, MonadPerspectivesTransaction, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.Deltas (TransactionPerUser, distributeTransaction)
 import Perspectives.DependencyTracking.Dependency (lookupActiveSupportedEffect)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -58,7 +58,7 @@ import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
-import Perspectives.ScheduledAssignment (ScheduledAssignment(..), contextsToBeRemoved)
+import Perspectives.ScheduledAssignment (ScheduledAssignment(..), StateEvaluation(..), contextsToBeRemoved)
 import Perspectives.Sync.HandleTransaction (executeDeltas, expandDeltas)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
@@ -101,7 +101,8 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
       log ("Starting transaction " <> show transactionNumber)
       catchError 
         do 
-          r <- run
+          -- Execute the value that accumulates Deltas in a Transaction.
+          r <- a >>= run
           -- 5. Raise the flag
           log ("Ending transaction " <> show transactionNumber)
           _ <- lift $ lift $ put (transactionNumber + 1) t
@@ -112,13 +113,10 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
           _ <- lift $ lift $ put (transactionNumber + 1) t
           throwError e
 
-    run :: MonadPerspectivesTransaction o
-    run = do
-      -- 1. Execute the value that accumulates Deltas in a Transaction.
-      r <- a
-
+    run :: o -> MonadPerspectivesTransaction o
+    run r = do
       -- 2. Now run all actions.
-      ft@(Transaction{correlationIdentifiers, scheduledAssignments, modelsToBeRemoved}) <- AA.get >>= runAllAutomaticActions
+      ft@(Transaction{correlationIdentifiers, scheduledAssignments, modelsToBeRemoved, postponedStateEvaluations}) <- AA.get >>= runAllAutomaticActions
 
       -- 3. Send deltas to other participants, save changed domeinfiles.
       (publicRoleTransactions :: TransactionPerUser) <- if share 
@@ -156,17 +154,52 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
       log ("Will remove these models: " <> show modelsToBeRemoved)
       lift $ for_ modelsToBeRemoved tryRemoveEntiteit
 
-      -- 4. Run effects.
-      log "==========RUNNING EFFECTS============"
-      -- Sort from low to high, so we can never actualise a client side component after it has been removed.
-      for_ (sort correlationIdentifiers) \corrId -> do
-        mEffect <- pure $ lookupActiveSupportedEffect corrId
-        case mEffect of
-          Nothing -> pure unit
-          (Just {runner}) -> do
-            -- logShow corrId
-            lift $ runner unit
-      pure r
+      -- There may have been State evaluations that depend on resources that were scheduled to be removed. 
+      -- These were postponed. Reevaluate them here.
+      -- As this might lead to new changes, we have to do synchronization all over again.
+      if null postponedStateEvaluations
+        then do 
+          -- 4. Run effects.
+          log "==========RUNNING EFFECTS============"
+          -- Sort from low to high, so we can never actualise a client side component after it has been removed.
+          for_ (sort correlationIdentifiers) \corrId -> do
+            mEffect <- pure $ lookupActiveSupportedEffect corrId
+            case mEffect of
+              Nothing -> pure unit
+              (Just {runner}) -> do
+                -- logShow corrId
+                lift $ runner unit
+          pure r
+        else do 
+          AA.modify \t -> over Transaction 
+            (\tr -> tr {postponedStateEvaluations = []})
+            t
+          log $ "Re-evaluating state evaluations that depend on a removed resource: " <> (show postponedStateEvaluations)
+          evaluateStates postponedStateEvaluations
+          run r
+
+    evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
+    evaluateStates stateEvaluations =
+      for_ stateEvaluations \s -> case s of
+        ContextStateEvaluation stateId contextId -> do
+          -- Provide a new frame for the current context variable binding.
+          oldFrame <- lift pushFrame
+          lift $ addBinding "currentcontext" [unwrap contextId]
+          -- Error boundary.
+          catchError (evaluateContextState contextId stateId)
+            \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
+          lift $ restoreFrame oldFrame
+        RoleStateEvaluation stateId roleId -> do
+          cid <- lift (roleId ##>> context)
+          oldFrame <- lift pushFrame
+          -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
+          -- expressions in state.
+          lift $ addBinding "currentcontext" [unwrap cid]
+          -- TODO. add binding for "currentobject" or "currentsubject"?!
+          -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
+          catchError (evaluateRoleState roleId stateId) 
+            \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
+          lift $ restoreFrame oldFrame
 
     runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
     runAllAutomaticActions previousTransaction = do
@@ -191,29 +224,11 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
         ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
         _ -> pure unit
       -- Now state has changed. Re-evaluate the resources that may change state.
+      -- A problem is that instances may be waiting to be removed, but actually are still in existence as we evaluate state queries.
       (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
       log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
       -- NOTICE THAT NEGATION BY FAILURE BREAKS DOWN HERE, because we have not yet actually removed resources!!
-      for_ stateEvaluations \s -> case s of
-        ContextStateEvaluation stateId contextId roleType -> do
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift pushFrame
-          lift $ addBinding "currentcontext" [unwrap contextId]
-          -- Error boundary.
-          catchError (evaluateContextState contextId stateId)
-            \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
-          lift $ restoreFrame oldFrame
-        RoleStateEvaluation stateId roleId roleType -> do
-          cid <- lift (roleId ##>> context)
-          oldFrame <- lift pushFrame
-          -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
-          -- expressions in state.
-          lift $ addBinding "currentcontext" [unwrap cid]
-          -- TODO. add binding for "currentobject" or "currentsubject"?!
-          -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
-          catchError (evaluateRoleState roleId stateId) 
-            \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
-          lift $ restoreFrame oldFrame
+      evaluateStates stateEvaluations
       -- If the new transaction is not empty, run again.
       nt <- AA.get
       if isEmptyTransaction nt
@@ -237,9 +252,9 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
                   case mmguest of
                     -- If the Guest role is not filled, don't execute bots on its behalf!
                     Nothing -> pure []
-                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-                else pure $ (\state -> ContextStateEvaluation state cid (CR myType)) <$> states
-              Just (ENR myType) -> pure $ (\state -> ContextStateEvaluation state cid (ENR myType)) <$> states
+                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid) <$> states
+                else pure $ (\state -> ContextStateEvaluation state cid) <$> states
+              Just _ -> pure $ (\state -> ContextStateEvaluation state cid ) <$> states
               
         computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
           activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
@@ -256,9 +271,9 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
                   (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
                   case mmguest of
                     Nothing -> pure []
-                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-                else pure $ (\state -> RoleStateEvaluation state rid (CR myType)) <$> states
-              Just (ENR myType) -> pure $ (\state -> RoleStateEvaluation state rid (ENR myType)) <$> states
+                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
+                else pure $ (\state -> RoleStateEvaluation state rid) <$> states
+              Just _ -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
 
         isGuestRole :: CalculatedRoleType -> Boolean
         isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"

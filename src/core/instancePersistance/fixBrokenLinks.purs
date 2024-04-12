@@ -53,7 +53,7 @@ import Perspectives.CoreTypes (MonadPerspectives, ResourceToBeStored(..), MonadP
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError')
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol)
-import Perspectives.Instances.ObjectGetters (context2roleFromDatabase_, contextType_, filled2fillerFromDatabase_, filler2filledFromDatabase_, getRoleOnClipboard, role2contextFromDatabase_, roleType_)
+import Perspectives.Instances.ObjectGetters (Filler_(..), context2roleFromDatabase_, contextType_, filled2fillerFromDatabase_, filler2filledFromDatabase_, getRoleOnClipboard, role2contextFromDatabase_, roleType_)
 import Perspectives.ModelDependencies (cardClipBoard, sysUser)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveMarkedResources)
@@ -124,7 +124,7 @@ fixRoleReferences roleId = do
   -- If the role type is unlinked, we will find no contexts.
   for_ ctxts removeRoleInstanceFromContext
   -- Retrieve all roles that still refer to roleId as their filler.
-  filledRoles <- filler2filledFromDatabase_ roleId
+  filledRoles <- filler2filledFromDatabase_ (Filler_ roleId)
   -- Remove this role from all other roles that point to it as their filler.
   for_ filledRoles (flip RA.filledNoLongerPointsTo roleId)
   --- Retrieve the filler that still refers to roleId.
