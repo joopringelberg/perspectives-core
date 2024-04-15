@@ -127,12 +127,21 @@ scheduleRoleRemoval id = do
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
 scheduleContextRemoval authorizedRole id = (lift $ try $ getPerspectContext id) >>=
   handlePerspectContextError "scheduleContextRemoval"
-  \(ctxt@(PerspectContext{rolInContext, buitenRol, pspType:contextType})) -> do
+  \(ctxt@(PerspectContext{rolInContext, buitenRol:br, pspType:contextType})) -> do
     unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
     unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
+    allRoleInstances <- pure $ (cons br $ unlinkedInstances <> (concat $ values rolInContext))
+    clipboard <- lift getRoleOnClipboard
+    case clipboard of 
+      Just roleOnClipboard -> if isJust $ elemIndex roleOnClipboard allRoleInstances
+        then do 
+          s <- lift $ getMySystem
+          deleteProperty [RoleInstance (buitenRol s)] (EnumeratedPropertyType cardClipBoard)
+        else pure unit
+      _ -> pure unit
     modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
       { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
-      , rolesToExit = nub $ rolesToExit <> (cons buitenRol $ unlinkedInstances <> (concat $ values rolInContext))})
+      , rolesToExit = nub $ rolesToExit <> allRoleInstances})
 
 -- Only called when the external role is also 'bound' in a DBQ role.
 removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTransaction Unit
