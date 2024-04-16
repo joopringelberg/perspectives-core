@@ -120,6 +120,7 @@ domain TestAliases
     user Pilot
       aspect ta:Transport$Driver where
         License is replaced by Certification
+      aspect sys:ContextWithNotification$NotifiedUser
       -- A perspective on Plane is not necessary (other than for properties of Plane
       -- itself, or to add verbs)
       -- As a Driver, Pilot will have a perspective on Vehicle.
@@ -162,6 +163,8 @@ domain TestAliases
     context FlightSchedules filledBy FlightSchedule
       aspect ta:Transport$Schedules
       property IsInternational (Boolean)
+    
+    aspect thing sys:ContextWithNotification$Notifications
     
     case FlightSchedule
       aspect ta:Transport$Schedule

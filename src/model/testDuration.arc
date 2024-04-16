@@ -61,6 +61,9 @@ domain model://joopringelberg.nl#TestDuration
             "The time is now past { callExternal util:FormatDateTime( EndTime, "nl-NL", "{\"timeStyle\": \"short\"}" ) returns String }"
     
     user Manager = sys:Me
+      aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
         props (ExtraDays, EndTime) verbs (SetPropertyValue)
         props (Today, Tomorrow, EndDate) verbs (Consult)
+
+    aspect thing sys:ContextWithNotification$Notifications

@@ -32,6 +32,11 @@ domain model://joopringelberg.nl#TestQueries
 
     external
       aspect sys:RootContext$External
+    
+    state NoManager = not exists Manager
+      on entry 
+        do for Initializer
+          bind sys:Me to Manager
 
     -- This state has been seen to become active after creating TheEmbeddedContext.
     state State1 = exists TheEmbeddedContext
@@ -75,9 +80,19 @@ domain model://joopringelberg.nl#TestQueries
       on exit
         notify Manager
           "Leaving State4"
+    
+    aspect thing sys:ContextWithNotification$Notifications
+    
+    user Initializer = sys:Me
+      perspective on Manager
+        all roleverbs
+      perspective on TheEmbeddedContext >> binding >> context >> EmbeddedUser
+        all roleverbs
+
 
     -- Without a role this context could never be opened.
-    user Manager = sys:Me
+    user Manager filledBy sys:PerspectivesSystem$User
+      aspect sys:ContextWithNotification$NotifiedUser
       perspective on TheEmbeddedContext
         defaults
       perspective on TheEmbeddedContext >> binding >> context >> Thing1
@@ -86,6 +101,9 @@ domain model://joopringelberg.nl#TestQueries
         defaults
 
     context TheEmbeddedContext filledBy EmbeddedContext
+      on entry
+        do for Initializer
+          bind sys:Me to EmbeddedUser in binding >> context
       property Prop4 (Boolean)
 
     thing AnotherRole
@@ -117,10 +135,13 @@ domain model://joopringelberg.nl#TestQueries
         notify EmbeddedUser
           "Leaving EmbeddedState2"
 
+    aspect thing sys:ContextWithNotification$Notifications
+
     thing Thing1
       property Prop2 (Boolean)
     
-    user EmbeddedUser = sys:Me
+    user EmbeddedUser filledBy sys:PerspectivesSystem$User
+      aspect sys:ContextWithNotification$NotifiedUser
       perspective on Thing1
         defaults
       perspective on extern

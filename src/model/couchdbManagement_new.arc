@@ -191,6 +191,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- WithCredentials$Password
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Admin
+      aspect sys:ContextWithNotification$NotifiedUser
 
       action CreateRepository
         create role Repositories
@@ -249,6 +250,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- WithCredentials$SpecificUserName
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
+      aspect sys:ContextWithNotification$NotifiedUser
       state Filled = exists binding
         on entry
           do for Admin
@@ -416,6 +418,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     context BespokeDatabases (relational) filledBy BespokeDatabase
     context MyBespokeDatabases = filter BespokeDatabases with binding >> context >> Owner filledBy sys:Me
+    aspect thing sys:ContextWithNotification$Notifications
   -------------------------------------------------------------------------------
   ---- BESPOKEDATABASE
   -------------------------------------------------------------------------------
@@ -509,6 +512,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- NOTE: later, CouchdbServer$Accounts will also be allowed to fill this role.
     user Admin filledBy CouchdbServer$Admin
       aspect acc:Body$Admin
+      aspect sys:ContextWithNotification$NotifiedUser
         -- WithCredentials$SpecificUserName
         -- We must use the next three properties to provide the autentication details to the PDR for the RepositoryUrl.
         -- WithCredentials$UserName (either the SpecificUserName or the User identifier)
@@ -691,6 +695,7 @@ domain model://perspectives.domains#CouchdbManagement
               create_ context ModelManifest named manifestname bound to origin
               bind currentactor to Author in origin >> binding >> context
               DomeinFileName = manifestname + ".json" for origin >> binding
+    aspect thing sys:ContextWithNotification$Notifications
 
   case ModelManifest 
     aspect sys:ModelManifest
@@ -883,6 +888,7 @@ domain model://perspectives.domains#CouchdbManagement
             "Version {External$Version} (build {Build}) has been uploaded to the repository for {binder Versions >> context >> Repository >> NameSpace >>= first}."
 
     user Author (relational) filledBy cm:ModelManifest$Author
+      aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
         props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
@@ -911,3 +917,4 @@ domain model://perspectives.domains#CouchdbManagement
           form "All versions" Manifest 
 
     context Manifest (functional) = extern >> binder Versions >> context >> extern
+    aspect thing sys:ContextWithNotification$Notifications

@@ -216,6 +216,7 @@ domain model://perspectives.domains#BrokerServices
     -- PDRDEPENDENCY
     user AccountHolder filledBy sys:PerspectivesSystem$User
       aspect sys:Invitation$Invitee
+      aspect sys:ContextWithNotification$NotifiedUser
       -- PDRDEPENDENCY
       property AccountName (mandatory, String)
       -- PDRDEPENDENCY
@@ -310,6 +311,7 @@ domain model://perspectives.domains#BrokerServices
           table "Queues" Queues
 
     aspect user sys:Invitation$Guest
+    aspect thing sys:ContextWithNotification$Notifications
 
     context Queues (relational) filledBy sys:PerspectivesSystem
       property QueueName (String)
