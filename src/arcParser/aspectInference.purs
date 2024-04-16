@@ -41,8 +41,8 @@ import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, withDomeinFile)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.QueryTypes (roleInContext2Role)
-import Perspectives.Representation.ADT (product)
+import Perspectives.Query.QueryTypes (RoleInContext, roleInContext2Role)
+import Perspectives.Representation.ADT (ADT(..), product)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (binding, roleAspects)
@@ -115,5 +115,10 @@ inferFromAspectRoles = do
     inferBinding r = lift $ lift $ do
       ownBinding <- binding r
       aspects <- roleAspects r
-      completeBinding <- product <<< cons ownBinding <$> for (roleInContext2Role <$> aspects) (getEnumeratedRole >=> binding)
+      -- An aspect may have no binding restrictions, which is represented as EMPTY. Don't include that in the PRODUCT.
+      completeBinding <- product <<< filter isNotEmpty <<< cons ownBinding <$> for (roleInContext2Role <$> aspects) (getEnumeratedRole >=> binding)
       pure $ over EnumeratedRole (\rr -> rr {binding = completeBinding}) r
+      where
+      isNotEmpty :: ADT RoleInContext -> Boolean
+      isNotEmpty EMPTY = false
+      isNotEmpty _ = true

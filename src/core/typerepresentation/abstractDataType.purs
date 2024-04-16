@@ -283,6 +283,8 @@ equalsOrSpecialisesADT adt1 adt2 = let
   in
   equalsOrSpecialisesADT_ adt1' adt2'
 
+-- | a1 `equalsOrSpecialisesADT_` a2
+-- | intuitively when a2 is built from a1 (or a2 == a1).
 equalsOrSpecialisesADT_ :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
 equalsOrSpecialisesADT_ a1 a2 = 
   case a1 of 
