@@ -51,7 +51,7 @@ import Perspectives.Assignment.Update (RoleProp(..), deleteProperty, getProperty
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###>))
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -340,22 +340,19 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (ContextInstance object)
           onlyOnce
 
-    -- { request: "GetPerspective", subject: UserRoleType OPTIONAL, predicate: RoleInstance, object: ContextInstance OPTIONAL }
+    -- { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
     Api.GetPerspective -> do
-      contextInstance <- if object == ""
-        then (RoleInstance predicate) ##>> context
-        else pure $ ContextInstance object
+      contextInstance <- (RoleInstance predicate) ##>> context
       contextType <- contextInstance ##>> contextType
-      (objectRoleType :: EnumeratedRoleType) <- (RoleInstance predicate) ##>> roleType
-      (muserRoleType :: Maybe RoleType) <- if subject == ""
-        then contextInstance ##> getMyType
-        else contextType ###> lookForRoleType subject
+      (objectRoleType :: RoleType) <- if subject == ""
+        -- No explicit type given for the perspective object; assume that the predicate has the instance of the role that we want a perspective on.
+        then ENR <$> ((RoleInstance predicate) ##>> roleType)
+        -- Type has been given in subject. 
+        else string2RoleType subject
+      (muserRoleType :: Maybe RoleType) <- contextInstance ##> getMyType
       case muserRoleType of
         Nothing -> do
-          message <- if subject == ""
-            then pure ("Cannot find your role in the context " <> object)
-            else pure ("Cannot find the role type '" <> subject <> "' in context type '" <> show contextType <> "'.")
-          sendResponse (Error corrId message) setter
+          sendResponse (Error corrId ("Cannot find your role in the context " <> show contextInstance)) setter
         Just userRoleType -> do
           muserRoleInstance <- contextInstance ##> getRoleInstances userRoleType
           case muserRoleInstance of
@@ -363,7 +360,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             Just userRoleInstance -> registerSupportedEffect
               corrId
               setter
-              (perspectiveForContextAndUser userRoleInstance userRoleType (ENR objectRoleType))
+              (perspectiveForContextAndUser userRoleInstance userRoleType objectRoleType)
               contextInstance
               onlyOnce
 
