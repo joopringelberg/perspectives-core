@@ -36,7 +36,8 @@ import Data.Maybe (Maybe(..))
 import Data.MediaType (MediaType(..))
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign (Foreign)
+import Effect.Class (liftEffect)
+import Foreign (Foreign, unsafeToForeign)
 import Foreign.Object (Object, empty)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
@@ -53,14 +54,14 @@ import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment) as Persistence
-import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, retrieveDocumentVersion, tryGetDocument_)
+import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, retrieveDocumentVersion, toFile, tryGetDocument_)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
-import Simple.JSON (write)
+import Simple.JSON (unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
@@ -132,16 +133,20 @@ uploadToRepository_ splitName (DomeinFile df) invertedQueries = do
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
     -- next attachment.
     go :: URL -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
-    go documentUrl documentName attachments = forWithIndex_ attachments \attName (Tuple mimetype mattachment) -> do 
-      case mattachment of
-        Nothing -> pure unit
-        Just attachment -> do
-          newRev <- get
-          DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
-          put rev
-        -- Lastly, add the StoredQueries
-      newRev <- get
-      lift $ Persistence.addAttachment documentUrl documentName newRev "storedQueries.json" (write invertedQueries) (MediaType "application/json")
+    go documentUrl documentName attachments = do 
+      forWithIndex_ 
+        attachments 
+        (\attName (Tuple mimetype mattachment) -> do 
+          case mattachment of
+            Nothing -> pure unit
+            Just attachment -> do
+              newRev <- get
+              DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
+              put rev)
+      -- Lastly, add the StoredQueries
+      (newRev :: Revision_) <- get
+      theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ unsafeStringify invertedQueries)
+      lift $ void $ Persistence.addAttachment documentUrl documentName newRev "storedQueries.json" theFile (MediaType "application/json")
 
 removeFromRepository :: 
   Array ModelUri ->
