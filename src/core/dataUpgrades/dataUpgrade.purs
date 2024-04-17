@@ -32,12 +32,14 @@ import Control.Monad.Except (runExceptT)
 import Data.Array (catMaybes)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (for)
 import Effect.Aff.Class (liftAff)
 import Foreign (unsafeToForeign)
 import IDBKeyVal (idbGet, idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.Extern.Utilities (pdrVersion)
@@ -46,8 +48,8 @@ import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (createDatabase, databaseInfo, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (entitiesDatabaseName, saveMarkedResources)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SetupCouchdb (setContext2RoleView, setFilled2FillerView, setFiller2FilledView, setRole2ContextView)
 import Perspectives.SetupUser (setupInvertedQueryDatabase)
@@ -108,6 +110,10 @@ indexedQueries = do
   void $ databaseInfo $ user <> "_invertedqueries"
   -- set all the views
   setupInvertedQueryDatabase
+  -- Fix the source of model:System
+  (DomeinFile dfr) <- getDomeinFile (DomeinFileId "model://perspectives.domains#System")
+  void $ saveEntiteit_ (DomeinFileId "model://perspectives.domains#System")
+    (DomeinFile dfr {arc = replace (Pattern "    aspect sys:RootContext\n") (Replacement "    aspect sys:RootContext\n    external \n      aspect sys:RootContext$External\n") dfr.arc})
   -- recompile local models.
   modelsDb <- modelsDatabaseName
   {rows:allModels} <- documentsInDatabase modelsDb includeDocs
