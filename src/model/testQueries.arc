@@ -95,10 +95,18 @@ domain model://joopringelberg.nl#TestQueries
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on TheEmbeddedContext
         defaults
-      perspective on TheEmbeddedContext >> binding >> context >> Thing1
+      perspective on Thing1InEmbeddedContext
         defaults
       perspective on AnotherRole
         defaults
+      
+      screen "TestQueries"
+        row
+          form "TheEmbeddedContext" TheEmbeddedContext
+        row
+          form "Thing1 in EmbeddedContext" Thing1InEmbeddedContext
+        row 
+          form "AnotherRole" AnotherRole
 
     context TheEmbeddedContext filledBy EmbeddedContext
       on entry
@@ -108,6 +116,8 @@ domain model://joopringelberg.nl#TestQueries
 
     thing AnotherRole
       property Prop3 (Boolean)
+    
+    thing Thing1InEmbeddedContext = TheEmbeddedContext >> binding >> context >> Thing1
 
   case EmbeddedContext
     aspect sys:ContextWithNotification
