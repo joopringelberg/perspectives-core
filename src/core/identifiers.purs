@@ -144,6 +144,7 @@ modelUri2ModelRepository s = let
 -----------------------------------------------------------
 -- STRIP A MODEL URI FROM ITS VERSION
 -----------------------------------------------------------
+-- | Remove the version from a model URI. E.g. "model://joopringelberg.nl#TestQueries@1.0" becomes "model://joopringelberg.nl#TestQueries"
 unversionedModelUri :: String -> String
 unversionedModelUri s = case indexOf (Pattern "@") s of 
   Nothing -> s

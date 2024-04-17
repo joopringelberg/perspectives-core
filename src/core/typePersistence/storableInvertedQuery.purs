@@ -28,16 +28,17 @@ import Prelude
 import Control.Monad.Error.Class (catchError)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Effect.Aff.Class (liftAff)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.ErrorLogging (logPerspectivesError)
+import Perspectives.Identifiers (unversionedModelUri)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey, serializeInvertedQueryKey)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (Keys(..), addDocuments, createDatabase, deleteDatabase, deleteDocuments, getAttachment, getViewWithDocs)
+import Perspectives.Persistence.API (Keys(..), addDocuments, createDatabase, deleteDatabase, deleteDocuments, fromBlob, getAttachment, getViewWithDocs)
 import Perspectives.Persistent (invertedQueryDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
-import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
-import Simple.JSON (read)
+import Simple.JSON (readJSON)
 
 type StorableInvertedQuery = { queryType :: String, keys :: Array String, query :: InvertedQuery, model :: DomeinFileId }
 
@@ -86,13 +87,14 @@ saveInvertedQueries queries = do
   void $ addDocuments db queries
 
 -- | Retrieve the inverted queries for a model from the Repository.
-getInvertedQueriesOfModel :: DomeinFileId -> MonadPerspectives StoredQueries
-getInvertedQueriesOfModel (DomeinFileId dfid) = do 
-  {database, documentName} <- resourceIdentifier2DocLocator dfid
+getInvertedQueriesOfModel :: String -> String -> MonadPerspectives StoredQueries
+getInvertedQueriesOfModel database documentName = do 
   getAttachment database documentName "storedQueries.json" >>= case _ of 
-    Just f -> case read f of
-      Left e -> logPerspectivesError (Custom $ "getInvertedQueriesOfModel" <> show e) *> pure []
-      Right sq -> pure sq
+    Just f -> do 
+      x <- liftAff $ fromBlob f 
+      case readJSON x of
+        Left e -> logPerspectivesError (Custom $ "getInvertedQueriesOfModel" <> show e) *> pure []
+        Right sq -> pure $ sq
     Nothing -> pure []
 
 -- | Remove the inverted queries contributed from the local database.
@@ -100,5 +102,5 @@ removeInvertedQueriesContributedByModel :: DomeinFileId -> MonadPerspectives Uni
 removeInvertedQueriesContributedByModel (DomeinFileId dfid) = do 
   db <- invertedQueryDatabaseName
   -- First retrieve all inverted queries from the local database contributed by the current model.
-  (modelQueries :: Array {_id :: String, _rev :: String }) <- getViewWithDocs db "defaultViews/modelView" (Key dfid)
+  (modelQueries :: Array {_id :: String, _rev :: String }) <- getViewWithDocs db "defaultViews/modelView" (Key $ unversionedModelUri dfid)
   void $ deleteDocuments db modelQueries

@@ -179,13 +179,12 @@ exports.addDocumentImpl = function ( database, doc ) {
 
 exports.bulkDocsImpl = function( database, docs, deleteP )
 {
-  let docs_ = docs;
   if (deleteP)
     {
-      docs_ = docs.map( doc => doc._deleted = true )
+      docs.forEach( doc => doc._deleted = true )
     }
   return function (onError, onSuccess){
-    database.bulkDocs( docs_, function( err, response)
+    database.bulkDocs( docs, function( err, response)
     {
       if (err !== null)
       {

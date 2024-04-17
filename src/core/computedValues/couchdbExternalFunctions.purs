@@ -195,7 +195,7 @@ updateModel arrWithModelName arrWithDependencies versions = try
       lift $ removeInvertedQueriesContributedByModel dfid
       -- Get the inverted queries from the repository,
       -- and add the inverted queries to the local database.
-      lift (getInvertedQueriesOfModel dfid >>= saveInvertedQueries)
+      lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
 
       unversionedModelname <- pure $ unversionedModelUri modelName
       forWithIndex_ upstreamStateNotifications
@@ -277,7 +277,7 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   {documentName:unversionedDocumentName} <- lift $ resourceIdentifier2WriteDocLocator unversionedModelname
-  lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName})
+  lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName, _attachments = Nothing})
   -- saveCachedDomeinFile takes care of revisions.
   revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
@@ -299,7 +299,7 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
           Just _ -> pure unit
     else pure unit
 
-  lift (getInvertedQueriesOfModel dfid >>= saveInvertedQueries)
+  lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
 
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications

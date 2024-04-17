@@ -61,7 +61,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
-import Simple.JSON (unsafeStringify)
+import Simple.JSON (writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
@@ -145,7 +145,7 @@ uploadToRepository_ splitName (DomeinFile df) invertedQueries = do
               put rev)
       -- Lastly, add the StoredQueries
       (newRev :: Revision_) <- get
-      theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ unsafeStringify invertedQueries)
+      theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ writeJSON invertedQueries)
       lift $ void $ Persistence.addAttachment documentUrl documentName newRev "storedQueries.json" theFile (MediaType "application/json")
 
 removeFromRepository :: 
