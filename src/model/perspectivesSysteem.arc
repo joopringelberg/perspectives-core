@@ -191,7 +191,7 @@ domain model://perspectives.domains#System
     -- a PerspectivesUsers behind it, we have to have Persons for PerspectivesUsers, too.
     -- TODO. WHAT ABOUT SOCIALENVIRONMENT$ME?
     user User (mandatory) filledBy Persons
-      aspect ContextWithNotification$NotifiedUser
+      aspect sys:ContextWithNotification$NotifiedUser
       -- This will happen on importing SocialEnvironment and Me from another installation.
       -- If we import a peer's data, we will get a User instance that is already filled.
       state FillWithPerson = (not exists binding) and exists sys:MySocialEnvironment >> Me
@@ -432,6 +432,7 @@ domain model://perspectives.domains#System
     -- As soon as we have perspective contextualisation, add NotifiedUser as an Aspect to all users that can be notified.
     user NotifiedUser
       perspective on Notifications
+        all roleverbs
         props (Message) verbs (Consult)
         action DeleteNotifications
           delete role Notifications

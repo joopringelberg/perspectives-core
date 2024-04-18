@@ -172,7 +172,16 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
           pure r
         else do 
           AA.modify \t -> over Transaction 
-            (\tr -> tr {postponedStateEvaluations = []})
+            (\tr -> tr 
+              { invertedQueryResults = []
+              , rolesToExit = []
+              , scheduledAssignments = []
+              , modelsToBeRemoved = []
+              , createdContexts = []
+              , createdRoles = []
+              , untouchableContexts = []
+              , untouchableRoles = []
+              , postponedStateEvaluations = [] })
             t
           log $ "Re-evaluating state evaluations that depend on a removed resource: " <> (show postponedStateEvaluations)
           evaluateStates postponedStateEvaluations
@@ -230,9 +239,10 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
       -- NOTICE THAT NEGATION BY FAILURE BREAKS DOWN HERE, because we have not yet actually removed resources!!
       evaluateStates stateEvaluations
       -- If the new transaction is not empty, run again.
-      nt <- AA.get
+      nt@(Transaction ntr) <- AA.get
       if isEmptyTransaction nt
-        then pure at
+        -- The new transaction may have postponed state evaluations.
+        then pure $ over Transaction (\tr -> tr {postponedStateEvaluations = tr.postponedStateEvaluations <> ntr.postponedStateEvaluations}) at
         else pure <<< (<>) at =<< runAllAutomaticActions nt
       where
         -- Add to each context or role instance the user role type and the RootState type.
