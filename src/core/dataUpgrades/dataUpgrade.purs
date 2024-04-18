@@ -113,7 +113,7 @@ indexedQueries = do
   -- Fix the source of model:System
   (DomeinFile dfr) <- getDomeinFile (DomeinFileId "model://perspectives.domains#System")
   void $ saveEntiteit_ (DomeinFileId "model://perspectives.domains#System")
-    (DomeinFile dfr {arc = replace (Pattern "    aspect sys:RootContext\n") (Replacement "    aspect sys:RootContext\n    external \n      aspect sys:RootContext$External\n") dfr.arc})
+    (DomeinFile dfr {arc = replace (Pattern "    state InitMe = not exists Me") (Replacement "\n    external \n      aspect sys:RootContext$External\n    state InitMe = not exists Me") dfr.arc})
   -- recompile local models.
   modelsDb <- modelsDatabaseName
   {rows:allModels} <- documentsInDatabase modelsDb includeDocs
