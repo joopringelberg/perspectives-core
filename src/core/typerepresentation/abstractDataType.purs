@@ -47,7 +47,7 @@ import Data.Set (fromFoldable, subset)
 import Data.Traversable (traverse)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
-import Prelude (class Applicative, class Apply, class Bind, class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, join, map, pure, show, ($), (&&), (/=), (<$>), (<*>), (<<<), (<>), (==), (>>>))
+import Prelude (class Applicative, class Apply, class Bind, class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, map, pure, show, ($), (&&), (/=), (<$>), (<*>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 data ADT a = ST a | EMPTY | SUM (Array (ADT a)) | PROD (Array (ADT a)) | UNIVERSAL

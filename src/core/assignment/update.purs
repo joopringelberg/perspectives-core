@@ -39,6 +39,7 @@ import Prelude
 
 import Control.Monad.AvarMonadAsk (get, gets, modify)
 import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.State (StateT, evalStateT, put, get) as ST
 import Control.Monad.Trans.Class (lift)
 import Data.Array (concat, cons, difference, elemIndex, filter, filterA, find, foldM, foldMap, nub, null, snoc)
 import Data.Array (head) as ARR
@@ -60,8 +61,8 @@ import Partial.Unsafe (unsafePartial)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (class Persistent, InformedAssumption(..), MonadPerspectives, Updater, MonadPerspectivesTransaction, (###=), (##=), (##>), (##>>))
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_context, rol_isMe, rol_pspType)
+import Perspectives.CoreTypes (class Persistent, InformedAssumption(..), MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -723,19 +724,33 @@ roleContextualisations ctxt qualifiedRoleIdentifier = do
 -- | resource removal.
 data ConditionResult = Undetermined | Determined Boolean
 
-isUntouchable :: Array ContextInstance -> Array RoleInstance -> InformedAssumption -> Boolean
--- We cannot say anything about a RoleAssumption. It is added when querying the database for instances of a particular role.
-isUntouchable ctxts rls (RoleAssumption c r) = false
-isUntouchable ctxts rls (Me c) = isJust $ elemIndex c ctxts
-isUntouchable ctxts rls (Filler rl) = isJust $ elemIndex rl rls
-isUntouchable ctxts rls (FilledRolesAssumption filler _ _) = isJust $ elemIndex filler rls
-isUntouchable ctxts rls (Property rl _) = isJust $ elemIndex rl rls
-isUntouchable ctxts rls (Context rl) = isJust $ elemIndex rl rls
-isUntouchable ctxts rls (External ct) = isJust $ elemIndex ct ctxts
-isUntouchable ctxts rls (State ct) = isJust $ elemIndex ct ctxts
-isUntouchable ctxts rls (RoleState rl) = isJust $ elemIndex rl rls
+isUntouchable :: Array ContextInstance -> Array RoleInstance -> InformedAssumption -> MonadPerspectives Boolean
+-- There should not be a role in rls that has type r and context c.
+isUntouchable ctxts rls (RoleAssumption c r) =  ST.evalStateT ((for_ rls f) *> ST.get) false
+  where
+    f :: RoleInstance -> ST.StateT Boolean MonadPerspectives Unit
+    f rl = do
+      isUntouchable_ <- ST.get
+      if not isUntouchable_
+        then do 
+          rle <- lift $ getPerspectRol rl
+          if c == rol_context rle && r == rol_pspType rle
+            then ST.put true
+            else pure unit
+        else pure unit
+
+isUntouchable ctxts rls (Me c) = pure $ isJust $ elemIndex c ctxts
+isUntouchable ctxts rls (Filler rl) = pure $ isJust $ elemIndex rl rls
+isUntouchable ctxts rls (FilledRolesAssumption filler _ _) = pure $ isJust $ elemIndex filler rls
+isUntouchable ctxts rls (Property rl _) = pure $ isJust $ elemIndex rl rls
+isUntouchable ctxts rls (Context rl) = pure $ isJust $ elemIndex rl rls
+isUntouchable ctxts rls (External ct) = pure $ isJust $ elemIndex ct ctxts
+isUntouchable ctxts rls (State ct) = pure $ isJust $ elemIndex ct ctxts
+isUntouchable ctxts rls (RoleState rl) = pure $ isJust $ elemIndex rl rls
 
 isUndetermined :: Array InformedAssumption -> MonadPerspectivesTransaction Boolean
 isUndetermined assumptions = do
   Transaction{untouchableContexts, untouchableRoles} <- get
-  pure $ ala Conj foldMap  (assumptions <#> isUntouchable untouchableContexts untouchableRoles)
+  bools <- lift (for assumptions (isUntouchable untouchableContexts untouchableRoles))
+  pure $ ala Conj foldMap bools
+  
