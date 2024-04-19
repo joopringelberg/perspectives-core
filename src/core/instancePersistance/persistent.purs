@@ -157,13 +157,13 @@ removeEntiteit entId = do
 
 removeEntiteit_ :: forall a i. Persistent a i => i -> a -> MonadPerspectives a
 removeEntiteit_ entId entiteit =
-  ensureAuthentication (Resource $ unwrap entId) $ \_ ->
+  ensureAuthentication (Resource $ unwrap entId) $ \_ -> do
+    -- If on the list of items to be saved, remove!
+    modify \s@{entitiesToBeStored} -> s { entitiesToBeStored = delete (resourceToBeStored entiteit) entitiesToBeStored}
     case (rev entiteit) of
       Nothing -> removeInternally entId *> pure entiteit
       (Just rev) -> do
         void $ removeInternally entId
-        -- If on the list of items to be saved, remove!
-        modify \s@{entitiesToBeStored} -> s { entitiesToBeStored = delete (resourceToBeStored entiteit) entitiesToBeStored}
         {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap entId)
         void $ deleteDocument database documentName (Just rev)
         pure entiteit

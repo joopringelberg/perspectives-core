@@ -224,6 +224,9 @@ whenRightUser roleId contextGetter allowedUser updater = do
     then pure unit
     else updater actorsThatAreMe contextId roleId
 
+-- | Creates a Notificaton role in either the User's System context, or in the context of the role that enters the state 
+-- | of which the user is notified. In both cases, the Notification role is filled with the external role of the context
+-- | of the role that enters the state.
 notify :: CompiledSentence RoleInstance -> (RoleInstance ~~> ContextInstance) -> RoleInstance -> MonadPerspectivesTransaction Unit
 notify compiledSentence contextGetter roleId = do
   currentcontext <- lift $ (roleId ##>> contextGetter)
