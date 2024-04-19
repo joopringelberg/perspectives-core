@@ -426,13 +426,12 @@ domain model://perspectives.domains#System
   -- PDRDEPENDENCY
   case ContextWithNotification
     -- PDRDEPENDENCY
-    thing Notifications (relational)
+    context Notifications (relational)
       -- PDRDEPENDENCY
       property Message (String)
-    -- As soon as we have perspective contextualisation, add NotifiedUser as an Aspect to all users that can be notified.
     user NotifiedUser
       perspective on Notifications
-        all roleverbs
+        only (Remove)
         props (Message) verbs (Consult)
         action DeleteNotifications
           delete role Notifications

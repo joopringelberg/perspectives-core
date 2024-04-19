@@ -48,7 +48,7 @@ import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType(..))
-import Data.Monoid.Conj (Conj(..))
+import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (ala, over, unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
@@ -752,5 +752,5 @@ isUndetermined :: Array InformedAssumption -> MonadPerspectivesTransaction Boole
 isUndetermined assumptions = do
   Transaction{untouchableContexts, untouchableRoles} <- get
   bools <- lift (for assumptions (isUntouchable untouchableContexts untouchableRoles))
-  pure $ ala Conj foldMap bools
+  pure $ ala Disj foldMap bools
   
