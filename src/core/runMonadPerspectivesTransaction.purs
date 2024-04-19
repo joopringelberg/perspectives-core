@@ -22,10 +22,10 @@
 
 module Perspectives.RunMonadPerspectivesTransaction where
 
-import Control.Monad.AvarMonadAsk (get, modify) as AA
+import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (concat, filterA, index, length, nub, null, reverse, sort, unsafeIndex)
+import Data.Array (concat, difference, filter, filterA, index, length, nub, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
@@ -61,9 +61,9 @@ import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, remo
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), StateEvaluation(..), contextsToBeRemoved)
 import Perspectives.Sync.HandleTransaction (executeDeltas, expandDeltas)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
-import Perspectives.Sync.Transaction (Transaction(..), cloneEmptyTransaction, createTransaction, isEmptyTransaction)
+import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Types.ObjectGetters (contextRootStates, publicUrl_, roleRootStates)
-import Prelude (Unit, bind, discard, flip, join, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (=<<), (>), (>=>), (>>=))
+import Prelude (Unit, bind, discard, flip, join, not, pure, show, unit, ($), (*>), (+), (<$>), (<<<), (<>), (>), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -102,7 +102,7 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
       catchError 
         do 
           -- Execute the value that accumulates Deltas in a Transaction.
-          r <- a >>= run
+          r <- a >>= phase1 share authoringRole
           -- 5. Raise the flag
           log ("Ending transaction " <> show transactionNumber)
           _ <- lift $ lift $ put (transactionNumber + 1) t
@@ -113,12 +113,138 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
           _ <- lift $ lift $ put (transactionNumber + 1) t
           throwError e
 
-    run :: o -> MonadPerspectivesTransaction o
-    run r = do
-      -- 2. Now run all actions.
-      ft@(Transaction{correlationIdentifiers, scheduledAssignments, modelsToBeRemoved, postponedStateEvaluations}) <- AA.get >>= runAllAutomaticActions
+-- | In phase1 we handle:
+-- | createdContexts, createdRoles, rolesToExit and ScheduledAssignments that are a ContextRemoval, a RoleUnbinding or a ExecuteDestructiveEffect.
+-- | The first three are cleared out; from the last we remove the ExecuteDestructiveEffect and RoleUnbinding items.
+phase1 :: forall o. Boolean -> RoleType -> o -> MonadPerspectivesTransaction o
+phase1 share authoringRole r = do
+  -- Run monotonic actions, after
+  --  * adding all ContextRemovals to the untouchableContexts and
+  --  * adding rolesToExit to the untouchableRoles.
+  AA.modify (\t -> over Transaction (\tr -> tr
+    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
+    , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
+    })
+    t)
+  (Transaction{createdContexts, createdRoles, rolesToExit, scheduledAssignments}) <- AA.get
+  -- AFWIJKING: we initialiseren deze members direct.
+  -- Even though we use ContextRemovals here, we cannot remove them from the Transaction as we need them in 
+  -- step2 to finally remove the contexts. Keeping them in the Transaction is not optimal as we have to 
+  -- filter them on every recursive call to phase1, to see whether they have exited or not.
+  AA.modify (\t -> over Transaction (\tr -> tr {createdContexts = [], createdRoles = [], rolesToExit = []}) t)
+  -- Enter the rootState of new contexts.
+  for_ createdContexts
+    \ctxt -> do
+      states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+      -- Provide a new frame for the current context variable binding.
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap ctxt]
+      -- Error boundary.
+      catchError (for_ states (enteringState ctxt))
+        \e -> logPerspectivesError $ Custom ("Cannot enter context state for " <> show ctxt <>  ", because " <> show e)
+      lift $ restoreFrame oldFrame
+  -- Enter the rootState of roles that are created.
+  for_ createdRoles
+    \rid -> do
+      ctxt <- lift (rid ##>> context)
+      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap ctxt]
+      -- Error boundary.
+      catchError (for_ states (enteringRoleState rid))
+        \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
+      lift $ restoreFrame oldFrame
+  -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
+  rolesThatHaveNotExited <- lift $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
+  if not $ null rolesThatHaveNotExited
+    then log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
+    else pure unit
+  for_ rolesThatHaveNotExited
+    \rid -> do
+      ctxt <- lift (rid ##>> context)
+      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+      if null states
+        then pure unit
+        else do
+          oldFrame <- lift pushFrame
+          lift $ addBinding "currentcontext" [unwrap ctxt]
+          stateEvaluationAndQueryUpdatesForRole rid
+          -- Error boundary.
+          catchError (for_ states (exitingRoleState rid))
+            \e -> do 
+              logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
+              lift $ restoreFrame oldFrame
+              throwError e
+          lift $ restoreFrame oldFrame
+  -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
+  contextsThatHaveNotExited <- lift $ filterA (\sa -> case sa of
+      ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
+      _ -> pure false)
+    scheduledAssignments
+  for_ contextsThatHaveNotExited (unsafePartial exitContext)
+    -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
+    -- to preserve the invariant.
+  AA.modify (\t -> over Transaction (\tr -> tr
+    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
+    , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
+    -- Remove the ScheduledAssignments in contextsThatHaveNotExited from scheduledAssignments
+    })
+    t)
+  recur <- AA.gets( \(Transaction tr) -> 
+      -- There may be new ContextRemovals scheduled; if so, recur must be true.
+       (not $ null (filter isContextRemoval (difference tr.scheduledAssignments scheduledAssignments)))
+    || (not $ null tr.rolesToExit)
+    || (not $ null tr.createdContexts)
+    || (not $ null tr.createdRoles) )
+  if recur 
+    then phase1 share authoringRole r
+    else do 
+      -- Unbind roles and execute destructive effects.
+      for_ (reverse scheduledAssignments) case _ of
+        RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
+        ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
+        _ -> pure unit
+      -- We never need these again, so remove them from the Transaction.
+      AA.modify \(Transaction tr) -> Transaction $ tr {scheduledAssignments = filter criterium tr.scheduledAssignments}
+      -- Invariant: as we call phase2, there are no rolesToExit, no createdContexts, no createdRoles.
+      -- Nor will there be RoleUnbinding or ExecuteDestructiveEffect items in scheduledAssignments.
+      phase2 share authoringRole r
+  where
+    isContextRemoval :: ScheduledAssignment -> Boolean
+    isContextRemoval (ContextRemoval _ _) = true
+    isContextRemoval _ = false
 
-      -- 3. Send deltas to other participants, save changed domeinfiles.
+    criterium :: ScheduledAssignment -> Boolean
+    criterium (RoleUnbinding _ _ _ ) = false
+    criterium (ExecuteDestructiveEffect _ _ _) = false
+    criterium _ = true
+
+phase2 :: forall o. Boolean -> RoleType -> o -> MonadPerspectivesTransaction o
+phase2 share authoringRole r = do
+  Transaction {invertedQueryResults, createdContexts, createdRoles, rolesToExit, scheduledAssignments, modelsToBeRemoved} <- AA.get
+  (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
+  AA.modify \t -> over Transaction (\tr -> tr {invertedQueryResults = []}) t
+  if not null stateEvaluations
+    then log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
+    else pure unit
+  evaluateStates stateEvaluations
+  -- Is there a reason to run phase1 again?
+  -- Only if there are new createdContexts, createdRoles, rolesToExit, 
+  -- or new scheduledAssignments that are a ContextRemoval, a RoleUnbinding or a ExecuteDestructiveEffect.
+  reRunPhase1 <- AA.gets( \(Transaction tr) -> 
+       (not $ null (filter criterium (tr.scheduledAssignments `difference` scheduledAssignments)))
+    || (not $ null (tr.rolesToExit `difference` rolesToExit))
+    || (not $ null (tr.createdContexts `difference` createdContexts))
+    || (not $ null (tr.createdRoles `difference` createdRoles)) )
+  if reRunPhase1
+    then phase1 share authoringRole r
+    else do
+      -- Invariant: there are no rolesToExit, no createdContexts, no createdRoles. 
+      -- Nor will there be RoleUnbinding or ExecuteDestructiveEffect items in scheduledAssignments.
+      -- This is because phase1 has no items in these members and apparantly 
+      -- there have been no new items added during state evaluation.
+      -- Notice that there may be ContextRemoval and RoleRemoval items, though!
+      ft <- AA.get
       (publicRoleTransactions :: TransactionPerUser) <- if share 
         then lift $ distributeTransaction ft 
         else pure empty
@@ -151,142 +277,126 @@ runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPersp
         ContextRemoval ctxt authorizedRole -> lift (log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole)
         RoleRemoval rid -> lift (log ("Remove role " <> unwrap rid) *> removeRoleInstance rid)
         _ -> pure unit
-      log ("Will remove these models: " <> show modelsToBeRemoved)
+      -- we can now remove ContextRemovals and RoleRemovals from scheduledAssignments. As these can be the only items left in the collection of scheduledAssignments,
+      -- we can simply reset it.
+      -- We can also remove the untouchables; all resources listed in them have gone, now.
+      AA.modify \t -> over Transaction (\tr -> tr {scheduledAssignments = [], untouchableContexts = [], untouchableRoles = []}) t
+      if not $ null modelsToBeRemoved
+        then log ("Will remove these models: " <> show modelsToBeRemoved)
+        else pure unit
       lift $ for_ modelsToBeRemoved tryRemoveEntiteit
-
-      -- There may have been State evaluations that depend on resources that were scheduled to be removed. 
-      -- These were postponed. Reevaluate them here.
-      -- As this might lead to new changes, we have to do synchronization all over again.
+      Transaction {postponedStateEvaluations, correlationIdentifiers} <- AA.get
       if null postponedStateEvaluations
         then do 
-          -- 4. Run effects.
-          log "==========RUNNING EFFECTS============"
-          -- Sort from low to high, so we can never actualise a client side component after it has been removed.
-          for_ (sort correlationIdentifiers) \corrId -> do
-            mEffect <- pure $ lookupActiveSupportedEffect corrId
-            case mEffect of
-              Nothing -> pure unit
-              (Just {runner}) -> do
-                -- logShow corrId
-                lift $ runner unit
-          pure r
+          if not $ null correlationIdentifiers
+            then do
+              log "==========RUNNING EFFECTS============"
+              -- Sort from low to high, so we can never actualise a client side component after it has been removed.
+              for_ (sort correlationIdentifiers) \corrId -> do
+                mEffect <- pure $ lookupActiveSupportedEffect corrId
+                case mEffect of
+                  Nothing -> pure unit
+                  (Just {runner}) -> do
+                    -- logShow corrId
+                    lift $ runner unit
+              -- As this is the end of execution of this Transaction, we don't bother with removing the postponedStateEvaluations.
+              pure r
+            else pure r
         else do 
-          AA.modify \t -> over Transaction 
-            (\tr -> tr 
-              { invertedQueryResults = []
-              , rolesToExit = []
-              , scheduledAssignments = []
-              , modelsToBeRemoved = []
-              , createdContexts = []
-              , createdRoles = []
-              , untouchableContexts = []
-              , untouchableRoles = []
-              , postponedStateEvaluations = [] })
-            t
           log $ "Re-evaluating state evaluations that depend on a removed resource: " <> (show postponedStateEvaluations)
           evaluateStates postponedStateEvaluations
-          run r
+          AA.modify \t -> over Transaction (\tr -> tr {postponedStateEvaluations = [], modelsToBeRemoved = []}) t
+          phase2 share authoringRole r
 
-    evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
-    evaluateStates stateEvaluations =
-      for_ stateEvaluations \s -> case s of
-        ContextStateEvaluation stateId contextId -> do
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift pushFrame
-          lift $ addBinding "currentcontext" [unwrap contextId]
-          -- Error boundary.
-          catchError (evaluateContextState contextId stateId)
-            \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
-          lift $ restoreFrame oldFrame
-        RoleStateEvaluation stateId roleId -> do
-          cid <- lift (roleId ##>> context)
-          oldFrame <- lift pushFrame
-          -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
-          -- expressions in state.
-          lift $ addBinding "currentcontext" [unwrap cid]
-          -- TODO. add binding for "currentobject" or "currentsubject"?!
-          -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
-          catchError (evaluateRoleState roleId stateId) 
-            \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
-          lift $ restoreFrame oldFrame
+  where
+    criterium :: ScheduledAssignment -> Boolean
+    criterium (ContextRemoval _ _) = true
+    criterium (RoleUnbinding _ _ _ ) = true
+    criterium (ExecuteDestructiveEffect _ _ _) = true
+    criterium _ = false
 
-    runAllAutomaticActions :: Transaction -> MonadPerspectivesTransaction Transaction
-    runAllAutomaticActions previousTransaction = do
-      -- Run monotonic actions, after
-      --  * adding all ContextRemovals to the untouchableContexts and
-      --  * adding rolesToExit to the untouchableRoles.
-      AA.modify (\t -> over Transaction (\tr -> tr
-        { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
-        , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
-        })
-        t)
-      at@(Transaction{modelsToBeRemoved, rolesToExit, invertedQueryResults, scheduledAssignments}) <- runEntryAndExitActions previousTransaction
 
-      -- Install a fresh transaction (cloning preserves the untouchableContexts and untouchableRoles
-      -- but removes the scheduledAssignments and rolesToExit).
-      log "==========RUNNING SCHEDULED ASSIGNMENTS============"
-      void $ AA.modify cloneEmptyTransaction
-      -- Detach and remove instances, collecting new information in the fresh Transaction.
-      for_ (reverse scheduledAssignments) case _ of
-        -- NOTICE that we do not remove contexts and roles yet. Distributing deltas for public proxies requires access to removed user roles and their contexts!
-        RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
-        ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
-        _ -> pure unit
-      -- Now state has changed. Re-evaluate the resources that may change state.
-      -- A problem is that instances may be waiting to be removed, but actually are still in existence as we evaluate state queries.
-      (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
-      log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
-      -- NOTICE THAT NEGATION BY FAILURE BREAKS DOWN HERE, because we have not yet actually removed resources!!
-      evaluateStates stateEvaluations
-      -- If the new transaction is not empty, run again.
-      nt@(Transaction ntr) <- AA.get
-      if isEmptyTransaction nt
-        -- The new transaction may have postponed state evaluations.
-        then pure $ over Transaction (\tr -> tr {postponedStateEvaluations = tr.postponedStateEvaluations <> ntr.postponedStateEvaluations}) at
-        else pure <<< (<>) at =<< runAllAutomaticActions nt
-      where
-        -- Add to each context or role instance the user role type and the RootState type.
-        computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
-        computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
-          activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
-          for activeInstances \cid -> do
-            -- States includes root states of Aspects.
-            states <- cid ##= contextType >=> liftToInstanceLevel contextRootStates
-            -- Note that the user may play different roles in the various context instances.
-            (mmyType :: Maybe RoleType) <- cid ##> getMyType
-            case mmyType of
-              Nothing -> pure []
-              Just (CR myType) -> if isGuestRole myType
-                then do
-                  (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
-                  case mmguest of
-                    -- If the Guest role is not filled, don't execute bots on its behalf!
-                    Nothing -> pure []
-                    otherwise -> pure $ (\state -> ContextStateEvaluation state cid) <$> states
-                else pure $ (\state -> ContextStateEvaluation state cid) <$> states
-              Just _ -> pure $ (\state -> ContextStateEvaluation state cid ) <$> states
-              
-        computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
-          activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
-          -- If the roleInstance has no recorded states, this means it has been marked for removal
-          -- and has exited all its states. We should not do that again!
-          for activeInstances \rid -> do
-            (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
-              -- Neem aspecten hier ook mee!
-            states <- rid ##= roleType >=> liftToInstanceLevel roleRootStates
-            case mmyType of
-              Nothing -> pure []
-              Just (CR myType) -> if isGuestRole myType
-                then do
-                  (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
-                  case mmguest of
-                    Nothing -> pure []
-                    otherwise -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
-                else pure $ (\state -> RoleStateEvaluation state rid) <$> states
-              Just _ -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
+-- Add to each context or role instance the user role type and the RootState type.
+computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
+computeStateEvaluations (ContextStateQuery contextInstances) = join <$> do
+  activeInstances <- filterA (\rid -> rid ##>> exists' getActiveStates) contextInstances
+  for activeInstances \cid -> do
+    -- States includes root states of Aspects.
+    states <- cid ##= contextType >=> liftToInstanceLevel contextRootStates
+    -- Note that the user may play different roles in the various context instances.
+    (mmyType :: Maybe RoleType) <- cid ##> getMyType
+    case mmyType of
+      Nothing -> pure []
+      Just (CR myType) -> if isGuestRole myType
+        then do
+          (mmguest :: Maybe RoleInstance) <- cid ##> getCalculatedRoleInstances myType
+          case mmguest of
+            -- If the Guest role is not filled, don't execute bots on its behalf!
+            Nothing -> pure []
+            otherwise -> pure $ (\state -> ContextStateEvaluation state cid) <$> states
+        else pure $ (\state -> ContextStateEvaluation state cid) <$> states
+      Just _ -> pure $ (\state -> ContextStateEvaluation state cid ) <$> states
+      
+computeStateEvaluations (RoleStateQuery roleInstances) = join <$> do
+  activeInstances <- filterA (\rid -> rid ##>> exists' getActiveRoleStates) roleInstances
+  -- If the roleInstance has no recorded states, this means it has been marked for removal
+  -- and has exited all its states. We should not do that again!
+  for activeInstances \rid -> do
+    (mmyType :: Maybe RoleType) <- rid ##> context >=> getMyType
+      -- Neem aspecten hier ook mee!
+    states <- rid ##= roleType >=> liftToInstanceLevel roleRootStates
+    case mmyType of
+      Nothing -> pure []
+      Just (CR myType) -> if isGuestRole myType
+        then do
+          (mmguest :: Maybe RoleInstance) <- rid ##> context >=> getCalculatedRoleInstances myType
+          case mmguest of
+            Nothing -> pure []
+            otherwise -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
+        else pure $ (\state -> RoleStateEvaluation state rid) <$> states
+      Just _ -> pure $ (\state -> RoleStateEvaluation state rid) <$> states
 
-        isGuestRole :: CalculatedRoleType -> Boolean
-        isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
+isGuestRole :: CalculatedRoleType -> Boolean
+isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
+
+
+exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
+exitContext (ContextRemoval ctxt authorizedRole) = do
+  stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
+  states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
+  if null states
+    then pure unit
+    else do
+      -- Provide a new frame for the current context variable binding.
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap ctxt]
+      -- Error boundary.
+      catchError (for_ states (exitingState ctxt))
+        \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
+      lift $ restoreFrame oldFrame
+
+evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
+evaluateStates stateEvaluations =
+  for_ stateEvaluations \s -> case s of
+    ContextStateEvaluation stateId contextId -> do
+      -- Provide a new frame for the current context variable binding.
+      oldFrame <- lift pushFrame
+      lift $ addBinding "currentcontext" [unwrap contextId]
+      -- Error boundary.
+      catchError (evaluateContextState contextId stateId)
+        \e -> logPerspectivesError $ Custom ("Cannot evaluate context state, because " <> show e)
+      lift $ restoreFrame oldFrame
+    RoleStateEvaluation stateId roleId -> do
+      cid <- lift (roleId ##>> context)
+      oldFrame <- lift pushFrame
+      -- NOTE. This may not be necessary; we have no analysis in runtime whether these variables occur in
+      -- expressions in state.
+      lift $ addBinding "currentcontext" [unwrap cid]
+      -- TODO. add binding for "currentobject" or "currentsubject"?!
+      -- `stateId` points the way: stateFulObject (StateFulObject) tells us whether it is subject- or object state.
+      catchError (evaluateRoleState roleId stateId) 
+        \e -> logPerspectivesError $ Custom ("Cannot evaluate role state, because " <> show e)
+      lift $ restoreFrame oldFrame
 
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives o)
@@ -364,95 +474,6 @@ runEmbeddedIfNecessary share authoringRole a = do
           throwError e
 
     else runMonadPerspectivesTransaction' share authoringRole a
-
-
--- | Evaluates state transitions. Executes automatic actions. Notifies users. Collects deltas in a new transaction.
--- | If any are collected, recursively calls itself.
--- | Notice that context- and role instances are still not actually removed from cache, nor from Couchdb, while
--- | this function runs.
--- | Terminates on the fixpoint where no more states need to be evaluated.
--- | Invariant: when called, the rolesToExit are already part of the untouchableRoles and the ContextRemovals
--- | are part of untouchableContexts, for the transaction in state.
-runEntryAndExitActions :: Transaction -> MonadPerspectivesTransaction Transaction
-runEntryAndExitActions previousTransaction@(Transaction{createdContexts, createdRoles, scheduledAssignments, rolesToExit}) = do
-  log "==========RUNNING ON ENTRY AND ON EXIT ACTIONS============"
-  -- Install a fresh transaction, keeping the untouchableRoles and untouchableContexts.
-  void $ AA.modify cloneEmptyTransaction
-  -- Enter the rootState of new contexts.
-  for_ createdContexts
-    \ctxt -> do
-      states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-      -- Provide a new frame for the current context variable binding.
-      oldFrame <- lift pushFrame
-      lift $ addBinding "currentcontext" [unwrap ctxt]
-      -- Error boundary.
-      catchError (for_ states (enteringState ctxt))
-        \e -> logPerspectivesError $ Custom ("Cannot enter context state for " <> show ctxt <>  ", because " <> show e)
-      lift $ restoreFrame oldFrame
-  -- Enter the rootState of roles that are created.
-  for_ createdRoles
-    \rid -> do
-      ctxt <- lift (rid ##>> context)
-      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-      oldFrame <- lift pushFrame
-      lift $ addBinding "currentcontext" [unwrap ctxt]
-      -- Error boundary.
-      catchError (for_ states (enteringRoleState rid))
-        \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
-      lift $ restoreFrame oldFrame
-  -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
-  log ("Roles to exit: " <> show rolesToExit)
-  rolesThatHaveNotExited <- lift $ filterA (\rid -> rid ##>> exists' getActiveRoleStates) rolesToExit
-  log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
-  for_ rolesThatHaveNotExited
-    \rid -> do
-      ctxt <- lift (rid ##>> context)
-      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-      if null states
-        then pure unit
-        else do
-          oldFrame <- lift pushFrame
-          lift $ addBinding "currentcontext" [unwrap ctxt]
-          stateEvaluationAndQueryUpdatesForRole rid
-          -- Error boundary.
-          catchError (for_ states (exitingRoleState rid))
-            \e -> do 
-              logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
-              lift $ restoreFrame oldFrame
-              throwError e
-          lift $ restoreFrame oldFrame
-  -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
-  contextsThatHaveNotExited <- lift $ filterA (\sa -> case sa of
-      ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
-      _ -> pure false)
-    scheduledAssignments
-  for_ contextsThatHaveNotExited (unsafePartial exitContext)
-    -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
-    -- to preserve the invariant.
-  AA.modify (\t -> over Transaction (\tr -> tr
-    { untouchableRoles = tr.untouchableRoles <> tr.rolesToExit
-    , untouchableContexts = tr.untouchableContexts <> (contextsToBeRemoved tr.scheduledAssignments)
-    })
-    t)
-  nt <- AA.get
-  if isEmptyTransaction nt
-    then pure previousTransaction
-    else pure <<< (<>) previousTransaction =<< runEntryAndExitActions nt
-  where
-    exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
-    exitContext (ContextRemoval ctxt authorizedRole) = do
-      stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
-      states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
-      if null states
-        then pure unit
-        else do
-          -- Provide a new frame for the current context variable binding.
-          oldFrame <- lift pushFrame
-          lift $ addBinding "currentcontext" [unwrap ctxt]
-          -- Error boundary.
-          catchError (for_ states (exitingState ctxt))
-            \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
-          lift $ restoreFrame oldFrame
 
 -----------------------------------------------------------
 -- EXECUTEEFFECT

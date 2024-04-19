@@ -56,24 +56,35 @@ import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 -- TRANSACTIE
 -----------------------------------------------------------
 newtype Transaction = Transaction (TransactionRecord
-  ( invertedQueryResults :: Array InvertedQueryResult
+  ( -- used in runAllAutomaticActions to compute the states that need evaluation.
+    invertedQueryResults :: Array InvertedQueryResult
+    -- used in runMonadPerspectivesTransaction'.run to recompute query results.
   , correlationIdentifiers :: Array CorrelationIdentifier
   -- The role type that must have a sufficient perspective for the deltas in the transaction.
   -- Notice that it may be changed during the transaction, so not all delta's need have the same authoringRole.
   , authoringRole :: RoleType
   -- rolesToExit is the only complete collection of role instances that will be removed
   -- (including role instances that are removed with their context).
+  -- Used in runEntryAndExitActions to exit role states, for synchronization and for query updates.
   , rolesToExit :: Array RoleInstance
+  -- used in runMonadPerspectivesTransaction'.run to execute ContextRemoval and RoleRemoval.
+  -- used in runAllAutomaticActions to execute RoleUnbinding and ExecuteDestructiveEffect.
   , scheduledAssignments :: Array ScheduledAssignment
   , modelsToBeRemoved :: Array DomeinFileId
+  -- Used in runEntryAndExitActions to enter the root state of a new context.
   , createdContexts :: Array ContextInstance
+  -- Used in runEntryAndExitActions to enter the root state of a new context.
   , createdRoles :: Array RoleInstance
   -- No Delta and no InvertedQueryResult (leading to state evaluation) should be constructed using one of the
   -- resources in the next two members.
+  -- No state condition should depend on them either, but we do not have a mechanism to compute state conditions
+  -- that reckons with them. Instead, we postpone state evaluations that depend on them (which we CAN establish) till
+  -- after they have been actually removed.
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
   -- A Map from any RoleInstance to its most deeply nested filler.
   , userRoleBottoms :: MAP.Map RoleInstance (Array RoleInstance)
+  -- used in runMonadPerspectivesTransaction'.run to evaluate states again (and execute actions on entry and exit).
   , postponedStateEvaluations :: Array StateEvaluation
   ))
 
@@ -195,15 +206,17 @@ cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchabl
   { author
   , timeStamp
   , authoringRole
+
   , deltas: []
   , changedDomeinFiles: []
-  , scheduledAssignments: []
+  , scheduledAssignments: []      --
   , invertedQueryResults: []
   , correlationIdentifiers: []
-  , rolesToExit: []
+  , rolesToExit: []               --
   , modelsToBeRemoved: []
-  , createdContexts: []
-  , createdRoles: []
+  , createdContexts: []           --
+  , createdRoles: []              --
+
   , untouchableRoles
   , untouchableContexts
   , userRoleBottoms
