@@ -24,11 +24,62 @@ domain model://joopringelberg.nl#TestQueries
 
   aspect user sys:PerspectivesSystem$Installer
   
+  case TQAspect
+    -- This state has been seen to become active after creating TheEmbeddedContext.
+    -- This state has been seen to become inactive after removing TheEmbeddedContext.
+    state AspectState1 = exists EC
+      on entry
+        notify AspectManager
+          "Entering AspectState1"
+      on exit
+        notify AspectManager
+          "Leaving AspectState1"
+    
+    -- This state has been seen to become active after setting Prop1 on the external role of the EmbeddedContext instance.
+    -- This state has been seen to become inactive after setting Prop1 to false on the external role of the EmbeddedContext instance.
+    state AspectState2 = EC >> AspectProp1
+      on entry
+        notify AspectManager
+          "Entering AspectState2"
+      on exit
+        notify AspectManager
+          "Leaving AspectState2"
+
+    -- This state has been seen to become active after creating Thing1 in the EmbeddedContext.
+    -- This state has been seen to become inactive after removing Thing1 in the EmbeddedContext.
+    state AspectState3 = exists EC >> binding >> context >> AspectThing1
+      on entry
+        notify AspectManager
+          "Entering AspectState3"
+      on exit
+        notify AspectManager
+          "Leaving AspectState3"
+
+    -- This state has been seen to become active after setting Prop2 on Thing1 in the EmbeddedContext.
+    -- This state has been seen to become inactive after removing Prop2 (or setting it to false) in the EmbeddedContext.
+    state AspectState4 = EC >> binding >> context >> AspectThing1 >> AspectProp2
+      on entry
+        notify AspectManager
+          "Entering AspectState4"
+      on exit
+        notify AspectManager
+          "Leaving AspectState4"
+
+    context EC filledBy TQAspectEmbeddedContext
+
+    user AspectManager
+
+  case TQAspectEmbeddedContext
+    external
+      property AspectProp1 (Boolean)
+    thing AspectThing1
+      property AspectProp2 (Boolean)
 
   case TestQueries
     indexed tq:TestQueryApp
     aspect sys:RootContext
     aspect sys:ContextWithNotification
+    aspect tq:TQAspect
 
     external
       aspect sys:RootContext$External
@@ -61,7 +112,6 @@ domain model://joopringelberg.nl#TestQueries
     
     -- This state has been seen to become active after creating Thing1.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
-    -- TODO. Removing Thing1 does not exit this state.
     state State3 = exists TheEmbeddedContext >> binding >> context >> Thing1
       on entry
         notify Manager
@@ -72,7 +122,6 @@ domain model://joopringelberg.nl#TestQueries
     
     -- This state has been seen to become active after setting Prop2 to true.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
-    -- TODO. Removing Thing1 does not exit this state.
     state State4 = TheEmbeddedContext >> binding >> context >> Thing1 >> Prop2
       on entry
         notify Manager
@@ -93,6 +142,7 @@ domain model://joopringelberg.nl#TestQueries
     -- Without a role this context could never be opened.
     user Manager filledBy sys:PerspectivesSystem$User
       aspect sys:ContextWithNotification$NotifiedUser
+      aspect tq:TQAspect$AspectManager
       perspective on TheEmbeddedContext
         defaults
       perspective on Thing1InEmbeddedContext
@@ -109,6 +159,7 @@ domain model://joopringelberg.nl#TestQueries
           form "AnotherRole" AnotherRole
 
     context TheEmbeddedContext filledBy EmbeddedContext
+      aspect tq:TQAspect$EC
       on entry
         do for Initializer
           bind sys:Me to EmbeddedUser in binding >> context
@@ -131,7 +182,11 @@ domain model://joopringelberg.nl#TestQueries
 
   case EmbeddedContext
     aspect sys:ContextWithNotification
+    aspect tq:TQAspectEmbeddedContext 
     external 
+      aspect tq:TQAspectEmbeddedContext$External
+        where
+          AspectProp1 is replaced by Prop1
       state ECE = (exists context >> EmbeddedUser) and exists binder TheEmbeddedContext
         on entry
           notify EmbeddedUser
@@ -166,6 +221,9 @@ domain model://joopringelberg.nl#TestQueries
     aspect thing sys:ContextWithNotification$Notifications
 
     thing Thing1
+      aspect tq:TQAspectEmbeddedContext$AspectThing1
+        where 
+          AspectProp2 is replaced by Prop2
       property Prop2 (Boolean)
     
     user EmbeddedUser filledBy sys:PerspectivesSystem$User
