@@ -112,6 +112,16 @@ domain model://joopringelberg.nl#TestQueries
       on entry
         do for Initializer
           bind sys:Me to EmbeddedUser in binding >> context
+      -- This state has been seen to become active after creating it and its filler.
+      -- This state has been seen to become active after filling it.
+      -- This state has been seen to become inactive after removing the filler.
+      state TEC = exists binding
+        on entry
+          notify Manager
+            "Entering state TEC"
+        on exit
+          notify Manager
+            "Leaving state TEC"
       property Prop4 (Boolean)
 
     thing AnotherRole
@@ -122,6 +132,14 @@ domain model://joopringelberg.nl#TestQueries
   case EmbeddedContext
     aspect sys:ContextWithNotification
     external 
+      state ECE = (exists context >> EmbeddedUser) and exists binder TheEmbeddedContext
+        on entry
+          notify EmbeddedUser
+            "Entering state ECE"
+        on exit
+          notify EmbeddedUser
+            "Leaving state ECE"
+
       property Prop1 (Boolean)
     
     -- This state has been seen to become active after setting Prop4 to true.
@@ -137,7 +155,7 @@ domain model://joopringelberg.nl#TestQueries
     -- This state has been seen to become active after setting Prop4 to true.
     -- It has also been seen to become inactive after setting Prop1 to false.
     -- This state has been seen to become inactive after removing the filler of TheEmbeddedContext.
-    state EmbeddedState2 = extern >> binder TheEmbeddedContext >> context >> AnotherRole >> Prop3
+    state EmbeddedState2 = (exists EmbeddedUser) and extern >> binder TheEmbeddedContext >> context >> AnotherRole >> Prop3 >>= first
       on entry
         notify EmbeddedUser
           "Entering EmbeddedState2"
