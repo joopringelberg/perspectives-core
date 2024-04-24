@@ -93,7 +93,6 @@ domain model://perspectives.domains#CouchdbManagement
       property CouchdbPort (mandatory, String)
         pattern = "^\\d{1,5}$" "A port number written as a string, consisting of up to 5 digits, maximally 65535."
       -- The Password and UserName of Manager (and therefore CouchdbServer$Admin) for Url.
-      -- Notice that the AdminUserName *must* be 
       property AdminPassword (mandatory, String)
       property AdminUserName (mandatory, String)
 
@@ -182,7 +181,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- This role requires credentials for the ServerUrl, because it updates CouchdbServer and creates and updates Repositories and Accounts.
     -- It requires write access to cw_servers_and_repositories.
     -- TODO Hernoem dit naar ServerAdmin.
-    user Admin filledBy CouchdbManagementApp$Manager 
+    user Admin (relational) filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
       -- These properties come from sys:WithCredentials
       -- WithCredentials$UserName - CALCULATED, either the SpecificUserName or the ID of the PerspectivesSystem$User.
@@ -197,7 +196,7 @@ domain model://perspectives.domains#CouchdbManagement
         create role Repositories
 
       perspective on extern
-        props (ServerUrl) verbs (Consult)
+        props (ServerUrl, CouchdbPort) verbs (Consult)
         props (Name) verbs (SetPropertyValue, Consult)
 
       perspective on Repositories
@@ -218,6 +217,11 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on BespokeDatabases
         all roleverbs
         props(OwnerName) verbs (Consult)
+      
+      perspective on Admin
+        props (FirstName, UserName) verbs (Consult)
+        props (SpecificUserName, Password) verbs (SetPropertyValue)
+        all roleverbs
 
         -- This is currently not very useful, because a Repositories instance will not enter state WithoutManifests 
         -- when its last Manifest is deleted. Negation by failure breaks on removing instances!
@@ -232,7 +236,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (ServerUrl, Name) verbs (Consult)
               --props (Name) verbs (SetPropertyValue)
           row
-            form "Admin" Admin
+            table "Admins" Admin
         tab "Repositories"
           row 
             table Repositories
@@ -245,7 +249,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- This role requires credentials for the ServerUrl, because it can remove itself.
     -- It requires write access to cw_servers_and_repositories.
-    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
+    user Accounts (unlinked, relational) filledBy sys:SocialEnvironment$Persons
       -- WithCredentials$Password
       -- WithCredentials$SpecificUserName
       -- WithCredentials$AuthorizedDomain
@@ -289,7 +293,8 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on Accounts
         selfonly
-        props (Password, AuthorizedDomain) verbs (Consult)
+        -- Add FirstName to make sure the filler of this role is sent to the peer himself!
+        props (FirstName, Password, AuthorizedDomain) verbs (Consult)
 
       perspective on External
         props (ServerUrl, Name) verbs (Consult)
@@ -318,7 +323,7 @@ domain model://perspectives.domains#CouchdbManagement
           row
             form External
           row
-            form "Admin" Admin
+            table "Admins" Admin
           row
             table Accounts
         tab "Repositories"
@@ -570,6 +575,9 @@ domain model://perspectives.domains#CouchdbManagement
 
         action CompileRepositoryModels
           callEffect p:CompileRepositoryModels( RepositoryUrl + ModelsDatabase, RepositoryUrl + InstancesDatabase )
+      
+      perspective on Admin
+        props (FirstName, SpecificUserName, UserName, Password) verbs (Consult)
 
       -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.

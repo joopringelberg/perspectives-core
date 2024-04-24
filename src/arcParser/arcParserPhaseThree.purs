@@ -131,9 +131,9 @@ phaseThree_ df@{id, referredModels} postponedParts screens = do
       -- As all Calculated roles and Properties are now compiled, we can safely compile public Url calculations.
       compilePublicUrls
       qualifyPropertyReferences
+      addAspectsToExternalRoles
       handlePostponedStateQualifiedParts
       compileStateQueries
-      addAspectsToExternalRoles
       contextualisePerspectives
       -- Now all perspectives are available.
       -- Check whether actions are allowed given perspectives.
