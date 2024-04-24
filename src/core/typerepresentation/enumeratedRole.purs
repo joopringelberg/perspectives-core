@@ -68,6 +68,8 @@ type EnumeratedRoleRecord =
 
   , roleAspects :: Array RoleInContext
   , properties :: Array PropertyType
+  -- A key is a (qualified) alias name; the value is the qualified property that it signifies.
+  -- property values can be saved under their alias name in instances.
   , propertyAliases :: OBJ.Object (EnumeratedPropertyType)
 
   , binding :: ADT RoleInContext

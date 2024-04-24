@@ -81,7 +81,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Time (string2Date, string2DateTime, string2Time)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, unit, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -847,31 +847,30 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
       -- has been added to the role.
       aliases <- catchError (lift $ propertyAliases roleType)
         \e -> pure OBJ.empty
+      allProps <- lift $ allLocallyRepresentedProperties (ST roleType)
+      if isJust $ elemIndex (ENP pn) allProps
+        -- No value, but there might have been one. 
+        -- We can use either the alias name or the original name for the assumption, as we use both when looking up correlation identifiers.
+        then tell $ ArrayWithoutDoubles [Property r pn]
+        else pure unit
       case OBJ.lookup (unwrap pn) aliases of
         Just aliasPropertyName -> do 
-          -- getProperty destination rid
+          -- Property values may have been stored under their alias name on the role instance.
+          -- Check whether we have a value.
           case (OBJ.lookup (unwrap aliasPropertyName) properties) of
             Nothing -> do
               case bnd of
-                Nothing -> do 
-                  tell $ ArrayWithoutDoubles [Property r aliasPropertyName]
-                  pure []
+                Nothing -> pure []
                 -- Search further with the original name. The alias was defined just for this role type.
                 Just b -> runArrayT $ getPropertyFromTelescope pn b
-            (Just p) -> do 
-              tell $ ArrayWithoutDoubles [Property r aliasPropertyName]
-              pure p
+            (Just p) -> pure p
         Nothing -> case (OBJ.lookup (unwrap pn) properties) of
           Nothing -> do
             case bnd of
-              Nothing -> do 
-                tell $ ArrayWithoutDoubles [Property r pn] 
-                pure []
+              Nothing -> pure []
               -- Search further with the original name. The alias was defined just for this role type.
               Just b -> runArrayT $ getPropertyFromTelescope pn b
-          (Just p) ->  do 
-            tell $ ArrayWithoutDoubles [Property r pn]
-            pure p
+          (Just p) -> pure p
 
 -- | Builds, in compile time, a composition of `binding` and `getProperty` that will retrieve the value from the first 
 -- | instance on the chain on which that property has been declared. 
