@@ -34,7 +34,7 @@ import Data.Show.Generic (genericShow)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap as ENCMAP
-import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (PublicKeyInfo)
@@ -46,6 +46,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -----------------------------------------------------------
 newtype TransactionForPeer = TransactionForPeer
   { author :: PerspectivesUser
+  , perspectivesSystem :: ContextInstance
   , timeStamp :: SerializableDateTime
   , deltas :: Array SignedDelta
   , publicKeys :: ENCMAP.EncodableMap PerspectivesUser PublicKeyInfo

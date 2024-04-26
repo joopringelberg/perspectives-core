@@ -52,7 +52,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabase
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesSystemUser, PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesSystemUser, PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
@@ -141,16 +141,17 @@ type TransactionPerUser = Map.Map TransactionDestination TransactionForPeer
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{timeStamp, deltas, userRoleBottoms, publicKeys}) = do
   execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
+    system <- lift getMySystem
     -- Lookup the ultimate filler for all users in the delta.
     (sysUsers :: Array TransactionDestination) <- pure $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
-    addDeltaToCustomisedTransactie delta (nub sysUsers))
+    addDeltaToCustomisedTransactie delta (nub sysUsers) (ContextInstance system))
     Map.empty
   where
     -- `destinations` WILL be either 
     --    * Peer model://perspectives.domains#System$TheWorld$PerspectivesUsers instances, or
     --    * PublicDestination roleInstance, where the latter is an instance of the Visitor role.
-    addDeltaToCustomisedTransactie :: SignedDelta -> (Array TransactionDestination) -> StateT TransactionPerUser (MonadPerspectives) Unit
-    addDeltaToCustomisedTransactie d@(SignedDelta {author}) destinations = for_
+    addDeltaToCustomisedTransactie :: SignedDelta -> (Array TransactionDestination) -> ContextInstance -> StateT TransactionPerUser (MonadPerspectives) Unit
+    addDeltaToCustomisedTransactie d@(SignedDelta {author}) destinations perspectivesSystem = for_
       destinations
       (\destination -> case destination of 
         peer@(Peer perspectivesUser) -> if not $ eq perspectivesUser author
@@ -158,13 +159,13 @@ transactieForEachUser t@(Transaction tr@{timeStamp, deltas, userRoleBottoms, pub
             trs <- get
             case Map.lookup peer trs of 
               -- TODO: verwijder public key info voor deltas die er niet toe doen voor deze user.
-              Nothing -> put $ Map.insert peer (TransactionForPeer {author, timeStamp, deltas: [d], publicKeys}) trs
+              Nothing -> put $ Map.insert peer (TransactionForPeer {author, perspectivesSystem, timeStamp, deltas: [d], publicKeys}) trs
               Just trans -> put $ Map.insert peer (addToTransactionForPeer d trans) trs
           else pure unit
         publicRole@(PublicDestination _) -> do
             trs <- get
             case Map.lookup publicRole trs of 
-              Nothing -> put $ Map.insert publicRole (TransactionForPeer {author, timeStamp, deltas: [d], publicKeys}) trs
+              Nothing -> put $ Map.insert publicRole (TransactionForPeer {author, perspectivesSystem, timeStamp, deltas: [d], publicKeys}) trs
               Just trans -> put $ Map.insert publicRole (addToTransactionForPeer d trans) trs
       )
 

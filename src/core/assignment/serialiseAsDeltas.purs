@@ -53,14 +53,14 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.ModelDependencies (idProperty, sysUser)
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
@@ -89,8 +89,10 @@ serialisedAsDeltasForUserType cid userType = do
     -- user identifier (we serialise for a type!) we use it as a stand in.
     (serialisedAsDeltasFor_ cid (RoleInstance "def:#serializationuser") userType)) >>= addPublicKeysToTransaction
   author <- getPerspectivesUser
+  perspectivesSystem <- ContextInstance <$> getMySystem
   tfp <- pure $ TransactionForPeer
     { author
+    , perspectivesSystem
     , timeStamp
     , deltas: _.delta <<< unwrap <$> deltas
     , publicKeys
