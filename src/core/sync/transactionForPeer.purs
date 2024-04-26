@@ -31,9 +31,10 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Foreign.Object (Object)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
+import Perspectives.Data.EncodableMap as ENCMAP
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser)
 import Perspectives.Sync.DateTime (SerializableDateTime)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Sync.Transaction (PublicKeyInfo)
@@ -44,10 +45,10 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -- TRANSACTIE
 -----------------------------------------------------------
 newtype TransactionForPeer = TransactionForPeer
-  { author :: String
+  { author :: PerspectivesUser
   , timeStamp :: SerializableDateTime
   , deltas :: Array SignedDelta
-  , publicKeys :: Object PublicKeyInfo
+  , publicKeys :: ENCMAP.EncodableMap PerspectivesUser PublicKeyInfo
   }
 
 derive instance genericRepTransactionForPeer :: Generic TransactionForPeer _
@@ -71,7 +72,7 @@ addToTransactionForPeer d (TransactionForPeer r@{deltas}) = TransactionForPeer r
     else snoc deltas d}
 
 transactieID :: TransactionForPeer -> String
-transactieID (TransactionForPeer{author, timeStamp}) = author <> "_" <> show timeStamp
+transactieID (TransactionForPeer{author, timeStamp}) = show author <> "_" <> show timeStamp
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
 instance revisionTransactionForPeer :: Revision TransactionForPeer where

@@ -30,6 +30,7 @@ module Perspectives.Data.EncodableMap
   , lookup
   , removeAll
   , values
+  , union
   )
   where
 
@@ -38,7 +39,7 @@ import Prelude
 import Data.Array (foldr)
 import Data.Array.Partial (head, tail)
 import Data.List (List)
-import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys) as Map
+import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys, union) as Map
 import Data.Map (unionWith)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
@@ -104,3 +105,6 @@ addAll value = foldr (\key map -> insert key value map)
 
 removeAll :: forall key value. Ord key => value -> EncodableMap key value -> Array key -> EncodableMap key value
 removeAll value = foldr (\key map -> delete key map)
+
+union :: forall k v. Ord k => EncodableMap k v -> EncodableMap k v -> EncodableMap k v
+union (EncodableMap m1) (EncodableMap m2) = EncodableMap (m1 `Map.union` m2) 

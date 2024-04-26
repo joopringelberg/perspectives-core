@@ -65,7 +65,7 @@ import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ScheduledAssignment (StateEvaluation(..))
@@ -197,7 +197,7 @@ enteringRoleState roleId stateId = do
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
       currentcontext <- lift $ (roleId ##>> contextGetter)
-      userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (Filler_ me)) <<< Filled_))
+      userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (Filler_ $ perspectivesUser2RoleInstance me)) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
         -- As the user gets a new perspective, he should have the corresonding resources. Hence we serialise them as Deltas and 

@@ -25,8 +25,9 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (concat, difference, filter, filterA, index, length, nub, null, reverse, sort, unsafeIndex)
+import Data.Array (concat, difference, filter, filterA, fromFoldable, index, length, nub, null, reverse, sort, unsafeIndex)
 import Data.Foldable (for_)
+import Data.Map as MAP
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
@@ -34,7 +35,6 @@ import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.AVar (new, put, take, tryRead)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Object (empty, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CollectAffectedContexts (reEvaluatePublicFillerChanges)
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
@@ -48,20 +48,20 @@ import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
 import Perspectives.Instances.ObjectGetters (Filler_(..), context, contextType, filler2filledFromDatabase_, getActiveRoleStates, getActiveStates, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
+import Perspectives.Names (getPerspectivesUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, clearPublicRolesJustLoaded, getPublicRolesJustLoaded, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances, getMyType)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
 import Perspectives.SaveUserData (changeRoleBinding, removeContextInstance, removeRoleInstance, stateEvaluationAndQueryUpdatesForContext, stateEvaluationAndQueryUpdatesForRole)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..), StateEvaluation(..), contextsToBeRemoved)
 import Perspectives.Sync.HandleTransaction (executeDeltas, expandDeltas)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
-import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
+import Perspectives.Sync.Transaction (Transaction(..), TransactionDestination(..), createTransaction)
 import Perspectives.Types.ObjectGetters (contextRootStates, publicUrl_, roleRootStates)
 import Prelude (Unit, bind, discard, flip, join, not, pure, show, unit, ($), (*>), (+), (<$>), (<<<), (<>), (>), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -90,7 +90,7 @@ runMonadPerspectivesTransaction' :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPerspectivesUser) >>= lift <<< createTransaction authoringRole <<< unwrap >>= lift <<< new >>= runReaderT whenFlagIsDown
+runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPerspectivesUser) >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT whenFlagIsDown
   where
     -- | Wait until the TransactionFlag can be taken down, then run the action; raise it again.
     whenFlagIsDown :: MonadPerspectivesTransaction o
@@ -247,22 +247,24 @@ phase2 share authoringRole r = do
       ft <- AA.get
       (publicRoleTransactions :: TransactionPerUser) <- if share 
         then lift $ distributeTransaction ft 
-        else pure empty
+        else pure MAP.empty
 
       -- Collect all deltas in order, add the public resource schemes and remove doubles. Then execute.
-      publicDeltas <- nub <<< concat <<< values <$>
+      publicDeltas <- nub <<< concat <<< fromFoldable <<< MAP.values <$>
         forWithIndex publicRoleTransactions
-          \userId publicRoleTransaction -> do
-            userType <- lift $ roleType_ (RoleInstance userId)
-            mUrl <- lift $ publicUrl_ userType
-            case mUrl of
-              Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> userId <> "')")
-              Just (Q qfd) -> do 
-                ctxt <- lift $ ((RoleInstance userId) ##>> context)
-                urlComputer <- lift $ context2propertyValue qfd
-                (Value url) <- lift (ctxt ##>> urlComputer)
-                expandDeltas publicRoleTransaction url
-              Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
+          \destination publicRoleTransaction -> case destination of 
+            (PublicDestination userId) -> do
+              userType <- lift $ roleType_ userId
+              mUrl <- lift $ publicUrl_ userType
+              case mUrl of
+                Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> show userId <> "')")
+                Just (Q qfd) -> do 
+                  ctxt <- lift $ (userId ##>> context)
+                  urlComputer <- lift $ context2propertyValue qfd
+                  (Value url) <- lift (ctxt ##>> urlComputer)
+                  expandDeltas publicRoleTransaction url
+                Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
+            Peer _ -> pure []
 
       -- Those deltas for public roles aren't sent anywhere but executed
       -- right here. Notice that no changes to local state will result from executing such a transaction.
@@ -401,7 +403,7 @@ evaluateStates stateEvaluations =
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives o)
 runSterileTransaction a =
-  getUserIdentifier
+  getPerspectivesUser
   >>= lift <<< createTransaction (ENR $ EnumeratedRoleType sysUser)
   >>= lift <<< new
   >>= runReaderT a

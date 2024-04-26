@@ -12,12 +12,12 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (logShow)
 import Perspectives.CoreTypes ((##>), (##>>))
 import Perspectives.Instances.ObjectGetters (externalRole)
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
 import Perspectives.Persistence.API (addDocument, createDatabase, deleteDatabase, tryGetDocument)
 import Perspectives.Persistence.CouchdbFunctions (endReplication)
 import Perspectives.Persistence.State (withCouchdbUrl)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, localReplication, postDbName, setChannelReplication, setMyAddress, setYourAddress)
 import Perspectives.Sync.Transaction (Transaction, createTransaction)
@@ -91,8 +91,8 @@ theSuite = suite "Perspectives.Sync.Channel" do
   test "local replication" (runP $ void $ withCouchdbUrl \url -> do
     createDatabase "channel"
     createDatabase "post"
-    (user :: String) <- getUserIdentifier
-    localReplication url "channel" "post" (Just user)
+    user <- getPerspectivesUser
+    localReplication url "channel" "post" (Just $ unwrap user)
     t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") user
     void $ addDocument "channel" t "emptyTransaction"
 
@@ -132,7 +132,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") "model:User$joop$User"
+            t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (PerspectivesUser "model:User$joop$User")
             void $ addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)

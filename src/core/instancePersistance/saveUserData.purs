@@ -58,7 +58,7 @@ import Data.Traversable (for, for_, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
-import Perspectives.Assignment.Update (cacheAndSave, deleteProperty, getAuthor, getSubject)
+import Perspectives.Assignment.Update (cacheAndSave, deleteProperty, getSubject)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
@@ -179,10 +179,8 @@ stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
       users2 <- handleRoleOnContextRemoval buitenRol
       -- SYNCHRONISATION
       subject <- getSubject
-      author <- getAuthor
       -- (roleType ###>> hasAspect (EnumeratedRoleType "sys:RootContext$External"))
-      delta <- lift $ signDelta 
-        author 
+      delta <- signDelta 
         (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
               { id
               , contextType
@@ -287,9 +285,7 @@ synchroniseRoleRemoval (PerspectRol{id:roleId, pspType:roleType, context:context
         -- SYNCHRONISATION
         contextType <- lift $ contextType_ contextId
         subject <- getSubject
-        author <- getAuthor
-        delta <- lift $ signDelta
-          author 
+        delta <- signDelta
           (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
             { id: contextId
             , contextType
@@ -447,10 +443,8 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled
             -- Adds deltas for paths beyond the nodes involved in the binding,
             -- for queries that use the binder- or binding step.
             users <- usersWithPerspectiveOnRoleBinding delta true
-            author <- getAuthor
             signedDelta <-  case msignedDelta of
-              Nothing -> lift $ signDelta
-                author
+              Nothing -> signDelta
                 (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
 
@@ -541,10 +535,8 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectRol fill
           else do
             -- SYNCHRONISATION
             -- Only push a RoleBindingDelta if the role will not be removed.
-            author <- getAuthor
             signedDelta <- case msignedDelta of
-              Nothing -> lift $ signDelta
-                author 
+              Nothing -> signDelta
                 (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
             handleNewPeer filled

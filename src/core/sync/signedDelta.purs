@@ -29,13 +29,14 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- | The author is the instance of sys:PerspectivesSystem$User who signed the delta.
 -- | NOTE: like all resource identifiers in Deltas, the author is a schemaless string!
 newtype SignedDelta = SignedDelta 
-  { author :: String
+  { author :: PerspectivesUser
   , encryptedDelta :: String
   , signature :: Maybe String
   }

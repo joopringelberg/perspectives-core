@@ -54,6 +54,7 @@ import Data.ArrayBuffer.Types (ArrayBuffer, Int8Array, Uint8Array)
 import Data.Either (Either(..))
 import Data.Int (hexadecimal, toStringAs)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (over, unwrap)
 import Data.String (length)
 import Data.Traversable (for)
 import Data.UInt (fromInt)
@@ -63,16 +64,15 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import IDBKeyVal (idbGet)
-import Perspectives.CoreTypes (MonadPerspectives, (##>))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.Instances.ObjectGetters (getProperty)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Persistent (entityExists)
-import Perspectives.Representation.InstanceIdentifiers (Value(..))
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers)
-import Perspectives.ResourceIdentifiers.Parser (ResourceIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Simple.JSON (parseJSON, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
@@ -83,22 +83,23 @@ import Web.Encoding.TextEncoder (encode, new) as Encoder
 -----------------------------------------------------------
 -- | Top level entry to message authentication. Sign a message. Under the hood this requires fetching
 -- | the users private key and signing the message.
-signDelta :: ResourceIdentifier -> String -> MonadPerspectives SignedDelta
-signDelta author encryptedDelta = do
+signDelta :: String -> MonadPerspectivesTransaction SignedDelta
+signDelta encryptedDelta = do
+  author <- gets (_.author <<< unwrap)
   deltaBuff :: ArrayBuffer <- liftEffect $ string2buff encryptedDelta
-  mcryptoKey <- gets (_.privateKey <<< _.runtimeOptions)
+  mcryptoKey <- lift $ gets (_.privateKey <<< _.runtimeOptions)
   case mcryptoKey of
     Nothing ->  pure $ SignedDelta 
-      { author: stripNonPublicIdentifiers author
+      { author: over PerspectivesUser stripNonPublicIdentifiers author
       , encryptedDelta
       , signature: Nothing
       }
     Just cryptoKey -> do 
-      signatureBuff <- lift $ sign (ecdsa sha384) (unsafeCoerce cryptoKey) deltaBuff
+      signatureBuff <- lift $ lift $ sign (ecdsa sha384) (unsafeCoerce cryptoKey) deltaBuff
       (int8array :: Uint8Array) <- liftEffect $ whole signatureBuff
       (signature :: String) <- liftAff $ bytesToBase64DataUrl int8array
       sd <- pure $ SignedDelta 
-        { author: stripNonPublicIdentifiers author
+        { author: over PerspectivesUser stripNonPublicIdentifiers author
         , encryptedDelta
         , signature: Just signature
         }
@@ -113,7 +114,7 @@ verifyDelta' (SignedDelta{author, encryptedDelta, signature}) mcryptoKey = do
   case signature, mcryptoKey of 
     Nothing, Nothing -> pure $ Just encryptedDelta
     Nothing, Just _ ->  pure $ Just encryptedDelta
-    Just s, Nothing -> throwError (error $ "No public key found for " <> author)
+    Just s, Nothing -> throwError (error $ "No public key found for " <> show author)
     Just signature', Just cryptoKey -> do 
       signatureBuff <- buffer <$> (liftAff $ dataUrlToBytes signature')
       deltaBuff <- liftAff $ liftEffect $ string2buff encryptedDelta
@@ -123,15 +124,15 @@ verifyDelta' (SignedDelta{author, encryptedDelta, signature}) mcryptoKey = do
         else pure Nothing
 
 -- | Get the public key of a peer.
-getPublicKey :: String -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
+getPublicKey :: PerspectivesUser -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPublicKey author = do
-  mrawKey <- deltaAuthor2ResourceIdentifier author ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
+  mrawKey <- deltaAuthor2ResourceIdentifier (perspectivesUser2RoleInstance author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
   case mrawKey of 
     Nothing -> pure Nothing 
     Just (Value rawKey) -> lift (Just <$> deserializeJWK rawKey)
 
-tryGetPublicKey  :: String -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
-tryGetPublicKey author = entityExists (deltaAuthor2ResourceIdentifier author) >>= if _ 
+tryGetPublicKey  :: PerspectivesUser -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
+tryGetPublicKey author = entityExists (deltaAuthor2ResourceIdentifier (perspectivesUser2RoleInstance author)) >>= if _ 
   then getPublicKey author
   else pure Nothing
 

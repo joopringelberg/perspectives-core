@@ -51,7 +51,7 @@ domain model://perspectives.domains#System
     property Id = callExternal util:RoleIdentifier() returns String
 
   -- PDRDEPENDENCY
-  user WithCredentials filledBy sys:PerspectivesSystem$User
+  user WithCredentials
     -- | The role identifier of the filler of SocialEnvironment$Me - that is, the unique identifier of this user
     -- | in the Perspectives Universe (a PerspectivesUsers instance).
     -- | This includes the storage scheme!

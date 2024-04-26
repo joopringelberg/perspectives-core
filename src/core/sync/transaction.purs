@@ -36,12 +36,12 @@ import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
-import Foreign.Object (Object, empty, union) as OBJ
 import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
+import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser, RoleInstance, perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.ScheduledAssignment (ScheduledAssignment, StateEvaluation)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
@@ -49,7 +49,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Semigroup, class Show, bind, pure, ($), (&&), (<>), (>))
+import Prelude (class Eq, class Ord, class Semigroup, class Show, bind, compare, eq, pure, show, ($), (&&), (<>), (>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
@@ -83,19 +83,31 @@ newtype Transaction = Transaction (TransactionRecord
   , untouchableContexts :: Array ContextInstance
   , untouchableRoles :: Array RoleInstance
   -- A Map from any RoleInstance to its most deeply nested filler.
-  , userRoleBottoms :: MAP.Map RoleInstance (Array RoleInstance)
+  , userRoleBottoms :: MAP.Map RoleInstance TransactionDestination
   -- used in runMonadPerspectivesTransaction'.run to evaluate states again (and execute actions on entry and exit).
   , postponedStateEvaluations :: Array StateEvaluation
   ))
 
+data TransactionDestination = PublicDestination RoleInstance | Peer PerspectivesUser
+instance Show TransactionDestination where
+  show (PublicDestination r) = "(PublicDestination " <> show r <> ")"
+  show (Peer p) = "(Peer " <> show p <> ")"
+instance Ord TransactionDestination where
+  compare (Peer p1) (Peer p2) = compare p1 p2
+  compare (PublicDestination p1) (PublicDestination p2) = compare p1 p2
+  compare (Peer p1) (PublicDestination p2) = compare (perspectivesUser2RoleInstance p1) p2
+  compare (PublicDestination p1) (Peer p2)  = compare p1 (perspectivesUser2RoleInstance p2)
+instance Eq TransactionDestination where
+  eq (Peer p1) (Peer p2) = eq p1 p2
+  eq (PublicDestination p1) (PublicDestination p2) = eq p1 p2
+  eq _ _ = false
+
 type TransactionRecord f =
-  -- The author is an instance of sys:PerspectivesSystem$User who signs deltas.
-  { author :: String
+  { author :: PerspectivesUser
   , timeStamp :: SerializableDateTime
   , deltas :: Array DeltaInTransaction
   , changedDomeinFiles :: Array String
-  -- The keys of the Object are the author string values.
-  , publicKeys :: OBJ.Object PublicKeyInfo
+  , publicKeys :: ENCMAP.EncodableMap PerspectivesUser PublicKeyInfo
   | f
   }
 
@@ -137,7 +149,7 @@ instance ReadForeign Transaction where
       , untouchableRoles: []
       , untouchableContexts: []
       , userRoleBottoms: MAP.empty
-      , publicKeys: OBJ.empty
+      , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
       }
 
@@ -161,7 +173,7 @@ instance semiGroupTransactie :: Semigroup Transaction where
       , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
       , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
       , userRoleBottoms: userRoleBottoms `MAP.union` urb
-      , publicKeys: publicKeys `OBJ.union` pk
+      , publicKeys: publicKeys `ENCMAP.union` pk
       , postponedStateEvaluations: postponedStateEvaluations <> pse
     }
 
@@ -177,7 +189,7 @@ instance Attachment Transaction where
   setAttachment t _ = t
   getAttachments t = Nothing
 
-createTransaction :: RoleType -> String -> Aff Transaction
+createTransaction :: RoleType -> PerspectivesUser -> Aff Transaction
 createTransaction authoringRole author =
   do
     n <- liftEffect $ now
@@ -197,7 +209,7 @@ createTransaction authoringRole author =
       , untouchableContexts: []
       , untouchableRoles: []
       , userRoleBottoms: MAP.empty
-      , publicKeys: OBJ.empty
+      , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
     }
 

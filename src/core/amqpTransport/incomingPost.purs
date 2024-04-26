@@ -118,7 +118,7 @@ incomingPost = do
         Just stompClient -> do
           (transactions :: Array OutgoingTransaction) <- sort <<< nub <$> traverse (getDocument_ postDB) waitingTransactions
           -- We do not delete here; only when we receive the receipt.
-          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (writeJSON transaction)
+          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient (unwrap receiver) _id (writeJSON transaction)
         _ -> pure unit
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.

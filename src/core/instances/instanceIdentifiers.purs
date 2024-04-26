@@ -24,10 +24,10 @@ module Perspectives.Representation.InstanceIdentifiers where
 
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype, unwrap)
-
-
+import Data.Show.Generic (genericShow)
 import Perspectives.Utilities (class PrettyPrint)
 import Prelude (class Eq, class Ord, class Show, compare, show, (<>), (==))
+import Safe.Coerce (coerce)
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 newtype ContextInstance = ContextInstance String
@@ -79,3 +79,31 @@ instance prettyPrintValue :: PrettyPrint Value where
 
 externalRole :: ContextInstance -> RoleInstance
 externalRole ct = RoleInstance (unwrap ct <> "$External")
+
+newtype PerspectivesUser = PerspectivesUser String
+derive instance Newtype PerspectivesUser _
+derive instance Generic PerspectivesUser _
+derive newtype instance WriteForeign PerspectivesUser
+derive newtype instance ReadForeign PerspectivesUser
+instance Eq PerspectivesUser where 
+  eq (PerspectivesUser p1) (PerspectivesUser p2) = p1 == p2
+instance Show PerspectivesUser where show = genericShow
+instance PrettyPrint PerspectivesUser where
+  prettyPrint' t = show
+instance Ord PerspectivesUser where
+  compare (PerspectivesUser v1) (PerspectivesUser v2) = compare v1 v2
+
+perspectivesUser2RoleInstance :: PerspectivesUser -> RoleInstance
+perspectivesUser2RoleInstance = coerce
+
+roleInstance2PerspectivesUser :: RoleInstance -> PerspectivesUser
+roleInstance2PerspectivesUser = coerce
+
+newtype PerspectivesSystemUser = PerspectivesSystemUser String
+derive instance Newtype PerspectivesSystemUser _
+
+perspectivesSystemUser2RoleInstance :: PerspectivesSystemUser -> RoleInstance
+perspectivesSystemUser2RoleInstance = coerce
+
+roleInstance2PerspectivesSystemUser :: RoleInstance -> PerspectivesSystemUser
+roleInstance2PerspectivesSystemUser = coerce

@@ -54,7 +54,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..), ex
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
-import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
+import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers, socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
@@ -64,7 +64,7 @@ import Perspectives.Representation.Class.PersistentType (getContext, getEnumerat
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesSystemUser, PerspectivesUser, RoleInstance(..), Value(..), roleInstance2PerspectivesSystemUser, roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
@@ -247,16 +247,24 @@ bottom_ r = do
     Just b -> bottom_ b
 
 -- | The TheWorld$PerspectivesUsers bottom in the chain, or nothing
-perspectivesUsersRole_ :: RoleInstance -> MP (Maybe RoleInstance)
+perspectivesUsersRole_ :: RoleInstance -> MP (Maybe PerspectivesUser)
 perspectivesUsersRole_ r = do
   EnumeratedRoleType rt <- roleType_ r
   if rt == perspectivesUsers
-    then pure $ Just r
+    then pure $ Just (roleInstance2PerspectivesUser r)
     else do 
       (mbinding :: Maybe RoleInstance) <- binding_ r
       case mbinding of
         Nothing -> pure Nothing
         Just b -> perspectivesUsersRole_ b
+
+-- | Get the SocialEnvironment$Persons instance that is filled by the PerspectivesUsers instance and from that get the 
+-- | PerspectivesSystem$User instances that are filled by it.
+getPerspectivesSystemUsers :: RoleInstance ~~> PerspectivesSystemUser
+getPerspectivesSystemUsers = 
+  getFilledRoles (ContextType socialEnvironment) (EnumeratedRoleType socialEnvironmentPersons) >=>
+  getFilledRoles (ContextType theSystem) (EnumeratedRoleType sysUser) >=>
+  pure <<< roleInstance2PerspectivesSystemUser
 
 -- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
 -- | type (filledType) that are filled with it. The type of filledType (EnumeratedRoleType) may

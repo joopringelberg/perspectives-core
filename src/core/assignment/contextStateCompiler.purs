@@ -64,7 +64,7 @@ import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getRoleInstances, roleFunctionFromQfd)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), externalRole)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), externalRole, perspectivesUser2RoleInstance)
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), PropertyType, RoleType, StateIdentifier)
 import Perspectives.ScheduledAssignment (StateEvaluation(..))
@@ -188,7 +188,7 @@ enteringState contextId stateId = do
   case object of
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, isSelfPerspective} -> do
-      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) ((COMB.not' (filledBy (Filler_ me))) <<< Filled_))
+      userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) ((COMB.not' (filledBy (Filler_ $ perspectivesUser2RoleInstance me))) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
         Just u' -> serialiseRoleInstancesAndProperties

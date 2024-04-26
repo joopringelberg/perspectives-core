@@ -46,11 +46,10 @@ import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), 
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Representation.Class.PersistentType (getContext)
 import Perspectives.Representation.Context (Context(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
--- import Perspectives.TypesForDeltas (UniverseRoleDelta(..))
 import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>), (<<<), (<>))
 
 -- CONTEXT
@@ -193,7 +192,7 @@ defaultContextRecord =
   , rolInContext: empty
   , me: Nothing
   , preferredUserRoleType: Nothing
-  , universeContextDelta: SignedDelta{author: "", encryptedDelta: "UniverseContextDelta from defaultContextRecord", signature: Nothing}
+  , universeContextDelta: SignedDelta{author: PerspectivesUser "", encryptedDelta: "UniverseContextDelta from defaultContextRecord", signature: Nothing}
   , states: []
   , publicUrl: Nothing
   }
@@ -211,8 +210,8 @@ defaultRolRecord =
   , filledRoles: empty
   , occurrence: 0
   , isMe: false
-  , universeRoleDelta: SignedDelta {author: "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord", signature: Nothing}
-  , contextDelta: SignedDelta {author: "", encryptedDelta: "ContextDelta from defaultRolRecord", signature: Nothing}
+  , universeRoleDelta: SignedDelta {author: PerspectivesUser "", encryptedDelta: "UniverseRoleDelta from defaultRolRecord", signature: Nothing}
+  , contextDelta: SignedDelta {author: PerspectivesUser "", encryptedDelta: "ContextDelta from defaultRolRecord", signature: Nothing}
   , bindingDelta: Nothing
   , propertyDeltas: empty
   , states: []

@@ -53,7 +53,7 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (roleType_)
 import Perspectives.ModelDependencies (idProperty, sysUser)
-import Perspectives.Names (getUserIdentifier)
+import Perspectives.Names (getPerspectivesUser, getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
@@ -101,7 +101,7 @@ serialisedAsDeltasForUserType cid userType = do
       MonadPerspectivesTransaction o ->
       MonadPerspectives Transaction
     execMonadPerspectivesTransaction authoringRole a =
-      getUserIdentifier
+      getPerspectivesUser
       >>= lift <<< createTransaction authoringRole
       >>= lift <<< new
       >>= runReaderT run

@@ -35,7 +35,7 @@ module Perspectives.Instances.CreateRole where
 import Control.Monad.Writer (lift)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Perspectives.Assignment.Update (getAuthor, getSubject)
+import Perspectives.Assignment.Update (getSubject)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.ContextAndRole (defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=))
@@ -61,12 +61,10 @@ constructEmptyRole ::
   RoleInstance ->
   MonadPerspectivesTransaction PerspectRol
 constructEmptyRole contextInstance roleType i rolInstanceId = do
-  author <- getAuthor
   subject <- getSubject
   allTypes <- lift (roleType ###= roleAspectsClosure)
   contextType <- lift $ contextType_ contextInstance
-  delta <- lift $ signDelta 
-    author
+  delta <- signDelta 
     (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
       { id: contextInstance
       , contextType

@@ -33,6 +33,7 @@ import Data.Foldable (for_)
 import Data.Map (insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
+import Data.Nullable (Nullable, toMaybe)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
@@ -83,9 +84,12 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (reSetupUser, setupInvertedQueryDatabase, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
+import Perspectives.Sync.HandleTransaction (executeTransaction)
+import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
 import Perspectives.SystemClocks (forkedSystemClocks)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read) as JSON
+import Simple.JSON (read_)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -420,8 +424,8 @@ initialisePersistence userName password couchdbUrl = void $ runAff
   handleError
   (setupPerspectivesInCouchdb userName password couchdbUrl)
 
-createAccount :: UserName -> Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
-createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
+createAccount :: UserName -> Foreign -> RuntimeOptions -> Nullable Foreign -> (Boolean -> Effect Unit) -> Effect Unit
+createAccount usr rawPouchdbUser runtimeOptions nullableIdentityDocument callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
     Right (pouchdbUser :: PouchdbUser) -> do
@@ -462,6 +466,13 @@ createAccount usr rawPouchdbUser runtimeOptions callback = void $ runAff handler
           modify \(s@{runtimeOptions:ro}) -> s {runtimeOptions = ro {privateKey = unsafeCoerce key}}
           getSystemIdentifier >>= createUserDatabases
           setupUser
+          case toMaybe nullableIdentityDocument of
+            Just identityDocument -> do 
+              (mt :: Maybe TransactionForPeer) <- pure $ read_ identityDocument
+              case mt of 
+                Just t -> runMonadPerspectivesTransaction' doNotShareWithPeers (ENR $ EnumeratedRoleType sysUser {-Who should be the author of this transaction?-}) (executeTransaction t)
+                Nothing -> pure unit
+            Nothing -> pure unit
           saveMarkedResources
           )
         state

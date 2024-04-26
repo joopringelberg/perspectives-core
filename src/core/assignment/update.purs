@@ -159,12 +159,10 @@ addRoleInstanceToContext contextId rolName (Tuple roleId receivedDelta) = do
           lift $ cacheAndSave contextId (changeContext_me changedContext (Just roleId))
         else lift $ cacheAndSave contextId changedContext
 
-      author <- getAuthor
       subject <- getSubject
       delta <- case receivedDelta of
         Just d -> pure d
-        _ -> lift $ signDelta 
-              author
+        _ -> signDelta 
               (writeJSON $ stripResourceSchemes $ ContextDelta
                 { contextInstance : contextId
                 , contextType: context_pspType pe
@@ -214,9 +212,7 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
         users <- usersWithPerspectiveOnRoleInstance rolName (head rolInstances) contextId false
         subject <- getSubject
       -- SYNCHRONISATION
-        author <- getAuthor
-        delta <- lift $ signDelta 
-          author
+        delta <- signDelta 
           (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
             { id: contextId
             , contextType: context_pspType pe
@@ -313,7 +309,6 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
   Just _ -> do
     values <- pure $ fst <$> valuesAndDeltas
     subject <- getSubject
-    author <- getAuthor
     for_ rids \roleInstanceOnpath -> do
       -- Look for the contextualised property first: if we find a replacement for the requested property on a role instance,
       -- that is the instance we will work with - and the (replacing) local property we will work with!
@@ -342,7 +337,7 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       , values: [value]
                       , subject
                       }
-                    lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
+                    signDelta (writeJSON $ stripResourceSchemes delta)
                   Just signedDelta -> pure signedDelta
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
@@ -420,8 +415,7 @@ removeProperty rids propertyName values = case ARR.head rids of
               , values: values
               , subject
               }
-            author <- getAuthor
-            signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
+            signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
             (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -462,8 +456,7 @@ deleteProperty rids propertyName = case ARR.head rids of
                 , values: maybe [] identity (lookup (unwrap replacementProperty) properties)
                 , subject
                 }
-              author <- getAuthor
-              signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
+              signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
               (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -512,7 +505,6 @@ saveFile r property arrayBuf mimeType = do
       -- Compute the users for this role (the property's value has no effect on this calculation). As a side effect, contexts are added to the transaction.
   users <- aisInPropertyDelta r rid property replacementProperty (rol_pspType roleInstance)
   subject <- getSubject
-  author <- getAuthor
   dbLoc <- lift $ databaseLocation $ unwrap rid
   {database, documentName} <- lift $ resourceIdentifier2DocLocator (unwrap rid)
   mval <- lift (rid ##> getProperty replacementProperty)
@@ -550,7 +542,7 @@ saveFile r property arrayBuf mimeType = do
             , values: [Value usedVal]
             , subject
             }
-          signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes delta)
+          signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
           addDelta (DeltaInTransaction { users, delta: signedDelta })
           setProperty [rid] replacementProperty [Value usedVal]
           pure usedVal
@@ -586,10 +578,6 @@ setMe cid me = do
 -- | (not necessarily and usually not an instance of sys:PerspectivesSystem$User)
 getSubject :: MonadPerspectivesTransaction RoleType
 getSubject = gets (_.authoringRole <<< unwrap)
-
--- | Returns the instance of sys:PerspectivesSystem$User who signs deltas.
-getAuthor :: MonadPerspectivesTransaction String
-getAuthor = gets (_.author <<< unwrap)
 
 -----------------------------------------------------------
 -- SETACTIVECONTEXTSTATE

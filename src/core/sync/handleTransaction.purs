@@ -22,20 +22,22 @@
 
 module Perspectives.Sync.HandleTransaction where
 
+
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Except (lift, runExcept)
 import Control.Monad.State (StateT, gets, modify, runStateT) as ST
 import Crypto.Subtle.Key.Types (CryptoKey)
-import Data.Array (catMaybes, concat)
+import Data.Array (catMaybes, concat, fromFoldable)
 import Data.Array.NonEmpty (head)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Generic.Rep (class Generic)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.MediaType (MediaType(..))
-import Data.Newtype (unwrap)
+import Data.Newtype (over, unwrap)
 import Data.Ordering (Ordering(..))
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
@@ -43,13 +45,13 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
-import Foreign.Object (Object, empty, insert, lookup, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (deserializeJWK, tryGetPublicKey, verifyDelta, verifyDelta')
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, removeInternally, (###=), (###>>), (##=), (##>), (##>>))
+import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
 import Perspectives.DependencyTracking.Dependency (findRoleRequests)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -64,7 +66,7 @@ import Perspectives.Persistence.API (getAttachment, getDocument)
 import Perspectives.Persistent (addAttachment, entityExists, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
@@ -332,13 +334,13 @@ executeTransaction t = try (verifyTransaction t) >>= case _ of
     (do
       -- Verify public key informaton.
       -- Stop or throw if a key cannot be verified!
-      forWithIndex_ publicKeys verifyPublicKey
+      forWithIndex_ (unwrap publicKeys) verifyPublicKey
       -- Verify all deltas, using the (now verified) public keys.
       -- Stop or throw if a delta cannot be verified!
       for_ deltas verifyDelta_)
-    empty
+    Map.empty
 
-  verifyPublicKey :: String -> PublicKeyInfo -> ST.StateT (Object CryptoKey) MonadPerspectivesTransaction Unit
+  verifyPublicKey :: PerspectivesUser -> PublicKeyInfo -> ST.StateT (Map.Map PerspectivesUser CryptoKey) MonadPerspectivesTransaction Unit
   verifyPublicKey authorOfKey {key, deltas:keyDeltas} = do
     mcryptoKey <- lift $ lift $ tryGetPublicKey authorOfKey
     case mcryptoKey of 
@@ -347,32 +349,32 @@ executeTransaction t = try (verifyTransaction t) >>= case _ of
         for_ keyDeltas \d@(SignedDelta{author}) -> if author == authorOfKey
           then (lift $ lift $ verifyDelta' d (Just cryptoKey)) >>=
             case _ of 
-              Nothing -> throwError (error $ "Cannot verify key of author: " <> author)
+              Nothing -> throwError (error $ "Cannot verify key of author: " <> show author)
               Just _ -> pure unit
           else do 
             mcryptoKeyOfAuthor <- lift $ lift $ tryGetPublicKey author
             case mcryptoKeyOfAuthor of 
-              Nothing -> throwError (error $ "No public key known for this author: " <> author)
+              Nothing -> throwError (error $ "No public key known for this author: " <> show author)
               Just keyOfAuthor -> (lift $ lift $ verifyDelta' d (Just keyOfAuthor)) >>= 
                 case _ of 
-                  Nothing -> throwError (error $ "Cannot verify key of author: " <> author)
-                  Just _ -> void $ ST.modify \s -> insert author keyOfAuthor s
-        void $ ST.modify \s -> insert authorOfKey cryptoKey s
-      Just cryptoKey -> void $ ST.modify \s -> insert authorOfKey cryptoKey s
+                  Nothing -> throwError (error $ "Cannot verify key of author: " <> show author)
+                  Just _ -> void $ ST.modify \s -> Map.insert author keyOfAuthor s
+        void $ ST.modify \s -> Map.insert authorOfKey cryptoKey s
+      Just cryptoKey -> void $ ST.modify \s -> Map.insert authorOfKey cryptoKey s
 
-  verifyDelta_ :: SignedDelta -> ST.StateT (Object CryptoKey) MonadPerspectivesTransaction Unit
+  verifyDelta_ :: SignedDelta -> ST.StateT (Map.Map PerspectivesUser CryptoKey) MonadPerspectivesTransaction Unit
   verifyDelta_ d@(SignedDelta{author}) = do
-    cryptoKey <- ST.gets (lookup author)
+    cryptoKey <- ST.gets (Map.lookup author)
     lift $ lift $ verifyDelta' d cryptoKey >>=
       case _ of 
-        Nothing -> throwError (error $ "Cannot verify delta allegedly by author: " <> author)
+        Nothing -> throwError (error $ "Cannot verify delta allegedly by author: " <> show author)
         Just _ -> pure unit
 
 executeTransaction' :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 
   -- Add all public key information (possibly leading to more TheWorld$PerspectivesUsers instances).
-  for_ publicKeys \{deltas:keyDeltas} -> for_ keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
+  for_ (unwrap publicKeys) \{deltas:keyDeltas} -> for_ keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
 
   -- Process all deltas.
   for_ deltas verifyAndExcecuteDelta
@@ -410,7 +412,7 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 expandDeltas :: TransactionForPeer -> String -> MonadPerspectivesTransaction (Array Delta)
 expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
   contentDeltas :: Array Delta <- catMaybes <$> (for deltas expandDelta)
-  keyDeltas :: Array Delta <- concat <$> for (values publicKeys) \{deltas:kd} -> catMaybes <$> (for kd expandDelta)
+  keyDeltas :: Array Delta <- concat <$> for (fromFoldable (ENCMAP.values publicKeys)) \{deltas:kd} -> catMaybes <$> (for kd expandDelta)
   pure  $ keyDeltas <> contentDeltas
 
   where
@@ -418,7 +420,7 @@ expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
   expandDelta :: SignedDelta -> MonadPerspectivesTransaction (Maybe Delta)
   expandDelta s@(SignedDelta sr@{author, encryptedDelta, signature}) = do 
     -- Use the storageUrl to add a public scheme to the author.
-    s' <- pure $ SignedDelta sr { author = createPublicIdentifier storageUrl author}
+    s' <- pure $ SignedDelta sr { author = over PerspectivesUser (createPublicIdentifier storageUrl) author}
     case runExcept $ readJSON' encryptedDelta of
       Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s' <$> addPublicResourceScheme storageUrl d1))
       Left _ -> case runExcept $ readJSON' encryptedDelta of

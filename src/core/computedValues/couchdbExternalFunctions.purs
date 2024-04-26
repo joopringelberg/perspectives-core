@@ -56,9 +56,9 @@ import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.StateCache (clearModelStates)
-import Perspectives.Assignment.Update (addRoleInstanceToContext, cacheAndSave, getAuthor, getSubject, withAuthoringRole)
-import Perspectives.Authenticate (getMyPublicKey, signDelta)
-import Perspectives.ContextAndRole (context_id, rol_context, rol_id)
+import Perspectives.Assignment.Update (withAuthoringRole)
+import Perspectives.Authenticate (getMyPublicKey)
+import Perspectives.ContextAndRole (context_id, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, rev)
@@ -70,10 +70,9 @@ import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunct
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (getFirstMatch, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
-import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..))
+import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
-import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
@@ -89,7 +88,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -98,17 +97,15 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
-import Perspectives.RoleAssignment (filledPointsTo, fillerPointsTo, roleIsMe)
+import Perspectives.RoleAssignment (roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContext2RoleView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRole2ContextView)
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..), stripResourceSchemes)
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
-import Simple.JSON (writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 modelsDatabaseName :: MonadPerspectives String
@@ -341,43 +338,13 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
       lift $ void $ saveEntiteit_ (identifier ctxt) ctxt
       addCreatedContextToTransaction (identifier ctxt)
 
-  -- Now create the Installer user role IN THE DOMAIN INSTANCE (it is cached automatically)
-  -- What follows below is a simplified version of createAndAddRoleInstance. We cannot use that because
-  -- it would introduce module imnport circularity.
-  -- TODO: refactor. We can now actually use createAndAddRoleInstance!!
-  (installerRole :: PerspectRol) <- constructEmptyRole
-    (ContextInstance cid)
-    (EnumeratedRoleType DEP.installer)
-    0
-    (RoleInstance (cid <> "$" <> (typeUri2LocalName_ DEP.installer) <> "_0000"))
-
-  -- Fill the installerRole with the PerspectivesUser that represents the end user (all these operations cache the roles that are involved).
+  -- Now create the Installer user role IN THE MODEL INSTANCE.
   me <- lift $ getPerspectivesUser
-  lift ((identifier installerRole) `filledPointsTo` me)
-  lift (me `fillerPointsTo` (identifier installerRole))
-  roleIsMe (identifier installerRole) (rol_context installerRole)
-
-  subject <- getSubject
-  author <- getAuthor
-  delta@(RoleBindingDelta _) <- pure $ RoleBindingDelta
-    { filled : (identifier installerRole)
-    , filledType: (EnumeratedRoleType DEP.installer)
-    , filler: Just me
-    , fillerType: Just (EnumeratedRoleType DEP.sysUser)
-    , oldFiller: Nothing
-    , oldFillerType: Nothing
-    , deltaType: SetFirstBinding
-    , subject
-    }
-  signedDelta <- lift $ signDelta author (writeJSON $ stripResourceSchemes $ delta)
-
-  -- Retrieve the PerspectRol with accumulated modifications to add the binding delta.
-  (installerRole' :: PerspectRol) <- lift $ getPerspectRol (identifier installerRole)
-  lift $ cacheAndSave (identifier installerRole) 
-    (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) installerRole')
-
-  -- And now add to the context.
-  void $ addRoleInstanceToContext (ContextInstance cid) (EnumeratedRoleType DEP.installer) (Tuple (identifier installerRole) Nothing)
+  void $ createAndAddRoleInstance (EnumeratedRoleType DEP.installer) cid
+    (RolSerialization 
+      { id: Nothing
+      , properties: PropertySerialization empty
+      , binding: Just $ unwrap me})
 
   if unversionedModelname == DEP.systemModelName
     then pure unit
@@ -405,7 +372,7 @@ initSystem = do
   sysId <- lift getSystemIdentifier
   sysresult <- runExceptT $ constructContext Nothing 
     (ContextSerialization
-      { id: Just sysId
+      { id: Just sysId    -- TODO: MAAK HIER EEN NIEUWE CUID
       , prototype: Nothing
       , ctype: DEP.theSystem
       , rollen: empty
@@ -416,7 +383,7 @@ initSystem = do
     Right system@(ContextInstance systemId) -> do 
       -- Now create the user role (the instance of sys:PerspectivesSystem$User; it is cached automatically).
       -- This will also create the IndexedRole in the System instance, filled with the new User instance.
-      userId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.sysUser) (sysId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
+      userId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.sysUser) (systemId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
       me <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.sysUser) systemId
         (RolSerialization 
           { id: Just userId

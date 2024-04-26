@@ -279,8 +279,8 @@ takeGuid s = case match discardStorageRegex s of
 -----------------------------------------------------------
 -- TRANSFORM THE AUTHOR OF A DELTA INTO A RESOURCEIDENTIFIER
 -----------------------------------------------------------
-deltaAuthor2ResourceIdentifier :: String -> RoleInstance
-deltaAuthor2ResourceIdentifier author = if isInPublicScheme author 
+deltaAuthor2ResourceIdentifier :: RoleInstance -> RoleInstance
+deltaAuthor2ResourceIdentifier (RoleInstance author) = if isInPublicScheme author 
     then RoleInstance $ author
     else RoleInstance $ createDefaultIdentifier author
 

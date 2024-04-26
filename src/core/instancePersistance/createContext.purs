@@ -7,7 +7,7 @@ import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Foreign.Object (isEmpty)
 import Perspectives.ApiTypes (PropertySerialization(..))
-import Perspectives.Assignment.Update (getAuthor, getSubject, setProperty)
+import Perspectives.Assignment.Update (getSubject, setProperty)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (###=))
@@ -49,10 +49,8 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
   pspType <- ContextType <$> (lift $ lift $ expandDefaultNamespaces ctype)
   allExternalRoleTypes <- lift $ lift (externalRoleType pspType ###= roleAspectsClosure)
   allContextTypes <- lift $ lift (pspType ###= contextAspectsClosure)
-  author <- lift $ getAuthor
   subject <- lift $ getSubject
-  delta <- lift $ lift $ signDelta 
-    author 
+  delta <- lift $ signDelta 
     (writeJSON $ stripResourceSchemes $ UniverseContextDelta
       { id: contextInstanceId
       , contextType: pspType
@@ -71,7 +69,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , states = [StateIdentifier $ unwrap pspType]
       })
   lift $ lift  $ void $ cacheEntity contextInstanceId contextInstance
-  delta' <- lift $ lift $ signDelta author
+  delta' <- lift $ signDelta
     (writeJSON $ stripResourceSchemes $ UniverseRoleDelta
       { id: contextInstanceId
       , contextType: pspType
@@ -80,7 +78,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       , authorizedRole
       , deltaType: ConstructExternalRole
       , subject })
-  contextDelta <- lift $ lift $ signDelta author
+  contextDelta <- lift $ signDelta
     (writeJSON $ stripResourceSchemes $ ContextDelta
       { contextInstance: contextInstanceId
       , contextType: pspType
