@@ -30,13 +30,13 @@ import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.ModelDependencies (sysMe)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), RoleInstance(..))
 import Prelude (bind, show, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.
-runPerspectives :: forall a. String -> String -> String -> String -> Int -> MonadPerspectives a
+runPerspectives :: forall a. String -> String -> String -> String -> String -> Int -> MonadPerspectives a
   -> Aff a
-runPerspectives userName password systemId host port mp = do
+runPerspectives userName password perspectivesUser systemId host port mp = do
   transactionFlag <- new 1
   brokerService <- empty
   transactionWithTiming <- empty
@@ -46,6 +46,7 @@ runPerspectives userName password systemId host port mp = do
   (rf :: AVar PerspectivesState) <- new $
     ((newPerspectivesState
         { systemIdentifier: systemId
+        , perspectivesUser: PerspectivesUser perspectivesUser
         , password: Just password
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
         -- , userName: UserName userName

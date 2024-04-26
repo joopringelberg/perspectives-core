@@ -36,6 +36,7 @@ import Effect.Aff.AVar (new)
 import Foreign (Foreign, MultipleErrors)
 import Foreign.Object (Object, empty, singleton)
 import Perspectives.Couchdb.Revision (Revision_)
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser)
 import Simple.JSON (read, readImpl, readJSON', write, E)
 
 -----------------------------------------------------------
@@ -69,6 +70,7 @@ type PouchbdDocumentFields f =
 type PouchdbState f =
   { databases :: Object PouchdbDatabase
   , systemIdentifier :: String
+  , perspectivesUser :: PerspectivesUser
   , couchdbUrl :: Maybe String
   -- The keys are the URLs of CouchdbServers
   -- The values are passwords.
@@ -88,6 +90,7 @@ instance Semigroup Credential where
 -- type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
 type PouchdbUser =
   { systemIdentifier :: String
+  , perspectivesUser :: PerspectivesUser
   , password :: Maybe String
   , couchdbUrl :: Maybe String
   }
@@ -113,11 +116,12 @@ type MonadPouchdb f = ReaderT (AVar (PouchdbState f)) Aff
 -----------------------------------------------------------
 -- | Run an action in MonadPouchdb, given a username and password etc.
 -- | Its primary use is in addAttachment_ (to add an attachment using the default "admin" account).
-runMonadPouchdb :: forall a. UserName -> Password -> SystemIdentifier -> Maybe Url -> MonadPouchdb () a
+runMonadPouchdb :: forall a. UserName -> Password -> PerspectivesUser -> SystemIdentifier -> Maybe Url -> MonadPouchdb () a
   -> Aff a
-runMonadPouchdb userName password systemId couchdbUrl mp = do
+runMonadPouchdb userName password perspectivesUser systemId couchdbUrl mp = do
   (rf :: AVar (PouchdbState ())) <- new $
     { systemIdentifier: systemId
+    , perspectivesUser
     , couchdbUrl
     , couchdbCredentials: maybe empty ((flip singleton) (Credential systemId password)) couchdbUrl
     , databases: empty

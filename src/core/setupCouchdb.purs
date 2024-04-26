@@ -33,11 +33,10 @@ import Perspectives.Couchdb (SecurityDocument(..), User)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, runMonadPouchdb)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
-import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
-import Perspectives.Persistent (entitiesDatabaseName)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
+import Perspectives.Persistence.State (withCouchdbUrl)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==), (&&))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (&&), (<>), (==))
 
 -----------------------------------------------------------
 -- SETUPPERSPECTIVESINCOUCHDB
@@ -47,8 +46,8 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (<>), (>>=), (==), (
 -- |  * create system databases
 -- |  * initialize the local repository
 -- |  * create the database `localusers` and set its security document.
-setupPerspectivesInCouchdb :: UserName -> Password -> Maybe Url -> Aff Unit
-setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couchdbUrl
+setupPerspectivesInCouchdb :: UserName -> Password -> PerspectivesUser -> Maybe Url -> Aff Unit
+setupPerspectivesInCouchdb usr pwd perspectivesUser couchdbUrl = runMonadPouchdb usr pwd perspectivesUser usr couchdbUrl
   do
     {doc_count} <- databaseInfo "localusers"
     -- isFirstUser <- databaseExists_ "localusers"
@@ -62,17 +61,6 @@ setupPerspectivesInCouchdb usr pwd couchdbUrl = runMonadPouchdb usr pwd usr couc
           \url -> setSecurityDocument url "localusers"
             (SecurityDocument {admins: {names: Just [], roles: []}, members: {names: Just [], roles: ["NotExistingRole"]}})
       else pure unit
-
------------------------------------------------------------
--- CREATEPERSPECTIVESUSER
--- Notice: Requires authentication.
------------------------------------------------------------
-createPerspectivesUser :: UserName -> Password -> Maybe Url -> Aff Unit
-createPerspectivesUser usr pwd couchdbUrl =
-  -- TODO: genereer hier de systeemIdentifier als een guid.
-  runMonadPouchdb usr pwd usr couchdbUrl do
-    getSystemIdentifier >>= createUserDatabases
-    entitiesDatabaseName >>= setRoleView
 
 -----------------------------------------------------------
 -- INITREPOSITORY

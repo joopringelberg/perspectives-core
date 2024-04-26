@@ -76,7 +76,7 @@ import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesSta
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
@@ -419,10 +419,10 @@ handleError (Right _) = pure unit
 -- | Implementation notes:
 -- |  1. we need credentials if Couchdb is the database backend.
 -- |  2. couchdbUrl should terminate on a forward slash.
-initialisePersistence :: UserName -> Password -> Maybe Url -> Effect Unit
-initialisePersistence userName password couchdbUrl = void $ runAff
+initialisePersistence :: UserName -> Password -> String -> Maybe Url -> Effect Unit
+initialisePersistence userName password perspectivesUser couchdbUrl = void $ runAff
   handleError
-  (setupPerspectivesInCouchdb userName password couchdbUrl)
+  (setupPerspectivesInCouchdb userName password (PerspectivesUser perspectivesUser) couchdbUrl)
 
 createAccount :: UserName -> Foreign -> RuntimeOptions -> Nullable Foreign -> (Boolean -> Effect Unit) -> Effect Unit
 createAccount usr rawPouchdbUser runtimeOptions nullableIdentityDocument callback = void $ runAff handler
@@ -644,6 +644,7 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
       Right (pdbu :: PouchdbUser) -> do
         (pouchdbUser :: PouchdbUser) <- pure
           { systemIdentifier: pdbu.systemIdentifier
+          , perspectivesUser: pdbu.perspectivesUser
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
           }

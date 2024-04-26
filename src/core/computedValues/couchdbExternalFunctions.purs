@@ -78,7 +78,7 @@ import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInverted
 import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
-import Perspectives.Names (getMySystem, getPerspectivesUser)
+import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase, Keys(..))
 import Perspectives.Persistence.API (deleteDocument) as Persistence
@@ -89,7 +89,7 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
-import Perspectives.PerspectivesState (contextCache, roleCache)
+import Perspectives.PerspectivesState (contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)

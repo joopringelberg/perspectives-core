@@ -32,7 +32,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isTypeUri)
 import Perspectives.ModelDependencies (sysMe)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser(..), RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
@@ -109,16 +109,4 @@ getUserIdentifier = getMySystem >>= pure <<< flip append "$User"
 -- | To be more precise: "def:#<SystemIdentifier>"
 getMySystem :: MonadPerspectives String
 getMySystem = getSystemIdentifier >>= \sysId -> pure $ "def:#" <> sysId
-
------------------------------------------------------------
--- PERSPECTIVESUSER
------------------------------------------------------------
--- | Returns the role in TheWorld that fills SocialEnvironment$Me (and this instance in turn fills PerspectivesSystem$User).
--- | This is dependent on model://perspectives.domains#System.
-getPerspectivesUser :: MonadPerspectives PerspectivesUser
-getPerspectivesUser = getMySystem >>= pure <<< PerspectivesUser <<< flip append "_KeyHolder"
-
--- getPerspectivesUser = lookupIndexedContext mySocialEnvironment >>= case _ of 
---   Just socEnv -> (socEnv ##>> getEnumeratedRoleInstances_ (EnumeratedRoleType socialEnvironmentMe))
---     >>= binding_ >>= pure <<< fromJust
 

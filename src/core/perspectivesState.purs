@@ -37,7 +37,7 @@ import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
 import Perspectives.Persistence.Types (Credential(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser, RoleInstance)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=))
 
 newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> AVar IntegrityFix -> PerspectivesState
@@ -48,6 +48,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
   , systemIdentifier: uinfo.systemIdentifier
+  , perspectivesUser: uinfo.perspectivesUser
   , couchdbUrl: uinfo.couchdbUrl 
   , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of 
       Just url, Just password -> singleton url (Credential uinfo.systemIdentifier password)
@@ -155,6 +156,14 @@ getIndexedResourceToCreate = gets _.indexedResourceToCreate
 
 getMissingResource :: MonadPerspectives (AVar IntegrityFix)
 getMissingResource = gets _.missingResource
+
+-----------------------------------------------------------
+-- PERSPECTIVESUSER
+-----------------------------------------------------------
+-- | Returns the role in TheWorld that fills SocialEnvironment$Me (and this instance in turn fills PerspectivesSystem$User).
+-- | This is dependent on model://perspectives.domains#System.
+getPerspectivesUser :: MonadPerspectives PerspectivesUser
+getPerspectivesUser = gets _.perspectivesUser
 
 -----------------------------------------------------------
 -- RESETTING CACHES
