@@ -94,7 +94,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
     createDatabase "post"
     user <- getPerspectivesUser
     localReplication url "channel" "post" (Just $ unwrap user)
-    t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") user
+    t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
     void $ addDocument "channel" t "emptyTransaction"
 
     -- Wait a bit
@@ -133,7 +133,7 @@ theSuite = suite "Perspectives.Sync.Channel" do
         case mchannel of
           Nothing -> pure unit
           Just (Value channelId) -> do
-            t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User") (PerspectivesUser "model:User$joop$User")
+            t <- liftAff $ createTransaction (ENR $ EnumeratedRoleType "model:System$PerspectivesSystem$User")
             void $ addDocument channelId t "emptyTransaction"
             -- Wait a bit
             liftAff $ delay (Milliseconds 5000.0)

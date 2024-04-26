@@ -103,8 +103,7 @@ instance Eq TransactionDestination where
   eq _ _ = false
 
 type TransactionRecord f =
-  { author :: PerspectivesUser
-  , timeStamp :: SerializableDateTime
+  { timeStamp :: SerializableDateTime
   , deltas :: Array DeltaInTransaction
   , changedDomeinFiles :: Array String
   , publicKeys :: ENCMAP.EncodableMap PerspectivesUser PublicKeyInfo
@@ -128,14 +127,13 @@ instance showTransactie :: Show Transaction where
 
 -- Only used in Tests
 instance WriteForeign Transaction where
-  writeImpl (Transaction{author, timeStamp, deltas, changedDomeinFiles}) = writeImpl {author, timeStamp, deltas, changedDomeinFiles}
+  writeImpl (Transaction{timeStamp, deltas, changedDomeinFiles}) = writeImpl {timeStamp, deltas, changedDomeinFiles}
 
 instance ReadForeign Transaction where
   readImpl f = do
-    ((Transaction' {author, timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- read' f
+    ((Transaction' {timeStamp, deltas, changedDomeinFiles}) :: Transaction') <- read' f
     pure $ Transaction
-      { author
-      , timeStamp
+      { timeStamp
       , deltas
       , changedDomeinFiles
       , scheduledAssignments: []
@@ -156,10 +154,9 @@ instance ReadForeign Transaction where
 derive newtype instance ReadForeign Transaction'
 
 instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {author, timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations})
-    t2@(Transaction {author: a, timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk, postponedStateEvaluations: pse}) = Transaction
-      { author: author
-      , timeStamp: timeStamp
+  append t1@(Transaction {timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations})
+    t2@(Transaction {timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk, postponedStateEvaluations: pse}) = Transaction
+      { timeStamp: timeStamp
       , deltas: deltas `union` ds
       , changedDomeinFiles: union changedDomeinFiles cd
       , scheduledAssignments: scheduledAssignments <> sa
@@ -189,13 +186,12 @@ instance Attachment Transaction where
   setAttachment t _ = t
   getAttachments t = Nothing
 
-createTransaction :: RoleType -> PerspectivesUser -> Aff Transaction
-createTransaction authoringRole author =
+createTransaction :: RoleType -> Aff Transaction
+createTransaction authoringRole =
   do
     n <- liftEffect $ now
     pure $ Transaction
-      { author: author
-      , timeStamp: SerializableDateTime (toDateTime n)
+      { timeStamp: SerializableDateTime (toDateTime n)
       , deltas: []
       , changedDomeinFiles: []
       , scheduledAssignments: []
@@ -214,9 +210,8 @@ createTransaction authoringRole author =
     }
 
 cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ author, timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations}) = Transaction
-  { author
-  , timeStamp
+cloneEmptyTransaction (Transaction{ timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations}) = Transaction
+  { timeStamp
   , authoringRole
 
   , deltas: []

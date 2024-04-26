@@ -54,7 +54,7 @@ import Data.ArrayBuffer.Types (ArrayBuffer, Int8Array, Uint8Array)
 import Data.Either (Either(..))
 import Data.Int (hexadecimal, toStringAs)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (over, unwrap)
+import Data.Newtype (over)
 import Data.String (length)
 import Data.Traversable (for)
 import Data.UInt (fromInt)
@@ -70,6 +70,7 @@ import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Persistent (entityExists)
+import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers)
@@ -85,7 +86,7 @@ import Web.Encoding.TextEncoder (encode, new) as Encoder
 -- | the users private key and signing the message.
 signDelta :: String -> MonadPerspectivesTransaction SignedDelta
 signDelta encryptedDelta = do
-  author <- gets (_.author <<< unwrap)
+  author <- lift getPerspectivesUser
   deltaBuff :: ArrayBuffer <- liftEffect $ string2buff encryptedDelta
   mcryptoKey <- lift $ gets (_.privateKey <<< _.runtimeOptions)
   case mcryptoKey of

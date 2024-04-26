@@ -80,7 +80,7 @@ serialisedAsDeltasFor cid userId = do
 serialisedAsDeltasForUserType :: ContextInstance -> RoleType -> MonadPerspectives Value
 serialisedAsDeltasForUserType cid userType = do
   me <- getUserIdentifier
-  (Transaction{author, timeStamp, deltas, publicKeys}) <- (execMonadPerspectivesTransaction
+  (Transaction{timeStamp, deltas, publicKeys}) <- (execMonadPerspectivesTransaction
     -- The authoringRole is used on *constructing* deltas. However, here we merely *read* deltas from the
     -- context- and role representations. So this value is in effect ignored.
     (ENR $ EnumeratedRoleType sysUser)
@@ -88,6 +88,7 @@ serialisedAsDeltasForUserType cid userType = do
     -- the user for whom we serialise. As we don't know the real
     -- user identifier (we serialise for a type!) we use it as a stand in.
     (serialisedAsDeltasFor_ cid (RoleInstance "def:#serializationuser") userType)) >>= addPublicKeysToTransaction
+  author <- getPerspectivesUser
   tfp <- pure $ TransactionForPeer
     { author
     , timeStamp
@@ -102,8 +103,7 @@ serialisedAsDeltasForUserType cid userType = do
       MonadPerspectivesTransaction o ->
       MonadPerspectives Transaction
     execMonadPerspectivesTransaction authoringRole a =
-      getPerspectivesUser
-      >>= lift <<< createTransaction authoringRole
+      (lift $ createTransaction authoringRole)
       >>= lift <<< new
       >>= runReaderT run
         where

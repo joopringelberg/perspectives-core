@@ -50,7 +50,7 @@ import Perspectives.Instances.ObjectGetters (Filler_(..), context, contextType, 
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
-import Perspectives.PerspectivesState (addBinding, clearPublicRolesJustLoaded, getPublicRolesJustLoaded, pushFrame, restoreFrame, transactionFlag, getPerspectivesUser)
+import Perspectives.PerspectivesState (addBinding, clearPublicRolesJustLoaded, getPublicRolesJustLoaded, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances, getMyType)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
@@ -89,7 +89,7 @@ runMonadPerspectivesTransaction' :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
   -> (MonadPerspectives o)
-runMonadPerspectivesTransaction' share authoringRole a = (unsafePartial getPerspectivesUser) >>= lift <<< createTransaction authoringRole >>= lift <<< new >>= runReaderT whenFlagIsDown
+runMonadPerspectivesTransaction' share authoringRole a = (lift $ createTransaction authoringRole) >>= lift <<< new >>= runReaderT whenFlagIsDown
   where
     -- | Wait until the TransactionFlag can be taken down, then run the action; raise it again.
     whenFlagIsDown :: MonadPerspectivesTransaction o
@@ -402,8 +402,7 @@ evaluateStates stateEvaluations =
 -- | Run and discard the transaction.
 runSterileTransaction :: forall o. MonadPerspectivesTransaction o -> (MonadPerspectives o)
 runSterileTransaction a =
-  getPerspectivesUser
-  >>= lift <<< createTransaction (ENR $ EnumeratedRoleType sysUser)
+  (lift $ createTransaction (ENR $ EnumeratedRoleType sysUser))
   >>= lift <<< new
   >>= runReaderT a
 
