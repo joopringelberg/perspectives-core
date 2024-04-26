@@ -97,7 +97,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
@@ -411,7 +411,8 @@ initSystem = do
               case worldresult of 
                 Left e -> logPerspectivesError (Custom (show e))
                 Right world@(ContextInstance worldId) -> do 
-                  puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) (sysId <> "_KeyHolder")
+                  PerspectivesUser perspectivesUser <- lift getPerspectivesUser
+                  puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) perspectivesUser
                   withAuthoringRole (CR $ CalculatedRoleType theWorldInitializer) do
                     puser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
                       (RolSerialization 
