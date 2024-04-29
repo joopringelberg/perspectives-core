@@ -69,7 +69,9 @@ type PouchbdDocumentFields f =
 -----------------------------------------------------------
 type PouchdbState f =
   { databases :: Object PouchdbDatabase
+  -- Notice that this is the schemaless identifier,
   , systemIdentifier :: String
+  -- while this is the schemed identifier cast as PerspectivesUser.
   , perspectivesUser :: PerspectivesUser
   , couchdbUrl :: Maybe String
   -- The keys are the URLs of CouchdbServers
@@ -85,12 +87,9 @@ data Credential = Credential UserName Password
 instance Semigroup Credential where
   append c1 c2 = c1
 
--- TODO. Te verwijderen zodra Perspectives.Persistence.API alles heeft overgenomen.
--- We do not need the UserName value in the core, as long as we have the systemIdentifier.
--- type PouchdbUser = PouchdbUser' (userName :: CDBstate.UserName)
 type PouchdbUser =
-  { systemIdentifier :: String
-  , perspectivesUser :: PerspectivesUser
+  { systemIdentifier :: String        -- the schemaless string
+  , perspectivesUser :: String        -- the schemaless string
   , password :: Maybe String
   , couchdbUrl :: Maybe String
   }

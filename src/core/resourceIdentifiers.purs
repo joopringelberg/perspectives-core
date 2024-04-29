@@ -263,7 +263,7 @@ stripNonPublicIdentifiers s = if isInPublicScheme s
   then s
   else takeGuid s
 
--- | Captures everything following the "#" as its first and only captureing group.
+-- | Captures everything following the "#" as its first and only capturing group.
 discardStorageRegex :: Regex
 discardStorageRegex = unsafeRegex "^[^#$]+#(.+)" noFlags
 

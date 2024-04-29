@@ -99,8 +99,8 @@ import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (createDefaultIdentifier, createResourceIdentifier', resourceIdentifier2WriteDocLocator, takeGuid)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.RoleAssignment (roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContext2RoleView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRole2ContextView)
@@ -383,7 +383,7 @@ initSystem = do
     Right system@(ContextInstance systemId) -> do 
       -- Now create the user role (the instance of sys:PerspectivesSystem$User; it is cached automatically).
       -- This will also create the IndexedRole in the System instance, filled with the new User instance.
-      userId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.sysUser) (systemId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
+      userId <- pure (systemId <> "$" <> (typeUri2LocalName_ DEP.sysUser))
       me <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.sysUser) systemId
         (RolSerialization 
           { id: Just userId
@@ -411,12 +411,12 @@ initSystem = do
               case worldresult of 
                 Left e -> logPerspectivesError (Custom (show e))
                 Right world@(ContextInstance worldId) -> do 
+                  -- Is with a storage scheme right from the start.
                   PerspectivesUser perspectivesUser <- lift getPerspectivesUser
-                  puserId <- createResourceIdentifier' (RType $ EnumeratedRoleType DEP.perspectivesUsers) perspectivesUser
                   withAuthoringRole (CR $ CalculatedRoleType theWorldInitializer) do
                     puser <- createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
                       (RolSerialization 
-                        { id: Just puserId
+                        { id: Just perspectivesUser
                         , properties: PropertySerialization (singleton perspectivesUsersPublicKey [publicKey])
                         , binding: Nothing
                         })
