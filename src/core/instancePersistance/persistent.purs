@@ -63,7 +63,7 @@ import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, delete, elemIndex)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.MediaType (MediaType)
@@ -253,10 +253,12 @@ saveMarkedResources :: MonadPerspectives Unit
 saveMarkedResources = do 
   (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
   modify \s -> s {entitiesToBeStored = []}
-  for_ toBeSaved \(rs :: ResourceToBeStored) -> case rs of 
-    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance) 
+  for_ toBeSaved \(rs :: ResourceToBeStored) -> try (case rs of 
+    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance)
     Rle r -> void $ saveCachedEntiteit (r :: RoleInstance)
-    Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId) 
+    Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId)) >>= case _ of 
+      Left e -> logPerspectivesError (Custom ("Could not save resource " <> show rs <> " because: " <> show e)) 
+      _ -> pure unit
 
 -- | Assumes the entity a has been cached. 
 saveCachedEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> MonadPerspectives a
