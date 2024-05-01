@@ -317,6 +317,19 @@ externalRoleOfADT = pure <<< map \ctype -> RoleInContext {context: ctype, role: 
 bindingOfADT :: ADT RoleInContext -> MP (ADT RoleInContext)
 bindingOfADT = reduce (getEnumeratedRole <<< roleInContext2Role >=> binding)
 
+transitiveBindingOfADT :: ADT RoleInContext -> MP (ADT RoleInContext)
+transitiveBindingOfADT = reduce magic
+  where
+    magic :: RoleInContext -> MP (ADT RoleInContext)
+    magic roleInContext = do
+      bndg <- getEnumeratedRole (roleInContext2Role roleInContext) >>= binding
+      case bndg of 
+        EMPTY -> pure $ ST roleInContext
+        otherwise -> do
+          expansion <- reduce magic otherwise
+          pure $ PROD [ST roleInContext, expansion]
+
+
 -----------------------------------------------------------
 -- VIEWSOFADT
 -----------------------------------------------------------

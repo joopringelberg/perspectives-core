@@ -514,6 +514,11 @@ instance Eq ResourceToBeStored where
   eq (Dfile c1) (Dfile c2) = eq c1 c2
   eq _ _ = false
 
+instance Show ResourceToBeStored where
+  show (Ctxt c) = show c
+  show (Rle r) = show r
+  show (Dfile d) = show d
+
 instance cacheableDomeinFile :: Cacheable DomeinFile DomeinFileId where
   theCache = gets _.domeinCache
   representInternally c = do

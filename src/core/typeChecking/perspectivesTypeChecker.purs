@@ -32,16 +32,16 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
-import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Instances.ObjectGetters (context', contextType_, roleType_)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (bindingOfADT, bindingOfRole, kindOfRole, roleAndBinding)
+import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, transitiveBindingOfADT)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -126,15 +126,17 @@ checkBinding :: RoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
   -- If the model is not available locally, try to get it from the repository.
   (fillerType :: EnumeratedRoleType) <- roleType_ filler
+  fillerContextType <- (context' >=> contextType_) filler
   if filledType == ENR fillerType
     then pure false
     else do
-      (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAndBinding) fillerType 
+      -- (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAndBinding) fillerType 
+      fillerADT <- pure $ ST $ QT.RoleInContext {context: fillerContextType, role: fillerType}
       -- The filledType has restrictions on the fillers that it allows.
       -- These restrictions can be modeled with the filledType itself, but
       -- the restrictions of all of its Aspects count as well.
       (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
       -- Take the transitive closure over binding.
-      fillers' <- bindingOfADT fillerADT
-      filleds' <- bindingOfADT filledTypeAllowedFiller
+      fillers' <- transitiveBindingOfADT fillerADT
+      filleds' <- transitiveBindingOfADT filledTypeAllowedFiller
       filleds' `lessThanOrEqualTo` fillers'
