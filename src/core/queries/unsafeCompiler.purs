@@ -81,7 +81,7 @@ import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), 
 import Perspectives.Time (string2Date, string2DateTime, string2Time)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', specialisesRoleType, userRole)
 import Perspectives.Utilities (prettyPrint)
-import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, unit, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
+import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. String dekt de lading niet sinds we RoleTypes toelaten. Een variabele zou
@@ -837,40 +837,45 @@ getDynamicPropertyGetter p adt = do
       getter bnd
 
 -- | Get a property on a chain of EnumeratedRole instances that are filled by each other.
+-- | Steps through the chain until it reaches a filler that could store the property value.
 -- | The function [getDynamicPropertyGetter](Perspectives.Query.UnsafeCompiler.html#t:getDynamicPropertyGetter)
 -- | will compute the Values for a PropertyType (Enumerated or Calculated).
 getPropertyFromTelescope :: EnumeratedPropertyType -> (RoleInstance ~~> Value)
 getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
   handlePerspectRolError' "getPropertyFromTelescope" []
     \((PerspectRol{properties, binding: bnd, pspType:roleType}) :: PerspectRol) -> do
-      -- We must take aliases of the actual role type into account. An alias is another name for an Aspect Property that 
-      -- has been added to the role.
-      aliases <- catchError (lift $ propertyAliases roleType)
-        \e -> pure OBJ.empty
       allProps <- lift $ allLocallyRepresentedProperties (ST roleType)
       if isJust $ elemIndex (ENP pn) allProps
-        -- No value, but there might have been one. 
         -- We can use either the alias name or the original name for the assumption, as we use both when looking up correlation identifiers.
-        then tell $ ArrayWithoutDoubles [Property r pn]
-        else pure unit
-      case OBJ.lookup (unwrap pn) aliases of
-        Just aliasPropertyName -> do 
-          -- Property values may have been stored under their alias name on the role instance.
-          -- Check whether we have a value.
-          case (OBJ.lookup (unwrap aliasPropertyName) properties) of
+        then do 
+          tell $ ArrayWithoutDoubles [Property r pn]
+          case (OBJ.lookup (unwrap pn) properties) of
+            -- No need to look further; the property is represented on this role, after all.
+            Nothing -> pure []
+            Just p -> pure p
+        else do
+          -- We must take aliases of the actual role type into account. An alias is another name for an Aspect Property that 
+          -- has been added to the role.
+          aliases <- catchError (lift $ propertyAliases roleType)
+            \e -> pure OBJ.empty
+          case OBJ.lookup (unwrap pn) aliases of
+            Just aliasPropertyName -> do 
+              -- Property values may have been stored under their alias name on the role instance.
+              -- Check whether we have a value.
+              case (OBJ.lookup (unwrap aliasPropertyName) properties) of
+                -- No need to look further; the property is represented on this role (under its alias name), after all.
+                Nothing -> pure []
+                Just p -> pure p
+            -- The property is not represented on this role; neither directly, nor as alias. Continue 
+            -- the search on the binding after adding a Filler Assumption.
             Nothing -> do
+              tell $ ArrayWithoutDoubles [Filler r]
               case bnd of
+                -- No binding yet; we're done.
                 Nothing -> pure []
                 -- Search further with the original name. The alias was defined just for this role type.
-                Just b -> runArrayT $ getPropertyFromTelescope pn b
-            (Just p) -> pure p
-        Nothing -> case (OBJ.lookup (unwrap pn) properties) of
-          Nothing -> do
-            case bnd of
-              Nothing -> pure []
-              -- Search further with the original name. The alias was defined just for this role type.
-              Just b -> runArrayT $ getPropertyFromTelescope pn b
-          (Just p) -> pure p
+                Just b -> do 
+                  runArrayT $ getPropertyFromTelescope pn b
 
 -- | Builds, in compile time, a composition of `binding` and `getProperty` that will retrieve the value from the first 
 -- | instance on the chain on which that property has been declared. 
