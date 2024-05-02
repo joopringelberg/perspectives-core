@@ -47,9 +47,9 @@ import Perspectives.ModelDependencies (accountHolder, accountHolderName, account
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
-import Perspectives.PerspectivesState (getBrokerService, setBrokerService, setStompClient, stompClient, getPerspectivesUser)
+import Perspectives.PerspectivesState (getBrokerService, getPerspectivesUser, setBrokerService, setStompClient, stompClient)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesSystemUser(..), RoleInstance(..), Value(..), perspectivesSystemUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -68,7 +68,7 @@ incomingPost = do
   setStompClient stpClient
   -- Create a messageProducer: ConnectAndSubscriptionParameters
   (transactionProducer :: Producer (Either MultipleErrors (StructuredMessage TransactionForPeer)) MonadPerspectives Unit) <- pure $ messageProducer stpClient
-    { topic -- the user's identifier.
+    { topic -- the PerspectivesSystem identifier.
     , queueId
     , login
     , passcode
@@ -123,16 +123,16 @@ incomingPost = do
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.
 retrieveBrokerService :: MonadPerspectives Unit
-retrieveBrokerService = getUserIdentifier >>= (\u -> (RoleInstance u) ##> constructBrokerServiceForUser) >>= setBrokerService
+retrieveBrokerService = getUserIdentifier >>= (\u -> (PerspectivesSystemUser u) ##> constructBrokerServiceForUser) >>= setBrokerService
 
 -- | Construct a BrokerService object for a particular user by querying the database.
-constructBrokerServiceForUser :: RoleInstance -> MonadPerspectivesQuery BrokerService
+constructBrokerServiceForUser :: PerspectivesSystemUser -> MonadPerspectivesQuery BrokerService
 constructBrokerServiceForUser userId = do
   -- LET OP: gaat misschien fout als model:BrokerServices nog niet beschikbaar is.
   accountHolder <- getFilledRoles
     (ContextType brokerContract)
     (EnumeratedRoleType accountHolder)
-    userId
+    (perspectivesSystemUser2RoleInstance userId)
   (Value login) <- getProperty (EnumeratedPropertyType accountHolderName) accountHolder
   (Value passcode) <- getProperty (EnumeratedPropertyType accountHolderPassword) accountHolder
   
@@ -143,6 +143,9 @@ constructBrokerServiceForUser userId = do
   (Value vhost) <- exchangeGetter brokerContractExternal
   queueNameGetter <- lift $ lift $ getPropertyFunction accountHolderQueueName
   (Value queueId) <- queueNameGetter brokerContractExternal
+  -- The topic is the unique identifier of this peer (his PerspectivesUsers instance).
+  -- RabbitMQ will forward the messages sent to this topic to the various queues the user has, 
+  -- one for each PerspectivesSystem (i.e. one for each installation).
   perspectivesUser <- lift $ lift $ getPerspectivesUser
   pure $
     { topic : (unwrap perspectivesUser)

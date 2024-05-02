@@ -258,14 +258,6 @@ perspectivesUsersRole_ r = do
         Nothing -> pure Nothing
         Just b -> perspectivesUsersRole_ b
 
--- | Get the SocialEnvironment$Persons instance that is filled by the PerspectivesUsers instance and from that get the 
--- | PerspectivesSystem$User instances that are filled by it.
-getPerspectivesSystemUsers :: RoleInstance ~~> PerspectivesSystemUser
-getPerspectivesSystemUsers = 
-  getFilledRoles (ContextType socialEnvironment) (EnumeratedRoleType socialEnvironmentPersons) >=>
-  getFilledRoles (ContextType theSystem) (EnumeratedRoleType sysUser) >=>
-  pure <<< roleInstance2PerspectivesSystemUser
-
 -- | From the instance of a Role (fillerId) of any kind, find the instances of the Role of the given
 -- | type (filledType) that are filled with it. The type of filledType (EnumeratedRoleType) may
 -- | be psp:Context$externalRole.

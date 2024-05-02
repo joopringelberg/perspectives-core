@@ -38,12 +38,12 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.ContextAndRole (context_buitenRol, context_universeContextDelta, rol_context, rol_property, rol_propertyDelta, rol_contextDelta, rol_universeRoleDelta)
-import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>), (##=))
+import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (getPerspectivesSystemUsers, getProperty, notIsMe, perspectivesUsersRole_, roleType_)
+import Perspectives.Instances.ObjectGetters (getProperty, notIsMe, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel) as DEP
 import Perspectives.ModelDependencies (perspectivesUsersCancelled, perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)
@@ -52,7 +52,7 @@ import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabase
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesSystemUser, PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
@@ -112,10 +112,9 @@ sendTransactieToUserUsingAMQP perspectivesUser t = do
       case mstompClient of
         Just stompClient -> do
           saveTransactionInOutgoingPost perspectivesUser messageId t
-          -- Get all PerspectivesSystemUsers and send the transaction to them. This is how we deal with multiple installations.
-          (allInstallations :: Array PerspectivesSystemUser) <- (perspectivesUser2RoleInstance perspectivesUser ##= getPerspectivesSystemUsers) 
-          for_ allInstallations 
-            \(installation :: PerspectivesSystemUser) -> liftEffect $ sendToTopic stompClient (unwrap installation) messageId (writeJSON t)
+          -- Just send the message to the topic that is the addressees PerspectivesUser instance.
+          -- Each system will listen to a queue that is bound to that topic upon subscription.
+          liftEffect $ sendToTopic stompClient (unwrap perspectivesUser) messageId (writeJSON t)
         otherwise -> saveTransactionInOutgoingPost perspectivesUser messageId t
     else saveTransactionInOutgoingPost perspectivesUser messageId t
 
@@ -176,6 +175,7 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 -- | If we have a public role instance, return [Tuple rid []].
 -- | If the role chain bottoms out in an instance of TheWorld$PerspectivesUsers, return Tuple rid <<the other PerspectivesSystem$Users>>.
 -- | Otherwise return an empty array.
+-- | Also return an empty array if the PerspectivesUser has been cancelled.
 computeUserRoleBottom :: RoleInstance -> MonadPerspectives (Array (Tuple RoleInstance TransactionDestination))
 computeUserRoleBottom rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= if _ 
   then pure [Tuple rid (PublicDestination rid)]
