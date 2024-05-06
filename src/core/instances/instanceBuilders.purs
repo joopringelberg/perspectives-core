@@ -33,6 +33,8 @@ module Perspectives.Instances.Builders
   ( constructContext
   , createAndAddRoleInstance
   , createAndAddRoleInstance_
+  , lookupOrCreateRoleInstance
+  , lookupOrCreateContextInstance
   , module Perspectives.Instances.CreateContext
   )
   where
@@ -147,7 +149,6 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
               -- This will never happen.
               Nothing -> pure unit
               )
-        lift $ createIndexedContext (ContextType ctype) contextInstanceId
         pure contextInstanceId 
   where
 
@@ -166,7 +167,6 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
         Nothing -> RoleInstance <$> (createResourceIdentifier (RType roleType))
         Just rid -> RoleInstance <$> (createResourceIdentifier' (RType roleType) rid)
       void $ constructEmptyRole contextInstanceId roleType i roleInstanceId
-      createIndexedRole roleType roleInstanceId
       pure $ roleInstanceId
 
     -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta.
@@ -228,39 +228,7 @@ createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSeri
     case properties of
       (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
         setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
-
-    createIndexedRole roleType roleInstance
     pure roleInstance
-
--- | Iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
--- | Also sets the Name property.
--- | The role and name will be used to re-create IndexedRoles at system startup.
--- | DOES NOT check whether an instance of the indexed role has been made before.
-createIndexedRole :: EnumeratedRoleType -> RoleInstance -> MonadPerspectivesTransaction Unit
-createIndexedRole rtype rid = do
-  mindexedName <- lift $ indexedRoleName rtype
-  case mindexedName of 
-    Nothing -> pure unit
-    -- Create an instance of IndexedRole in sys:MySystem
-    -- Fill it with rid
-    -- Set its property Name to indexedName.
-    -- Run the transaction in a separate thread.
-    Just (RoleInstance iName) -> scheduleIndexedResourceCreation (IndexedRole rid iName)
-
--- | Iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
--- | Also sets the Name property.
--- | The role and name will be used to re-create IndexedContexts at system startup.
--- | DOES NOT check whether an instance of the indexed context has been made before.
-createIndexedContext :: ContextType -> ContextInstance -> MonadPerspectivesTransaction Unit
-createIndexedContext ctype cid = do
-  mindexedName <- lift $ indexedContextName ctype
-  case mindexedName of 
-    Nothing -> pure unit
-    -- Create an instance of IndexedContext in sys:MySystem
-    -- Fill it with rid
-    -- Set its property Name to indexedName.
-    -- Run the transaction in a separate thread.
-    Just (ContextInstance iName) -> scheduleIndexedResourceCreation (IndexedContext cid iName)
 
 scheduleIndexedResourceCreation :: IndexedResource -> MonadPerspectivesTransaction Unit
 scheduleIndexedResourceCreation ir = do
@@ -270,21 +238,31 @@ scheduleIndexedResourceCreation ir = do
   -- and it will take the IndexedResourece out of the AVar as soon as possible.
   liftAff $ put ir av
 
+-- | If made before, returns the indexed role.
+-- | Iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
+-- | Also sets the Name property.
+-- | The role and name will be used to re-create IndexedRoles at system startup.
+-- | DOES NOT check whether an instance of the indexed role has been made before.
 lookupOrCreateRoleInstance :: EnumeratedRoleType -> MonadPerspectivesTransaction RoleInstance -> MonadPerspectivesTransaction RoleInstance
 lookupOrCreateRoleInstance rtype roleConstructor = do
   mindexedName <- lift $ indexedRoleName rtype
   case mindexedName of
     Nothing -> roleConstructor
-    Just indexedName -> do
-      mrole <- lift $ lookupIndexedRole (unwrap indexedName)
+    Just (RoleInstance indexedName) -> do
+      mrole <- lift $ lookupIndexedRole indexedName
       case mrole of 
         Nothing -> do
           rid <- roleConstructor
-          liftAff $ log $ "Adding indexed role " <> (unwrap indexedName)
-          lift $ modify \ps -> ps {indexedRoles = insert (unwrap indexedName) rid ps.indexedRoles}
+          liftAff $ log $ "Adding indexed role " <> indexedName
+          lift $ modify \ps -> ps {indexedRoles = insert indexedName rid ps.indexedRoles}
+          scheduleIndexedResourceCreation (IndexedRole rid indexedName)
           pure rid
         Just r -> pure r
 
+-- | If made before, returns the indexed context.
+-- | Otherwise, iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
+-- | Also sets the Name property.
+-- | The role and name will be used to re-create IndexedContexts at system startup.
 lookupOrCreateContextInstance :: ContextType -> 
   ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance -> 
   ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
@@ -292,12 +270,13 @@ lookupOrCreateContextInstance ctype contextConstructor = do
   mindexedName <- lift $ lift $ indexedContextName ctype 
   case mindexedName of 
     Nothing -> contextConstructor
-    Just indexedName -> do
-      minst <- lift $ lift $ lookupIndexedContext (unwrap indexedName)
+    Just (ContextInstance indexedName) -> do
+      minst <- lift $ lift $ lookupIndexedContext indexedName
       case minst of
         Nothing -> do
           cid <- contextConstructor
-          liftAff $ log $ "Adding indexed context " <> (unwrap indexedName)
-          lift $ lift $ modify \ps -> ps {indexedContexts = insert (unwrap indexedName) cid ps.indexedContexts}
+          liftAff $ log $ "Adding indexed context " <> indexedName
+          lift $ lift $ modify \ps -> ps {indexedContexts = insert indexedName cid ps.indexedContexts}
+          lift $ scheduleIndexedResourceCreation (IndexedContext cid indexedName)
           pure cid
         Just i -> pure i

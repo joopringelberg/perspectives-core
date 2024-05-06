@@ -54,7 +54,7 @@ import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..), ex
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
-import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers, socialEnvironment, socialEnvironmentPersons, sysUser, theSystem)
+import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
@@ -64,7 +64,7 @@ import Perspectives.Representation.Class.PersistentType (getContext, getEnumerat
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesSystemUser, PerspectivesUser, RoleInstance(..), Value(..), roleInstance2PerspectivesSystemUser, roleInstance2PerspectivesUser)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)

@@ -22,7 +22,9 @@
 
 module Perspectives.SetupUser where
 
+import Control.Monad.AvarMonadAsk (modify)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (over)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Extern.Couchdb (addModelToLocalStore', createInitialInstances)
@@ -31,6 +33,7 @@ import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, invertedQue
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction)
 import Perspectives.SetupCouchdb (setContext2RoleView, setContextSpecialisationsView, setContextView, setCredentialsView, setFilled2FillerView, setFiller2FilledView, setModelView, setPendingInvitationView, setRTContextKeyView, setRTFilledKeyView, setRTFillerKeyView, setRTPropertyKeyView, setRTRoleKeyView, setRole2ContextView, setRoleFromContextView, setRoleSpecialisationsView, setRoleView)
+import Perspectives.Sync.Transaction (Transaction(..), UninterpretedTransactionForPeer)
 import Prelude (Unit, bind, discard, void, ($), (>>=))
 
 modelDirectory :: String
@@ -39,8 +42,8 @@ modelDirectory = "./src/model"
 -- | Set up by adding model:System and dependencies to the users' models database. This will add the model instances, too.
 -- | This function also ensures CURRENTUSER.
 -- | Note that the repository should have model://perspectives.domains#Couchdb, model://perspectives.domains#Serialise and model://perspectives.domains#System.
-setupUser :: MonadPerspectives Unit
-setupUser = do 
+setupUser :: Maybe UninterpretedTransactionForPeer -> MonadPerspectives Unit
+setupUser uninterpretedIdentityDoc = do 
   entitiesDatabaseName >>= setRoleView 
   entitiesDatabaseName >>= setRoleFromContextView 
   -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
@@ -57,7 +60,12 @@ setupUser = do
   modelDatabaseName >>= setRoleSpecialisationsView
   modelDatabaseName >>= setContextSpecialisationsView 
   -- Finally, upload model:System to perspect_models.
-  void $ runMonadPerspectivesTransaction (ENR $ EnumeratedRoleType sysUser) (addModelToLocalStore' (DomeinFileId systemModelName))
+  void $ runMonadPerspectivesTransaction 
+    (ENR $ EnumeratedRoleType sysUser) 
+    (do 
+      modify (over Transaction \t -> t { identityDocument = uninterpretedIdentityDoc })
+      addModelToLocalStore' (DomeinFileId systemModelName)
+    )
 
 setupInvertedQueryDatabase :: MonadPerspectives Unit
 setupInvertedQueryDatabase = do

@@ -84,12 +84,10 @@ import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
 import Perspectives.SetupUser (reSetupUser, setupInvertedQueryDatabase, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
-import Perspectives.Sync.HandleTransaction (executeTransaction)
-import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
+import Perspectives.Sync.Transaction (UninterpretedTransactionForPeer(..))
 import Perspectives.SystemClocks (forkedSystemClocks)
 import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Simple.JSON (read) as JSON
-import Simple.JSON (read_)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -465,14 +463,7 @@ createAccount usr rawPouchdbUser runtimeOptions nullableIdentityDocument callbac
           key <- getPrivateKey
           modify \(s@{runtimeOptions:ro}) -> s {runtimeOptions = ro {privateKey = unsafeCoerce key}}
           getSystemIdentifier >>= createUserDatabases
-          setupUser
-          case toMaybe nullableIdentityDocument of
-            Just identityDocument -> do 
-              (mt :: Maybe TransactionForPeer) <- pure $ read_ identityDocument
-              case mt of 
-                Just t -> runMonadPerspectivesTransaction' doNotShareWithPeers (ENR $ EnumeratedRoleType sysUser {-Who should be the author of this transaction?-}) (executeTransaction t)
-                Nothing -> pure unit
-            Nothing -> pure unit
+          setupUser (UninterpretedTransactionForPeer <$> (toMaybe nullableIdentityDocument))
           saveMarkedResources
           )
         state
@@ -580,7 +571,7 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
             key <- getPrivateKey
             modify \(s@{runtimeOptions}) -> s {runtimeOptions = runtimeOptions {privateKey = unsafeCoerce key}}
             getSystemIdentifier >>= createUserDatabases
-            setupUser
+            setupUser Nothing
             saveMarkedResources)
           state
     where

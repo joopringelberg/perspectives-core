@@ -26,16 +26,17 @@ module Perspectives.Sync.Transaction where
 -- TRANSACTIE
 -----------------------------------------------------------
 
-import Data.Array (length, null, union)
+import Data.Array (null) 
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
-import Data.Map (Map, empty, union) as MAP
+import Data.Map (Map, empty) as MAP
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Effect.Aff (Aff)
 import Effect.Class (liftEffect)
 import Effect.Now (now)
+import Foreign (Foreign)
 import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
@@ -49,7 +50,7 @@ import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Sync.SignedDelta (SignedDelta)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Eq, class Ord, class Semigroup, class Show, bind, compare, eq, pure, show, ($), (&&), (<>), (>))
+import Prelude (class Eq, class Ord, class Show, bind, compare, eq, pure, show, ($), (&&), (<>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 -----------------------------------------------------------
@@ -86,6 +87,9 @@ newtype Transaction = Transaction (TransactionRecord
   , userRoleBottoms :: MAP.Map RoleInstance TransactionDestination
   -- used in runMonadPerspectivesTransaction'.run to evaluate states again (and execute actions on entry and exit).
   , postponedStateEvaluations :: Array StateEvaluation
+  -- A Transaction for the users TheWorld and SocialEnvironment. Included as uninterpreted data to avoid
+  -- module cycles. Use read_ to transform to Maybe TransactionForPeer.
+  , identityDocument :: Maybe UninterpretedTransactionForPeer
   ))
 
 data TransactionDestination = PublicDestination RoleInstance | Peer PerspectivesUser
@@ -149,30 +153,10 @@ instance ReadForeign Transaction where
       , userRoleBottoms: MAP.empty
       , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
+      , identityDocument: Nothing
       }
 
 derive newtype instance ReadForeign Transaction'
-
-instance semiGroupTransactie :: Semigroup Transaction where
-  append t1@(Transaction {timeStamp, deltas, correlationIdentifiers, changedDomeinFiles, scheduledAssignments, invertedQueryResults, authoringRole, rolesToExit, modelsToBeRemoved, createdContexts, createdRoles, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations})
-    t2@(Transaction {timeStamp: t, deltas: ds, changedDomeinFiles: cd, scheduledAssignments: sa, invertedQueryResults: iqr, correlationIdentifiers: ci, rolesToExit: rte, modelsToBeRemoved: mtbr, createdContexts: cc, createdRoles: cr, untouchableRoles: ur, untouchableContexts: uc, userRoleBottoms: urb, publicKeys: pk, postponedStateEvaluations: pse}) = Transaction
-      { timeStamp: timeStamp
-      , deltas: deltas `union` ds
-      , changedDomeinFiles: union changedDomeinFiles cd
-      , scheduledAssignments: scheduledAssignments <> sa
-      , invertedQueryResults: invertedQueryResults `union` iqr
-      , correlationIdentifiers: union correlationIdentifiers ci
-      , authoringRole
-      , rolesToExit: rolesToExit <> rte
-      , modelsToBeRemoved: modelsToBeRemoved <> mtbr
-      , createdContexts: createdContexts <> cc
-      , createdRoles: createdRoles <> cr
-      , untouchableRoles: if length untouchableRoles > length ur then untouchableRoles else ur
-      , untouchableContexts: if length untouchableContexts > length uc then untouchableContexts else uc
-      , userRoleBottoms: userRoleBottoms `MAP.union` urb
-      , publicKeys: publicKeys `ENCMAP.union` pk
-      , postponedStateEvaluations: postponedStateEvaluations <> pse
-    }
 
 -- | The Revision instance is a stub; we don't really need it (except in tests).
 instance revisionTransaction :: Revision Transaction where
@@ -207,29 +191,8 @@ createTransaction authoringRole =
       , userRoleBottoms: MAP.empty
       , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
+      , identityDocument: Nothing
     }
-
-cloneEmptyTransaction :: Transaction -> Transaction
-cloneEmptyTransaction (Transaction{ timeStamp, authoringRole, untouchableRoles, untouchableContexts, userRoleBottoms, publicKeys, postponedStateEvaluations}) = Transaction
-  { timeStamp
-  , authoringRole
-
-  , deltas: []
-  , changedDomeinFiles: []
-  , scheduledAssignments: []      --
-  , invertedQueryResults: []
-  , correlationIdentifiers: []
-  , rolesToExit: []               --
-  , modelsToBeRemoved: []
-  , createdContexts: []           --
-  , createdRoles: []              --
-
-  , untouchableRoles
-  , untouchableContexts
-  , userRoleBottoms
-  , publicKeys
-  , postponedStateEvaluations
-}
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.
 -- | This means it is considered to be not empty when one of the members that is wiped on cloning, has content.
@@ -263,3 +226,8 @@ type Url = String
 
 derive instance Generic StorageScheme _
 instance Show StorageScheme where show = genericShow
+
+newtype UninterpretedTransactionForPeer = UninterpretedTransactionForPeer Foreign
+derive instance Newtype UninterpretedTransactionForPeer _
+instance Show UninterpretedTransactionForPeer where show _ = "UninterpretedTransactionForPeer"
+instance PrettyPrint UninterpretedTransactionForPeer where prettyPrint' t _ = t <> "UninterpretedTransactionForPeer"

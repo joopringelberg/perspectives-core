@@ -25,7 +25,7 @@ module Perspectives.Sync.HandleTransaction where
 
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (catchError, throwError, try)
-import Control.Monad.Except (lift, runExcept)
+import Control.Monad.Except (lift, runExcept, runExceptT)
 import Control.Monad.State (StateT, gets, modify, runStateT) as ST
 import Crypto.Subtle.Key.Types (CryptoKey)
 import Data.Array (catMaybes, concat, fromFoldable)
@@ -58,6 +58,7 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
+import Perspectives.Instances.Builders (lookupOrCreateContextInstance, lookupOrCreateRoleInstance)
 import Perspectives.Instances.ObjectGetters (getProperty, roleType)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
@@ -197,26 +198,29 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
   externalRoleExists <- lift $ entityExists (RoleInstance $ buitenRol $ unwrap id)
   if externalRoleExists
     then case deltaType of
-      ConstructEmptyContext -> do
-        (exists :: Maybe PerspectContext) <- lift $ tryGetPerspectEntiteit id
-        -- This is where we make the operation idempotent. Nothing happens if it already exists.
-        if isNothing exists
-          then do
-            contextInstance <- pure
-              (PerspectContext defaultContextRecord
-                { _id = takeGuid $ unwrap id
-                , id = id
-                , displayName = unwrap id 
-                , pspType = contextType
-                , allTypes = allTypes
-                , buitenRol = RoleInstance $ buitenRol $ unwrap id
-                , universeContextDelta = signedDelta
-                , states = [StateIdentifier $ unwrap contextType]
-                })
-            lift $ void $ saveEntiteit_ id contextInstance
-            (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
-            addCreatedContextToTransaction id
-          else pure unit
+      ConstructEmptyContext -> void $ runExceptT $ lookupOrCreateContextInstance 
+        contextType
+        (lift $ do
+          (exists :: Maybe PerspectContext) <- lift $ tryGetPerspectEntiteit id
+          -- This is where we make the operation idempotent. Nothing happens if it already exists.
+          if isNothing exists
+            then do
+              contextInstance <- pure
+                (PerspectContext defaultContextRecord
+                  { _id = takeGuid $ unwrap id
+                  , id = id
+                  , displayName = unwrap id 
+                  , pspType = contextType
+                  , allTypes = allTypes
+                  , buitenRol = RoleInstance $ buitenRol $ unwrap id
+                  , universeContextDelta = signedDelta
+                  , states = [StateIdentifier $ unwrap contextType]
+                  })
+              lift $ void $ saveEntiteit_ id contextInstance
+              (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
+              addCreatedContextToTransaction id
+            else pure unit
+          pure id)
     else logPerspectivesError $ UnauthorizedForContext "auteur" subject contextType
 
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
@@ -243,10 +247,10 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- be created by any user.
       -- PERSISTENCE is handled here.
       lift (roleType ###>> hasAspect (EnumeratedRoleType rootContext)) >>= if _
-        then constructExternalRole
+        then void $ lookupOrCreateRoleInstance roleType constructExternalRole
         else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
           Left e -> handleError e
-          Right _ -> constructExternalRole
+          Right _ -> void $ lookupOrCreateRoleInstance roleType constructExternalRole
     RemoveRoleInstance -> do
       (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
         Left e -> handleError e
@@ -273,12 +277,16 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       constructAnotherRole_ = do
         -- find the number of roleinstances in the context.
         offset <- (lift (id ##= getRoleInstances (ENR roleType))) >>= pure <<< getNextRolIndex
-        forWithIndex_ (toNonEmptyArray roleInstances) \i roleInstance -> do
-          (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit roleInstance
-          -- Here we make constructing another role idempotent. Nothing happens if it already exists.
-          if isNothing exists
-            then void $ constructEmptyRole_ id (offset + i) roleInstance
-            else pure unit
+        forWithIndex_ (toNonEmptyArray roleInstances) 
+          \i roleInstance -> lookupOrCreateRoleInstance
+            roleType
+            do
+              (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit roleInstance
+              -- Here we make constructing another role idempotent. Nothing happens if it already exists.
+              if isNothing exists
+                then void $ constructEmptyRole_ id (offset + i) roleInstance
+                else pure unit
+              pure roleInstance
 
       constructEmptyRole_ :: ContextInstance -> Int -> RoleInstance -> MonadPerspectivesTransaction Boolean
       constructEmptyRole_ contextInstance i rolInstanceId = do
@@ -303,7 +311,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           else pure false
 
       -- PERSISTENCE
-      constructExternalRole  :: MonadPerspectivesTransaction Unit
+      constructExternalRole  :: MonadPerspectivesTransaction RoleInstance
       constructExternalRole = do
         externalRole <- pure (head $ toNonEmptyArray roleInstances)
         log ("ConstructExternalRole in " <> show id)
@@ -311,6 +319,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         constructEmptyRole_ id 0 externalRole >>= if _
           then lift $ void $ saveEntiteit externalRole
           else pure unit
+        pure externalRole
 
 -- | Execute all Deltas in a run that does not distribute.
 -- executeTransaction :: TransactionForPeer -> MonadPerspectives Unit
@@ -340,6 +349,10 @@ executeTransaction t = try (verifyTransaction t) >>= case _ of
       for_ deltas verifyDelta_)
     Map.empty
 
+  -- Verify the deltas that make up the PerspectivesUser instance and his public key. 
+  -- Add this author-key combination to state.
+  -- For a author-key combination that is not yet known, will throw up one error on the console 
+  -- as the PDR tries to find the author.
   verifyPublicKey :: PerspectivesUser -> PublicKeyInfo -> ST.StateT (Map.Map PerspectivesUser CryptoKey) MonadPerspectivesTransaction Unit
   verifyPublicKey authorOfKey {key, deltas:keyDeltas} = do
     mcryptoKey <- lift $ lift $ tryGetPublicKey authorOfKey

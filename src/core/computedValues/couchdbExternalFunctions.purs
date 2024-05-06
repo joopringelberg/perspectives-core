@@ -24,6 +24,7 @@
 
 module Perspectives.Extern.Couchdb where
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.AvarMonadAsk (modify, gets) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
@@ -58,7 +59,7 @@ import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..
 import Perspectives.Assignment.StateCache (clearModelStates)
 import Perspectives.Assignment.Update (withAuthoringRole)
 import Perspectives.Authenticate (getMyPublicKey)
-import Perspectives.ContextAndRole (context_id, rol_id)
+import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, rev)
@@ -88,7 +89,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -104,8 +105,10 @@ import Perspectives.ResourceIdentifiers (createDefaultIdentifier, resourceIdenti
 import Perspectives.RoleAssignment (roleIsMe)
 import Perspectives.SaveUserData (scheduleContextRemoval)
 import Perspectives.SetupCouchdb (contextViewFilter, roleViewFilter, setContext2RoleView, setContextView, setCredentialsView, setFiller2FilledView, setFilled2FillerView, setPendingInvitationView, setRoleFromContextView, setRoleView, setRole2ContextView)
-import Perspectives.Sync.Transaction (Transaction(..))
+import Perspectives.Sync.HandleTransaction (executeTransaction)
+import Perspectives.Sync.Transaction (Transaction(..), UninterpretedTransactionForPeer(..))
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Simple.JSON (read_)
 import Unsafe.Coerce (unsafeCoerce)
 
 modelsDatabaseName :: MonadPerspectives String
@@ -340,11 +343,18 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
 
   -- Now create the Installer user role IN THE MODEL INSTANCE.
   me <- lift $ getPerspectivesUser
-  void $ createAndAddRoleInstance (EnumeratedRoleType DEP.installer) cid
+  minstallerId <- createAndAddRoleInstance (EnumeratedRoleType DEP.installer) cid
     (RolSerialization 
       { id: Nothing
       , properties: PropertySerialization empty
       , binding: Just $ unwrap me})
+  -- Make the PDR recognize this role as one played by the user.
+  case minstallerId  of 
+    Just installerId ->  do 
+      installer <- lift $ getPerspectRol installerId
+      void $ lift $ cacheEntity installerId (changeRol_isMe installer true)
+    _ -> pure unit
+
 
   if unversionedModelname == DEP.systemModelName
     then pure unit
@@ -372,7 +382,7 @@ initSystem = do
   sysId <- lift getSystemIdentifier
   sysresult <- runExceptT $ constructContext Nothing 
     (ContextSerialization
-      { id: Just sysId    -- TODO: MAAK HIER EEN NIEUWE CUID
+      { id: Just sysId
       , prototype: Nothing
       , ctype: DEP.theSystem
       , rollen: empty
@@ -430,8 +440,15 @@ initSystem = do
                         })
                         false
             Nothing -> logPerspectivesError (Custom "No public key found on setting up!")
-        else pure unit
-
+          -- Instead, read the Identity document.
+          else do 
+            mIdoc <- gets \(Transaction{identityDocument}) -> identityDocument
+            case mIdoc of 
+              Just (UninterpretedTransactionForPeer i) -> 
+                case read_ i of 
+                  Just identityDocument -> executeTransaction identityDocument
+                  Nothing -> pure unit
+              Nothing -> pure unit
 
       -- Add the base repository to system:
       void $ createAndAddRoleInstance (EnumeratedRoleType DEP.baseRepository) systemId
