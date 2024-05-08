@@ -47,6 +47,7 @@ import Perspectives.Names (getUserIdentifier)
 import Perspectives.Persistence.API (Url, createDatabase)
 import Perspectives.Persistence.CouchdbFunctions (endReplication, replicateContinuously)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
+import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleFunction)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType(..))
@@ -248,7 +249,9 @@ postDbName = do
 -- | Push local channel to remote.
 setPushReplication :: Url -> String -> String -> String -> String -> MonadPerspectives Unit
 setPushReplication base channelDatabaseName host port author = do
+  usr <- getPerspectivesUser
   replicateContinuously
+    usr
     base
     channelDatabaseName
     (base <> channelDatabaseName)
@@ -260,7 +263,9 @@ setPushAndPullReplication :: Url -> String -> String -> String -> String -> Mona
 setPushAndPullReplication base channelDatabaseName host port author = do
   -- Push my Transactions outwards;
   me <- getUserIdentifier
+  usr <- getPerspectivesUser
   replicateContinuously
+    usr
     base
     channelDatabaseName
     (base <> channelDatabaseName)
@@ -268,6 +273,7 @@ setPushAndPullReplication base channelDatabaseName host port author = do
     (Just $ selectOnFieldEqual "author" me)
   -- Pull in all Transactions from the partner inwards.
   replicateContinuously
+    usr
     base
     channelDatabaseName
     (host <> ":" <> port <> "/" <> channelDatabaseName)
@@ -280,7 +286,9 @@ setPushAndPullReplication base channelDatabaseName host port author = do
 localReplication :: Url -> String -> String -> Maybe String -> MonadPerspectives Unit
 localReplication base source target author = do
   me <- getUserIdentifier
+  usr <- getPerspectivesUser
   replicateContinuously
+    usr
     base
     (source <> "_" <> target)
     (base <> source)

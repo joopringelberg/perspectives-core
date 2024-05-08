@@ -84,7 +84,7 @@ runDataUpgrades = do
   ------- SET CURRENT VERSION
   ----------------------------------------------------------------------------------------
   if installedVersion < pdrVersion
-    then liftAff $ idbSet "CurrentPDRVersion" (unsafeToForeign pdrVersion)
+    then liftAff $ idbSet "CurrentPDRVersion" (unsafeToForeign pdrVersion) 
     else pure unit
 
 runUpgrade :: PDRVersion -> PDRVersion -> MonadPerspectives Unit -> MonadPerspectives Unit
@@ -104,10 +104,10 @@ addFixingUpdates = do
 indexedQueries :: MonadPerspectives Unit
 indexedQueries = do
   addAllExternalFunctions
-  user <- getSystemIdentifier
+  sysId <- getSystemIdentifier
   -- Create the indexedQueries database
-  createDatabase $ user <> "_invertedqueries"
-  void $ databaseInfo $ user <> "_invertedqueries"
+  createDatabase $ sysId <> "_invertedqueries"
+  void $ databaseInfo $ sysId <> "_invertedqueries"
   -- set all the views
   setupInvertedQueryDatabase
   -- Fix the source of model:System

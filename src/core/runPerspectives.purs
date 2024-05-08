@@ -25,7 +25,7 @@ module Perspectives.RunPerspectives where
 import Control.Monad.Reader (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Effect.Aff.AVar (AVar, empty, new)
+import Effect.Aff.AVar (AVar, empty, new) 
 import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
 import Perspectives.ModelDependencies (sysMe)
@@ -47,9 +47,9 @@ runPerspectives userName password perspectivesUser systemId host port mp = do
     ((newPerspectivesState
         { systemIdentifier: systemId
         , perspectivesUser: perspectivesUser
+        , userName
         , password: Just password
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
-        -- , userName: UserName userName
         }
       transactionFlag
       transactionWithTiming

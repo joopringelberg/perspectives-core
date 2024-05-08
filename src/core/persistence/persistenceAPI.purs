@@ -62,7 +62,7 @@ import Perspectives.Persistence.Authentication (AuthoritySource(..), ensureAuthe
 import Perspectives.Persistence.Errors (handleNotFound, handlePouchError)
 import Perspectives.Persistence.RunEffectAff (runEffectFnAff2, runEffectFnAff3, runEffectFnAff5, runEffectFnAff6)
 import Perspectives.Persistence.State (getCouchdbBaseURL)
-import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, UserName, ViewName, Url, decodePouchdbUser', encodePouchdbUser', readPouchError, runMonadPouchdb)
+import Perspectives.Persistence.Types (AttachmentName, CouchdbUrl, DatabaseName, DocumentName, DocumentWithRevision, MonadPouchdb, Password, PouchError, PouchdbDatabase, PouchdbExtraState, PouchdbState, PouchdbUser, SystemIdentifier, UserName, ViewName, Url, decodePouchdbUser', encodePouchdbUser', readPouchError)
 import Simple.JSON (class ReadForeign, class WriteForeign, read, read', write)
 
 -----------------------------------------------------------

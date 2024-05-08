@@ -51,8 +51,8 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , systemIdentifier: uinfo.systemIdentifier
   , perspectivesUser: PerspectivesUser $ createDefaultIdentifier uinfo.perspectivesUser
   , couchdbUrl: uinfo.couchdbUrl 
-  , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of 
-      Just url, Just password -> singleton url (Credential uinfo.systemIdentifier password)
+  , couchdbCredentials: case uinfo.couchdbUrl, uinfo.password of
+      Just url, Just password -> singleton url (Credential uinfo.userName password)
       _, _ -> empty
   , indexedRoles: empty
   , indexedContexts: empty

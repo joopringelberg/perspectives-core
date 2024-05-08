@@ -579,7 +579,7 @@ removeModelFromLocalStore versionedModelURIA rid = try
     _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#RemoveModelFromLocalStore"
 
-scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit
+scheduleDomeinFileRemoval :: DomeinFileId -> MonadPerspectivesTransaction Unit 
 scheduleDomeinFileRemoval id = AMA.modify (over Transaction \t@{modelsToBeRemoved} -> t {modelsToBeRemoved = cons id modelsToBeRemoved})
 
 type Url = String
@@ -636,7 +636,9 @@ replicateContinuously databaseUrls couchdbUrls sources targets _ = try
       -- The replication may have been configured before. Overwriting the document will lead to unexpected results.
       -- Stop replication first, then reconfigure.
       void $ lift $ CDB.endReplication databaseUrl source target
+      usr <- lift $ getPerspectivesUser
       lift $ CDB.replicateContinuously
+        usr
         databaseUrl
         (source <> "_" <> target)
         (couchdbUrl <> source)

@@ -68,14 +68,14 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol)
-import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame)
+import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfRoleCalculation, roleKindOfRoleType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
@@ -311,14 +311,17 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       sendResponse (Result corrId [url]) setter
     -- {object: Role Instance}
     Api.GetRoleName -> registerSupportedEffect
-      corrId
+      corrId 
       setter
       getRoleName
       (RoleInstance object)
        onlyOnce
-    Api.GetUserIdentifier -> do
+    Api.GetSystemIdentifier -> do 
       sysId <- getSystemIdentifier
       sendResponse (Result corrId [sysId]) setter
+    Api.GetPerspectivesUser -> do  
+      PerspectivesUser id <- getPerspectivesUser
+      sendResponse (Result corrId [id]) setter
     Api.GetPublicUrl -> do
       mrepoUrl <- getPublicUrl (ContextInstance subject)
       case mrepoUrl of 

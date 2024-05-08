@@ -64,8 +64,9 @@ import Perspectives.Couchdb (CouchdbStatusCodes, ReplicationDocument(..), Replic
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Identifiers (endsWithSegments)
 import Perspectives.Persistence.Authentication (AuthoritySource(..), defaultPerspectRequest, ensureAuthentication, requestAuthentication)
-import Perspectives.Persistence.State (getCouchdbCredentials, getSystemIdentifier)
+import Perspectives.Persistence.State (getCouchdbCredentials)
 import Perspectives.Persistence.Types (Credential(..), DatabaseName, MonadPouchdb, Url)
+import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..))
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Simple.JSON (class ReadForeign, class WriteForeign, readJSON)
 import Unsafe.Coerce (unsafeCoerce)
@@ -128,9 +129,8 @@ ensureSecurityDocument base db = do
 -- REPLICATECONTINUOUSLY
 -----------------------------------------------------------
 -- | Authentication ensured.
-replicateContinuously :: forall f. Url -> DatabaseName -> Url -> Url -> Maybe SelectorObject -> MonadPouchdb f Unit
-replicateContinuously couchdbUrl name source target selector = do
-  usr <- getSystemIdentifier
+replicateContinuously :: forall f. PerspectivesUser -> Url -> DatabaseName -> Url -> Url -> Maybe SelectorObject -> MonadPouchdb f Unit
+replicateContinuously (PerspectivesUser usr) couchdbUrl name source target selector = do
   mpwd <- getCouchdbCredentials
   case mpwd of 
     Nothing -> throwError (error $ "replicateContinuously: no password found for user " <> usr <> " in " <> couchdbUrl)

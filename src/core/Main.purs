@@ -33,7 +33,7 @@ import Data.Foldable (for_)
 import Data.Map (insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
-import Data.Nullable (Nullable, toMaybe)
+import Data.Nullable (Nullable, toMaybe, toNullable)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
@@ -67,7 +67,7 @@ import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DatabaseName, Keys(..), Password, PouchdbUser, Url, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
+import Perspectives.Persistence.API (DatabaseName, Keys(..), PouchdbUser, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
@@ -76,12 +76,12 @@ import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesSta
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
 import Perspectives.RunPerspectives (runPerspectivesWithState)
-import Perspectives.SetupCouchdb (createUserDatabases, setupPerspectivesInCouchdb)
+import Perspectives.SetupCouchdb (createUserDatabases)
 import Perspectives.SetupUser (reSetupUser, setupInvertedQueryDatabase, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.Transaction (UninterpretedTransactionForPeer(..))
@@ -413,20 +413,11 @@ handleError :: forall a. (Either Error a -> Effect Unit)
 handleError (Left e) = logPerspectivesError $Custom $ "An error condition: " <> (show e)
 handleError (Right _) = pure unit
 
--- | Call this function from the client to initialise the Persistence of Perspectives.
--- | Implementation notes:
--- |  1. we need credentials if Couchdb is the database backend.
--- |  2. couchdbUrl should terminate on a forward slash.
-initialisePersistence :: UserName -> Password -> String -> Maybe Url -> Effect Unit
-initialisePersistence userName password perspectivesUser couchdbUrl = void $ runAff
-  handleError
-  (setupPerspectivesInCouchdb userName password (PerspectivesUser perspectivesUser) couchdbUrl)
-
-createAccount :: UserName -> Foreign -> RuntimeOptions -> Nullable Foreign -> (Boolean -> Effect Unit) -> Effect Unit
-createAccount usr rawPouchdbUser runtimeOptions nullableIdentityDocument callback = void $ runAff handler
+createAccount :: UserName -> Foreign -> RuntimeOptions -> Nullable Foreign -> ({success :: Boolean, reason :: Nullable String} -> Effect Unit) -> Effect Unit
+createAccount perspectivesUser rawPouchdbUser runtimeOptions nullableIdentityDocument callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
-    Right (pouchdbUser :: PouchdbUser) -> do
+    Right (pouchdbUser :: PouchdbUser) -> do 
       -- Set the current PDR version.
       idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
 
@@ -473,10 +464,10 @@ createAccount usr rawPouchdbUser runtimeOptions nullableIdentityDocument callbac
     handler :: Either Error Unit -> Effect Unit
     handler (Left e) = do
       logPerspectivesError $ Custom $ "An error condition in createAccount: " <> (show e)
-      callback false
+      callback {success: false, reason: toNullable $ Just $ show e}
     handler (Right _) = do
-      logPerspectivesError $ Custom $ "Created an account " <> usr
-      callback true
+      logPerspectivesError $ Custom $ "Created an account " <> perspectivesUser
+      callback {success: true, reason: toNullable Nothing}
 
 reCreateInstances :: Foreign -> RuntimeOptions -> (Boolean -> Effect Unit) -> Effect Unit
 reCreateInstances rawPouchdbUser options callback = void $ runAff handler
@@ -633,9 +624,10 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in removeAccount")
       Right (pdbu :: PouchdbUser) -> do
-        (pouchdbUser :: PouchdbUser) <- pure
-          { systemIdentifier: pdbu.systemIdentifier
+        (pouchdbUser :: PouchdbUser) <- pure 
+          { systemIdentifier: pdbu.systemIdentifier 
           , perspectivesUser: pdbu.perspectivesUser
+          , userName: pdbu.userName
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
           }

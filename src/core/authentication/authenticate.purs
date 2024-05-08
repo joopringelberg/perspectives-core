@@ -67,13 +67,12 @@ import IDBKeyVal (idbGet)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.Instances.ObjectGetters (getProperty)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
-import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Persistent (entityExists)
 import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
-import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers)
+import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers, takeGuid)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Simple.JSON (parseJSON, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
@@ -150,16 +149,16 @@ deserializeJWK rawKey = do
 -- | in order to put it in Perspectives State.
 getPrivateKey :: MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPrivateKey = do
-  sysId <- getSystemIdentifier
-  privateKey <- lift $ getCryptoKey $ sysId <> privateKeyString
+  PerspectivesUser id <- getPerspectivesUser
+  privateKey <- lift $ getCryptoKey $ (takeGuid id) <> privateKeyString
   pure privateKey
 
 -- | Get my public key. This will only be used on setting up an installation.
 -- | It is taken from IndexedDB.
 getMyPublicKey :: MonadPerspectives (Maybe String)
 getMyPublicKey = do
-  sysId <- getSystemIdentifier
-  publicKey <- lift $ getCryptoKey $ sysId <> publicKeyString
+  PerspectivesUser id <- getPerspectivesUser
+  publicKey <- lift $ getCryptoKey $ (takeGuid id) <> publicKeyString
   for publicKey
     \key -> lift $ do 
       jwk <- CryptoTypes.exportKey CryptoTypes.jwk key

@@ -26,51 +26,16 @@ import Data.Array (elemIndex)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
-import Effect.Aff (Aff)
 import Foreign.Object (foldMap)
 import Perspectives.ContextAndRole (context_allTypes, context_iedereRolInContext, rol_allTypes, rol_binding, rol_context, rol_gevuldeRollen)
 import Perspectives.Couchdb (SecurityDocument(..), User)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
-import Perspectives.Persistence.API (MonadPouchdb, Password, Url, UserName, addViewToDatabase, createDatabase, databaseInfo, runMonadPouchdb)
+import Perspectives.Persistence.API (MonadPouchdb, addViewToDatabase, createDatabase, databaseInfo)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (withCouchdbUrl)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser, RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedRoleType)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (&&), (<>), (==))
-
------------------------------------------------------------
--- SETUPPERSPECTIVESINCOUCHDB
--- Notice: Requires authentication.
------------------------------------------------------------
--- | If it has not been done before,
--- |  * create system databases
--- |  * initialize the local repository
--- |  * create the database `localusers` and set its security document.
-setupPerspectivesInCouchdb :: UserName -> Password -> PerspectivesUser -> Maybe Url -> Aff Unit
-setupPerspectivesInCouchdb usr pwd perspectivesUser couchdbUrl = runMonadPouchdb usr pwd perspectivesUser usr couchdbUrl
-  do
-    {doc_count} <- databaseInfo "localusers"
-    -- isFirstUser <- databaseExists_ "localusers"
-    if doc_count == 0
-      then do
-        createSystemDatabases
-        -- For now, we initialise the repository, too.
-        initRepository
-        createDatabase "localusers"
-        void $ withCouchdbUrl
-          \url -> setSecurityDocument url "localusers"
-            (SecurityDocument {admins: {names: Just [], roles: []}, members: {names: Just [], roles: ["NotExistingRole"]}})
-      else pure unit
-
------------------------------------------------------------
--- INITREPOSITORY
------------------------------------------------------------
--- | Create a database "repository" and add a view to it to retrive the external roles of the ModelDescription instances.
-initRepository :: forall f. MonadPouchdb f Unit
-initRepository = do
-  createDatabase "repository"
-  void $ withCouchdbUrl \url -> setSecurityDocument url "repository"
-      (SecurityDocument {admins: {names: Just [], roles: ["_admin"]}, members: {names: Just [], roles: []}})
+import Prelude (Unit, discard, void, ($), (&&), (<>), (==))
 
 -----------------------------------------------------------
 -- CREATESYSTEMDATABASES
