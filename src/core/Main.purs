@@ -416,7 +416,7 @@ handleError (Right _) = pure unit
 createAccount :: UserName -> Foreign -> RuntimeOptions -> Nullable Foreign -> ({success :: Boolean, reason :: Nullable String} -> Effect Unit) -> Effect Unit
 createAccount perspectivesUser rawPouchdbUser runtimeOptions nullableIdentityDocument callback = void $ runAff handler
   case decodePouchdbUser' rawPouchdbUser of
-    Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in createAccount")
+    Left e -> throwError (error $ "Wrong format for parameter 'rawPouchdbUser' in createAccount: " <> (show e))
     Right (pouchdbUser :: PouchdbUser) -> do 
       -- Set the current PDR version.
       idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
