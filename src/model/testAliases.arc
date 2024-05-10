@@ -43,7 +43,7 @@ domain TestAliases
     external 
       property Name (String)
 
-    user Driver filledBy sys:PerspectivesSystem$User
+    user Driver filledBy sys:TheWorld$PerspectivesUsers
       property VehicleName = context >> Vehicle >> Name
 
       -- Property License is used to define state HasLicense. 

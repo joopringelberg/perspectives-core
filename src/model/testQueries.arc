@@ -140,7 +140,7 @@ domain model://joopringelberg.nl#TestQueries
 
 
     -- Without a role this context could never be opened.
-    user Manager filledBy sys:PerspectivesSystem$User
+    user Manager filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:ContextWithNotification$NotifiedUser
       aspect tq:TQAspect$AspectManager
       perspective on TheEmbeddedContext
@@ -226,7 +226,7 @@ domain model://joopringelberg.nl#TestQueries
           AspectProp2 is replaced by Prop2
       property Prop2 (Boolean)
     
-    user EmbeddedUser filledBy sys:PerspectivesSystem$User
+    user EmbeddedUser filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on Thing1
         defaults

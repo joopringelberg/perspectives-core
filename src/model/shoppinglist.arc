@@ -37,7 +37,7 @@ domain model://perspectives.domains#Shopping@1.0.0
 
     -- As soon as a user is registered as one of the Housemates, he will take on that 
     -- role on opening the context.
-    user Housemates (relational) filledBy sys:PerspectivesSystem$User
+    user Housemates (relational) filledBy sys:TheWorld$PerspectivesUsers
       perspective on ShoppingLists
         only (CreateAndFill)
         props (ToDate, Buyer)

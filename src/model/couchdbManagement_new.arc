@@ -249,7 +249,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- This role requires credentials for the ServerUrl, because it can remove itself.
     -- It requires write access to cw_servers_and_repositories.
-    user Accounts (unlinked, relational) filledBy sys:SocialEnvironment$Persons
+    user Accounts (unlinked, relational) filledBy sys:TheWorld$PerspectivesUsers
       -- WithCredentials$Password
       -- WithCredentials$SpecificUserName
       -- WithCredentials$AuthorizedDomain

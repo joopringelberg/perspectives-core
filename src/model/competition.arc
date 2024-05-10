@@ -20,7 +20,7 @@ domain Competition
 
     -- The Manager can manage all Competitions. Each system user is manager in his own CompetitionApp!
     -- The manager role is constructed in the .crl file.
-    user Manager filledBy sys:PerspectivesSystem$User
+    user Manager filledBy sys:TheWorld$PerspectivesUsers
       indexed com:CompetitionManager
       perspective on Competitions
         defaults
@@ -84,5 +84,5 @@ domain Competition
       perspective on Captain
         defaults
 
-    user Captain filledBy sys:PerspectivesSystem$User
+    user Captain filledBy sys:TheWorld$PerspectivesUsers
       property Budget (Number)

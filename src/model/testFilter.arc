@@ -64,7 +64,7 @@ domain model://joopringelberg.nl#TestFilter
   case FilterTest
     external
       property Name (String)
-    user ZietAlles filledBy sys:PerspectivesSystem$User
+    user ZietAlles filledBy sys:TheWorld$PerspectivesUsers
       perspective on AlleDingen
         all roleverbs
         props (Naam, Zichtbaar) verbs (Consult, SetPropertyValue)
@@ -74,7 +74,7 @@ domain model://joopringelberg.nl#TestFilter
         only (Create, Fill)
         props (FirstName) verbs (Consult)
 
-    user ZietMinder filledBy sys:PerspectivesSystem$User
+    user ZietMinder filledBy sys:TheWorld$PerspectivesUsers
       perspective on SommigeDingen
         props (Naam) verbs (Consult)
       perspective on ZietMinder

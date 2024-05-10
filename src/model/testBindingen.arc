@@ -47,7 +47,7 @@ domain model://joopringelberg.nl#TestBindingen
       perspective on Manager
         all roleverbs
 
-    user Manager filledBy sys:PerspectivesSystem$User
+    user Manager filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on Tests
         all roleverbs
@@ -167,4 +167,25 @@ domain model://joopringelberg.nl#TestBindingen
       aspect tb:TestFiller
 
     thing Filler4
+      aspect tb:TestFiller
+
+  case TestInsufficientFiller
+    aspect tb:Test
+
+    -- We expect that Filled1 can be filled by Filler1 but not by Filler2.
+    user Tester = extern >> binder Tests >> context >> Manager
+      perspective on Filled1
+        defaults
+      perspective on Filler1
+        defaults
+      perspective on Filler2
+        defaults
+
+    thing Filled1 filledBy TestInsufficientFiller$Filler1
+      aspect tb:Test$FilledRole
+
+    thing Filler1 filledBy TestInsufficientFiller$Filler2
+      aspect tb:TestFiller
+
+    thing Filler2
       aspect tb:TestFiller

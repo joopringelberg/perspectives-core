@@ -99,7 +99,7 @@ domain model://perspectives.domains#TestPublicRole
     external
       property AccountName = context >> Account >> FirstName
 
-    user Account filledBy sys:PerspectivesSystem$User
+    user Account filledBy sys:TheWorld$PerspectivesUsers
       perspective on Admin
       perspective on extern
         props (AccountName) verbs (Consult)

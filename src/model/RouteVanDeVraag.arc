@@ -110,7 +110,7 @@ domain model://joopringelberg.nl#Route
       property Naam (String)
       aspect Locatie
     
-    user Medewerkers filledBy sys:PerspectivesSystem$User
+    user Medewerkers filledBy sys:TheWorld$PerspectivesUsers
       perspective on Routes
         props (Voornaam, Achternaam) verbs (Consult)
 

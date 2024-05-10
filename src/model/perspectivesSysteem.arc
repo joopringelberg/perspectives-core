@@ -107,25 +107,25 @@ domain model://perspectives.domains#System
     aspect sys:RootContext
     external 
       aspect sys:RootContext$External
-    state InitMe = not exists Me 
+    state InitMe = (callExternal util:SystemParameter( "IsFirstInstallation" ) returns Boolean) and not exists Me 
       on entry
         do for SystemUser
-          -- SystemUser has a sufficient perspective, but Me is never shared anyway.
           bind sys:TheWorld >> PerspectivesUsers >>= first to Me
           bind sys:TheWorld >> PerspectivesUsers >>= first to Persons
     -- To fill other user roles: require Persons as user role filler if there is no need to consider a natural person
     -- to be a peer with whom one wants to synchronize. Require PerspectivesSystem$Users otherwise.
     -- Using Persons rather than TheWorld$PerspectivesUsers or TheWorld$NonPerspectivesUsers creates a layer of indirection
     -- that allows us to switch rather painlessly from NonPerspectivesuser to PerspectivesUsers.
-    -- Persons will be synchronized between peers because they will have a perspective on properties of sys:Identifiable
+    -- Persons will be synchronized between peers because they will have a perspective on SocialEnvironment$Me with the properties of sys:Identifiable
+    -- We also make sure that each Persons instance we know about has access to all our System$User identities, so he/she can synchronize to us.
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy PerspectivesUsers, NonPerspectivesUsers
       perspective on Me
-        props (Cancelled) verbs (Consult)
+        props (Cancelled, LastName, FirstName, PublicKey) verbs (Consult)
     user Me filledBy PerspectivesUsers
+      aspect sys:RoleWithId
       indexed sys:SocialMe
       property MyIdentity (File)
-      property MyPublicKey (functional) = binder PerspectivesUsers >> PublicKey
     user SystemUser = sys:Me
       perspective on Me
         only (Create, Fill)
@@ -189,6 +189,9 @@ domain model://perspectives.domains#System
     -- by construction, a PerspectivesUsers behind it. We do not need the extra indirection here.
     -- However, to be able to use Persons effectively when we don't care whether or not there is 
     -- a PerspectivesUsers behind it, we have to have Persons for PerspectivesUsers, too.
+
+    -- If User is not filled with Persons, we can never fill a role that requires Persons with User. That may be inconvenient.
+    -- OF WE MOETEN ME VULLEN MET PERSONS.
     -- TODO. WHAT ABOUT SOCIALENVIRONMENT$ME?
     user User (mandatory) filledBy Persons
       aspect sys:ContextWithNotification$NotifiedUser
@@ -481,7 +484,7 @@ domain model://perspectives.domains#System
     external
       property Name (mandatory, String)
     -- PDRDEPENDENCY
-    user RootUser filledBy sys:PerspectivesSystem$User
+    user RootUser filledBy sys:TheWorld$PerspectivesUsers
 
   case Invitation
     state NoInviter = not exists Inviter
@@ -506,7 +509,7 @@ domain model://perspectives.domains#System
               create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
                 invitation
 
-    user Inviter (mandatory) filledBy sys:PerspectivesSystem$User
+    user Inviter (mandatory) filledBy sys:TheWorld$PerspectivesUsers
       perspective on Invitee
         props (FirstName, LastName) verbs (Consult)
       perspective on External
@@ -540,7 +543,7 @@ domain model://perspectives.domains#System
             props (CompleteMessage) verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
-    user Guest = filter sys:Me with not fills (currentcontext >> Inviter)
+    user Guest = filter sys:SocialMe with not fills (currentcontext >> Inviter)
       perspective on extern
         props (InviterLastName, Message) verbs (Consult)
       perspective on Invitee

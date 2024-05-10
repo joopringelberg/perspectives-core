@@ -43,8 +43,7 @@ domain model://perspectives.domains#Introduction
       aspect sys:RootContext$External
 
     context Introductions (relational) filledBy Introduction
-    -- NB: WAARSCHIJNLIJK IS NIET SYS:ME MAAR DE PERSPECTIVESUSER OF DE SOCIALENVIRONMENT$PERSONS ROLLEN DE VULLERS.
-    context IncomingIntroductions = sys:Me >> binder Introducee >> context >> extern
+    context IncomingIntroductions = sys:SocialMe >> binder Introducee >> context >> extern
     user Manager = sys:Me
       perspective on Introductions
         only (CreateAndFill, Remove)
@@ -61,18 +60,20 @@ domain model://perspectives.domains#Introduction
     state NoIntroducer = not exists Introducer
       on entry
         do for Guest
-          bind sys:Me to Introducer
+          bind sys:SocialMe to Introducer
     external
       property Title (String)
-    user Guest = sys:Me
+    user Guest = sys:SocialMe
       perspective on Introducer
         only (Create, Fill)
-    user Introducer filledBy sys:PerspectivesSystem$User
+    user Introducer filledBy sys:TheWorld$PerspectivesUsers
       perspective on Introducee
         only (Create, Fill, Remove, CreateAndFill)
         props (FirstName, LastName) verbs (Consult)
 
-    user Introducee (relational) filledBy sys:SocialEnvironment$Persons
+    user Introducee (relational) filledBy sys:TheWorld$PerspectivesUsers
+      perspective on extern
+        props (Title) verbs (Consult)
       perspective on Introducer
         props (FirstName, LastName) verbs (Consult)
       perspective on Introducee

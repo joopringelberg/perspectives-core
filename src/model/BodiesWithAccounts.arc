@@ -22,7 +22,7 @@ domain model://perspectives.domains#BodiesWithAccounts
     state NoAccounts = not exists Accounts
 
     -- Admin can always create and fill Accounts and see the UserName.
-    user Admin filledBy sys:PerspectivesSystem$User
+    user Admin filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:WithCredentials
 
       perspective on Accounts
@@ -46,7 +46,7 @@ domain model://perspectives.domains#BodiesWithAccounts
     -- This role is useful when a Body is a public context.
     -- Notice that because Accounts is unlinked and this perspective is selfonly, the existence of other accounts 
     -- plays no role.
-    user Guest = sys:Me
+    user Guest = sys:SocialMe
       in state NoAccounts
         -- Guest can request an Account.
         -- The only Guest instance that a PDR can ever compute, is by construction
@@ -71,7 +71,7 @@ domain model://perspectives.domains#BodiesWithAccounts
     -- This allows us to create a screen to browse through Accounts without
     -- loading all references at once with the context.
     -- Specialisation may restrict their fillers.
-    user Accounts (unlinked, relational) filledBy sys:PerspectivesSystem$User
+    user Accounts (unlinked, relational) filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:WithCredentials
       property IsAccepted (Boolean)
       property IsRejected (Boolean)

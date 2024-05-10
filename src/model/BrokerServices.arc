@@ -85,7 +85,7 @@ domain model://perspectives.domains#BrokerServices
     state NoAdministrator = not exists Administrator
       on entry
         do for BrokerService$Guest
-          bind sys:Me to Administrator
+          bind sys:SocialMe to Administrator
     external
       property Name (mandatory, String)
       -- PDRDEPENDENCY
@@ -105,7 +105,7 @@ domain model://perspectives.domains#BrokerServices
       property TerminationPeriod (Day)
   
       
-    user Administrator filledBy sys:PerspectivesSystem$User
+    user Administrator filledBy sys:TheWorld$PerspectivesUsers
       -- The credentials of Administrator for the remote RabbitMQ server.
       property AdminUserName (String)
       property AdminPassword (String)
@@ -140,7 +140,7 @@ domain model://perspectives.domains#BrokerServices
           letA
             account <- create context BrokerContract bound to Accounts
           in
-            bind sys:Me to AccountHolder in account >> binding >> context
+            bind sys:SocialMe to AccountHolder in account >> binding >> context
             bind Administrator to Administrator in account >> binding >> context
 
     -- PDRDEPENDENCY
@@ -214,7 +214,7 @@ domain model://perspectives.domains#BrokerServices
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
     
     -- PDRDEPENDENCY
-    user AccountHolder filledBy sys:PerspectivesSystem$User
+    user AccountHolder filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:Invitation$Invitee
       aspect sys:ContextWithNotification$NotifiedUser
       -- PDRDEPENDENCY

@@ -84,7 +84,7 @@ domain model://perspectives.domains#SimpleChat
       --   notify Initiator
       --     "Your invitation is being prepared."
 
-    user Initiator (mandatory) filledBy sys:PerspectivesSystem$User
+    user Initiator (mandatory) filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:Invitation$Inviter
       aspect cht:WithText$TextWriter
       perspective on Partner
@@ -106,7 +106,7 @@ domain model://perspectives.domains#SimpleChat
           form "Your message" Initiator
             props (MyText) verbs (SetPropertyValue)
 
-    user Partner filledBy sys:PerspectivesSystem$User
+    user Partner filledBy sys:TheWorld$PerspectivesUsers
       aspect sys:Invitation$Invitee
       aspect cht:WithText$TextWriter
       perspective on extern
@@ -137,5 +137,5 @@ domain model://perspectives.domains#SimpleChat
     aspect user sys:Invitation$Guest
 
   case WithText
-    user TextWriter filledBy sys:PerspectivesSystem$User
+    user TextWriter filledBy sys:TheWorld$PerspectivesUsers
       property MyText (String)
