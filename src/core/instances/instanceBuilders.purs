@@ -253,10 +253,16 @@ lookupOrCreateRoleInstance rtype id roleConstructor = do
     Just (RoleInstance indexedName) -> do
       mrole <- lift $ lookupIndexedRole indexedName
       case mrole of 
+        -- Now construct the instance and add an instance of IndexedRoles to register it is, in fact, an indexed instance!
         Nothing -> executeConstructor indexedName
         Just ind@(RoleInstance r) -> if maybe true (eq r) id
+          -- We have an indexed instance that is equal to the instance that we want to make.
+          -- Just return it.
           then pure ind
-          else executeConstructor indexedName
+          -- Yes, this is an indexed role type and we do already have an instance of IndexedRoles to register
+          -- that that instance is our indexed instance. Nevertheless, we want to make another instance - but 
+          -- it will not be our indexed instance!
+          else roleConstructor
   where
     executeConstructor :: String -> MonadPerspectivesTransaction RoleInstance
     executeConstructor indexedName = do
@@ -287,8 +293,13 @@ lookupOrCreateContextInstance ctype id contextConstructor = do
         -- but we may have other instances (e.g. received from other users) that we do store but not index!
         -- E.g. think of PerspectivesSystem. We have our own indexed instance, but receive instances from peers, too.
         Just ind@(ContextInstance i) -> if maybe true (eq i) id
+          -- We have an indexed instance that is equal to the instance that we want to make.
+          -- Just return it.
           then pure ind 
-          else executeConstructor indexedName
+          -- Yes, this is an indexed context type and we do already have an instance of IndexedContexts to register
+          -- that that instance is our indexed instance. Nevertheless, we want to make another instance - but 
+          -- it will not be our indexed instance!
+          else contextConstructor
   where
     executeConstructor :: String -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
     executeConstructor indexedName = do
