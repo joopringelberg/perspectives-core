@@ -200,6 +200,7 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
     then case deltaType of
       ConstructEmptyContext -> void $ runExceptT $ lookupOrCreateContextInstance 
         contextType
+        (Just $ unwrap id)
         (lift $ do
           (exists :: Maybe PerspectContext) <- lift $ tryGetPerspectEntiteit id
           -- This is where we make the operation idempotent. Nothing happens if it already exists.
@@ -247,10 +248,10 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- be created by any user.
       -- PERSISTENCE is handled here.
       lift (roleType ###>> hasAspect (EnumeratedRoleType rootContext)) >>= if _
-        then void $ lookupOrCreateRoleInstance roleType constructExternalRole
+        then void $ lookupOrCreateRoleInstance roleType Nothing constructExternalRole
         else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
           Left e -> handleError e
-          Right _ -> void $ lookupOrCreateRoleInstance roleType constructExternalRole
+          Right _ -> void $ lookupOrCreateRoleInstance roleType Nothing constructExternalRole
     RemoveRoleInstance -> do
       (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
         Left e -> handleError e
@@ -280,6 +281,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         forWithIndex_ (toNonEmptyArray roleInstances) 
           \i roleInstance -> lookupOrCreateRoleInstance
             roleType
+            (Just $ unwrap roleInstance)
             do
               (exists :: Maybe PerspectRol) <- lift $ tryGetPerspectEntiteit roleInstance
               -- Here we make constructing another role idempotent. Nothing happens if it already exists.

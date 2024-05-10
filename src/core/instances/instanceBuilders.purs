@@ -45,7 +45,7 @@ import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
 import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
@@ -76,7 +76,7 @@ import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourc
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Types.ObjectGetters (indexedContextName, indexedRoleName, publicUserRole)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (>>=), (<>))
+import Prelude (Unit, bind, discard, eq, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
@@ -85,7 +85,7 @@ import Prelude (Unit, bind, discard, pure, unit, void, ($), (*>), (+), (<$>), (<
 -- | This function is complete w.r.t. the five responsibilities, for the context and its roles.
 -- | Retrieves from the repository the model that holds the ContextType, if necessary.
 constructContext :: Maybe RoleType -> ContextSerialization -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
-constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = lookupOrCreateContextInstance  (ContextType ctype) 
+constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, externeProperties}) = lookupOrCreateContextInstance  (ContextType ctype) id
   do
     contextInstanceId <- case id of
       Nothing -> ContextInstance <$> (lift $ createResourceIdentifier (CType $ ContextType ctype))
@@ -105,8 +105,9 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           -- Construct all instances of this type without binding first, then add them to the context.
           (rolInstances' :: NonEmptyArray (Tuple RolSerialization RoleInstance)) <- forWithIndex
             (unwrap rolDescriptions)
-            \ind ser -> lift $ lift $ lookupOrCreateRoleInstance 
+            \ind ser@(RolSerialization{id:mRoleId}) -> lift $ lift $ lookupOrCreateRoleInstance 
               (EnumeratedRoleType rolTypeId) 
+              mRoleId
               (constructSingleRoleInstance contextInstanceId (EnumeratedRoleType rolTypeId) ind ser)
               >>= pure <<< Tuple ser
           -- SYNCHRONISATION: through setFirstBinding adds a RoleBindingDelta, also sets isMe.
@@ -199,6 +200,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSer
 
 createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = lookupOrCreateRoleInstance roleType
+  mRoleId
   do
     contextInstanceId <- ContextInstance <$> (lift $ expandDefaultNamespaces contextId) 
     rolInstances <- lift (contextInstanceId ##= getRoleInstances (ENR roleType))
@@ -243,40 +245,55 @@ scheduleIndexedResourceCreation ir = do
 -- | Also sets the Name property.
 -- | The role and name will be used to re-create IndexedRoles at system startup.
 -- | DOES NOT check whether an instance of the indexed role has been made before.
-lookupOrCreateRoleInstance :: EnumeratedRoleType -> MonadPerspectivesTransaction RoleInstance -> MonadPerspectivesTransaction RoleInstance
-lookupOrCreateRoleInstance rtype roleConstructor = do
+lookupOrCreateRoleInstance :: EnumeratedRoleType -> Maybe String -> MonadPerspectivesTransaction RoleInstance -> MonadPerspectivesTransaction RoleInstance
+lookupOrCreateRoleInstance rtype id roleConstructor = do
   mindexedName <- lift $ indexedRoleName rtype
   case mindexedName of
     Nothing -> roleConstructor
     Just (RoleInstance indexedName) -> do
       mrole <- lift $ lookupIndexedRole indexedName
       case mrole of 
-        Nothing -> do
-          rid <- roleConstructor
-          liftAff $ log $ "Adding indexed role " <> indexedName
-          lift $ modify \ps -> ps {indexedRoles = insert indexedName rid ps.indexedRoles}
-          scheduleIndexedResourceCreation (IndexedRole rid indexedName)
-          pure rid
-        Just r -> pure r
+        Nothing -> executeConstructor indexedName
+        Just ind@(RoleInstance r) -> if maybe true (eq r) id
+          then pure ind
+          else executeConstructor indexedName
+  where
+    executeConstructor :: String -> MonadPerspectivesTransaction RoleInstance
+    executeConstructor indexedName = do
+      rid <- roleConstructor
+      liftAff $ log $ "Adding indexed role " <> indexedName
+      lift $ modify \ps -> ps {indexedRoles = insert indexedName rid ps.indexedRoles}
+      scheduleIndexedResourceCreation (IndexedRole rid indexedName)
+      pure rid
 
 -- | If made before, returns the indexed context.
 -- | Otherwise, iff the role type is indexed, create an entry for IndexedRoles in System and fill it with this role.
 -- | Also sets the Name property.
 -- | The role and name will be used to re-create IndexedContexts at system startup.
 lookupOrCreateContextInstance :: ContextType -> 
+  Maybe String ->
   ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance -> 
   ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
-lookupOrCreateContextInstance ctype contextConstructor = do
+lookupOrCreateContextInstance ctype id contextConstructor = do
   mindexedName <- lift $ lift $ indexedContextName ctype 
   case mindexedName of 
     Nothing -> contextConstructor
     Just (ContextInstance indexedName) -> do
       minst <- lift $ lift $ lookupIndexedContext indexedName
       case minst of
-        Nothing -> do
-          cid <- contextConstructor
-          liftAff $ log $ "Adding indexed context " <> indexedName
-          lift $ lift $ modify \ps -> ps {indexedContexts = insert indexedName cid ps.indexedContexts}
-          lift $ scheduleIndexedResourceCreation (IndexedContext cid indexedName)
-          pure cid
-        Just i -> pure i
+        Nothing -> executeConstructor indexedName
+        -- Even though we may have an indexed instance, it may be ANOTHER instance than the one we want to create.
+        -- Only one instance of this role type in this context may be THE indexed instance in this installation,
+        -- but we may have other instances (e.g. received from other users) that we do store but not index!
+        -- E.g. think of PerspectivesSystem. We have our own indexed instance, but receive instances from peers, too.
+        Just ind@(ContextInstance i) -> if maybe true (eq i) id
+          then pure ind 
+          else executeConstructor indexedName
+  where
+    executeConstructor :: String -> ExceptT PerspectivesError MonadPerspectivesTransaction ContextInstance
+    executeConstructor indexedName = do
+      cid <- contextConstructor
+      liftAff $ log $ "Adding indexed context " <> indexedName
+      lift $ lift $ modify \ps -> ps {indexedContexts = insert indexedName cid ps.indexedContexts}
+      lift $ scheduleIndexedResourceCreation (IndexedContext cid indexedName)
+      pure cid
