@@ -89,7 +89,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -98,7 +98,7 @@ import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance, perspectivesUser2RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, resourceIdentifier2WriteDocLocator, takeGuid)
@@ -446,7 +446,13 @@ initSystem = do
             case mIdoc of 
               Just (UninterpretedTransactionForPeer i) -> 
                 case read_ i of 
-                  Just identityDocument -> executeTransaction identityDocument
+                  Just identityDocument -> do 
+                    executeTransaction identityDocument
+                    -- now set isMe of the PerspectivesUser that fills sys:SocialMe.
+                    pUser <- perspectivesUser2RoleInstance <$> lift getPerspectivesUser
+                    pUserRole <- lift (getPerspectRol pUser)
+                    lift $ void $ cacheEntity pUser $ changeRol_isMe pUserRole true
+                    lift $ void $ saveEntiteit pUser 
                   Nothing -> pure unit
               Nothing -> pure unit
 

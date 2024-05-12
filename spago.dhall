@@ -67,6 +67,7 @@ to generate this file without the comments in this block.
   , "profunctor-lenses"
   , "random"
   , "record"
+  , "safe-coerce"
   , "serializablenonemptyarray"
   , "simple-json"
   , "strings"
