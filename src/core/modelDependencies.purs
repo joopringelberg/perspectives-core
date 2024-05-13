@@ -38,6 +38,9 @@ socialEnvironmentPersons = "model://perspectives.domains#System$SocialEnvironmen
 socialEnvironmentMe :: String
 socialEnvironmentMe = "model://perspectives.domains#System$SocialEnvironment$Me" 
 
+indexedSocialMe :: String
+indexedSocialMe = "model://perspectives.domains#System$SocialMe"
+
 systemIdentityValues :: String
 systemIdentityValues = "model://perspectives.domains#System$TheWorld$SystemIdentities" 
 

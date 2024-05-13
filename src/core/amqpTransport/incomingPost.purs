@@ -32,24 +32,25 @@ import Data.Array (nub, sort)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.List.NonEmpty (head)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (ForeignError(..), MultipleErrors)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClient, messageProducer, sendToTopic)
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (BrokerService, MonadPerspectives, MonadPerspectivesQuery, (##>))
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.ObjectGetters (context, externalRole, getFilledRoles, getProperty)
-import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerEndpoint, brokerServiceExchange, connectedToAMQPBroker, sysUser)
-import Perspectives.Names (getMySystem, getUserIdentifier)
+import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerEndpoint, brokerServiceExchange, connectedToAMQPBroker, indexedSocialMe, sysUser)
+import Perspectives.Names (getMySystem, lookupIndexedRole)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
 import Perspectives.PerspectivesState (getBrokerService, getPerspectivesUser, setBrokerService, setStompClient, stompClient)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
-import Perspectives.Representation.InstanceIdentifiers (PerspectivesSystemUser(..), RoleInstance(..), Value(..), perspectivesSystemUser2RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
 import Perspectives.Sync.HandleTransaction (executeTransaction)
@@ -123,16 +124,17 @@ incomingPost = do
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.
 retrieveBrokerService :: MonadPerspectives Unit
-retrieveBrokerService = getUserIdentifier >>= (\u -> (PerspectivesSystemUser u) ##> constructBrokerServiceForUser) >>= setBrokerService
+retrieveBrokerService = lookupIndexedRole indexedSocialMe >>= (\u -> (unsafePartial fromJust u) ##> constructBrokerServiceForUser) >>= setBrokerService
+
 
 -- | Construct a BrokerService object for a particular user by querying the database.
-constructBrokerServiceForUser :: PerspectivesSystemUser -> MonadPerspectivesQuery BrokerService
-constructBrokerServiceForUser userId = do
+constructBrokerServiceForUser :: RoleInstance -> MonadPerspectivesQuery BrokerService
+constructBrokerServiceForUser socialMe = do
   -- LET OP: gaat misschien fout als model:BrokerServices nog niet beschikbaar is.
   accountHolder <- getFilledRoles
     (ContextType brokerContract)
     (EnumeratedRoleType accountHolder)
-    (perspectivesSystemUser2RoleInstance userId)
+    socialMe
   (Value login) <- getProperty (EnumeratedPropertyType accountHolderName) accountHolder
   (Value passcode) <- getProperty (EnumeratedPropertyType accountHolderPassword) accountHolder
   
