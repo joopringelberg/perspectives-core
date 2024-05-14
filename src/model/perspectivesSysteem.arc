@@ -293,8 +293,7 @@ domain model://perspectives.domains#System
 
     context SocialEnvironment filledBy SocialEnvironment
 
-    -- Note that some of these may be NonPerspectivesUsers.
-    user Contacts = SocialEnvironment >> binding >> context >> Persons
+    user Contacts = sys:TheWorld >> PerspectivesUsers
     -- user Contacts = sys:MySocialEnvironment >> Persons
 
     -- PDRDEPENDENCY
