@@ -488,9 +488,6 @@ class (Identifiable v i, Revision v, Newtype i String) <= Cacheable v i | v -> i
   representInternally :: i -> MonadPerspectives (AVar v)
   retrieveInternally :: i -> MonadPerspectives (Maybe (AVar v))
   removeInternally :: i -> MonadPerspectives (Maybe (AVar v))
-  -- decaching is like removing, but not for a public resource.
-  -- If a public resource cannot be found in the database, it is not removed internally.
-  -- decache :: v -> MonadPerspectives Unit
 
 -----------------------------------------------------------
 -- CLASS PERSISTENT

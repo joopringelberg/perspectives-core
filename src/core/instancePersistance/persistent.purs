@@ -226,6 +226,7 @@ saveEntiteit_ :: forall a i. Attachment a => WriteForeign a => Persistent a i =>
 saveEntiteit_ entId entiteit = saveEntiteit__ entId (Just entiteit)
 
 -- | Ensures that the entity is in cache and schedules it for saving to the database.
+-- | This is the only function that adds to `entitiesToBeStored`.
 saveEntiteit__ :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> Maybe a -> MonadPerspectives a
 saveEntiteit__ entId mentiteit = do
   case mentiteit of 
@@ -249,21 +250,23 @@ saveEntiteit__ entId mentiteit = do
       -- The version might be updated in the caching process.
       liftAff $ read a'
 
+-- | This is the only function that removes items from `entitiesToBeStored`.
 saveMarkedResources :: MonadPerspectives Unit
 saveMarkedResources = do 
   (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
-  modify \s -> s {entitiesToBeStored = []}
   for_ toBeSaved \(rs :: ResourceToBeStored) -> try (case rs of 
-    Ctxt c -> void $ saveCachedEntiteit (c :: ContextInstance)
-    Rle r -> void $ saveCachedEntiteit (r :: RoleInstance)
-    Dfile d -> void $ saveCachedEntiteit (d :: DomeinFileId)) >>= case _ of 
+    Ctxt c -> void $ saveCachedEntiteit rs (c :: ContextInstance)
+    Rle r -> void $ saveCachedEntiteit rs (r :: RoleInstance)
+    Dfile d -> void $ saveCachedEntiteit rs (d :: DomeinFileId)) >>= case _ of 
       Left e -> logPerspectivesError (Custom ("Could not save resource " <> show rs <> " because: " <> show e)) 
       _ -> pure unit
 
 -- | Assumes the entity a has been cached. 
-saveCachedEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => i -> MonadPerspectives a
-saveCachedEntiteit entId = do 
+saveCachedEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => ResourceToBeStored -> i -> MonadPerspectives a
+saveCachedEntiteit r entId = do 
   entiteit <- takeEntiteitFromCache entId
+  -- The cache is now blocked, so there is no way to modify the entity. It may be decached; but we have the modified entity in our hands, here.
+  modify \s -> s {entitiesToBeStored = delete r s.entitiesToBeStored}
   {database, documentName} <- resourceIdentifier2WriteDocLocator (unwrap $ identifier entiteit)
   (rev :: Revision_) <- addDocument database entiteit documentName
   entiteit' <- pure (changeRevision rev entiteit)
