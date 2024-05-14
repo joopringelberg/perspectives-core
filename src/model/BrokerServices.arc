@@ -58,8 +58,8 @@ domain model://perspectives.domains#BrokerServices
           do for Guest
             create_ context BrokerService bound to origin
 
-    -- The BrokerServices I use (have a contract with).
-    context Contracts = sys:Me >> binder AccountHolder >> context >> extern
+    -- A contract for the BrokerService I use.
+    context Contracts = sys:SocialMe >> binder AccountHolder >> context >> extern
 
     user Guest = sys:Me
       perspective on ManagedBrokers

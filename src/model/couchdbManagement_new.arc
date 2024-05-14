@@ -64,7 +64,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- in order to create databases and members.
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     -- The username should be the PerspectivesSystem$User ID.
-    user Manager = sys:Me
+    user Manager = sys:SocialMe
       perspective on CouchdbServers
         only (CreateAndFill, Remove, Delete)
         props (Name) verbs (Consult)
@@ -216,7 +216,8 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on BespokeDatabases
         all roleverbs
-        props(OwnerName) verbs (Consult)
+        props (OwnerName) verbs (Consult)
+        props (Endorsed) verbs (SetPropertyValue)
       
       perspective on Admin
         props (FirstName, UserName) verbs (Consult)
@@ -366,6 +367,7 @@ domain model://perspectives.domains#CouchdbManagement
         -- However, the parser refuses (, ) and /.
         -- ^[a-z][a-z0-9_$()+/-]*$ according to https://docs.couchdb.org/en/3.2.0/api/database/common.html and https://localhost:6984//_utils/docs/api/database/common.html#specifying-the-document-id
         pattern = "^[a-z]([a-z]|[0-9]|[\\._$+-])*$" "Only lowercase characters (a-z), digits (0-9), and any of the characters ., _, $, + and - are allowed. Must begin with a letter."
+      property HasDatabases (Boolean)
 
       state CreateRepository = exists Repositories$NameSpace
         on entry
@@ -394,6 +396,7 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:CreateEntitiesDatabase( baseurl, readinstances )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
+              HasDatabases = true
         on exit
           do for Admin
             letA
@@ -405,6 +408,7 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
               -- instances
               callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
+              HasDatabases = false
 
       -- THIS STATE WILL NOT BE REVISITED WHEN ALL MANIFESTS ARE REMOVED,
       -- because the role instance state is re-evaluated BEFORE the instance is actually thrown away.
@@ -439,7 +443,7 @@ domain model://perspectives.domains#CouchdbManagement
       state CreateDb = Endorsed and exists context >> Owner
         on entry
           do for CBAdmin
-            DatabaseName = callExternal util:GenSym() returns String
+            DatabaseName = "cw_" + callExternal util:GenSym() returns String + "/" 
             callEffect cdb:CreateCouchdbDatabase( BaseUrl, DatabaseName )
             DatabaseLocation = BaseUrl + DatabaseName
             callEffect cdb:MakeAdminOfDb( BaseUrl, DatabaseName, context >> Owner >> UserName )
@@ -454,7 +458,7 @@ domain model://perspectives.domains#CouchdbManagement
         do for CBAdmin
           callEffect cdb:DeleteCouchdbDatabase( BaseUrl, DatabaseName )
 
-    user Owner filledBy CouchdbServer$Accounts
+    user Owner filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       perspective on External
         props (Public, Description) verbs (Consult, SetPropertyValue)
         props (DatabaseLocation) verbs (Consult)
@@ -501,6 +505,7 @@ domain model://perspectives.domains#CouchdbManagement
       property ServerUrl (functional) = binder Repositories >> context >> extern >> ServerUrl
       property RepositoryUrl = "https://" + NameSpace + "/"
       property AdminLastName = context >> Admin >> LastName
+      property RepoHasDatabases (functional) = binder Repositories >> HasDatabases
 
     -- We need the ServerAdmin in this context in order to configure the local Admin and to give Authors write access.
     user ServerAdmin (functional) = extern >> binder Repositories >> context >> CouchdbServer$Admin
@@ -528,7 +533,7 @@ domain model://perspectives.domains#CouchdbManagement
       action CreateManifest
         create role Manifests
 
-      state IsFilled = exists binding
+      state IsFilled = (exists binding) and context >> extern >> RepoHasDatabases
         on entry
           do for ServerAdmin
             -- Only the CouchdbServer$Admin has a Create and Fill perspective on
