@@ -24,10 +24,12 @@ module Decacheable where
 
 import Prelude
 
+import Control.Monad.AvarMonadAsk (gets)
+import Data.Array (elemIndex)
 import Data.Maybe (Maybe, isJust)
 import Data.Newtype (unwrap)
 import Persistence.Attachment (class Attachment)
-import Perspectives.CoreTypes (class Persistent, MonadPerspectives, removeInternally)
+import Perspectives.CoreTypes (class Persistent, MonadPerspectives, ResourceToBeStored, removeInternally, resourceIdToBeStored)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Persistence.API (tryGetDocument)
@@ -49,8 +51,18 @@ instance Decacheable PerspectRol RoleInstance where
 
 decache_ :: forall v i. Attachment v => Decacheable v i => i -> MonadPerspectives Unit
 decache_ id = entityIsInDatabase id >>= if _ 
-  then void $ removeInternally id
+  then isWaitingToBeSaved (resourceIdToBeStored id) >>= 
+    if _
+      -- Even though the entity is in the database, we have lined it up to be saved which 
+      -- at least suggests it has been changed in cache wrt the database version.
+      then pure unit
+      else void $ removeInternally id
   else pure unit
+
+isWaitingToBeSaved :: ResourceToBeStored -> MonadPerspectives Boolean
+isWaitingToBeSaved r = do
+  (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
+  pure $ isJust $ elemIndex r toBeSaved
 
 entityIsInDatabase :: forall a i. Attachment a => Persistent a i => i -> MonadPerspectives Boolean
 entityIsInDatabase id = do
