@@ -879,7 +879,9 @@ getPropertyFromTelescope pn r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
       tell $ ArrayWithoutDoubles [Filler r]
       case bnd of
         -- No binding yet; we're done.
-        Nothing -> pure []
+        Nothing -> do 
+          tell $ ArrayWithoutDoubles [Property r pn]
+          pure []
         -- Search further with the original name. The alias was defined just for this role type.
         Just b -> do 
           runArrayT $ getPropertyFromTelescope pn b
