@@ -1,4 +1,4 @@
--- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2023
+-- Copyright Joop Ringelberg and Cor Baars 2019, 2020, 2021, 2023, 2024
 domain model://perspectives.domains#SimpleChat
   use sys for model://perspectives.domains#System
   use cdb for model://perspectives.domains#Couchdb
@@ -17,14 +17,11 @@ domain model://perspectives.domains#SimpleChat
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context ChatApp
-          indexedcontext <- create role IndexedContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
           bind app >> extern to StartContexts in sys:MySystem
           Name = "Simple Chat App" for app >> extern
-          bind_ app >> extern to indexedcontext
-          IndexedContexts$Name = app >> indexedName for indexedcontext
   
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -48,15 +45,13 @@ domain model://perspectives.domains#SimpleChat
     external
       aspect sys:RootContext$External
     context Chats (relational) filledBy Chat
-    context IncomingChats = sys:Me >> binder Partner >> context >> extern
-    user Chatter = sys:Me
+    context IncomingChats = sys:SocialMe >> binding >> binder Partner >> context >> extern
+    user Chatter = sys:SocialMe
       perspective on Chats
         only (CreateAndFill, Remove)
         props (Title) verbs (SetPropertyValue)
       perspective on IncomingChats
         props (Title) verbs (Consult)
-        -- action RemoveThisChat
-        --   remove context origin
       screen "Simple Chat"
         row 
           table "My Chats" Chats
@@ -64,7 +59,6 @@ domain model://perspectives.domains#SimpleChat
           table "Chats started by others" IncomingChats
 
   case Chat
-    aspect sys:Invitation
     aspect cht:WithText
     state NoInitiator = not exists Initiator
       perspective of Creator
@@ -72,24 +66,14 @@ domain model://perspectives.domains#SimpleChat
           only (Create, Fill)
       on entry
         do for Creator
-          bind sys:Me to Initiator
+          bind sys:SocialMe to Initiator
     external
-      aspect sys:Invitation$External
       property Title (String)
-      -- on exit
-      --   notify Me
-      --     "Chat '{Title}' has been removed."
-      ---- THIS action can be used to test upstream state based notification.
-      -- on entry of sys:Invitation$External$InviteUnconnectedUser
-      --   notify Initiator
-      --     "Your invitation is being prepared."
 
     user Initiator (mandatory) filledBy sys:TheWorld$PerspectivesUsers
-      aspect sys:Invitation$Inviter
       aspect cht:WithText$TextWriter
       perspective on Partner
-        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
-        props (MyText) verbs (Consult)
+        props (FirstName, LastName, MyText) verbs (Consult)
         only (Create, Fill)
       perspective on Initiator
         props (MyText) verbs (SetPropertyValue)
@@ -99,7 +83,7 @@ domain model://perspectives.domains#SimpleChat
       screen "Chat"
         row 
           form External
-            props (Title, Message, SerialisedInvitation) verbs (SetPropertyValue)
+            props (Title) verbs (SetPropertyValue)
         row 
           form "This chat's partner" Partner
         row
@@ -107,34 +91,25 @@ domain model://perspectives.domains#SimpleChat
             props (MyText) verbs (SetPropertyValue)
 
     user Partner filledBy sys:TheWorld$PerspectivesUsers
-      aspect sys:Invitation$Invitee
       aspect cht:WithText$TextWriter
       perspective on extern
         props (Title) verbs (Consult)
       perspective on Initiator
-        view sys:PerspectivesSystem$User$VolledigeNaam verbs (Consult)
-        props (MyText) verbs (Consult)
+        props (FirstName, LastName, MyText) verbs (Consult)
       perspective on Partner
         props (MyText) verbs (SetPropertyValue)
         props (FirstName) verbs (Consult)
       screen "Chat"
         row 
           form External
-            props (Title, Message) verbs (Consult)
+            props (Title) verbs (Consult)
         row
           form "This Chat's Initiator" Initiator
         row
           form "Your message" Partner
             props (MyText) verbs (SetPropertyValue)
 
-    user Creator = filter sys:Me with not exists currentcontext >> Initiator
-
-    thing PotentialPartners = filter (callExternal cdb:RoleInstances( "model:System$PerspectivesSystem$User" ) returns sys:PerspectivesSystem$User) with not filledBy sys:Me
-
-    user Me = filter (Initiator union Partner) with filledBy sys:Me
-    user You = filter (Initiator union Partner) with not filledBy sys:Me
-
-    aspect user sys:Invitation$Guest
+    user Creator = sys:SocialMe
 
   case WithText
     user TextWriter filledBy sys:TheWorld$PerspectivesUsers
