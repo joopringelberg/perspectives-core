@@ -41,6 +41,8 @@ domain model://joopringelberg.nl#Disconnect
       perspective on DisconnectedPeers
         all roleverbs
         props (Peer, Disconnected) verbs (Consult)
+      perspective on DisconnectedPeers >> binding >> context >> Disconnecter
+        all roleverbs
 
     context DisconnectedPeers (relational) filledBy DisconnectedPeer
       state GiveMeARole = exists binding
@@ -54,10 +56,12 @@ domain model://joopringelberg.nl#Disconnect
       property Disconnected = context >> Disconnected >> Cancelled
 
     user Disconnecter filledBy sys:TheWorld$PerspectivesUsers
+      perspective on Disconnecter
+        props (FirstName, LastName) verbs (Consult)
       perspective on Disconnected
         only (Create, Fill)
         props (FirstName, LastName) verbs (Consult)
-        props (Cancelled) verbs (SetPropertyValue)
+        props (Cancelled, Reconnect) verbs (SetPropertyValue)
       action Disconnect
         Cancelled = true for Disconnected
       action Reconnect
@@ -78,3 +82,7 @@ domain model://joopringelberg.nl#Disconnect
       perspective on Disconnecter
         props (FirstName, LastName) verbs (Consult)
         props (Cancelled) verbs (SetPropertyValue)
+
+      perspective on Disconnected
+        props (FirstName, LastName, Reconnect) verbs (Consult)
+        
