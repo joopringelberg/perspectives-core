@@ -141,12 +141,12 @@ domain model://perspectives.domains#System
           Cancelled = true
       perspective on Persons
         only (Create, Fill)
-        props (Cancelled) verbs (Consult)
         props (FirstName, LastName) verbs (SetPropertyValue, Consult)
       -- Use this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
       -- that previously was filled by a NonPerspectivesUsers instance.
       perspective on sys:TheWorld >> PerspectivesUsers
         props (FirstName, LastName) verbs (Consult)
+        props (Cancelled) verbs (SetPropertyValue)
   
   -- PDRDEPENDENCY
   case PerspectivesSystem
