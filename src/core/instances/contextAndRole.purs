@@ -40,7 +40,6 @@ import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
 import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
-import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace)
 import Perspectives.InstanceRepresentation (ContextRecord, PerspectContext(..), PerspectRol(..), RolRecord)
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
@@ -62,18 +61,6 @@ context_Namespace (PerspectContext{id}) = unsafePartial $ fromJust $ typeUri2typ
 
 changeContext_id :: ContextInstance -> PerspectContext -> PerspectContext
 changeContext_id id (PerspectContext cr) = PerspectContext $ cr {id = id}
-
-context_rev :: PerspectContext -> Maybe String
-context_rev (PerspectContext{_rev}) = _rev
-
-changeContext_rev :: String -> PerspectContext -> PerspectContext
-changeContext_rev rev (PerspectContext cr) = PerspectContext $ cr {_rev = Just rev}
-
-context_rev' :: PerspectContext -> Revision_
-context_rev' (PerspectContext{_rev}) = _rev
-
-changeContext_rev' :: Revision_ -> PerspectContext -> PerspectContext
-changeContext_rev' rev (PerspectContext cr) = PerspectContext $ cr {_rev = rev}
 
 context_displayName :: PerspectContext -> String
 context_displayName (PerspectContext{displayName})= displayName
@@ -233,18 +220,6 @@ change_context_publicUrl (PerspectContext cr) murl = PerspectContext cr {publicU
 
 rol_id :: PerspectRol -> RoleInstance
 rol_id (PerspectRol{id}) = id
-
-rol_rev :: PerspectRol -> Maybe String
-rol_rev (PerspectRol{_rev}) = _rev
-
-changeRol_rev :: String -> PerspectRol -> PerspectRol
-changeRol_rev rev (PerspectRol cr) = PerspectRol $ cr {_rev = Just rev}
-
-rol_rev' :: PerspectRol -> Revision_
-rol_rev' (PerspectRol{_rev}) = _rev
-
-changeRol_rev' :: Revision_ -> PerspectRol -> PerspectRol
-changeRol_rev' rev (PerspectRol cr) = PerspectRol $ cr {_rev = rev}
 
 rol_occurrence :: PerspectRol -> Int
 rol_occurrence (PerspectRol{occurrence}) = occurrence
