@@ -46,7 +46,7 @@ import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureE
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, TestSuite, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Text.Parsing.Parser (ParseError) 
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
@@ -113,7 +113,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
               -- logShow dr'
               (runP $ phaseThree dr' state.postponedStateQualifiedParts Nil) >>=
                 case _ of
-                  (Left [(ContextHasNoRole _ _)]) -> assert "" true
+                  (Left [(ContextHasNoRole _ _ _ _)]) -> assert "" true
                   otherwise -> do
                     logShow otherwise
                     assert "Expected the 'ContextHasNoRole' error" false
@@ -567,7 +567,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
   expectError "Bind: roletype not in context"
     "domain Test\n  user Gast (mandatory)\n    property Prop1 (mandatory, Number)\n    state SomeState = Prop1 > 10\n      on entry\n        do\n          bind Gast to AnotherRole\n  user EreGast\n"
     case _ of
-      (Left (ContextHasNoRole _ _)) -> assert "ok" true
+      (Left (ContextHasNoRole _ _ _ _)) -> assert "ok" true
       otherwise -> do
         -- logShow otherwise
         assert "Expected the error ContextHasNoRole" false

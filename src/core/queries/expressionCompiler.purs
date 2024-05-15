@@ -327,7 +327,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
                   otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
                 else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
             case uncons rts of
-              Nothing -> throwError $ ContextHasNoRole c ident
+              Nothing -> throwError $ ContextHasNoRole c ident pos (endOf $ Simple s)
               Just {head, tail} -> if null tail
                 then unsafePartial $ makeRoleGetter currentDomain head
                 else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))

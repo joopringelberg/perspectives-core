@@ -69,7 +69,7 @@ data PerspectivesError
     | NotUniquelyIdentifying ArcPosition String (Array String)
     | UnknownElementaryQueryStep
     | IncompatibleQueryArgument ArcPosition Domain Step
-    | ContextHasNoRole (ADT ContextType) String
+    | ContextHasNoRole (ADT ContextType) String ArcPosition ArcPosition
     | RoleHasNoProperty (ADT EnumeratedRoleType) String ArcPosition ArcPosition
     | RoleHasNoEnumeratedProperty (ADT EnumeratedRoleType) String ArcPosition ArcPosition
     | UniversalRoleHasNoParts
@@ -161,7 +161,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NoCalculatedAspect start calculatedRoleName) = "(NoCalculatedAspect) The role '" <> calculatedRoleName <> "' is implied to be an aspect (by providing an explicit context type) but CalculatedRoles cannot be used as an Aspect."
   show (ScreenForUserRoleOnly start end) = "(ScreenForUserRoleOnly) Only a user role may contain a screen definition!"
   show (WidgetCardinalityMismatch start end) = "(WidgetCardinalityMismatch) The cardinality of the Widget and the Role do not suit each other (between " <> show start <> " and " <> show end <> ")."
-  show (ContextHasNoRole ctype qn) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here)."
+  show (ContextHasNoRole ctype qn start end) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here). Between " <> show start <> " and " <> show end
   show (RoleHasNoProperty rtype qn start end) = "(RoleHasNoProperty) The Role-type '" <> show rtype <> "' has no property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> ")."
   show (RoleHasNoEnumeratedProperty rtype qn start end) = "(RoleHasNoEnumeratedProperty) The Role-type '" <> show rtype <> "' has no enumerated property with the name '" <> qn <> "' (between " <> show start <> " and " <> show end <> "). It may have a calculated property, but we cannot use that in this situation."
   show UniversalRoleHasNoParts = "(UniversalRoleHasNoParts) 'NoBinding' gives no access to properties, aspects, binding, etc."

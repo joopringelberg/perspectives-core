@@ -399,7 +399,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           case head mrt of
             Just et@(ENR _) -> pure et
             Just ct'@(CR _) -> pure ct'
-            otherwise -> throwError $ ContextHasNoRole ct roleIdentifier
+            otherwise -> throwError $ ContextHasNoRole ct roleIdentifier start end
 
         -- Either the identifier is qualified, or we qualify it with respect to the model.
         qualifyContextType :: String -> ArcPosition -> ArcPosition -> PhaseThree ContextType

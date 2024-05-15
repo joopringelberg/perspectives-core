@@ -39,7 +39,7 @@ import Text.Parsing.Parser (ParseError)
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
   void $ storeDomeinFileInCache (DomeinFileId ns) df
-  r <- mpa
+  r <- mpa 
   removeDomeinFileFromCache (DomeinFileId ns)
   pure r
 
@@ -94,7 +94,7 @@ theSuite = suite  "Perspectives.Query.ExpressionCompiler" do
   makeTest "compileSimpleStep: ArcIdentifier, missing Role."
     "domain Test\n  thing Role = AnotherRole"
     (\e -> case e of
-      (ContextHasNoRole _ _) -> pure unit
+      (ContextHasNoRole _ _ _ _) -> pure unit
       e' -> assert (show e') false)
     (\(correctedDFR@{calculatedRoles}) -> assert "It should be detected that there is no role AnotherRole" false)
 
