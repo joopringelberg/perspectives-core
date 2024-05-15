@@ -46,7 +46,7 @@ import Perspectives.Utilities (prettyPrint)
 import Prelude (Unit, bind, discard, flip, pure, unit, ($), (<$>), (<>), (==))
 
 type WithModificationSummary = ReaderT ModificationSummary (PhaseTwo' MonadPerspectives)
--- | Modifies the DomeinFile in PhaseTwoState.
+
 storeInvertedQuery ::
   QueryWithAKink ->
   Array RoleType ->
@@ -54,7 +54,19 @@ storeInvertedQuery ::
   Map.Map PropertyType (Array StateIdentifier) ->
   Boolean ->
   WithModificationSummary Unit
-storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty selfOnly = do
+storeInvertedQuery qwk users roleStates statesPerProperty selfOnly = storeInvertedQuery' qwk users roleStates statesPerProperty selfOnly Nothing
+
+
+-- | Modifies the DomeinFile in PhaseTwoState.
+storeInvertedQuery' ::
+  QueryWithAKink ->
+  Array RoleType ->
+  Array StateIdentifier ->
+  Map.Map PropertyType (Array StateIdentifier) ->
+  Boolean ->
+  Maybe QueryFunctionDescription ->
+  WithModificationSummary Unit
+storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty selfOnly mfilter = do
   -- What is confusing about what follows is that it just seems to handle the first step of an inverted query.
   -- What about the steps that follow?
   -- Reflect that we have generated *separate inverted queries* for all these steps, each 'kinking' the original query
@@ -83,17 +95,24 @@ storeInvertedQuery qwk@(ZQ backward forward) users roleStates statesPerProperty 
           selfOnly 
           Nothing
         -- prepend the filter to the source. Store {first source step} << filter criterium.
-        unsafePartial $ setPathForStep 
-          source
-          (ZQ (Just source) $ forwards qwk)
+        storeInvertedQuery' 
+          (ZQ (Just source) $ forwards qwk) 
           users 
           (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) 
-          statesPerProperty 
-          selfOnly 
+          statesPerProperty
+          selfOnly
           (Just filter)
-      _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly Nothing
-    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly Nothing
-    (Just b@(MQD _ _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly Nothing
+        -- unsafePartial $ setPathForStep 
+        --   source
+        --   (ZQ (Just source) $ forwards qwk)
+        --   users 
+        --   (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) 
+        --   statesPerProperty 
+        --   selfOnly 
+        --   (Just filter)
+      _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly mfilter
+    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly mfilter
+    (Just b@(MQD _ _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly mfilter
     otherwise -> lift $ throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
 -- | The function is partial, because we just handle the SQD and MQD cases.
