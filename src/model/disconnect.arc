@@ -43,12 +43,19 @@ domain model://joopringelberg.nl#Disconnect
         props (Peer, Disconnected) verbs (Consult)
       perspective on DisconnectedPeers >> binding >> context >> Disconnecter
         all roleverbs
+      perspective on IncomingDisconnections
+        props (Peer) verbs (Consult)
 
     context DisconnectedPeers (relational) filledBy DisconnectedPeer
       state GiveMeARole = exists binding
         on entry
           do for Manager
             bind currentactor to Disconnecter in binding >> context
+    
+    -- All DisconnectedPeers that do not fill an instance of DisconnectedPeers in this context.
+    context IncomingDisconnections = filter callExternal cdb:RoleInstances( "model://joopringelberg.nl#Disconnect$DisconnectedPeer$External" ) returns dc:DisconnectedPeer$External
+      with not (binder DisconnectedPeers >> context >>= first) == dc:DisconnectApp
+    -- context IncomingDisconnections = sys:SocialMe >> binder Disconnected >> context >> extern
 
   case DisconnectedPeer
     external
