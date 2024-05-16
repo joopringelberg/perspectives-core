@@ -72,6 +72,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.State (StateFulObject(..))
 import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
@@ -159,7 +160,7 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
 
           for 
             (filter (\{head} -> case head of
-                R rid -> true
+                R rid -> not $ isInPublicScheme $ unwrap rid
                 -- If not a role domain, just return false. This will be a similar case to
                 -- computeUsersFromState.computeUsersFromState, case Orole. For example forward queries resulting
                 -- from inverted filtered queries end up in a Boolean, not in the object.
@@ -219,8 +220,12 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createContextStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createContextStateQuery = do
-      (invertedQueryResults :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
-      addInvertedQueryResult $ ContextStateQuery invertedQueryResults
+      (affectedContexts :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
+      -- we're not interested in public resource state change.
+      affectedPrivateContexts <- pure $ filter (not <<< isInPublicScheme <<< unwrap) affectedContexts
+      if null affectedPrivateContexts
+        then pure unit
+        else addInvertedQueryResult $ ContextStateQuery affectedPrivateContexts
       pure []
 
     -- | The InvertedQuery is based on a Role state condition.
@@ -229,7 +234,11 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     createRoleStateQuery = do
       -- Apply the compiled backwards query.
       (affectedRoles :: Array RoleInstance) <- lift (roleInstance ##= (roleInstancesGetter :: RoleInstance ~~> RoleInstance))
-      addInvertedQueryResult $ RoleStateQuery affectedRoles
+      -- we're not interested in public resource state change.
+      affectedPrivateRoles <- pure $ filter (not <<< isInPublicScheme <<< unwrap) affectedRoles
+      if null affectedPrivateRoles
+        then pure unit
+        else addInvertedQueryResult $ RoleStateQuery affectedPrivateRoles
       pure []
 
     -- | The InvertedQuery is based on an explicit or implicit perspective.
@@ -260,7 +269,9 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
         -- The currently inefficient version accumulates users from each state examined.
         -- The efficient version stops as soon as a context type state is valid.
         computeUsersFromContext :: Array ContextWithUsers -> ContextInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
-        computeUsersFromContext accumulatedUsers cid = foldM (computeUsersFromState cid) accumulatedUsers states
+        computeUsersFromContext accumulatedUsers cid = if isInPublicScheme $ unwrap cid
+          then pure []
+          else foldM (computeUsersFromState cid) accumulatedUsers states
 
         -- | As explicit Perspectives may be conditional on each type of state, we have to consider them all.
         computeUsersFromState :: ContextInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
@@ -305,7 +316,9 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
 
       where
         computeUsersFromRole :: Array ContextWithUsers -> RoleInstance -> MonadPerspectivesTransaction (Array ContextWithUsers)
-        computeUsersFromRole accumulatedUsers rid = foldM (computeUsersFromState rid) accumulatedUsers states
+        computeUsersFromRole accumulatedUsers rid = if isInPublicScheme $ unwrap rid
+          then pure []
+          else foldM (computeUsersFromState rid) accumulatedUsers states
 
         -- | We only have to consider Srole and Orole cases.
         computeUsersFromState :: RoleInstance -> Array ContextWithUsers -> StateIdentifier -> MonadPerspectivesTransaction (Array ContextWithUsers)
