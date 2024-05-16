@@ -41,6 +41,8 @@ domain model://perspectives.domains#BrokerServices
   ---- BROKER SERVICES
   -------------------------------------------------------------------------------
 
+  context Broker (relational) filledBy BrokerService
+
   -- The entry point (the `application`), available as bs:MyBrokers.
   case BrokerServices
     -- PDRDEPENDENCY
@@ -55,19 +57,39 @@ domain model://perspectives.domains#BrokerServices
         pattern = "^https://.*" "A url with the https scheme"
       state HasStorageLocation = exists StorageLocation
         on entry
-          do for Guest
+          do for Manager
             create_ context BrokerService bound to origin
-
+    
+    context PublicBrokers (relational) filledBy BrokerService
+      state NoContract = not exists context >> filter PublicBrokers >> binding >> context >> Accounts >> binding >> context >> AccountHolder with filledBy sys:SocialMe -- gaat fout; origin kan wel.
+    
     -- A contract for the BrokerService I use.
     context Contracts = sys:SocialMe >> binder AccountHolder >> context >> extern
 
-    user Guest = sys:Me
+    user Manager = sys:Me
       perspective on ManagedBrokers
         only (Create, Fill, CreateAndFill, Remove)
         props (Name) verbs (Consult)
         props (StorageLocation) verbs (Consult, SetPropertyValue)
       perspective on Contracts
         view BrokerContract$External$ForAccountHolder verbs (Consult)
+      perspective on PublicBrokers
+        props (Name) verbs (Consult)
+        in object state NoContract
+          perspective on PublicBrokers >> binding >> context >> Accounts
+            only (CreateAndFill)
+          perspective on PublicBrokers >> binding >> context >> Accounts >> binding >> context >> AccountHolder
+            only (Create, Fill)
+          perspective on PublicBrokers >> binding >> context >> Accounts >> binding >> context >> Administrator
+            only (Create, Fill)
+          action SignUp
+            create context BrokerContract bound to Accounts in origin >> binding >> context
+            -- letA
+            -- account <- create context BrokerContract bound to Accounts in origin >> binding
+            -- in
+            --   bind sys:SocialMe to AccountHolder in account
+            --   bind Administrator to Administrator in account
+
       
       screen "Managing Broker Services and contracts"
         tab "My Contracts"
@@ -77,6 +99,8 @@ domain model://perspectives.domains#BrokerServices
           row 
             table ManagedBrokers
               only (Create, Remove)
+          row 
+            table PublicBrokers
 
 
   -- A Managed service.
@@ -86,6 +110,7 @@ domain model://perspectives.domains#BrokerServices
       on entry
         do for BrokerService$Guest
           bind sys:SocialMe to Administrator
+          PublicUrl = extern >> binder ManagedBrokers >> StorageLocation for extern
     external
       property Name (mandatory, String)
       -- PDRDEPENDENCY
@@ -99,7 +124,7 @@ domain model://perspectives.domains#BrokerServices
       -- For mycontexts this is "https://mycontexts.com/rbsr/".
       property SelfRegisterEndpoint (mandatory, String)
         pattern = "^https://[^\\/]+\\/rbsr\\/$" "A url with the https scheme, ending on '/rbsr/'"
-      property PublicUrl = binder ManagedBrokers >> StorageLocation
+      property PublicUrl (String)
       property ContractPeriod (Day)
       property GracePeriod (Day)
       property TerminationPeriod (Day)
@@ -118,15 +143,17 @@ domain model://perspectives.domains#BrokerServices
         props (FirstName, LastName) verbs (Consult)
         props (AdminUserName, AdminPassword) verbs (SetPropertyValue)
       perspective on extern
-        props (Name, Url, ManagementEndpoint, Exchange) verbs (Consult, SetPropertyValue)
+        props (Name, Url, ManagementEndpoint, Exchange, PublicUrl) verbs (Consult, SetPropertyValue)
 
     user Guest = sys:Me
       perspective on Administrator
         only (Fill, Create)
+      perspective on extern
+        props (PublicUrl) verbs (SetPropertyValue)
 
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Name, SelfRegisterEndpoint) verbs (Consult)
+        props (Name, SelfRegisterEndpoint, PublicUrl) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
       perspective on Accounts
@@ -135,13 +162,16 @@ domain model://perspectives.domains#BrokerServices
         only (Create, Fill)
       perspective on Accounts >> binding >> context >> Administrator
         only (Create, Fill)
-      state NoAccount = not exists sys:Me >> binder AccountHolder
-        action SignUp
-          letA
-            account <- create context BrokerContract bound to Accounts
-          in
-            bind sys:SocialMe to AccountHolder in account >> binding >> context
-            bind Administrator to Administrator in account >> binding >> context
+      perspective on bs:MyBrokers >> PublicBrokers
+        only (CreateAndFill)
+      screen "Broker service"
+        row
+          form "This service" External
+            props (Name) verbs (Consult)
+        row 
+          form "Service administrator" Administrator
+      action AddThisServer
+        bind extern to PublicBrokers in bs:MyBrokers
 
     -- PDRDEPENDENCY
     context Accounts (relational, unlinked) filledBy BrokerContract
