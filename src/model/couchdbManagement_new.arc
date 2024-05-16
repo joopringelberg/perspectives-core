@@ -447,10 +447,10 @@ domain model://perspectives.domains#CouchdbManagement
             callEffect cdb:CreateCouchdbDatabase( BaseUrl, DatabaseName )
             DatabaseLocation = BaseUrl + DatabaseName
             callEffect cdb:MakeAdminOfDb( BaseUrl, DatabaseName, context >> Owner >> UserName )
-      state IsPublic = Public
-        on entry
-          do for CBAdmin
-            callEffect cdb:MakeDatabasePublic( BaseUrl, DatabaseName )
+        state Publish = Public
+          on entry
+            do for CBAdmin
+              callEffect cdb:MakeDatabasePublic( BaseUrl, DatabaseName )
         -- on exit
         --   do for CBAdmin
         --     callEffect cdb:MakeDatabasePrivate( BaseUrl, DatabaseName )
