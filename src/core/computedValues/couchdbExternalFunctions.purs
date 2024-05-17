@@ -77,7 +77,7 @@ import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
 import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
-import Perspectives.ModelDependencies (perspectivesUsersPublicKey, theWorldInitializer)
+import Perspectives.ModelDependencies (identifiableLastName, perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -435,7 +435,7 @@ initSystem = do
                     void $ createAndAddRoleInstance_ (EnumeratedRoleType DEP.perspectivesUsers) worldId
                       (RolSerialization 
                         { id: Just "def:#serializationuser"
-                        , properties: PropertySerialization empty
+                        , properties: PropertySerialization (singleton identifiableLastName ["Serialisation persona"])
                         , binding: Nothing
                         })
                         false
