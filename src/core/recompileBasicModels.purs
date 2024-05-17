@@ -84,7 +84,7 @@ recompileModelsAtUrl modelsDb manifestsDb = do
     recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _id, _rev, arc}) =
       do
         log ("Recompiling " <> namespace)
-        r <- lift $ loadAndCompileArcFile_ arc
+        r <- lift $ loadAndCompileArcFile_ (DomeinFileId namespace) arc
         case r of
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right (Tuple df@(DomeinFile dfr@{id}) invertedQueries) -> lift $ lift do
@@ -114,7 +114,7 @@ recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors 
 recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
   do
     log ("Recompiling " <> namespace)
-    r <- lift $ loadAndCompileArcFile_ arc
+    r <- lift $ loadAndCompileArcFile_ (DomeinFileId namespace) arc
     case r of
       Left m -> logPerspectivesError $ Custom ("recompileModel: " <> show m)
       Right (Tuple df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) invertedQueries) -> lift $ lift do

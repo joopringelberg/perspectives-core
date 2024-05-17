@@ -37,7 +37,7 @@ import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
 import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, EnumeratedRoleType, PropertyType, RoleKind, RoleType, StateIdentifier, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, DomeinFileId, EnumeratedRoleType, PropertyType, RoleKind, RoleType, StateIdentifier, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Show, show, (<<<), (<>))
@@ -129,6 +129,8 @@ data PerspectivesError
     | MissingObject ArcPosition ArcPosition
     | NoCalculatedAspect ArcPosition String
 
+    | DomeinFileIdIncompatible DomeinFileId DomeinFileId ArcPosition
+
     -- Screens
     | ScreenForUserRoleOnly ArcPosition ArcPosition
     | WidgetCardinalityMismatch ArcPosition ArcPosition
@@ -159,6 +161,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (UnknownElementaryQueryStep) = "(UnknownElementaryQueryStep) This step is unknown"
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (NoCalculatedAspect start calculatedRoleName) = "(NoCalculatedAspect) The role '" <> calculatedRoleName <> "' is implied to be an aspect (by providing an explicit context type) but CalculatedRoles cannot be used as an Aspect."
+  show (DomeinFileIdIncompatible manifestDfid sourceDfid start) = "(DomeinFileIdIncompatible) The manifest is for " <> show manifestDfid <> " while the arc source mentions " <> show sourceDfid <> "."
   show (ScreenForUserRoleOnly start end) = "(ScreenForUserRoleOnly) Only a user role may contain a screen definition!"
   show (WidgetCardinalityMismatch start end) = "(WidgetCardinalityMismatch) The cardinality of the Widget and the Role do not suit each other (between " <> show start <> " and " <> show end <> ")."
   show (ContextHasNoRole ctype qn start end) = "(ContextHasNoRole) The Context-type '" <> show ctype <> "' has no enumerated role with the name '" <> qn <> "' (it may have a calculated role but that cannot be used here). Between " <> show start <> " and " <> show end

@@ -49,7 +49,7 @@ import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (ModelUri, isModelUri, modelUri2ModelUrl)
+import Perspectives.Identifiers (DomeinFileName, ModelUri, isModelUri, modelUri2ModelUrl, unversionedModelUri)
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
@@ -58,7 +58,7 @@ import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment,
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
 import Simple.JSON (writeJSON)
@@ -66,14 +66,16 @@ import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
 -- | However, will load, cache and store dependencies of the model.
-parseAndCompileArc :: Array ArcSource -> (ContextInstance ~~> Value)
-parseAndCompileArc arcSource_ _ = try
-  (case head arcSource_ of
-    Nothing -> pure $ Value "No arc source given!"
-    Just arcSource -> catchError
+-- | The DomeinFileName should be unversioned.
+parseAndCompileArc :: Array DomeinFileName -> Array ArcSource -> (ContextInstance ~~> Value)
+parseAndCompileArc domeinFileName_ arcSource_ _ = try
+  (case head domeinFileName_, head arcSource_ of
+    Nothing, _ -> pure $ Value "No model name given!"
+    _, Nothing -> pure $ Value "No arc source given!"
+    Just domeinFileName, Just arcSource -> catchError
       do
         lift $ lift $ resetWarnings
-        r <- lift $ lift $ runEmbeddedTransaction true (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ arcSource)
+        r <- lift $ lift $ runEmbeddedTransaction true (ENR $ EnumeratedRoleType sysUser) (loadAndCompileArcFile_ (DomeinFileId domeinFileName) arcSource)
         case r of
           Left errs -> ArrayT $ pure (Value <<< show <$> errs) 
           -- Als er meldingen zijn, geef die dan terug.
@@ -89,14 +91,15 @@ type Url = String
 
 -- | Parse and compile the Arc file. Upload to the repository. Does neither cache, nor stores it in the local collection of DomeinFiles.
 -- | If the file is not valid, nothing happens.
+-- | The DomeinFileName should be versioned.
 uploadToRepository ::
-  Array String -> 
+  Array DomeinFileName -> 
   Array ArcSource ->
   Array RoleInstance -> MonadPerspectivesTransaction Unit
 uploadToRepository domeinFileName_ arcSource_ _ = try
   (case head domeinFileName_, head arcSource_ of
     Just domeinFileName, Just arcSource -> do
-      r <- loadAndCompileArcFile_ arcSource
+      r <- loadAndCompileArcFile_ (DomeinFileId $ unversionedModelUri domeinFileName) arcSource
       case r of
         Left m -> logPerspectivesError $ Custom ("uploadToRepository: " <> show m)
         -- Here we will have a tuple of the DomeinFile and an instance of StoredQueries.
@@ -178,7 +181,7 @@ compileRepositoryModels modelsurl_ manifestsurl_ _ = try
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 1, isFunctional: True}
+  [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2, isFunctional: True}
   , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1, isFunctional: True}
   , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 2, isFunctional: True}

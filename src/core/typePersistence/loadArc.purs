@@ -37,14 +37,15 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, defaultDomeinFileRecord)
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc (domain)
-import Perspectives.Parsing.Arc.AST (ContextE)
+import Perspectives.Parsing.Arc.AST (ContextE(..))
 import Perspectives.Parsing.Arc.IndentParser (position2ArcPosition, runIndentParser)
 import Perspectives.Parsing.Arc.PhaseThree (phaseThree)
 import Perspectives.Parsing.Arc.PhaseTwo (traverseDomain)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
-import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
+import Perspectives.Parsing.Messages (MultiplePerspectivesErrors, PerspectivesError(..))
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (takeGuid)
-import Prelude (bind, discard, pure, show, ($), (<<<))
+import Prelude (bind, discard, pure, show, ($), (<<<), (==))
 import Text.Parsing.Parser (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
@@ -61,37 +62,39 @@ type Source = String
 
 -- | Parses and compiles the ARC file to a DomeinFile. Does neither cache nor store the DomeinFile.
 -- | However, will load, cache and store dependencies of the model.
-loadAndCompileArcFile_ :: Source -> MonadPerspectivesTransaction (Either (Array PerspectivesError) (Tuple DomeinFile StoredQueries))
-loadAndCompileArcFile_ text = catchError
+loadAndCompileArcFile_ :: DomeinFileId -> Source -> MonadPerspectivesTransaction (Either (Array PerspectivesError) (Tuple DomeinFile StoredQueries))
+loadAndCompileArcFile_ dfid@(DomeinFileId dfName) text = catchError
   do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} lift $ lift $ runIndentParser text domain
     case r of
       (Left e) -> pure $ Left [parseError2PerspectivesError e]
-      (Right ctxt) -> do
-        (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- lift $ lift $ runPhaseTwo_' (traverseDomain ctxt) defaultDomeinFileRecord empty empty Nil
-        case result of
-          (Left e) -> pure $ Left e
-          (Right (DomeinFile dr'@{id})) -> do
-            dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
-            -- We should load referred models if they are missing (but not the model we're compiling!).
-            for_ (delete id state.referredModels) (lift <<< retrieveDomeinFile)
-            (x' :: (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
-            case x' of
-              (Left e) -> pure $ Left e
-              (Right (Tuple correctedDFR@{referredModels:refModels} invertedQueries)) -> do
-                -- Run the type checker
-                typeCheckErrors <- lift $ checkDomeinFile (DomeinFile correctedDFR)
-                if null typeCheckErrors
-                  then do
-                    -- Remove the self-referral and add the source.
-                    df <- pure $ DomeinFile correctedDFR
-                      { referredModels = delete id refModels
-                      , arc = text
-                      , _id = takeGuid $ unwrap id
-                      }
-                    -- void $ lift $ storeDomeinFileInCache id df
-                    pure $ Right $ Tuple df invertedQueries
-                  else pure $ Left typeCheckErrors
+      (Right ctxt@(ContextE{id:sourceDfid, pos})) -> if sourceDfid == dfName
+        then do
+          (Tuple result state :: Tuple (Either MultiplePerspectivesErrors DomeinFile) PhaseTwoState) <- lift $ lift $ runPhaseTwo_' (traverseDomain ctxt) defaultDomeinFileRecord empty empty Nil
+          case result of
+            (Left e) -> pure $ Left e
+            (Right (DomeinFile dr'@{id})) -> do
+              dr''@{referredModels} <- pure dr' {referredModels = state.referredModels}
+              -- We should load referred models if they are missing (but not the model we're compiling!).
+              for_ (delete id state.referredModels) (lift <<< retrieveDomeinFile)
+              (x' :: (Either MultiplePerspectivesErrors (Tuple DomeinFileRecord StoredQueries))) <- lift $ phaseThree dr'' state.postponedStateQualifiedParts state.screens
+              case x' of
+                (Left e) -> pure $ Left e
+                (Right (Tuple correctedDFR@{referredModels:refModels} invertedQueries)) -> do
+                  -- Run the type checker
+                  typeCheckErrors <- lift $ checkDomeinFile (DomeinFile correctedDFR)
+                  if null typeCheckErrors
+                    then do
+                      -- Remove the self-referral and add the source.
+                      df <- pure $ DomeinFile correctedDFR
+                        { referredModels = delete id refModels
+                        , arc = text
+                        , _id = takeGuid $ unwrap id
+                        }
+                      -- void $ lift $ storeDomeinFileInCache id df
+                      pure $ Right $ Tuple df invertedQueries
+                    else pure $ Left typeCheckErrors
+        else pure $ Left [(DomeinFileIdIncompatible dfid (DomeinFileId sourceDfid) pos)]
   \e -> pure $ Left [Custom (show e)]
 
 type Persister = String -> DomeinFile -> MonadPerspectives (Array PerspectivesError)
