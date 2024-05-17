@@ -54,7 +54,7 @@ import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier)
+import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, takeGuid)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -105,7 +105,7 @@ sendTransactieToUserUsingAMQP perspectivesUser t = do
   connected <- connectedToAMQPBroker
   n <- liftEffect $ now
   dt <- pure $ SerializableDateTime (toDateTime n)
-  messageId <- pure $ show perspectivesUser <> show dt
+  messageId <- pure $ takeGuid $ unwrap perspectivesUser <> show dt
   if connected
     then do
       mstompClient <- stompClient
