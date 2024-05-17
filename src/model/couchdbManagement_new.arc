@@ -886,7 +886,7 @@ domain model://perspectives.domains#CouchdbManagement
       state ProcessArc = (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT) or not exists LastChangeDT)
         on entry
           do for Author
-            ArcFeedback = callExternal p:ParseAndCompileArc( ArcSource ) returns String
+            ArcFeedback = callExternal p:ParseAndCompileArc( ModelURI, ArcSource ) returns String
             LastChangeDT = callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime
             MustUpload = true
 
