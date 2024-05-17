@@ -472,7 +472,7 @@ isPublicIdentifierMe :: RoleInstance -> MP Boolean
 isPublicIdentifierMe rid = do
   t <- roleType_ rid
   storageSchemes <- gets _.typeToStorage
-  isMe (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType t)) rid)
+  isMe (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType t) <<< takeGuid) rid)
 
 notIsMe :: RoleInstance -> MP Boolean
 notIsMe = isMe >=> pure <<< not
