@@ -69,6 +69,7 @@ domain model://perspectives.domains#System
     property AuthorizedDomain (String)
 
   user Identifiable
+      -- PDRDEPENDENCY
       property LastName (mandatory, String)
       property FirstName (mandatory, String)
       -- If cancelled, the user's peers will stop synchronizing with him/her.

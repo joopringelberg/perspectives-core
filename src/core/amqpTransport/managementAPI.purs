@@ -248,7 +248,7 @@ type SelfRegisterInformation = { userName :: String, password :: String, queueNa
 selfRegisterWithRabbitMQ_ :: BrokerServiceUrl -> UserName -> Password -> QueueName -> MonadPerspectives Unit
 selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName = do
   res <- liftAff $ request 
-    { method: Left GET
+    { method: Left POST
     , url: brokerServiceUrl
     , headers: []
     , content: Just $ RequestBody.string $ writeJSON ({ userName, password, queueName } :: SelfRegisterInformation)

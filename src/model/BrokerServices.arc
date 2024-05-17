@@ -77,18 +77,22 @@ domain model://perspectives.domains#BrokerServices
         props (Name) verbs (Consult)
         in object state NoContract
           perspective on PublicBrokers >> binding >> context >> Accounts
-            only (CreateAndFill)
+            only (CreateAndFill, Remove)
           perspective on PublicBrokers >> binding >> context >> Accounts >> binding >> context >> AccountHolder
             only (Create, Fill)
           perspective on PublicBrokers >> binding >> context >> Accounts >> binding >> context >> Administrator
             only (Create, Fill)
           action SignUp
-            create context BrokerContract bound to Accounts in origin >> binding >> context
-            -- letA
-            -- account <- create context BrokerContract bound to Accounts in origin >> binding
-            -- in
-            --   bind sys:SocialMe to AccountHolder in account
-            --   bind Administrator to Administrator in account
+            letA
+              accountsinstance <- create context BrokerContract bound to Accounts in origin >> binding >> context
+            in
+              bind sys:SocialMe to AccountHolder in accountsinstance >> binding >> context
+              bind accountsinstance >> context >> Administrator to Administrator in accountsinstance >> binding >> context
+          action EndContract
+            letA
+              mycontract <- filter binding >> context >> Accounts with binding >> context >> AccountHolder filledBy sys:SocialMe
+            in
+              remove context mycontract
 
       
       screen "Managing Broker Services and contracts"
@@ -143,7 +147,7 @@ domain model://perspectives.domains#BrokerServices
         props (FirstName, LastName) verbs (Consult)
         props (AdminUserName, AdminPassword) verbs (SetPropertyValue)
       perspective on extern
-        props (Name, Url, ManagementEndpoint, Exchange, PublicUrl) verbs (Consult, SetPropertyValue)
+        props (Name, Url, ManagementEndpoint, SelfRegisterEndpoint, Exchange, PublicUrl) verbs (Consult, SetPropertyValue)
 
     user Guest = sys:Me
       perspective on Administrator
@@ -153,7 +157,7 @@ domain model://perspectives.domains#BrokerServices
 
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Name, SelfRegisterEndpoint, PublicUrl) verbs (Consult)
+        props (Name, SelfRegisterEndpoint, PublicUrl, Url, Exchange) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
       perspective on Accounts
@@ -190,7 +194,7 @@ domain model://perspectives.domains#BrokerServices
         do for BrokerContract$Administrator
           -- This is the role that the Invitee/AccountHolder will fill with himself if she accepts the BrokerContract.
           create role AccountHolder
-    state CanRegister = (exists AccountHolder) and exists Administrator
+    state CanRegister = ((exists AccountHolder) and exists Administrator) and exists extern >> SelfRegisterEndpoint
       on entry
         do for AccountHolder
           letA 
@@ -221,15 +225,18 @@ domain model://perspectives.domains#BrokerServices
           notify AccountHolder
             "Your lease of the BrokerService has ended. Within {Service >> GracePeriod} days, you will no longer be able to receive information from peers."
 
+    -- TODO: On exiting a BrokerContract, we want to undo the subscription with RabbitMQ.
+    -- on exit
+
     external
       aspect sys:Invitation$External
       -- PDRDEPENDENCY
-      property Url = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Url
-      property ManagementEndpoint = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> ManagementEndpoint
-      property SelfRegisterEndpoint = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> SelfRegisterEndpoint
+      property Url = binder Accounts >> context >> extern >> Url
+      property ManagementEndpoint = binder Accounts >> context >> extern >> ManagementEndpoint
+      property SelfRegisterEndpoint = binder Accounts >> context >> extern >> SelfRegisterEndpoint
       -- PDRDEPENDENCY
-      property Exchange = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Exchange
-      property Name = binder model://perspectives.domains#BrokerServices$BrokerService$Accounts >> context >> extern >> Name
+      property Exchange = binder Accounts >> context >> extern >> Exchange
+      property Name = binder Accounts >> context >> extern >> Name
       property FirstNameOfAccountHolder = context >> AccountHolder >> FirstName
       property LastNameOfAccountHolder = context >> AccountHolder >> LastName
       -- We use this on system startup.

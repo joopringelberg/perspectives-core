@@ -105,7 +105,7 @@ selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
       case r of 
         Left e -> (logPerspectivesError $ Custom $ show e) *> pure false
         Right _ -> pure true
-    _, _, _, _ -> throwError $ error "Missing some arguments in prepareAMQPaccount.")
+    _, _, _, _ -> throwError $ error "Missing some arguments in selfRegisterWithRabbitMQ.")
   >>= handleExternalFunctionError "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ"
 
 
