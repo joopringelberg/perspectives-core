@@ -22,6 +22,7 @@
 
 module Perspectives.Instances.ObjectGetters where 
 
+import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (lift, tell)
 import Control.Plus (empty)
@@ -32,7 +33,7 @@ import Data.Iterable (toArray)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (class Newtype, ala, unwrap)
+import Data.Newtype (class Newtype, ala, over, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -66,8 +67,8 @@ import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
-import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
+import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType, StateIdentifier)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
 import Prelude (class Show, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
@@ -457,14 +458,21 @@ isMe :: RoleInstance -> MP Boolean
 isMe ri = (try $ getPerspectRol ri) >>=
   handlePerspectRolError' "isMe" false
     \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if isInPublicScheme (unwrap ri)
-      then case bnd of 
-        Nothing -> pure false
-        Just b -> isMe b
+      then isPublicIdentifierMe ri
       else if me
         then pure true
         else case bnd of
           Nothing -> pure false
           Just b -> isMe b
+
+-- | From a RoleInstance with an identifier in the public scheme, 
+-- | lookup its type and use that to create a new schemed identifier.
+-- | Then apply isMe.
+isPublicIdentifierMe :: RoleInstance -> MP Boolean
+isPublicIdentifierMe rid = do
+  t <- roleType_ rid
+  storageSchemes <- gets _.typeToStorage
+  isMe (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType t)) rid)
 
 notIsMe :: RoleInstance -> MP Boolean
 notIsMe = isMe >=> pure <<< not
