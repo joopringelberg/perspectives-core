@@ -38,9 +38,9 @@ import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExterna
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>), (>>=), (*>))
+import Prelude (Unit, bind, discard, pure, show, unit, ($), (<>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 type AccountName = String
@@ -93,7 +93,7 @@ selfRegisterWithRabbitMQ ::
   Array AccountPassword ->
   Array QueueName -> 
   RoleInstance ->
-  MonadPerspectivesQuery Boolean
+  MonadPerspectivesQuery Value
 selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
   (case 
       head url_, 
@@ -103,8 +103,10 @@ selfRegisterWithRabbitMQ url_ accountName_ accountPassword_ queueName_ _ = try
     Just brokerServiceUrl, Just userName, Just password, Just queueName -> do
       r <- try $ lift $ lift $ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName
       case r of 
-        Left e -> (logPerspectivesError $ Custom $ show e) *> pure false
-        Right _ -> pure true
+        Left e -> do 
+          (logPerspectivesError $ Custom $ show e)
+          pure $ Value "false"
+        Right _ -> pure $ Value "true"
     _, _, _, _ -> throwError $ error "Missing some arguments in selfRegisterWithRabbitMQ.")
   >>= handleExternalFunctionError "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ"
 
