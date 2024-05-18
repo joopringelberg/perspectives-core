@@ -88,7 +88,7 @@ function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emi
         // Compliant brokers will terminate the connection after any error
         console.log('Broker reported error: ' + frame.headers['message']);
         console.log('Additional details: ' + frame.body);
-        emit( emitStep( {body: "noConnection"} ) )();
+        // emit( emitStep( {body: "noConnection"} ) )();
       };
     stompClient.onDisconnect = function ()
       {
