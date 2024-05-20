@@ -52,6 +52,7 @@ module Perspectives.Persistent
   , saveMarkedResources
   , tryGetPerspectContext
   , tryGetPerspectEntiteit
+  , tryGetPerspectRol
   , tryRemoveEntiteit
   , updateRevision
   )
@@ -73,7 +74,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Aff.AVar (AVar, put, read, take)
 import Effect.Aff.Class (liftAff)
-import Effect.Exception (Error, error)
+import Effect.Exception (error)
 import Persistence.Attachment (class Attachment)
 import Perspectives.CoreTypes (class Persistent, IntegrityFix(..), MP, MonadPerspectives, ResourceToBeStored(..), addPublicResource, dbLocalName, removeInternally, representInternally, resourceToBeStored, retrieveInternally, typeOfInstance)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..))
@@ -127,8 +128,11 @@ invertedQueryDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_invertedque
 getPerspectContext :: ContextInstance -> MP PerspectContext
 getPerspectContext = getPerspectEntiteit fix
 
-tryGetPerspectContext :: ContextInstance -> MonadPerspectives (Either Error  PerspectContext)
-tryGetPerspectContext id = try $ getPerspectEntiteit doNotFix id
+tryGetPerspectContext :: ContextInstance -> MonadPerspectives (Maybe PerspectContext)
+tryGetPerspectContext id = tryGetPerspectEntiteit id
+
+tryGetPerspectRol :: RoleInstance -> MonadPerspectives (Maybe  PerspectRol)
+tryGetPerspectRol id = tryGetPerspectEntiteit id
 
 getPerspectRol :: RoleInstance -> MP PerspectRol
 getPerspectRol = getPerspectEntiteit fix

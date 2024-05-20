@@ -45,7 +45,7 @@ import Effect.Class (liftEffect)
 import Foreign.Object (Object, keys, lookup, values)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>), (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -58,7 +58,7 @@ import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, tryGetPerspectRol)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.PersistentType (getContext, getEnumeratedRole)
@@ -455,15 +455,15 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
 -- We must do this because the public version will never have a useful version of 'isMe'. Neither will it 
 -- bottom out in a role that has a value for 'isMe': it will be public roles all to the bottom.
 isMe :: RoleInstance -> MP Boolean
-isMe ri = (try $ getPerspectRol ri) >>=
-  handlePerspectRolError' "isMe" false
-    \(IP.PerspectRol{isMe: me, binding: bnd, pspType}) -> if isInPublicScheme (unwrap ri)
-      then isPublicIdentifierMe ri
-      else if me
-        then pure true
-        else case bnd of
-          Nothing -> pure false
-          Just b -> isMe b
+isMe ri = if isInPublicScheme (unwrap ri)
+  then isPublicIdentifierMe ri
+  else tryGetPerspectRol ri >>= case _ of
+    Nothing -> pure false
+    Just rol -> if rol_isMe rol
+      then pure true
+      else case rol_binding rol of
+        Nothing -> pure false
+        Just b -> isMe b
 
 -- | From a RoleInstance with an identifier in the public scheme, 
 -- | lookup its type and use that to create a new schemed identifier.
