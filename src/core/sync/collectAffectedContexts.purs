@@ -72,15 +72,14 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleIns
 import Perspectives.Representation.State (StateFulObject(..))
 import Perspectives.Representation.State (StateFulObject(..), State(..)) as State
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, isPublicRole, roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (enumeratedRoleContextType, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM, prettyPrint)
-import Prelude (Unit, bind, const, discard, flip, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (>=>), (&&))
+import Prelude (Unit, bind, const, discard, flip, join, map, not, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>>=), (>=>))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. #12 Check the way state-conditional verbs are combined to establish whether a peer should receive a delta.
@@ -160,7 +159,7 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
 
           for 
             (filter (\{head} -> case head of
-                R rid -> not $ isInPublicScheme $ unwrap rid
+                R rid -> true
                 -- If not a role domain, just return false. This will be a similar case to
                 -- computeUsersFromState.computeUsersFromState, case Orole. For example forward queries resulting
                 -- from inverted filtered queries end up in a Boolean, not in the object.
@@ -220,12 +219,10 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     -- | This function adds, as a side effect, an InvertedQueryResult to the current transaction.
     createContextStateQuery :: MonadPerspectivesTransaction (Array ContextWithUsers)
     createContextStateQuery = do
-      (affectedContexts :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
-      -- we're not interested in public resource state change.
-      affectedPrivateContexts <- pure $ filter (not <<< isInPublicScheme <<< unwrap) affectedContexts
-      if null affectedPrivateContexts
+      (invertedQueryResults :: Array ContextInstance) <- lift (roleInstance ##= (contextInstancesGetter :: RoleInstance ~~> ContextInstance))
+      if null invertedQueryResults
         then pure unit
-        else addInvertedQueryResult $ ContextStateQuery affectedPrivateContexts
+        else addInvertedQueryResult $ ContextStateQuery invertedQueryResults
       pure []
 
     -- | The InvertedQuery is based on a Role state condition.
@@ -234,11 +231,7 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
     createRoleStateQuery = do
       -- Apply the compiled backwards query.
       (affectedRoles :: Array RoleInstance) <- lift (roleInstance ##= (roleInstancesGetter :: RoleInstance ~~> RoleInstance))
-      -- we're not interested in public resource state change.
-      affectedPrivateRoles <- pure $ filter (not <<< isInPublicScheme <<< unwrap) affectedRoles
-      if null affectedPrivateRoles
-        then pure unit
-        else addInvertedQueryResult $ RoleStateQuery affectedPrivateRoles
+      addInvertedQueryResult $ RoleStateQuery affectedRoles
       pure []
 
     -- | The InvertedQuery is based on an explicit or implicit perspective.
@@ -277,16 +270,16 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
           case _ of
             -- No state means: an undefined root state.
             -- But in that situation, there are no conditions at all, so we just compute the users from the context.
-            Nothing -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe)) userTypes)
+            Nothing -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 -- If the state's StateFulObject is a context type (Cnt), and the context is in that state, obtain all user role instances from the context (and we're done)
                 -- Note that the context is (one of the) result(s) of the backwards query.
                 State.Cnt _ -> (lift $ contextIsInState stateId cid) >>= if _
-                  then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe)) userTypes)
+                  then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                   else pure accumulatedUsers
                 -- If the state's StateFulObject is a subject type (Srole), then obtain the user role instances from the context and pass on all that are in that state.
-                State.Srole rtype -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe)) userTypes)
+                State.Srole rtype -> lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA (roleIsInState stateId) >>= filterA notIsMe) userTypes)
                 -- Construct an Array of object roles. If there is no forwards computation, it is just the roleInstance.
                 -- If the forwards computation results in the object of the original, not inverted, query, run it on the roleInstance. NOTE: instead we use a weaker test: if it results in a role instance.
                 -- Only if any of the object roles is in the required state, obtain the user role instances from the context and return them.
@@ -295,13 +288,8 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
                     Just f, Just true -> lift (roleInstance ##= unsafeCoerce f)
                     _, _ -> pure [roleInstance]
                   lift (findM (roleIsInState stateId) objects) >>= \mObject -> if isJust mObject
-                    then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe)) userTypes)
+                    then lift $ flip cons accumulatedUsers <<< Tuple cid <$> (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                     else pure accumulatedUsers
-          where 
-            notForPublicUserRoles :: (RoleType -> MonadPerspectives (Array RoleInstance)) -> RoleType -> MonadPerspectives (Array RoleInstance)
-            notForPublicUserRoles f rt = isPublicRole rt >>= if _ 
-              then pure []
-              else f rt
 
     -- | The inverted query (its backward part) always leads to a role instance.
     -- | These InvertedQueries have been derived from 'implicit Perspectives', that is: expressions in statements
@@ -329,29 +317,21 @@ handleBackwardQuery roleInstance iq@(InvertedQuery{description, backwardsCompile
             -- We then compute the users from the context of the role instance
             Nothing -> do
               cid <- lift (rid ##>> OG.context)
-              flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe)) userTypes)
+              flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
             Just (State.State{stateFulObject}) ->
               case stateFulObject of
                 State.Cnt _ -> throwError (error $ "fromRoleResults.computeUsersFromState: context states should not occur.")
                 -- The role we've been lead back to is a user role. Check whether it is in the required state.
-                State.Srole _ -> do 
-                  isPublic <- lift (roleType_ rid >>= isPublicRole <<< ENR)
-                  isInRightState <- (lift $ roleIsInState stateId rid)
-                  if not isPublic && isInRightState
-                    then lift (rid ##>> OG.context) >>= (\cid -> pure $ cons (Tuple cid [rid]) accumulatedUsers)
-                    else pure accumulatedUsers
+                State.Srole _ -> (lift $ roleIsInState stateId rid) >>= if _
+                  then lift (rid ##>> OG.context) >>= (\cid -> pure $ cons (Tuple cid [rid]) accumulatedUsers)
+                  else pure accumulatedUsers
                 -- The role we've been lead back to is an object role. If it is in the required state,
                 -- compute the users having a perspective from its context.
                 State.Orole _ -> (lift $ roleIsInState stateId rid) >>= if _
                   then do
                     cid <- lift (rid ##>> OG.context)
-                    flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (notForPublicUserRoles (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe)) userTypes)
+                    flip cons accumulatedUsers <<< Tuple cid <$> lift (join <$> traverse (\userType -> (cid ##= getRoleInstances userType) >>= filterA notIsMe) userTypes)
                   else pure accumulatedUsers
-          where 
-            notForPublicUserRoles :: (RoleType -> MonadPerspectives (Array RoleInstance)) -> RoleType -> MonadPerspectives (Array RoleInstance)
-            notForPublicUserRoles f rt = isPublicRole rt >>= if _ 
-              then pure []
-              else f rt
     
     -- Coerce the compiled backwards query to a role instance getter. 
     -- The result thus is a function that computes, from a role instance, the backwards query
