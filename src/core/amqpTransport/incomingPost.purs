@@ -52,6 +52,7 @@ import Perspectives.PerspectivesState (getBrokerService, getPerspectivesUser, se
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction')
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -150,7 +151,7 @@ constructBrokerServiceForUser socialMe = do
   -- one for each PerspectivesSystem (i.e. one for each installation).
   perspectivesUser <- lift $ lift $ getPerspectivesUser
   pure $
-    { topic : (unwrap perspectivesUser)
+    { topic : (takeGuid $ unwrap perspectivesUser)
     , queueId
     , login
     , passcode

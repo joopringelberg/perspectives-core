@@ -47,6 +47,7 @@ import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.Types (UserName)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.ResourceIdentifiers (takeGuid)
 import Simple.JSON (readJSON, writeJSON)
 
 type VirtualHost = String
@@ -235,7 +236,7 @@ createBinding (RoleInstance rid) queueName = do
   res <- liftAff $ request (rq
     { url = rq.url <> bindingsEndpoint
     , method = Left POST
-    , content = Just $ RequestBody.string $ writeJSON ({routing_key: rid } :: { routing_key :: String})
+    , content = Just $ RequestBody.string $ writeJSON ({routing_key: takeGuid rid } :: { routing_key :: String})
     })
   case res of 
     Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.setBindings: error in call: " <> printError e)

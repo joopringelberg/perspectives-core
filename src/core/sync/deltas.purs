@@ -114,7 +114,7 @@ sendTransactieToUserUsingAMQP perspectivesUser t = do
           saveTransactionInOutgoingPost perspectivesUser messageId t
           -- Just send the message to the topic that is the addressees PerspectivesUser instance.
           -- Each system will listen to a queue that is bound to that topic upon subscription.
-          liftEffect $ sendToTopic stompClient (unwrap perspectivesUser) messageId (writeJSON t)
+          liftEffect $ sendToTopic stompClient (takeGuid $ unwrap perspectivesUser) messageId (writeJSON t)
         otherwise -> saveTransactionInOutgoingPost perspectivesUser messageId t
     else saveTransactionInOutgoingPost perspectivesUser messageId t
 
@@ -172,7 +172,7 @@ addDomeinFileToTransactie :: ID -> MonadPerspectivesTransaction Unit
 addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinFiles}) ->
   t {changedDomeinFiles = union changedDomeinFiles [dfId]})
 
--- | If we have a public role instance, return [Tuple rid []].
+-- | If we have a public role instance, return [Tuple rid [PublicDestination rid]].
 -- | If the role chain bottoms out in an instance of TheWorld$PerspectivesUsers, return Tuple rid <<the other PerspectivesSystem$Users>>.
 -- | Otherwise return an empty array.
 -- | Also return an empty array if the PerspectivesUser has been cancelled.
