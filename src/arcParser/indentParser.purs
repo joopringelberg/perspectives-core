@@ -45,7 +45,6 @@ import Text.Parsing.Parser.Pos (Position)
 import Text.Parsing.Parser.String (eof)
 import Unsafe.Coerce (unsafeCoerce)
 
--- | This is the type that is produced by Perspectives.Parsing.TransferFile.
 -- type IndentParser m s a = ParserT s (StateT Position m) a
 -- type IP a = IndentParser Identity String a
 
