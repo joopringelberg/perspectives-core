@@ -21,7 +21,7 @@
 -- END LICENSE
 
 module Perspectives.Api where
-
+ 
 -- import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 
 import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
@@ -346,7 +346,6 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- { request: "GetPerspective", subject: PerspectiveObjectRoleType OPTIONAL, predicate: RoleInstanceOfContext }
     Api.GetPerspective -> do
       contextInstance <- (RoleInstance predicate) ##>> context
-      contextType <- contextInstance ##>> contextType
       (objectRoleType :: RoleType) <- if subject == ""
         -- No explicit type given for the perspective object; assume that the predicate has the instance of the role that we want a perspective on.
         then ENR <$> ((RoleInstance predicate) ##>> roleType)

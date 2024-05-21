@@ -32,8 +32,8 @@ import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Couchdb.Revision (class Revision)
-import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer)
+import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier)
 import Prelude (class Eq, class Ord, class Show, compare, eq)
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
@@ -42,7 +42,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -----------------------------------------------------------
 newtype OutgoingTransaction = OutgoingTransaction
   { _id :: String
-  , receiver :: PerspectivesUser
+  , receiver :: UnschemedResourceIdentifier
   , transaction :: TransactionForPeer
   }
 

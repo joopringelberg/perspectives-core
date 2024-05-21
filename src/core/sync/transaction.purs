@@ -26,7 +26,7 @@ module Perspectives.Sync.Transaction where
 -- TRANSACTIE
 -----------------------------------------------------------
 
-import Data.Array (null) 
+import Data.Array (null)
 import Data.DateTime.Instant (toDateTime)
 import Data.Generic.Rep (class Generic)
 import Data.Map (Map, empty) as MAP
@@ -42,13 +42,14 @@ import Perspectives.ApiTypes (CorrelationIdentifier)
 import Perspectives.Couchdb.Revision (class Revision)
 import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser, RoleInstance, perspectivesUser2RoleInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, PerspectivesUser, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId, EnumeratedRoleType(..), RoleType(..))
 import Perspectives.ScheduledAssignment (ScheduledAssignment, StateEvaluation)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult)
 import Perspectives.Sync.SignedDelta (SignedDelta)
+import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier, unschemeRoleInstance)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Eq, class Ord, class Show, bind, compare, eq, pure, show, ($), (&&), (<>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
@@ -92,15 +93,15 @@ newtype Transaction = Transaction (TransactionRecord
   , identityDocument :: Maybe UninterpretedTransactionForPeer
   ))
 
-data TransactionDestination = PublicDestination RoleInstance | Peer PerspectivesUser
+data TransactionDestination = PublicDestination RoleInstance | Peer UnschemedResourceIdentifier
 instance Show TransactionDestination where
   show (PublicDestination r) = "(PublicDestination " <> show r <> ")"
   show (Peer p) = "(Peer " <> show p <> ")"
 instance Ord TransactionDestination where
   compare (Peer p1) (Peer p2) = compare p1 p2
   compare (PublicDestination p1) (PublicDestination p2) = compare p1 p2
-  compare (Peer p1) (PublicDestination p2) = compare (perspectivesUser2RoleInstance p1) p2
-  compare (PublicDestination p1) (Peer p2)  = compare p1 (perspectivesUser2RoleInstance p2)
+  compare (Peer p1) (PublicDestination p2) = compare p1 (unschemeRoleInstance p2)
+  compare (PublicDestination p1) (Peer p2)  = compare (unschemeRoleInstance p1) p2
 instance Eq TransactionDestination where
   eq (Peer p1) (Peer p2) = eq p1 p2
   eq (PublicDestination p1) (PublicDestination p2) = eq p1 p2
@@ -208,26 +209,9 @@ isEmptyTransaction (Transaction tr) =
   && null tr.createdContexts
   && null tr.createdRoles
 
------------------------------------------------------------
--- STORAGE SCHEME
------------------------------------------------------------
--- | Resources (Context- or role instances) are stored under one of several 'schemes'.
--- | All storage options should be understood in terms of Pouchdb databases.
--- | A resource identified by the Default scheme is stored locally, in a database whose 
--- | identifier derives from the identifier sys:Me.
--- | A resource identified by the Local scheme is stored in another private, local database.
--- | Finally, a resource identified by the Remote scheme is stored in a database 
--- | through a REST interface. Because Pouchdb doesn't support the notion of a read-only 
--- | database, we separate a writing endpoint from a reading endpoint.
-data StorageScheme = Default DbName | Local DbName | Remote Url
-
-type DbName = String
-type Url = String
-
-derive instance Generic StorageScheme _
-instance Show StorageScheme where show = genericShow
 
 newtype UninterpretedTransactionForPeer = UninterpretedTransactionForPeer Foreign
 derive instance Newtype UninterpretedTransactionForPeer _
 instance Show UninterpretedTransactionForPeer where show _ = "UninterpretedTransactionForPeer"
 instance PrettyPrint UninterpretedTransactionForPeer where prettyPrint' t _ = t <> "UninterpretedTransactionForPeer"
+ 

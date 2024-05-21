@@ -65,10 +65,10 @@ import Perspectives.Representation.Class.PersistentType (getContext, getEnumerat
 import Perspectives.Representation.Class.Role (actionsOfRoleType)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, isInPublicScheme, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
 import Prelude (class Show, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
@@ -616,3 +616,11 @@ getRoleOnClipboard = do
 
 type RoleOnClipboard = { roleData :: { rolinstance :: String}}
 
+-----------------------------------------------------------
+-- TRANSFORM THE AUTHOR OF A DELTA INTO A RESOURCEIDENTIFIER
+-----------------------------------------------------------
+deltaAuthor2ResourceIdentifier :: PerspectivesUser -> PerspectivesUser
+deltaAuthor2ResourceIdentifier (PerspectivesUser author) = if isInPublicScheme author 
+    then PerspectivesUser $ author
+    -- TheWorld$PerspectivesUser must be in the default storage.
+    else PerspectivesUser $ createDefaultIdentifier author 

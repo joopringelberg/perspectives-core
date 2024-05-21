@@ -36,9 +36,11 @@ module Perspectives.CoreTypes
   , ContextInstances
   , ContextPropertyValueGetter
   , CryptoKey'
+  , DbName
   , DomeinCache
   , IndexedResource(..)
   , InformedAssumption(..)
+  , IntegrityFix(..)
   , JustInTimeModelLoad(..)
   , MP
   , MPQ
@@ -53,14 +55,15 @@ module Perspectives.CoreTypes
   , PropertyValueGetter
   , RepeatingTransaction(..)
   , ResourceToBeStored(..)
-  , IntegrityFix(..)
   , RolInstances
   , RoleGetter
   , RuntimeOptions
+  , StorageScheme(..)
   , TrackingObjectsGetter
   , TypeLevelGetter
   , TypeLevelResults
   , Updater
+  , Url
   , WithAssumptions
   , addPublicResource
   , assumption
@@ -75,9 +78,8 @@ module Perspectives.CoreTypes
   , liftToInstanceLevel
   , removeInternally
   , representInternally
-  , resourceToBeStored
   , resourceIdToBeStored
-  , typeOfInstance
+  , resourceToBeStored
   , retrieveInternally
   , runMonadPerspectivesQuery
   , runMonadPerspectivesQueryToObject
@@ -88,6 +90,7 @@ module Perspectives.CoreTypes
   , type (##>)
   , type (~~>)
   , type (~~~>)
+  , typeOfInstance
   )
   where
 
@@ -126,7 +129,7 @@ import Perspectives.Representation.Class.Identifiable (class Identifiable, ident
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), EnumeratedPropertyType, EnumeratedRoleType, ResourceType, RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers.Parser (pouchdbDatabaseName)
-import Perspectives.Sync.Transaction (Transaction, StorageScheme)
+import Perspectives.Sync.Transaction (Transaction)
 import Prelude (class Eq, class Monoid, class Ord, class Semigroup, class Show, Unit, bind, compare, eq, pure, show, unit, ($), (<<<), (<>), (>>=))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
@@ -588,3 +591,20 @@ instance persistentInstancePerspectRol :: Persistent PerspectRol RoleInstance wh
   resourceIdToBeStored id = Rle id
   typeOfInstance rid = Rle rid
 
+-----------------------------------------------------------
+-- STORAGE SCHEME
+-----------------------------------------------------------
+-- | Resources (Context- or role instances) are stored under one of several 'schemes'.
+-- | All storage options should be understood in terms of Pouchdb databases.
+-- | A resource identified by the Default scheme is stored locally, in a database whose 
+-- | identifier derives from the identifier sys:Me.
+-- | A resource identified by the Local scheme is stored in another private, local database.
+-- | Finally, a resource identified by the Remote scheme is stored in a database 
+-- | through a REST interface. Because Pouchdb doesn't support the notion of a read-only 
+-- | database, we separate a writing endpoint from a reading endpoint.
+data StorageScheme = Default DbName | Local DbName | Remote Url
+derive instance Generic StorageScheme _
+instance Show StorageScheme where show = genericShow
+
+type DbName = String
+type Url = String

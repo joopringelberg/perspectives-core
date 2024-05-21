@@ -43,7 +43,7 @@ import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (getProperty, notIsMe, perspectivesUsersRole_, roleType_)
+import Perspectives.Instances.ObjectGetters (deltaAuthor2ResourceIdentifier, getProperty, notIsMe, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel) as DEP
 import Perspectives.ModelDependencies (perspectivesUsersCancelled, perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)
@@ -54,7 +54,6 @@ import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser, RoleInstance(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..), RoleType(..))
-import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, takeGuid)
 import Perspectives.Sync.DateTime (SerializableDateTime(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
@@ -62,6 +61,7 @@ import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (PublicKeyInfo, Transaction(..), TransactionDestination(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.Types.ObjectGetters (isPublicRole)
+import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier, unschemePerspectivesUser)
 import Prelude (Unit, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (writeJSON)
 
@@ -100,12 +100,12 @@ sendTransactieToUserUsingCouchdb cdbUrl userId t = do
 -- | `userId` WILL be either 
 -- |   * a model://perspectives.domains#System$PerspectivesSystem$User instance, or
 -- |   * an instance of the Visitor role.
-sendTransactieToUserUsingAMQP :: PerspectivesUser -> TransactionForPeer -> MonadPerspectives Unit
+sendTransactieToUserUsingAMQP :: UnschemedResourceIdentifier -> TransactionForPeer -> MonadPerspectives Unit
 sendTransactieToUserUsingAMQP perspectivesUser t = do
   connected <- connectedToAMQPBroker
   n <- liftEffect $ now
   dt <- pure $ SerializableDateTime (toDateTime n)
-  messageId <- pure $ takeGuid $ unwrap perspectivesUser <> show dt
+  messageId <- pure $ unwrap perspectivesUser <> show dt
   if connected
     then do
       mstompClient <- stompClient
@@ -114,7 +114,7 @@ sendTransactieToUserUsingAMQP perspectivesUser t = do
           saveTransactionInOutgoingPost perspectivesUser messageId t
           -- Just send the message to the topic that is the addressees PerspectivesUser instance.
           -- Each system will listen to a queue that is bound to that topic upon subscription.
-          liftEffect $ sendToTopic stompClient (takeGuid $ unwrap perspectivesUser) messageId (writeJSON t)
+          liftEffect $ sendToTopic stompClient perspectivesUser messageId (writeJSON t)
         otherwise -> saveTransactionInOutgoingPost perspectivesUser messageId t
     else saveTransactionInOutgoingPost perspectivesUser messageId t
 
@@ -125,7 +125,7 @@ sendTransactieToUserUsingAMQP perspectivesUser t = do
       mConnected <- (RoleInstance $ buitenRol mySystem) ##> getProperty (EnumeratedPropertyType DEP.connectedToAMQPBroker)
       pure $ mConnected == (Just $ Value "true")
 
-saveTransactionInOutgoingPost :: PerspectivesUser -> String -> TransactionForPeer -> MonadPerspectives Unit
+saveTransactionInOutgoingPost :: UnschemedResourceIdentifier -> String -> TransactionForPeer -> MonadPerspectives Unit
 saveTransactionInOutgoingPost userId messageId t = do
   postDB <- postDatabaseName
   void $ addDocument postDB (OutgoingTransaction{_id: messageId, receiver: userId, transaction: t}) messageId
@@ -153,7 +153,7 @@ transactieForEachUser t@(Transaction tr@{timeStamp, deltas, userRoleBottoms, pub
     addDeltaToCustomisedTransactie d@(SignedDelta {author}) destinations perspectivesSystem = for_
       destinations
       (\destination -> case destination of 
-        peer@(Peer perspectivesUser) -> if not $ eq perspectivesUser author
+        peer@(Peer perspectivesUser) -> if not $ eq perspectivesUser (unschemePerspectivesUser author)
           then do
             trs <- get
             case Map.lookup peer trs of 
@@ -183,7 +183,7 @@ computeUserRoleBottom rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= i
     Nothing -> pure []
     Just perspectivesUser -> ((perspectivesUser2RoleInstance perspectivesUser) ##> getProperty (EnumeratedPropertyType perspectivesUsersCancelled)) >>= case _ of 
       Just (Value "true") -> pure []
-      _ -> pure [Tuple rid (Peer perspectivesUser)]
+      _ -> pure [Tuple rid (Peer $ unschemePerspectivesUser perspectivesUser)]
 
 -- | Add the delta at the end of the array, unless it is already in the transaction or there are no users (and ignore the own user).
 -- | Only include 
@@ -264,7 +264,8 @@ addPublicKeysToTransaction (Transaction tr@{deltas}) = do
     -- that fills SocialEnvironment$Me
     getPkInfo :: PerspectivesUser -> MonadPerspectives PublicKeyInfo
     getPkInfo perspectivesUser = do 
-      authorRole <- getPerspectRol (deltaAuthor2ResourceIdentifier (perspectivesUser2RoleInstance perspectivesUser))
+      -- The perspectivesUser is taken from the SignedDelta and is schemaless.
+      authorRole <- getPerspectRol (perspectivesUser2RoleInstance $ deltaAuthor2ResourceIdentifier perspectivesUser)
       theworld <- getPerspectContext $ rol_context authorRole
       theWorldExternal <- getPerspectRol (context_buitenRol theworld)
       pure let 
@@ -279,3 +280,5 @@ addPublicKeysToTransaction (Transaction tr@{deltas}) = do
           , rol_contextDelta authorRole
           , propertyDelta
           ]}
+
+

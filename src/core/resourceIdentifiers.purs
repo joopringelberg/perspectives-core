@@ -33,14 +33,13 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
+import Perspectives.CoreTypes (StorageScheme(..)) as CT
 import Perspectives.Cuid2 (cuid2)
 import Perspectives.Identifiers (isUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
-import Perspectives.Persistence.Types (MonadPouchdb)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
+import Perspectives.Persistence.Types (MonadPouchdb, Url)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
 import Perspectives.ResourceIdentifiers.Parser (DecomposedResourceIdentifier(..), Guid, ResourceIdentifier, parseResourceIdentifier, resourceIdentifierRegEx, pouchdbDatabaseName_)
-import Perspectives.Sync.Transaction (StorageScheme(..), Url, DbName) as TRANS
 
 {------------------------------------------------------------
 ------------------------------------------------------------
@@ -139,7 +138,7 @@ guid_ (Model _ g) = g
 -- THE DATABASE LOCATION (POSSIBLY A URL) OF A RESOURCE IDENTIFIER TO READ FROM
 -----------------------------------------------------------
 -- | Returns an URL for all databases except for IndexedDB.
-databaseLocation :: forall f. ResourceIdentifier -> MonadPouchdb f (Maybe TRANS.Url)
+databaseLocation :: forall f. ResourceIdentifier -> MonadPouchdb f (Maybe Url)
 databaseLocation s = do
   r <- parseResourceIdentifier s 
   case r of 
@@ -193,9 +192,9 @@ createResourceIdentifier' ctype g = do
   mstorageScheme <- lift $ gets \({typeToStorage}) -> lookup ctype typeToStorage 
   case mstorageScheme of
     Nothing -> pure $ createDefaultIdentifier g
-    Just (TRANS.Default _) -> pure $ createDefaultIdentifier g
-    Just (TRANS.Local dbName) -> pure $ createLocalIdentifier dbName g
-    Just (TRANS.Remote url) -> pure $ createRemoteIdentifier url g
+    Just (CT.Default _) -> pure $ createDefaultIdentifier g
+    Just (CT.Local dbName) -> pure $ createLocalIdentifier dbName g
+    Just (CT.Remote url) -> pure $ createRemoteIdentifier url g
 
 createCuid :: MonadPerspectives String
 createCuid = do
@@ -205,10 +204,11 @@ createCuid = do
 createDefaultIdentifier :: String -> ResourceIdentifier
 createDefaultIdentifier g = "def:#" <> g
 
-createLocalIdentifier :: TRANS.DbName -> String -> ResourceIdentifier
+type DbName = String
+createLocalIdentifier :: DbName -> String -> ResourceIdentifier
 createLocalIdentifier dbName g = "loc:" <> dbName <> "#" <> g
 
-createRemoteIdentifier :: TRANS.Url -> String -> ResourceIdentifier
+createRemoteIdentifier :: Url -> String -> ResourceIdentifier
 createRemoteIdentifier url g = "rem:" <> url <> "#" <> g
 
 addPublicScheme :: String -> ResourceIdentifier
@@ -227,14 +227,14 @@ createPublicIdentifier url s = if isInPublicScheme s
 -- | If no preference is available, use the Public scheme if the given identifier has the form of 
 -- | an URL; make it a Default scheme otherwise
 -- | This function will never create a resource identifier with the model: scheme.
-addSchemeToResourceIdentifier :: Map ResourceType TRANS.StorageScheme -> ResourceType -> String -> ResourceIdentifier
+addSchemeToResourceIdentifier :: Map ResourceType CT.StorageScheme -> ResourceType -> String -> ResourceIdentifier
 addSchemeToResourceIdentifier map t s = case lookup t map of
   Nothing -> if isUrl s
     then addPublicScheme s
     else createDefaultIdentifier s
-  Just (TRANS.Default _) -> createDefaultIdentifier s
-  Just (TRANS.Local dbName) -> createLocalIdentifier dbName s
-  Just (TRANS.Remote url) -> createRemoteIdentifier url s
+  Just (CT.Default _) -> createDefaultIdentifier s
+  Just (CT.Local dbName) -> createLocalIdentifier dbName s
+  Just (CT.Remote url) -> createRemoteIdentifier url s
   
 
 -----------------------------------------------------------
@@ -275,14 +275,6 @@ takeGuid s = case match discardStorageRegex s of
   Just matches -> case index matches 1 of
     Just (Just g) -> g
     _ -> s
-
------------------------------------------------------------
--- TRANSFORM THE AUTHOR OF A DELTA INTO A RESOURCEIDENTIFIER
------------------------------------------------------------
-deltaAuthor2ResourceIdentifier :: RoleInstance -> RoleInstance
-deltaAuthor2ResourceIdentifier (RoleInstance author) = if isInPublicScheme author 
-    then RoleInstance $ author
-    else RoleInstance $ createDefaultIdentifier author
 
 -----------------------------------------------------------
 -- TEST THE SHAPE OF A PUBLIC RESOURCE IDENTIFIER

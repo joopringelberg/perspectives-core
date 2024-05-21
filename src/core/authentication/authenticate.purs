@@ -65,14 +65,14 @@ import Effect.Class (class MonadEffect, liftEffect)
 import Effect.Uncurried (EffectFn1, runEffectFn1)
 import IDBKeyVal (idbGet)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
-import Perspectives.Instances.ObjectGetters (getProperty)
+import Perspectives.Instances.ObjectGetters (deltaAuthor2ResourceIdentifier, getProperty)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey)
 import Perspectives.Persistence.Types (Password)
 import Perspectives.Persistent (entityExists)
 import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), Value(..), perspectivesUser2RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..))
-import Perspectives.ResourceIdentifiers (deltaAuthor2ResourceIdentifier, stripNonPublicIdentifiers, takeGuid)
+import Perspectives.ResourceIdentifiers (stripNonPublicIdentifiers, takeGuid)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Simple.JSON (parseJSON, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
@@ -126,13 +126,13 @@ verifyDelta' (SignedDelta{author, encryptedDelta, signature}) mcryptoKey = do
 -- | Get the public key of a peer.
 getPublicKey :: PerspectivesUser -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
 getPublicKey author = do
-  mrawKey <- deltaAuthor2ResourceIdentifier (perspectivesUser2RoleInstance author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
+  mrawKey <- (perspectivesUser2RoleInstance $ deltaAuthor2ResourceIdentifier author) ##> getProperty (EnumeratedPropertyType perspectivesUsersPublicKey)
   case mrawKey of 
     Nothing -> pure Nothing 
     Just (Value rawKey) -> lift (Just <$> deserializeJWK rawKey)
 
 tryGetPublicKey  :: PerspectivesUser -> MonadPerspectives (Maybe CryptoTypes.CryptoKey)
-tryGetPublicKey author = entityExists (deltaAuthor2ResourceIdentifier (perspectivesUser2RoleInstance author)) >>= if _ 
+tryGetPublicKey author = entityExists (perspectivesUser2RoleInstance $ deltaAuthor2ResourceIdentifier author) >>= if _ 
   then getPublicKey author
   else pure Nothing
 

@@ -64,6 +64,7 @@ import Foreign (ForeignError(..), MultipleErrors)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch)
 import Perspectives.Persistence.Types (MonadPouchdb)
+import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier(..))
 import Simple.JSON (class ReadForeign, readJSON')
 
 -----------------------------------------------------------
@@ -179,7 +180,6 @@ unsubscribe stompClient queueId = runEffectFn2 unsubscribeImpl stompClient queue
 -- SEND
 -----------------------------------------------------------
 type Destination = String
-type Topic = String
 type Queue = String
 type MessageId = String
 
@@ -190,8 +190,8 @@ foreign import sendImpl :: EffectFn4 StompClient Destination MessageId String Un
 send :: StompClient -> Destination -> MessageId -> String -> Effect Unit
 send stompClient destination messageId messageString = runEffectFn4 sendImpl stompClient destination messageId messageString
 
-sendToTopic :: StompClient -> Topic -> MessageId -> String -> Effect Unit
-sendToTopic stompClient topic messageId messageString = runEffectFn4 sendImpl stompClient ("/topic/" <> topic) messageId messageString
+sendToTopic :: StompClient -> UnschemedResourceIdentifier -> MessageId -> String -> Effect Unit
+sendToTopic stompClient (UnschemedResourceIdentifier topic) messageId messageString = runEffectFn4 sendImpl stompClient ("/topic/" <> topic) messageId messageString
 
 sendToQueue :: StompClient -> Queue -> MessageId -> String -> Effect Unit
 sendToQueue stompClient queue messageId messageString = runEffectFn4 sendImpl stompClient ("/queue/" <> queue) messageId messageString
