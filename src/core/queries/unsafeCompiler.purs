@@ -818,6 +818,10 @@ getHiddenFunction = unsafeCoerce $ compileFunction
 getDynamicPropertyGetter :: String -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
 getDynamicPropertyGetter p adt = do
   (pt :: PropertyType) <- getPropertyType p
+  getDynamicPropertyGetter_ pt adt  
+
+getDynamicPropertyGetter_ :: PropertyType -> ADT EnumeratedRoleType -> MP (RoleInstance ~~> Value)
+getDynamicPropertyGetter_ pt adt = do
   case pt of 
     CP _ -> do 
       -- We MUST explore whether the property is defined locally for the current ADT EnumeratedRoleType.
@@ -826,14 +830,13 @@ getDynamicPropertyGetter p adt = do
       -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
       if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
         then getterFromPropertyType pt
-        -- THIS ONLY WORKS AS EXPECTED IN SITUATIONS WHERE THE FILLER IS OF EXACTLY THE TYPE REQUIRED IN THE MODEL!
         else pure (binding >=> f)
     ENP eprop -> pure $ getPropertyFromTelescope eprop
   where
     f :: RoleInstance ~~> Value
     f bnd = do
       (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd
-      getter <- lift $ lift $ getDynamicPropertyGetter p (ST bndType)
+      getter <- lift $ lift $ getDynamicPropertyGetter_ pt (ST bndType)
       getter bnd
 
 -- | Get a property on a chain of EnumeratedRole instances that are filled by each other.

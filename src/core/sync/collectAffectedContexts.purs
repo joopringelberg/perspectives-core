@@ -54,7 +54,7 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (binding, context, contextIsInState, contextType, getFilledRoles, makeChainGetter, notIsMe, roleIsInState, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, context, contextIsInState, contextType, getFilledRoles, notIsMe, roleIsInState, roleType_)
 import Perspectives.Instances.ObjectGetters (context, contextType, roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.InvertedQuery.Storable (getContextQueries, getFilledQueries, getFillerQueries, getPropertyQueries, getRoleQueries)
@@ -64,8 +64,8 @@ import Perspectives.Persistent (getPerspectContext, getPerspectRol, tryGetPerspe
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (isRoleDomain, range)
-import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances, getterFromPropertyType)
-import Perspectives.Representation.ADT (ArrayUnions(..))
+import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter_, getHiddenFunction, getRoleInstances)
+import Perspectives.Representation.ADT (ADT(..), ArrayUnions(..))
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, cacheInDomeinFile, getEnumeratedRole, tryGetState)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole, InvertedQueryMap)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -467,14 +467,13 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
       -- For each property, get its value from the role instance, if the state condition is met.
       -- When there are no properties, we add the deltas for the role instance anyway.
       -- This covers the case of a new binding for a perspective without properties.
+      PerspectRol{pspType, context} <- lift $  getPerspectRol roleInstance
       if (isEmpty (unwrap statesPerProperty))
-        then do
-          PerspectRol{pspType, context} <- lift $  getPerspectRol roleInstance
-          magic context (SerializableNonEmptyArray $ ANE.singleton roleInstance) pspType (join $ snd <$> cwus)
+        then magic context (SerializableNonEmptyArray $ ANE.singleton roleInstance) pspType (join $ snd <$> cwus)
         else pure unit
       forWithIndex_ (unwrap statesPerProperty)
         (\prop propStates -> do
-          propGetter <- lift (makeChainGetter <$> (getterFromPropertyType prop))
+          propGetter <- lift $ getDynamicPropertyGetter_ prop (ST pspType)
           for_ propStates
             -- For each state that provides a perspective on the property,
             \stateIdentifier ->

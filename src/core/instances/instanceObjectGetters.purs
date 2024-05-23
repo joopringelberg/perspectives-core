@@ -376,21 +376,6 @@ getProperty pn r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
         Nothing -> pure []
         (Just p) -> pure p
 
--- | From a Property value getter, create a function that tries to find a value for the property
--- | on the role or its binding, recursively.
-makeChainGetter :: (RoleInstance ~~> Value) -> (RoleInstance ~~> Value)
--- A beautiful definition that will not terminate:
--- makeChainGetter getter = disjunction getter (makeChainGetter (binding >=> getter))
-makeChainGetter getter r = ArrayT do
-  results <- runArrayT $ getter r
-  if null results
-    then do
-      bnd <- runArrayT $ binding r
-      case head bnd of
-        Nothing -> pure []
-        Just b -> runArrayT $ makeChainGetter getter b
-    else pure results
-
 -- | Turn a function that returns strings into one that returns Booleans.
 makeBoolean :: forall a. (a ~~> Value) -> (a ~~> Boolean)
 makeBoolean f = f >>> map (((==) "true") <<< unwrap)
