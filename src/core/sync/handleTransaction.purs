@@ -49,7 +49,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
 import Perspectives.Authenticate (deserializeJWK, tryGetPublicKey, verifyDelta, verifyDelta')
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
-import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex)
+import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, isDefaultContextDelta, rol_contextDelta)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, removeInternally, (###=), (###>>), (##=), (##>), (##>>))
 import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, addCreatedRoleToTransaction)
@@ -104,8 +104,11 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
     MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
       Left e -> handleError e
       Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
-    -- As the external role and the context have been constructed before (and apparently have not thrown errors) we just add the delta to the external role.
-    AddExternalRole -> lift (getPerspectRol roleInstance >>= \(PerspectRol r) -> void $ saveEntiteit_ roleInstance (PerspectRol r {contextDelta = signedDelta}))
+    -- As the external role and the context have been constructed before (and apparently have not thrown errors) we just add the delta to the external role
+    -- iff it is not present!
+    AddExternalRole -> lift (getPerspectRol roleInstance >>= \rol@(PerspectRol r) -> if isDefaultContextDelta (rol_contextDelta rol)
+      then void $ saveEntiteit_ roleInstance (PerspectRol r {contextDelta = signedDelta})
+      else pure unit)
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do
