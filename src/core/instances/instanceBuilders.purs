@@ -196,7 +196,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSer
       Nothing -> Just <$> (createAndAddRoleInstance_ roleType contextId r false)
       Just b -> do 
         me <- lift (isMe $ RoleInstance b)
-        Just <$> (createAndAddRoleInstance_ roleType contextId r false)
+        Just <$> (createAndAddRoleInstance_ roleType contextId r me)
 
 createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = lookupOrCreateRoleInstance roleType
