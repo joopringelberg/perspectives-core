@@ -157,10 +157,12 @@ interpretUQD (UQD _ FilterF criterium _ _ _) a = ArrayT do
 -----------------------------------------------------------
 interpretBQD :: Partial => QueryFunctionDescription -> DependencyPath ~~> DependencyPath
 interpretBQD (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (Constant _ _) _ _ _) _ _ _) a = interpret f2 a
-interpretBQD (BQD _ (BinaryCombinator ComposeF) f1 f2@(SQD _ (DataTypeGetter IdentityF) _ _ _) _ _ _) a = interpret f1 a
-interpretBQD (BQD _ (BinaryCombinator ComposeF) f1@(SQD _ (DataTypeGetter IdentityF) _ _ _) f2 _ _ _) a = interpret f2 a
 interpretBQD (BQD _ (BinaryCombinator ComposeF) f1 f2 _ _ _) a =
-  (interpret f1 >=> interpret f2) a
+  case f1, f2 of
+    (SQD _ (DataTypeGetter IdentityF) _ _ _), (SQD _ (DataTypeGetter IdentityF) _ _ _) -> pure a
+    _, (SQD _ (DataTypeGetter IdentityF) _ _ _) -> interpret f1 a
+    (SQD _ (DataTypeGetter IdentityF) _ _ _), _ -> interpret f2 a
+    _, _ -> (interpret f1 >=> interpret f2) a
 interpretBQD (BQD _ (BinaryCombinator SequenceF) f1 f2 _ _ _) a = ArrayT $ do
   (f1r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   f2r <- runArrayT $ interpret f2 a
@@ -598,29 +600,34 @@ getDynamicPropertyGetter p rid = do
       -- Special case for the 'property of last resort' that is inserted in serialised perspectives for roles without properties.
       if (isJust $ elemIndex pt allProps) || pt == (CP $ CalculatedPropertyType roleWithId)
         then getterFromPropertyType pt rid
-        else f rid
-    ENP eprop -> g rt eprop
+        else getItFromTheFiller rid
+    ENP eprop -> getPropertyFromTelescope rt eprop
 
   where
-    g :: EnumeratedRoleType -> EnumeratedPropertyType ~~> DependencyPath
-    g roleType eprop = do 
-      -- We must take aliases of the actual role type into account.
-      -- NOTE. UP TILL version v0.20.0 we have a very specific problem with the external roles of the specialisations
-      -- of model:System$Model. These roles are fetched before the models themselves are fetched; indeed, we don't mean to 
-      -- get the models until the end user explicitly asks for it.
-      -- This situation will go away in the next version.
-      aliases <- catchError (lift $ lift $ propertyAliases roleType)
-        \e -> pure OBJ.empty
-      case OBJ.lookup (unwrap eprop) aliases of
-        Just destination -> getterFromPropertyType (ENP destination) rid
-        Nothing -> do
-          allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST roleType)
-          if isJust $ elemIndex (ENP eprop) allProps
-            then getterFromPropertyType (ENP eprop) rid
-            else f rid
+    getPropertyFromTelescope :: EnumeratedRoleType -> EnumeratedPropertyType ~~> DependencyPath
+    getPropertyFromTelescope roleType eprop = do 
+      allProps <- lift2MPQ $ allLocallyRepresentedProperties (ST roleType)
+      if isJust $ elemIndex (ENP eprop) allProps
+        then ArrayT do 
+          r <- runArrayT $ getterFromPropertyType (ENP eprop) rid
+          if null r
+            -- Even though the property is represented on this role, we choose to search the rest of the chain.
+            then runArrayT $ getItFromTheFiller rid
+            else pure r
+        else do 
+          -- We must take aliases of the actual role type into account.
+          aliases <- catchError (lift $ lift $ propertyAliases roleType)
+            \e -> pure OBJ.empty
+          case OBJ.lookup (unwrap eprop) aliases of
+            Just destination -> ArrayT do 
+              r <- runArrayT $ getterFromPropertyType (ENP destination) rid
+              if null r
+                then runArrayT $ getItFromTheFiller rid
+                else pure r
+            Nothing -> getItFromTheFiller rid
 
-    f :: RoleInstance ~~> DependencyPath
-    f roleInstance = do
+    getItFromTheFiller :: RoleInstance ~~> DependencyPath
+    getItFromTheFiller roleInstance = do
       (bnd :: Maybe RoleInstance) <- lift2MPQ $ binding_ roleInstance
       case bnd of
         Nothing -> empty
