@@ -34,7 +34,7 @@ import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT, tell)
 import Control.Plus (empty)
-import Data.Array (catMaybes, elemIndex, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
+import Data.Array (catMaybes, elemIndex, filterA, findIndex, foldl, head, index, length, null, singleton, unsafeIndex)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), lastIndexOf, stripSuffix, length) as STRING
@@ -45,6 +45,7 @@ import Data.Traversable (for, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (rol_binding, rol_context, rol_pspType)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, AssumptionTracking, liftToInstanceLevel, (###=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -55,7 +56,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, bindingInContext, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getFilledRoles, getMe, getPreferredUserRoleType, getProperty, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRecursivelyFilledRoles, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseNumber)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -63,8 +64,8 @@ import Perspectives.ObjectGetterLookup (lookupPropertyValueGetterByName, lookupR
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2PropertyRange, domain2contextType, range, roleInContext2Role)
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, domain, domain2PropertyRange, domain2contextType, domain2roleType, range, roleInContext2Role)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
@@ -144,7 +145,7 @@ compileFunction (SQD _ (ContextTypeConstant qname) ContextKind _ _) = pure $ uns
 
 compileFunction (SQD _ (TypeGetter RoleTypesF) _ _ _) = pure $ unsafeCoerce (liftToInstanceLevel allRoleTypesInContext)
 
-compileFunction (SQD _ (DataTypeGetter FillerF) _ _ _) = pure $ unsafeCoerce binding
+compileFunction (SQD _ (DataTypeGetter FillerF) ran _ _) = pure $ unsafeCoerce (getFillerTypeRecursively $ roleInContext2Role <$> unsafePartial domain2roleType ran)
 
 compileFunction (SQD dom (Constant range value) _ _ _) = pure \_ -> pure value
 
@@ -415,11 +416,13 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')
 
-compileFunction (SQD _ (FilledF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getFilledRoles contextType enumeratedRoleType)
+compileFunction (SQD _ (FilledF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getRecursivelyFilledRoles contextType enumeratedRoleType)
 
-compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) _ _ _ ) = do
+compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) ran _ _ ) = do
   case functionName of
-    FillerF -> pure $ unsafeCoerce bindingInContext (ContextType parameter)
+    FillerF -> if parameter == "direct"
+      then pure $ unsafeCoerce binding
+      else pure $ unsafeCoerce (bindingInContext (ContextType parameter) (roleInContext2Role <$> unsafePartial domain2roleType ran))
     SpecialisesRoleTypeF -> pure $ unsafeCoerce (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)))
     IsInStateF -> do 
       (STATE.State {stateFulObject}) <- getState (StateIdentifier parameter)
@@ -960,6 +963,31 @@ getDynamicPropertyGetterFromLocalName ln adt = do
           (bndType :: EnumeratedRoleType) <- lift $ lift $ roleType_ bnd'
           getter <- lift $ lift $ getDynamicPropertyGetterFromLocalName ln (ST bndType)
           getter bnd'
+
+getFillerTypeRecursively :: ADT EnumeratedRoleType -> RoleInstance ~~> RoleInstance
+getFillerTypeRecursively adt r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
+  handlePerspectRolError' "binding" []
+  \(role :: PerspectRol) -> if (ST $ rol_pspType role) `equalsOrSpecialisesADT` adt
+    then do
+      tell $ ArrayWithoutDoubles [Filler r]
+      case rol_binding role of
+        Nothing -> pure []
+        (Just b) -> pure [b]
+    else case rol_binding role of
+      Nothing -> pure []
+      Just b -> runArrayT $ getFillerTypeRecursively adt b
+
+-- | Just the fillers that come from instances of a particular ContextType.
+bindingInContext :: ContextType -> ADT EnumeratedRoleType -> RoleInstance ~~> RoleInstance
+bindingInContext cType adt r = ArrayT do
+  (fillers :: Array RoleInstance) <- runArrayT $ getFillerTypeRecursively adt r
+  filterA
+    (\filler -> (lift $ try $ getPerspectRol filler) >>=
+      handlePerspectRolError' "bindingInContext" false
+        \(role :: PerspectRol) -> do
+          fillerContextType <-  lift ((rol_context role) ##>> contextType)
+          pure (eq cType fillerContextType))
+    fillers
 
 -- | Preferrably returns the value of the type of 'me' of the context instance:
 -- | this will be the enumerated role instance that is filled (ultimately) with sys:Me.

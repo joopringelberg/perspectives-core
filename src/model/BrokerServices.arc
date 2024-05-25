@@ -113,7 +113,7 @@ domain model://perspectives.domains#BrokerServices
     state NoAdministrator = not exists Administrator
       on entry
         do for BrokerService$Guest
-          bind sys:SocialMe >> binding to Administrator
+          bind sys:SocialMe to Administrator
           PublicUrl = extern >> binder ManagedBrokers >> StorageLocation for extern
     external
       property Name (mandatory, String)

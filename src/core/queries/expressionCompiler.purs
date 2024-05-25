@@ -361,14 +361,9 @@ compileSimpleStep currentDomain s@(Filler pos membeddingContext) = do
       (adtOfBinding :: (ADT RoleInContext)) <- lift2 $ bindingOfADT r
       case adtOfBinding of
         UNIVERSAL -> throwError $ RoleHasNoBinding pos (roleInContext2Role <$> r)
-        -- TODO. If the 'in context' clause is used, add the context
-        -- type as EmbeddingContext to the RDOM.
-        -- If not, just use the static context of adtOfBinding.
-        -- If the modeller has specified a particular context to navigate the filledBy link to,
-        -- Construct a RoleInContext with it.
-        -- Otherwise, take the default specified with the role(s) that is(are) the current domain.
         otherwise -> case membeddingContext of
           Nothing -> pure $ SQD currentDomain (QF.DataTypeGetter FillerF) (RDOM adtOfBinding) True False
+          -- This is the step type "binding in <context type>".
           Just context -> if isTypeUri context
             then pure $ SQD currentDomain (QF.DataTypeGetterWithParameter FillerF context) (RDOM $ replaceContext adtOfBinding (ContextType context)) True False
             -- Try to qualify the name within the Domain.

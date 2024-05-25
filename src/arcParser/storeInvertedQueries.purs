@@ -258,6 +258,9 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                     , states
                     , selfOnly}) 
           , model }
+          
+    -- Treat the variant with a context restriction in exactly the same way as without that restriction.
+    QF.DataTypeGetterWithParameter QF.FillerF _ -> setPathForStep (SQD dom (QF.DataTypeGetter QF.FillerF) ran fun man) qWithAK users states statesPerProperty selfOnly mfilter
 
     QF.RolGetter roleType -> case roleType of
       ENR role -> let

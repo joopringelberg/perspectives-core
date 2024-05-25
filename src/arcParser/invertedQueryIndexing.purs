@@ -197,13 +197,20 @@ isFilledF qf = case qf of
 -- | Compute the keys for the filledBy (Filler) step.
 -- | Is exactly like typeLevelKeyForFilledQueries, but with role and domain reversed.
 typeLevelKeyForFillerQueries :: Partial => QueryFunctionDescription -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-typeLevelKeyForFillerQueries qfd | DataTypeGetter FillerF == (queryFunction qfd) = 
-  reduce 
+typeLevelKeyForFillerQueries qfd = if (isFiller (queryFunction qfd))
+  then reduce 
     (\(RoleInContext{role:fillerType, context:fillerContextType}) -> 
       reduce 
         (\(RoleInContext{role:filledType, context:filledContextType}) -> runtimeIndexForFillerQueries' fillerContextType filledType filledContextType fillerType)
         (domain2roleInContext $ domain qfd))
     (domain2roleInContext $ range qfd)
+  else pure $ ArrayUnions []
+  
+  where
+    isFiller :: QueryFunction -> Boolean
+    isFiller (DataTypeGetter FillerF) = true
+    isFiller (DataTypeGetterWithParameter FillerF _) = true
+    isFiller _ = false
 
 -- | The EnumeratedPropertyType is defined on the EnumeratedRoleType. It is either defined in its namespace, or 
 -- | it is added as an Aspect property. In the latter case, if the (Maybe EnumeratedPropertyType) part is a Just value,

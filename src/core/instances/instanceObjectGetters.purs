@@ -24,9 +24,9 @@ module Perspectives.Instances.ObjectGetters where
 
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
-import Control.Monad.Writer (lift, tell)
+import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (empty)
-import Data.Array (catMaybes, concat, elemIndex, filter, filterA, findIndex, foldMap, foldl, head, index, length, null, singleton, union)
+import Data.Array (catMaybes, concat, elemIndex, filter, findIndex, foldMap, foldl, head, index, length, null, singleton, union)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Iterable (toArray)
@@ -37,7 +37,7 @@ import Data.Newtype (class Newtype, ala, over, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
-import Data.Traversable (for, traverse)
+import Data.Traversable (for, for_, traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (AVar, tryRead)
 import Effect.Aff.Class (liftAff)
@@ -47,7 +47,7 @@ import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, (##>>), (##>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), AssumptionTracking, InformedAssumption(..), MP, MonadPerspectives, (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
@@ -70,7 +70,7 @@ import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
-import Prelude (class Show, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (class Show, Unit, bind, discard, eq, flip, identity, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
 
 -----------------------------------------------------------
@@ -211,7 +211,7 @@ binding r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
     case rol_binding role of
       Nothing -> pure []
       (Just b) -> pure [b]
-
+    
 binding_ :: RoleInstance -> MonadPerspectives (Maybe RoleInstance)
 binding_ r = (try $ getPerspectRol r) >>=
   handlePerspectRolError' "binding_" Nothing
@@ -219,18 +219,6 @@ binding_ r = (try $ getPerspectRol r) >>=
       case rol_binding role of
         Nothing -> pure Nothing
         (Just b) -> pure $ Just b
-
--- | Just the fillers that come instances of a particular ContextType.
-bindingInContext :: ContextType -> RoleInstance ~~> RoleInstance
-bindingInContext cType r = ArrayT do
-  (fillers :: Array RoleInstance) <- runArrayT $ binding r
-  filterA
-    (\filler -> (lift $ try $ getPerspectRol filler) >>=
-      handlePerspectRolError' "bindingInContext" false
-        \(role :: IP.PerspectRol) -> do
-          fillerContextType <-  lift ((rol_context role) ##>> contextType)
-          pure (eq cType fillerContextType))
-    fillers
 
 bottom :: RoleInstance ~~> RoleInstance
 bottom r = ArrayT do
@@ -270,6 +258,20 @@ getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ ge
       {context:ct, role, instances} -> do
         tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId ct role]
         pure instances
+
+-- NOTA BENE: this function will push an Assumption for every filled role step, even if it leads to no result.
+-- So the entire filled tree on fillerId will be searched and added.
+getRecursivelyFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
+getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execWriterT $ depthFirst fillerId
+  where
+    depthFirst :: RoleInstance -> WriterT (Array RoleInstance) AssumptionTracking Unit
+    depthFirst rid = do 
+      r <- lift $ runArrayT $ getFilledRoles filledContextType filledType rid
+      if null r
+        then do 
+          allFilleds <- lift $ lift $ getAllFilledRoles rid
+          for_ allFilleds depthFirst
+        else tell r
 
 getAllFilledRoles :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 getAllFilledRoles rid = (try $ getPerspectRol rid) >>=

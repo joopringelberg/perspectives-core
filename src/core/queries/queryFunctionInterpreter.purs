@@ -36,8 +36,9 @@
 module Perspectives.Query.Interpreter where
 
 import Control.Monad.AvarMonadAsk (modify)
-import Control.Monad.Error.Class (catchError, throwError)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer (WriterT, execWriterT, tell)
 import Control.MonadZero (empty, join, void)
 import Data.Array (concat, elemIndex, foldl, head, index, length, null, union, unsafeIndex)
 import Data.List (List(..))
@@ -45,28 +46,32 @@ import Data.List.NonEmpty (fromList, singleton, tail)
 import Data.List.Types (List, NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (maximum, minimum, traverse)
+import Data.Traversable (for_, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ContextAndRole (rol_binding, rol_pspType)
 import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MP, MPQ, liftToInstanceLevel, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
+import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.Combinators (available', not_)
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), binding, binding_, context, contextModelName, contextType, externalRole, filledBy, fills, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), binding_, context, contextModelName, contextType, externalRole, filledBy, fills, getAllFilledRoles, getEnumeratedRoleInstances, getFilledRoles, getProperty, getUnlinkedRoleInstances, roleModelName, roleType)
 import Perspectives.Instances.Values (bool2Value, parseNumber, value2Date, value2Number)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (lookupIndexedRole)
 import Perspectives.Parsing.Arc.Position (arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFrame, restoreFrame)
-import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2PropertyRange, range)
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, composePaths, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain2PropertyRange, domain2roleType, range, roleInContext2Role)
 import Perspectives.Query.UnsafeCompiler (lookup, mapDurationOperator, mapNumericOperator, orderFunction, performNumericOperation')
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialisesADT)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
@@ -78,7 +83,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..), isDateOrTime, isPDuration)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', propertyAliases, roleTypeModelName', specialisesRoleType)
-import Prelude (bind, discard, eq, flip, notEq, pure, show, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
+import Prelude (Unit, bind, discard, eq, flip, map, notEq, pure, show, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a
@@ -542,8 +547,9 @@ interpretSQD qfd a = case a.head of
         (cp :: CalculatedProperty) <- lift2MPQ $ getPerspectType pt
         (lift2MPQ $ PC.calculation cp) >>= flip interpret a
       (SQD _ (DataTypeGetter ContextF) _ _ _) -> (flip consOnMainPath a) <<< C <$> context rid
-      (SQD _ (DataTypeGetter FillerF) _ _ _) -> (flip consOnMainPath a) <<< R <$> binding rid
-      (SQD _ (FilledF roleType contextType) _ _ _ ) -> (flip consOnMainPath a) <<< R <$> getFilledRoles contextType roleType rid
+      (SQD _ (DataTypeGetter FillerF) ran _ _) -> composePaths a <$> getFillerTypeRecursively (roleInContext2Role <$> unsafePartial domain2roleType ran) rid
+      (SQD _ (DataTypeGetterWithParameter FillerF _) ran _ _) -> composePaths a <$> getFillerTypeRecursively (roleInContext2Role <$> unsafePartial domain2roleType ran) rid
+      (SQD _ (FilledF roleType contextType) _ _ _ ) -> composePaths a <$> getRecursivelyFilledRoles contextType roleType rid
 
       otherwise -> throwError (error $ "(head=RoleInstance) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show rid)
 
@@ -573,6 +579,30 @@ interpretSQD qfd a = case a.head of
       (SQD _ (DataTypeGetterWithParameter SpecialisesRoleTypeF parameter) _ _ _ ) -> (flip consOnMainPath a) <<< V "SpecialisesRoleType" <$> (liftToInstanceLevel ((flip specialisesRoleType) (ENR $ EnumeratedRoleType parameter)) roleType)
 
       otherwise -> throwError (error $ "(head is RoleKind) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show roleType)
+
+getRecursivelyFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> DependencyPath)
+getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execWriterT $ depthFirst fillerId (singletonPath (R fillerId))
+  where
+    depthFirst :: RoleInstance -> DependencyPath ->  WriterT (Array DependencyPath) AssumptionTracking Unit
+    depthFirst rid depPath = do
+      r <- lift $ runArrayT $ getFilledRoles filledContextType filledType rid
+      if null r
+        then do 
+          allFilleds <- lift $ lift $ getAllFilledRoles rid
+          for_ allFilleds \filled -> depthFirst filled (consOnMainPath (R filled) depPath)
+        else for_ r \filled -> tell [consOnMainPath (R filled) depPath]
+
+getFillerTypeRecursively :: ADT EnumeratedRoleType -> RoleInstance ~~> DependencyPath
+getFillerTypeRecursively adt r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
+  handlePerspectRolError' "getFillerTypeRecursively" []
+  \(role :: PerspectRol) -> if (ST $ rol_pspType role) `equalsOrSpecialisesADT` adt
+    then do
+      case rol_binding role of
+        Nothing -> pure []
+        (Just b) -> pure [singletonPath (R b)]
+    else case rol_binding role of
+      Nothing -> pure []
+      Just b -> map (consOnMainPath (R b)) <$> (runArrayT $ getFillerTypeRecursively adt b)
 
 toBool :: List Dependency -> Boolean
 toBool (Cons (V _ (Value s)) _) = s == "true"

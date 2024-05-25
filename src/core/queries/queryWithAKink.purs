@@ -251,8 +251,6 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Just qfd | qfd == q -> pure []
     Just qfd -> invert_ qfd
 
--- TODO hier ontbreekt iets. We geven hier maar één pad terug!
--- Expandeer eerst en inverteer dan.
 invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
   (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
   if hasProp
@@ -270,13 +268,14 @@ invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man)
       hasProp <- roleHasProperty adt
       if hasProp
         then pure (SQD (RDOM adt) (PropertyGetter prop) ran fun man)
-        else makeComposition <$> makeBinding adt <*> (bindingOfADT adt >>= expandPropertyQuery)
-
-      where
-      makeBinding :: ADT RoleInContext -> MP QueryFunctionDescription
-      makeBinding adt' = do
-        b <- bindingOfADT adt'
-        pure (SQD (RDOM adt') (DataTypeGetter FillerF) (RDOM b) True False)
+        else do 
+          binding <- bindingOfADT adt
+          bindingHasProp <- roleHasProperty binding
+          if bindingHasProp
+            then pure $ makeComposition 
+              (SQD (RDOM adt) (DataTypeGetter FillerF) (RDOM binding) True False)
+              (SQD (RDOM binding) (PropertyGetter prop) ran fun man)
+            else makeComposition <$> pure (SQD (RDOM adt) (DataTypeGetterWithParameter FillerF "direct") (RDOM binding) True False) <*> (expandPropertyQuery binding)
 
     roleHasProperty :: ADT RoleInContext -> MP Boolean
     roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)

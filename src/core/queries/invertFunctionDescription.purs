@@ -79,6 +79,10 @@ invertFunction dom qf ran = case qf of
   DataTypeGetterWithParameter f _ -> case f of
     GetRoleInstancesForContextFromDatabaseF -> pure $ Just $ DataTypeGetter ContextF
     SpecialisesRoleTypeF -> pure $ Nothing
+    FillerF -> case dom of
+      (RDOM EMPTY) -> pure $ Nothing
+      (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ FilledF role context
+      otherwise -> pure $ Nothing
     -- A lot of cases will never be seen in a regular query.
     _ -> pure $ Nothing
 

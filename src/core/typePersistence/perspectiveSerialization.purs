@@ -201,6 +201,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
       Just {query, lastStep} -> case queryFunction lastStep of 
         DataTypeGetterWithParameter FilledByF _ -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
         DataTypeGetter FillerF -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
+        DataTypeGetterWithParameter FillerF _ -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
         RolGetter _ -> pure query
       Nothing -> if isContextDomain (domain qfd)
         then pure $ SQD (domain qfd) (DataTypeGetter IdentityF) (domain qfd) True True

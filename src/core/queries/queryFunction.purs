@@ -44,6 +44,7 @@ type VariableName = String
 data FunctionName =
   ContextF
   | FillerF
+  | DirectFillerF
   | ExternalRoleF
   | IndexedContextName
   | IndexedRoleName
@@ -87,6 +88,7 @@ data FunctionName =
 instance eqFunctionName :: Eq FunctionName where 
   eq ContextF ContextF = true
   eq FillerF FillerF = true
+  eq DirectFillerF DirectFillerF = true
   eq ExternalRoleF ExternalRoleF = true
   eq IndexedContextName IndexedContextName = true
   eq IndexedRoleName IndexedRoleName = true
@@ -135,6 +137,7 @@ instance Ord FunctionName where
 instance showFunctionName :: Show FunctionName where
     show ContextF = "context"
     show FillerF = "binding"
+    show DirectFillerF = "directFiller"
     show ExternalRoleF = "external" -- TODO klopt dit met de parser?
     show IndexedContextName = "indexedContext"
     show IndexedRoleName = "indexedRole"
@@ -182,6 +185,7 @@ instance readForeignFunctionName :: ReadForeign FunctionName where
     case x of 
       "context" -> pure ContextF
       "binding" -> pure FillerF
+      "directFiller" -> pure DirectFillerF
       "external" -> pure ExternalRoleF -- TODO klopt dit met de parser?
       "indexedContext" -> pure IndexedContextName
       "indexedRole" -> pure IndexedRoleName
@@ -225,6 +229,7 @@ isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
   ContextF -> True
   FillerF -> True
+  DirectFillerF -> True
   ExternalRoleF -> True
   IndexedRoleName -> True
   IndexedContextName -> True
@@ -268,6 +273,7 @@ isMandatoryFunction :: FunctionName -> ThreeValuedLogic
 isMandatoryFunction fn = case fn of
   ContextF -> True
   FillerF -> False
+  DirectFillerF -> False
   ExternalRoleF -> True
   IndexedRoleName -> False
   IndexedContextName -> False
