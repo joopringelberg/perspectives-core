@@ -120,7 +120,7 @@ storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty
 -- | This is not a recursive function! It merely adds the QueryWithAKink to a Context, Role or Property type.
 -- | Modifies the DomeinFile in PhaseTwoState.
 setPathForStep :: Partial =>
-  QueryFunctionDescription ->
+  QueryFunctionDescription ->                         -- First step of the backward part of the next argument.
   QueryWithAKink ->
   Array RoleType ->
   Array StateIdentifier ->
@@ -161,7 +161,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
         CP _ -> pure unit
 
     -- FILLED STEP
-    -- filled step is stored in filledInvertedQueries of the filled role.
     QF.FilledF enr ctxt ->
       -- Compute the keys on the base of the original backwards query.
       -- The domain can be a complex ADT RoleInContext. The range is always an ST RoleInContext.
@@ -195,7 +194,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             filter
       in 
         do 
-          (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFilledQueries qfd
+          (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFilledQueries qfd -- The first step of the backwards part of the original inverted query, being FilledF.
           lift $ addStorableInvertedQuery
             { keys: serializeInvertedQueryKey <$> keys 
             , queryType: "RTFilledKey"
@@ -212,7 +211,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
             , model }
 
     -- FILLER STEP
-    -- filler step is stored in fillerInvertedQueries of the filled role.
     QF.DataTypeGetter QF.FillerF -> do
       (ArrayUnions keys) <- lift $ lift $ lift $ typeLevelKeyForFillerQueries qfd
       oneStepLess <- pure $ removeFirstBackwardsStep qWithAK (\_ _ _ -> Nothing)

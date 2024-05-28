@@ -50,8 +50,8 @@ import Data.Traversable (for_, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (rol_binding, rol_pspType)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MP, MPQ, liftToInstanceLevel, (##=), (##>>))
+import Perspectives.ContextAndRole (rol_allTypes, rol_binding, rol_id)
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MPQ, AssumptionTracking, liftToInstanceLevel, (##=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
@@ -83,7 +83,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..), isDateOrTime, isPDuration)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', propertyAliases, roleTypeModelName', specialisesRoleType)
-import Prelude (Unit, bind, discard, eq, flip, map, notEq, pure, show, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
+import Prelude (Unit, bind, discard, eq, flip, map, notEq, pure, show, unit, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a
@@ -592,17 +592,42 @@ getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execW
           for_ allFilleds \filled -> depthFirst filled (consOnMainPath (R filled) depPath)
         else for_ r \filled -> tell [consOnMainPath (R filled) depPath]
 
+
+-- | For each Role dependency, push a Role assumption.
+pushAssumptionsForDependencyPath :: Partial => DependencyPath -> AssumptionTracking Unit
+pushAssumptionsForDependencyPath dp = for_ (allPaths dp) 
+  (\path -> for_ path 
+    (\a -> case a of 
+      R rid -> do
+        cType <- lift (rid ##>> (context >=> contextType))
+        rType <- lift (rid ##>> roleType)
+        tell $ ArrayWithoutDoubles[FilledRolesAssumption rid cType rType]
+      _ -> pure unit))
+
+-- | NOTE: this function is not in use.
+getRecursivelyFilledRolesAssumptions :: Partial => ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
+getRecursivelyFilledRolesAssumptions filledContextType filledType fillerId = ArrayT $ do
+  paths <- runArrayT $ getRecursivelyFilledRoles filledContextType filledType fillerId
+  for_ paths pushAssumptionsForDependencyPath
+  pure (map dPathToRoleInstance paths)
+  where
+    dPathToRoleInstance :: Partial => DependencyPath -> RoleInstance
+    dPathToRoleInstance {head} = case head of
+      R rid -> rid
+
 getFillerTypeRecursively :: ADT EnumeratedRoleType -> RoleInstance ~~> DependencyPath
 getFillerTypeRecursively adt r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
-  handlePerspectRolError' "getFillerTypeRecursively" []
-  \(role :: PerspectRol) -> if (ST $ rol_pspType role) `equalsOrSpecialisesADT` adt
-    then do
+  handlePerspectRolError' "getFillerTypeRecursively" [] depthFirst
+  where
+  depthFirst :: PerspectRol -> AssumptionTracking (Array DependencyPath)
+  depthFirst role =
       case rol_binding role of
         Nothing -> pure []
-        (Just b) -> pure [singletonPath (R b)]
-    else case rol_binding role of
-      Nothing -> pure []
-      Just b -> map (consOnMainPath (R b)) <$> (runArrayT $ getFillerTypeRecursively adt b)
+        Just b -> do
+          bRole <- lift $ getPerspectRol b
+          if (PROD $ ST <$> (rol_allTypes bRole)) `equalsOrSpecialisesADT` adt
+            then pure [snocOnMainPath (singletonPath (R b)) (R $ rol_id role)]
+            else map (flip snocOnMainPath (R $ rol_id role)) <$> depthFirst bRole
 
 toBool :: List Dependency -> Boolean
 toBool (Cons (V _ (Value s)) _) = s == "true"

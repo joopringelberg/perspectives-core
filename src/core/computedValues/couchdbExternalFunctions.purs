@@ -22,22 +22,22 @@
 
 -- | This module defines External Core functions for model://perspectives.domains#Couchdb.
 
-module Perspectives.Extern.Couchdb where
+module Perspectives.Extern.Couchdb
+  where
 
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.AvarMonadAsk (modify, gets) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
-import Control.Monad.State (State, execState, modify)
+import Control.Monad.State (execState)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
-import Data.Array (catMaybes, cons, filter, foldl, head, union)
+import Data.Array (catMaybes, cons, filter, head, union)
 import Data.Array (union, delete) as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Iterable (toArray)
-import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
@@ -52,7 +52,7 @@ import Effect.Aff.AVar (tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty, fromFoldable, insert, lookup, singleton)
+import Foreign.Object (empty, fromFoldable, singleton)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -66,7 +66,7 @@ import Perspectives.Couchdb.Revision (Revision_, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
-import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, SeparateInvertedQuery(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
+import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -75,7 +75,6 @@ import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.InvertedQuery (addInvertedQueryIndexedByContext, addInvertedQueryIndexedByRole, addInvertedQueryToPropertyIndexedByRole, deleteInvertedQueryFromPropertyTypeIndexedByRole, deleteInvertedQueryIndexedByContext, deleteInvertedQueryIndexedByRole)
 import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
 import Perspectives.ModelDependencies (identifiableLastName, perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
@@ -93,11 +92,8 @@ import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspect
 import Perspectives.PerspectivesState (contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
-import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.Class.Identifiable (identifier)
-import Perspectives.Representation.Context (Context(..)) as CTXT
-import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
-import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..), addInvertedQueryIndexedByTripleKeys, deleteInvertedQueryIndexedByTripleKeys)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance, perspectivesUser2RoleInstance)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), RoleType(..))
@@ -469,109 +465,6 @@ repository :: String -> MonadPerspectivesTransaction String
 repository url' = case getFirstMatch (unsafeRegex "^(.*/).+$" noFlags) url' of
   Nothing -> throwError (error ("Cannot get repository from " <> url'))
   Just s -> pure s
-
--- | Add an InvertedQuery stored in a DomeinFile under invertedQueriesInOtherDomains with the target DomeinFile.
-addInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-addInvertedQuery = modifyInvertedQuery true
-
--- | Remove an InvertedQuery stored in a DomeinFile under invertedQueriesInOtherDomains from the target DomeinFile.
-removeInvertedQuery :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-removeInvertedQuery = modifyInvertedQuery false
-
-modifyInvertedQuery :: Boolean -> SeparateInvertedQuery -> State DomeinFileRecord Unit
-modifyInvertedQuery add = modifyInvertedQuery'
-  where
-    -- Type of the context of the role instance; Type of the role instance to store on; InvertedQuery
-    modifyInvertedQuery' :: SeparateInvertedQuery -> State DomeinFileRecord Unit
-    modifyInvertedQuery' (ContextInvertedQuery embeddingContext roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
-      case lookup roleTypeName enumeratedRoles of
-        -- It should be there! But it seems possible that the author of this model removed roleTypeName
-        -- after the author of the imported model referenced it.
-        Nothing -> dfr
-        Just (EnumeratedRole rr@{contextInvertedQueries}) -> dfr {enumeratedRoles = insert roleTypeName (EnumeratedRole rr {contextInvertedQueries = if add
-          then addInvertedQueryIndexedByContext
-            invertedQuery
-            embeddingContext
-            contextInvertedQueries
-            -- On adding inverted queries in runtime (we're importing a model) we don't execute a synchronization
-            -- test. Hence it is sufficient to just pass on an empty Array.
-            []
-            (EnumeratedRoleType roleTypeName)
-          else deleteInvertedQueryIndexedByContext invertedQuery embeddingContext contextInvertedQueries
-          }) enumeratedRoles}
-
-    modifyInvertedQuery' (RoleInvertedQuery roleType contextTypeName invertedQuery) = void $ modify \dfr@{contexts} ->
-      case lookup contextTypeName contexts of
-        -- It should be there! But it seems possible that the author of this model removed typeName
-        -- after the author of the imported model referenced it.
-        Nothing -> dfr
-        -- Just (Context cr@{}) -> dfr
-        Just (CTXT.Context cr@{roleInvertedQueries}) ->
-          dfr {contexts = insert
-            contextTypeName
-            (CTXT.Context cr {roleInvertedQueries = if add
-              then addInvertedQueryIndexedByRole
-                invertedQuery
-                roleType
-                roleInvertedQueries
-                []
-                (ContextType contextTypeName)
-              else deleteInvertedQueryIndexedByRole invertedQuery roleType roleInvertedQueries
-              })
-            contexts}
-
-    modifyInvertedQuery' (FilledInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
-      case lookup roleTypeName enumeratedRoles of
-        -- It should be there! But it seems possible that the author of this model removed typeName
-        -- after the author of the imported model referenced it.
-        Nothing -> dfr
-        Just (EnumeratedRole rr@{filledInvertedQueries}) -> dfr {enumeratedRoles = insert
-          roleTypeName
-          (EnumeratedRole rr {filledInvertedQueries = if add
-            then addInvertedQueryIndexedByTripleKeys
-              invertedQuery
-              keys
-              filledInvertedQueries
-              []
-              (EnumeratedRoleType roleTypeName)
-            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys filledInvertedQueries})
-          enumeratedRoles}
-
-    modifyInvertedQuery' (FillerInvertedQuery keys roleTypeName invertedQuery) = void $ modify \dfr@{enumeratedRoles} ->
-      case lookup roleTypeName enumeratedRoles of
-        -- It should be there! But it seems possible that the author of this model removed typeName
-        -- after the author of the imported model referenced it.
-        Nothing -> dfr
-        Just (EnumeratedRole rr@{fillerInvertedQueries}) -> dfr {enumeratedRoles = insert
-          roleTypeName
-          (EnumeratedRole rr {fillerInvertedQueries = if add
-            then addInvertedQueryIndexedByTripleKeys
-              invertedQuery
-              keys
-              fillerInvertedQueries
-              []
-              (EnumeratedRoleType roleTypeName)
-            else deleteInvertedQueryIndexedByTripleKeys invertedQuery keys fillerInvertedQueries})
-          enumeratedRoles}
-
-    modifyInvertedQuery' (OnPropertyDelta keys typeName invertedQuery) = void $ modify \dfr@{enumeratedProperties} ->
-      case lookup typeName enumeratedProperties of
-        -- It should be there! But it seems possible that the author of this model removed typeName
-        -- after the author of the imported model referenced it.
-        Nothing -> dfr
-        Just (EnumeratedProperty pr@{onPropertyDelta}) -> dfr {enumeratedProperties = insert typeName
-          (EnumeratedProperty pr { onPropertyDelta = foldl
-            (\iqs roleType -> if add
-              then addInvertedQueryToPropertyIndexedByRole
-                invertedQuery
-                roleType
-                iqs
-                Map.empty
-                (EnumeratedPropertyType typeName)
-              else deleteInvertedQueryFromPropertyTypeIndexedByRole invertedQuery roleType iqs)
-            onPropertyDelta
-            keys})
-          enumeratedProperties }
 
 -- | The argument may be a versioned or unversioned modelURI, e.g. model://perspectives.domains#System@1.1.0
 removeModelFromLocalStore :: Array String ->  RoleInstance -> MonadPerspectivesTransaction Unit

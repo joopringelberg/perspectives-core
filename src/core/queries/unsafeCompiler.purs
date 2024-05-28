@@ -45,7 +45,7 @@ import Data.Traversable (for, maximum, minimum, traverse)
 import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (rol_binding, rol_context, rol_pspType)
+import Perspectives.ContextAndRole (rol_allTypes, rol_binding, rol_context, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, AssumptionTracking, liftToInstanceLevel, (###=), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
@@ -56,7 +56,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
 import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRecursivelyFilledRoles, getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRecursivelyFilledRoles', getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
 import Perspectives.Instances.Values (parseBool, parseNumber)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -416,7 +416,7 @@ compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')
 
-compileFunction (SQD _ (FilledF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getRecursivelyFilledRoles contextType enumeratedRoleType)
+compileFunction (SQD _ (FilledF enumeratedRoleType contextType) _ _ _ ) = pure $ unsafeCoerce (getRecursivelyFilledRoles' contextType enumeratedRoleType)
 
 compileFunction (SQD _ (DataTypeGetterWithParameter functionName parameter) ran _ _ ) = do
   case functionName of
@@ -966,16 +966,19 @@ getDynamicPropertyGetterFromLocalName ln adt = do
 
 getFillerTypeRecursively :: ADT EnumeratedRoleType -> RoleInstance ~~> RoleInstance
 getFillerTypeRecursively adt r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
-  handlePerspectRolError' "binding" []
-  \(role :: PerspectRol) -> if (ST $ rol_pspType role) `equalsOrSpecialisesADT` adt
-    then do
-      tell $ ArrayWithoutDoubles [Filler r]
-      case rol_binding role of
+  handlePerspectRolError' "binding" [] depthFirst
+  where
+  depthFirst :: PerspectRol -> AssumptionTracking (Array RoleInstance)
+  depthFirst role = do
+    tell $ ArrayWithoutDoubles [Filler $ rol_id role]
+    case rol_binding role of
         Nothing -> pure []
-        (Just b) -> pure [b]
-    else case rol_binding role of
-      Nothing -> pure []
-      Just b -> runArrayT $ getFillerTypeRecursively adt b
+        Just b -> do 
+          bRole <- lift $ getPerspectRol b
+          -- een product van alle types?
+          if (PROD $ ST <$> (rol_allTypes bRole)) `equalsOrSpecialisesADT` adt
+            then pure [b]
+            else depthFirst bRole
 
 -- | Just the fillers that come from instances of a particular ContextType.
 bindingInContext :: ContextType -> ADT EnumeratedRoleType -> RoleInstance ~~> RoleInstance

@@ -103,7 +103,6 @@ deleteInvertedQueryIndexedByContext q cType qs = case lookup (unwrap cType) qs o
   Just x -> insert (unwrap cType) (delete q x) qs
 
 -- | Add an InvertedQuery to (the inverted queries of) an EnumeratedRole type, indexed with ContextType.
--- | The inverted queries are stored in the contextInvertedQueries of the EnumeratedRole.
 -- | Their first step is `context`.
 addInvertedQueryIndexedByContext ::
   InvertedQuery ->
@@ -167,16 +166,6 @@ deleteInvertedQueryIndexedByRole :: InvertedQuery -> EnumeratedRoleType -> Objec
 deleteInvertedQueryIndexedByRole q eroleType qs = case lookup (unwrap eroleType) qs of
   Nothing -> qs
   Just x -> insert (unwrap eroleType) (delete q x) qs
-
--- TODO. Dit voegt InvertedQueries samen die apart moeten blijven.
--- addInvertedQuery q@(InvertedQuery{users, states}) qs = case findIndex (equalDescriptions q) qs of
---   Nothing -> cons q qs
---   Just i -> case unsafePartial $ fromJust $ index qs i of
---     InvertedQuery{users:users1, states:states1} -> if ((length $ (union users users1)) == length users)
---       then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {states = union states states1}) qs
---       else if ((length $ (union states states1)) == length states)
---         then unsafePartial $ fromJust $ modifyAt i (\(InvertedQuery qr) -> InvertedQuery $ qr {users = union users users1}) qs
---         else qs
 
 isStateQuery :: InvertedQuery -> Boolean
 isStateQuery (InvertedQuery{users}) = null users

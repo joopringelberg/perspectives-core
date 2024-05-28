@@ -60,7 +60,7 @@ import Foreign.Object (Object, values)
 import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (cacheAndSave, deleteProperty, getSubject)
 import Perspectives.Authenticate (signDelta)
-import Perspectives.CollectAffectedContexts (usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleInstance)
+import Perspectives.CollectAffectedContexts (addDeltasForPerspectiveObjects, usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleBinding', usersWithPerspectiveOnRoleInstance)
 import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
@@ -70,14 +70,14 @@ import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspect
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getRoleOnClipboard, getUnlinkedRoleInstances, isMe, roleType_)
-import Perspectives.ModelDependencies (cardClipBoard, sysUser)
+import Perspectives.ModelDependencies (cardClipBoard)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType, RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
@@ -239,38 +239,24 @@ handleRoleOnContextRemoval roleId = (lift $ try $ (getPerspectRol roleId)) >>= h
 -- | Returns peers with a perspective on the instance.
 -- | Adds StateEvaluations to the current transaction for resources whose state
 -- | is affected when the role instance is removed.
--- STATE EVALUATION and computing peers with a perspective on the instance.
+-- | STATE EVALUATION and computing peers with a perspective on the instance.
+-- | NO SYNCHRONIZATION: of the removal itself; this must be handled in the environment of the calling functions.
 statesAndPeersForRoleInstanceToRemove :: PerspectRol -> MonadPerspectivesTransaction (Array RoleInstance)
 statesAndPeersForRoleInstanceToRemove (PerspectRol{id:roleId, context, pspType:roleType, binding, filledRoles}) = do
   -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from adding Deltas to the transaction
   -- for the continuation of the path beyond the given role instance.
   users1 <- usersWithPerspectiveOnRoleInstance roleType roleId context false
-  -- Users from the inverted queries on the incoming fills relation (the role that fills this role):
-  users2 <- usersWithPerspectiveOnRoleBinding' roleId binding roleType
-  -- Users from the inverted queries on the outgoing fills relation (roles that are filled by this role):
-  -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
-  users3 <- concat <$> for (values filledRoles)
-    \(instancesPerRoleType :: Object (Array RoleInstance)) -> concat <$> values <$> forWithIndex instancesPerRoleType
-      \(roleName :: String) (filledRoles' :: Array RoleInstance) -> concat <$> for filledRoles'
-        \(filledRole :: RoleInstance) -> usersWithPerspectiveOnRoleBinding' filledRole (Just roleId) (EnumeratedRoleType roleName)
-  pure $ nub $ users1 <> users2 <> users3
-
-  where
-
-    usersWithPerspectiveOnRoleBinding' :: RoleInstance -> Maybe RoleInstance -> EnumeratedRoleType -> MonadPerspectivesTransaction (Array RoleInstance)
-    usersWithPerspectiveOnRoleBinding' filled filler filledType = usersWithPerspectiveOnRoleBinding
-      (RoleBindingDelta
-        { filled
-        , filledType
-        , filler
-        , fillerType: Just roleType
-        , oldFiller: Nothing
-        , oldFillerType: Nothing
-        , deltaType: RemoveBinding
-        , subject: ENR $ EnumeratedRoleType sysUser -- is not used
-      })
-      -- Do not run forwards query!
-      false
+  users2 <-  case binding of 
+      -- Users from the inverted queries on the outgoing fills relation (roles that are filled by this role):
+      -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
+      Nothing -> concat <$> for (values filledRoles)
+        \(instancesPerRoleType :: Object (Array RoleInstance)) -> concat <$> values <$> forWithIndex instancesPerRoleType
+          \(roleName :: String) (filledRoles' :: Array RoleInstance) -> concat <$> for filledRoles'
+            \(filledRole :: RoleInstance) -> usersWithPerspectiveOnRoleBinding' filledRole roleId Nothing RemoveBinding false
+      -- Users from the inverted queries on the incoming fills relation (the role that fills this role).
+      -- This function takes into consideration all filleds and all fillers.
+      Just filler -> usersWithPerspectiveOnRoleBinding' roleId filler Nothing RemoveBinding false
+  pure $ nub $ users1 <> users2
 
 -- | SYNCHRONISATION. Compute a RemoveRoleInstance UniverseRoleDelta 
 -- | (but not for external roles: a delta is generated on exiting the context).
@@ -457,6 +443,10 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled
             (modifiedFilled :: PerspectRol) <- lift $ getPerspectRol filled
             lift $ cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
 
+            -- Only now can we compute the deltas that must be sent to other users in case the filled role is a 
+            -- perspective object. The bindingdelta we've just added is a vital part of that.
+            addDeltasForPerspectiveObjects filled
+
             pure users
 
   where
@@ -539,7 +529,6 @@ removeBinding_ filled mFillerId msignedDelta = (lift $ try $ getPerspectRol fill
               Nothing -> signDelta
                 (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
-            handleNewPeer filled
             addDelta (DeltaInTransaction { users, delta: signedDelta})
 
         pure users

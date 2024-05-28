@@ -34,7 +34,7 @@ import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (execWriterT, tell)
 import Data.Array (cons, elemIndex)
-import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
@@ -47,10 +47,10 @@ import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey(..))
 import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain, domain2roleInContext, domain2roleType, queryFunction, range, roleDomain, roleRange)
 import Perspectives.Representation.ADT (ADT(..), ArrayUnions(..), allLeavesInADT, reduce)
 import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, contextOfRepresentation)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, bindingOfRole, contextOfRepresentation)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..))
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Types.ObjectGetters (propertyAliases, roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..))
 import Prelude (class Eq, bind, identity, join, map, not, pure, unit, ($), (&&), (/=), (<#>), (<$>), (<<<), (==), (>>=))
@@ -73,16 +73,18 @@ import Prelude (class Eq, bind, identity, join, map, not, pure, unit, ($), (&&),
 -----------------------------------------------------------
 -- COMPUTING KEYS IN RUN TIME
 -----------------------------------------------------------
--- | Keys for queries from filled to filler.
+-- | Keys for inverted queries from filled to filler.
 -- | Query the InvertedQueryDatase with these keys computed from a RoleBindingDelta,
 -- | where type SetFirstBinding or ReplaceBinding.
+-- | This function starts from a RoleBindingDelta; use `runtimeIndexForFilledQueries` instead if you have the various types.
 runtimeIndexForFilledQueries :: Partial => RoleBindingDelta -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-runtimeIndexForFilledQueries (RoleBindingDelta{filled, filledType, fillerType, filler}) = do 
-  fillerContext <- context' (unsafePartial fromJust $ filler)
-  fillerContextType <- contextType_ fillerContext
+runtimeIndexForFilledQueries (RoleBindingDelta{filled, filledType}) = do 
   filledContext <- context' filled
   filledContextType <- contextType_ filledContext
-  runtimeIndexForFilledQueries' fillerContextType filledType filledContextType (unsafePartial fromJust $ fillerType)
+  -- Don't take the actual filler type; work with the required filler type. That is the type required as binding by the type of the filled.
+  requiredBinding <- bindingOfRole $ ENR filledType
+  results <- for (allLeavesInADT requiredBinding) \(RoleInContext {context:fillerContextType, role: fillerType'}) -> runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType'
+  pure $ join $ ArrayUnions results
 
 -- | Keys for queries from filler to filled.
 runtimeIndexForFilledQueries' :: ContextType -> EnumeratedRoleType -> ContextType -> EnumeratedRoleType -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
@@ -94,6 +96,7 @@ runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fil
     Tuple filledRole_destination filledContext_destination <- filledCombinations
     pure $ RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}
 
+-- | Keys for inverted queries from filler to filled.
 -- | Query the InvertedQueryDatase with these keys computed from a RoleBindingDelta,
 -- | with type SetFirstBinding or ReplaceBinding.
 runtimeIndexForFillerQueries :: Partial => RoleBindingDelta -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
@@ -120,7 +123,7 @@ roleContextCombinations :: EnumeratedRoleType -> ContextType -> MonadPerspective
 roleContextCombinations roleType instantiationContext = do 
   roleTypes <- roleType ###= roleAspectsClosure  
   combinations <- execWriterT $ for roleTypes \role_origin -> do
-    lexicalContext <- lift (getPerspectType roleType >>= pure <<< contextOfRepresentation)
+    lexicalContext <- lift (getPerspectType role_origin >>= pure <<< contextOfRepresentation)
     if lexicalContext == instantiationContext
       then pure unit
       -- Only push this key if it is not a duplicate of the key with the instantiation context!
