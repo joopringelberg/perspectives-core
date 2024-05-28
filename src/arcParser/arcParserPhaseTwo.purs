@@ -186,9 +186,10 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
         Nothing -> cons (ENR roleId) gebruikerRol
         (Just _) -> gebruikerRol}
       -- This is the Enumerated variant of the public role:
-      TI.Public, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR roleId) gebruikerRol of
+      TI.PublicProxy, (Context cr@{gebruikerRol}) -> Context $ cr {gebruikerRol = case elemIndex (ENR roleId) gebruikerRol of
         Nothing -> cons (ENR roleId) gebruikerRol
         (Just _) -> gebruikerRol}
+      TI.Public, ctxt -> ctxt
 
     insertRoleInto (C (CalculatedRole {id:roleId, kindOfRole})) c = case kindOfRole, c of
       TI.RoleInContext, (Context cr@{rolInContext}) -> Context $ cr {rolInContext = cons (CR roleId) rolInContext}
@@ -322,7 +323,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
       pure e
 
     -- SCREENE
-    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole || kind == TI.Public
+    handleParts roleName e@(EnumeratedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole || kind == TI.PublicProxy
       then do
         screen' <- expandPrefix s
         void $ lift $ modify \st@{screens} -> st {screens = Cons screen' screens}

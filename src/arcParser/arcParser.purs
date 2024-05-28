@@ -144,6 +144,7 @@ contextE = withPos do
         Calculation _ _ -> false
         Screen _ -> false
         _ -> true) r.roleParts
+      , kindOfRole = PublicProxy
       }
     -- This case is redundant in the sense that we only apply enumeratedPublicDuplicate to RE parts anyway.
     enumeratedPublicDuplicate p = p

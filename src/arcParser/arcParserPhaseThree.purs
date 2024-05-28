@@ -1454,7 +1454,9 @@ invertPerspectiveObjects = do
         perspectivesInEnumeratedRole (EnumeratedRole{id, perspectives}) = for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (ENR id))
 
         perspectivesInCalculatedRole :: CalculatedRole -> PhaseThree Unit
-        perspectivesInCalculatedRole (CalculatedRole{id, perspectives}) = for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (CR id))
+        perspectivesInCalculatedRole (CalculatedRole{id, perspectives, kindOfRole}) = if kindOfRole == Public
+          then pure unit 
+          else for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (CR id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
         addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly}) = do

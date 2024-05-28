@@ -60,7 +60,7 @@ import Perspectives.Sync.OutgoingTransaction (OutgoingTransaction(..))
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (PublicKeyInfo, Transaction(..), TransactionDestination(..))
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
-import Perspectives.Types.ObjectGetters (isPublicRole)
+import Perspectives.Types.ObjectGetters (isPublicProxy)
 import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier, unschemePerspectivesUser)
 import Prelude (Unit, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (writeJSON)
@@ -177,7 +177,7 @@ addDomeinFileToTransactie dfId = AA.modify (over Transaction \(t@{changedDomeinF
 -- | Otherwise return an empty array.
 -- | Also return an empty array if the PerspectivesUser has been cancelled.
 computeUserRoleBottom :: RoleInstance -> MonadPerspectives (Array (Tuple RoleInstance TransactionDestination))
-computeUserRoleBottom rid = ((map ENR <<< roleType_ >=> isPublicRole) rid) >>= if _ 
+computeUserRoleBottom rid = ((map ENR <<< roleType_ >=> isPublicProxy) rid) >>= if _ 
   then pure [Tuple rid (PublicDestination rid)]
   else perspectivesUsersRole_ rid >>= case _ of 
     Nothing -> pure []

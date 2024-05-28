@@ -122,8 +122,11 @@ propertyAliases rtype = getEnumeratedRole rtype >>= pure <<< _.propertyAliases <
 publicUrl_ :: EnumeratedRoleType -> MonadPerspectives (Maybe Calculation)
 publicUrl_ et = getEnumeratedRole et >>= pure <<< _.publicUrl <<< unwrap
 
-isPublicRole :: RoleType -> MonadPerspectives Boolean
-isPublicRole = roleKindOfRoleType >=> pure <<< eq TI.Public
+isPublicProxy :: RoleType -> MonadPerspectives Boolean
+isPublicProxy = roleKindOfRoleType >=> pure <<< eq TI.PublicProxy
+
+isPublic :: RoleType -> MonadPerspectives Boolean
+isPublic = roleKindOfRoleType >=> \rk -> pure (rk == TI.Public || rk == TI.PublicProxy)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND A ROLETYPE WORKING FROM STRINGS OR ADT'S
@@ -175,13 +178,8 @@ enumeratedUserRole =  ArrayT <<< ((getPerspectType :: ContextType -> MonadPerspe
 -- | Just returns the Enumerated proxies!
 publicUserRole :: ContextType ~~~> RoleType
 publicUserRole = ArrayT <<< 
-  (((getPerspectType :: ContextType -> MonadPerspectives Context) >=> 
-    filterA isPublicRole <<< ContextClass.userRole) >=> 
-    pure <<< filter isEnumerated )
-  where
-    isEnumerated :: RoleType -> Boolean
-    isEnumerated (ENR _) = true
-    isEnumerated (CR _) = false
+  ((getPerspectType :: ContextType -> MonadPerspectives Context) >=> 
+    filterA isPublicProxy <<< ContextClass.userRole)
 
 -- | Returns User RoleTypes that are guaranteed to be Calculated.
 calculatedUserRole :: ContextType ~~~> RoleType
