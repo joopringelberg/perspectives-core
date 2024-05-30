@@ -70,7 +70,7 @@ import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
-import Prelude (class Show, Unit, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
 
 -----------------------------------------------------------
@@ -304,7 +304,7 @@ getAllFilledRoles rid = (try $ getPerspectRol rid) >>=
 getRecursivelyAllFilledRoles :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 getRecursivelyAllFilledRoles rid = do 
   all <- getAllFilledRoles rid
-  join <$> for all getRecursivelyAllFilledRoles
+  append all <<< join <$> for all getRecursivelyAllFilledRoles
 
 -- | Select by providing a filler and retrieve all roles that are filled by it.
 -- | Is especially useful for a public filler, as that carries no inverse administration of the (private) roles it fills.
