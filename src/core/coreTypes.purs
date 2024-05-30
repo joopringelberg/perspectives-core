@@ -53,6 +53,7 @@ module Perspectives.CoreTypes
   , PerspectivesExtraState
   , PerspectivesState
   , PropertyValueGetter
+  , QueryInstances
   , RepeatingTransaction(..)
   , ResourceToBeStored(..)
   , RolInstances
@@ -122,6 +123,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol)
 import Perspectives.Instances.Environment (Environment)
+import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.Persistence.Types (PouchdbState)
 import Perspectives.Persistent.ChangesFeed (EventSource)
 import Perspectives.Repetition (Duration)
@@ -141,6 +143,8 @@ type ContextInstances = Cache (AVar PerspectContext)
 type RolInstances = Cache (AVar PerspectRol)
 type DomeinCache = Cache (AVar DomeinFile)
 
+type QueryInstances = Cache (Array InvertedQuery)
+
 type BrokerService = ConnectAndSubscriptionParameters ( url :: String )
 
 type PerspectivesState = PouchdbState PerspectivesExtraState
@@ -153,6 +157,8 @@ type PerspectivesExtraState =
 
   -- Caching Domein files
   , domeinCache :: DomeinCache
+
+  , queryCache :: QueryInstances
 
   , queryAssumptionRegister :: AssumptionRegister
 

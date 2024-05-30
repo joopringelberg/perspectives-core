@@ -30,9 +30,9 @@ import Data.Nullable (null)
 import Effect.Aff.AVar (AVar, put, read)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
-import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, get, newCache, set, delete)
+import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, delete, get, newCache, set)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, MonadPerspectives)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, RepeatingTransaction, RolInstances, RuntimeOptions, QueryInstances)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
@@ -46,6 +46,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
+  , queryCache: newCache defaultCreateOptions
   , queryAssumptionRegister: empty
   , variableBindings: ENV.empty
   , systemIdentifier: uinfo.systemIdentifier
@@ -95,6 +96,9 @@ contextCache = gets _.contextInstances
 
 roleCache :: MonadPerspectives RolInstances
 roleCache = gets _.rolInstances
+
+queryCache :: MonadPerspectives QueryInstances
+queryCache = gets _.queryCache
 
 domeinCacheLookup :: String -> MonadPerspectives (Maybe (AVar DomeinFile))
 domeinCacheLookup = lookup domeinCache

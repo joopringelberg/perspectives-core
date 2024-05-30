@@ -20,16 +20,33 @@
 
 -- END LICENSE
 
-module Perspectives.InvertedQuery.Storable  where
+module Perspectives.InvertedQuery.Storable
+  ( StorableInvertedQuery
+  , StoredQueries
+  , clearInvertedQueriesDatabase
+  , getContextQueries
+  , getFilledQueries
+  , getFillerQueries
+  , getInvertedQueriesOfModel
+  , getPropertyQueries
+  , getRoleQueries
+  , removeInvertedQueriesContributedByModel
+  , saveInvertedQueries
+  )
+  where
 
 
 import Prelude
 
 import Control.Monad.Error.Class (catchError)
+import Data.Array (concat)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.Traversable (for)
 import Effect.Aff.Class (liftAff)
-import Perspectives.CoreTypes (MonadPerspectives)
+import Effect.Class (liftEffect)
+import LRUCache (defaultGetOptions, get, set)
+import Perspectives.CoreTypes (MonadPerspectives, QueryInstances)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (unversionedModelUri)
 import Perspectives.InvertedQuery (InvertedQuery)
@@ -37,6 +54,7 @@ import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey, serializeInverted
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (Keys(..), addDocuments, createDatabase, deleteDatabase, deleteDocuments, fromBlob, getAttachment, getViewWithDocs)
 import Perspectives.Persistent (invertedQueryDatabaseName)
+import Perspectives.PerspectivesState (queryCache)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Simple.JSON (readJSON)
 
@@ -51,35 +69,52 @@ clearInvertedQueriesDatabase = do
     \_ -> createDatabase iqDatabaseName
   createDatabase iqDatabaseName
 
-getPropertyQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
-getPropertyQueries qs = do 
-  db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTPropertyKeyView" (Keys (qs <#> serializeInvertedQueryKey))
-  pure (storedQueries <#> _.query)
+type QueryGetter = Array RunTimeInvertedQueryKey -> MonadPerspectives StoredQueries
+type QueryCompiler = InvertedQuery -> MonadPerspectives InvertedQuery
 
-getRoleQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
-getRoleQueries qs = do 
-  db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTRoleKeyView" (Keys (qs <#> serializeInvertedQueryKey))
-  pure (storedQueries <#> _.query)
+getQueries :: String -> QueryCompiler -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getQueries viewName queryCompiler = getQueriesFromCache queryCompiler getQueries'
+  where
+  getQueries' :: Array RunTimeInvertedQueryKey -> MonadPerspectives StoredQueries
+  getQueries' qs = do 
+    db <- invertedQueryDatabaseName
+    getViewWithDocs db viewName (Keys (qs <#> serializeInvertedQueryKey))
 
-getContextQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
-getContextQueries qs = do 
-  db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTContextKeyView" (Keys (qs <#> serializeInvertedQueryKey))
-  pure (storedQueries <#> _.query)
+getPropertyQueries :: QueryCompiler -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getPropertyQueries = getQueries "defaultViews/RTPropertyKeyView"
 
-getFillerQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
-getFillerQueries qs = do 
-  db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFillerKeyView" (Keys (qs <#> serializeInvertedQueryKey))
-  pure (storedQueries <#> _.query)
+getRoleQueries :: QueryCompiler -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getRoleQueries = getQueries "defaultViews/RTRoleKeyView"
 
-getFilledQueries :: Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
-getFilledQueries qs = do 
-  db <- invertedQueryDatabaseName
-  (storedQueries :: StoredQueries) <- getViewWithDocs db "defaultViews/RTFilledKeyView" (Keys (qs <#> serializeInvertedQueryKey))
-  pure (storedQueries <#> _.query)
+getContextQueries :: QueryCompiler -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getContextQueries = getQueries "defaultViews/RTContextKeyView"
+
+getFillerQueries ::  QueryCompiler ->Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getFillerQueries = getQueries "defaultViews/RTFillerKeyView"
+
+getFilledQueries ::  QueryCompiler -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getFilledQueries = getQueries "defaultViews/RTFilledKeyView"
+
+storeQueryInCache :: String -> (Array InvertedQuery) -> MonadPerspectives QueryInstances
+storeQueryInCache key queryInstance = queryCache >>= liftEffect <<< (set key queryInstance Nothing)
+
+getQueryFromCache :: RunTimeInvertedQueryKey -> MonadPerspectives (Maybe (Array InvertedQuery))
+getQueryFromCache key = do
+  cache <- queryCache
+  liftEffect $ get (serializeInvertedQueryKey key) defaultGetOptions cache
+
+getQueriesFromCache :: QueryCompiler -> QueryGetter -> Array RunTimeInvertedQueryKey -> MonadPerspectives (Array InvertedQuery)
+getQueriesFromCache queryCompiler queryGetter ks = concat <$> 
+  for ks
+    \key -> do 
+      mQueries <- getQueryFromCache key
+      case mQueries of 
+        Just queries -> pure queries
+        Nothing -> do 
+          (storedQueries :: Array StorableInvertedQuery) <- queryGetter [key]
+          queries <- for storedQueries \{query} -> queryCompiler query
+          void $ storeQueryInCache (serializeInvertedQueryKey key) queries
+          pure queries
 
 saveInvertedQueries :: StoredQueries -> MonadPerspectives Unit
 saveInvertedQueries queries = do 

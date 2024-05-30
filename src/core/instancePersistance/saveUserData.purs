@@ -445,7 +445,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled
 
             -- Only now can we compute the deltas that must be sent to other users in case the filled role is a 
             -- perspective object. The bindingdelta we've just added is a vital part of that.
-            addDeltasForPerspectiveObjects filled
+            void $ addDeltasForPerspectiveObjects filled
 
             pure users
 

@@ -25,12 +25,13 @@ module Perspectives.Data.EncodableMap
   , addAll
   , delete
   , empty
+  , filterKeys
   , insert
   , keys
   , lookup
   , removeAll
-  , values
   , union
+  , values
   )
   where
 
@@ -39,10 +40,9 @@ import Prelude
 import Data.Array (foldr)
 import Data.Array.Partial (head, tail)
 import Data.List (List)
-import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys, union) as Map
-import Data.Map (unionWith)
+import Data.Map (Map, fromFoldable, showTree, toUnfoldable, insert, delete, lookup, values, empty, keys, union, filterKeys, unionWith) as Map
 import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype, over, unwrap)
 import Data.Set (Set)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -97,7 +97,7 @@ keys :: forall k v. EncodableMap k v -> Set k
 keys (EncodableMap mp) = Map.keys mp
 
 instance semigroupEncodableMap :: (Ord k, Semigroup v) => Semigroup (EncodableMap k v) where
-  append (EncodableMap map1) (EncodableMap map2)= EncodableMap (unionWith append map1 map2)
+  append (EncodableMap map1) (EncodableMap map2)= EncodableMap (Map.unionWith append map1 map2)
 
 -- | Add the value to the map for each key.
 addAll :: forall key value. Ord key => value -> EncodableMap key value -> Array key -> EncodableMap key value
@@ -108,3 +108,8 @@ removeAll value = foldr (\key map -> delete key map)
 
 union :: forall k v. Ord k => EncodableMap k v -> EncodableMap k v -> EncodableMap k v
 union (EncodableMap m1) (EncodableMap m2) = EncodableMap (m1 `Map.union` m2) 
+
+-- | Filter out those key/value pairs of a map for which a predicate
+-- | on the key fails to hold.
+filterKeys :: forall k. Ord k => (k -> Boolean) -> EncodableMap k ~> EncodableMap k
+filterKeys criterium = over EncodableMap (Map.filterKeys criterium)

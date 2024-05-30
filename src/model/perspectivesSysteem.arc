@@ -403,10 +403,12 @@ domain model://perspectives.domains#System
             contextcache <- create role Cache
             rolecache <- create role Cache
             domeincache <- create role Cache
+            querycache <- create role Cache
           in
             Name = "contextcache" for contextcache
             Name = "rolecache" for rolecache
             Name = "domaincache" for domeincache
+            Name = "querycache" for querycache
 
     external
       aspect sys:ContextWithScreenState$External

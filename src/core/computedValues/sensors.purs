@@ -72,6 +72,7 @@ sensorFunctions = fromFoldable
   [ Tuple (Tuple "contextcache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "rolecache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "domaincache" "size") (unsafePartial cacheSize)
+  , Tuple (Tuple "querycache" "size") (unsafePartial cacheSize)
   , Tuple (Tuple "clock" "now") (unsafePartial currentDate)
   ]
 
@@ -91,6 +92,9 @@ cacheSize device sensor = show <$> case device, sensor of
     liftEffect $ size cache
   "domaincache", "size" -> do
     cache <- gets _.domeinCache
+    liftEffect $ size cache
+  "querycache", "size" -> do
+    cache <- gets _.queryCache
     liftEffect $ size cache
 
 -- | Read a value from a Sensor on a Device.
