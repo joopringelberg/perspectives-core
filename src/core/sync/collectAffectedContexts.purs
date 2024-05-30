@@ -724,7 +724,7 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
       us <- pure (filter (\(Tuple context users) -> not $ null users) cwus)
       if null us
         then pure unit
-        else computeProperties [(singletonPath (R roleWithPropertyValue))] (filterKeys (\k -> isNothing $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) us
+        else computeProperties [(singletonPath (R roleWithPropertyValue))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) us
       pure $ concat (snd <$> cwus)
   
   where 
