@@ -459,7 +459,7 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled
 -- | we add a new user to the context. This user should have access to
 -- | this context. We will generate Deltas so his PDR can build it from scratch,
 -- | according to his perspective.
--- | Notice that in order to establish whether this role represents `sys:Me`,
+-- | Notice that in order to establish whether this role represents `sys:SocialMe`,
 -- | it needs a binding!
 handleNewPeer :: RoleInstance -> MonadPerspectivesTransaction Unit
 handleNewPeer roleInstance = (lift $ try$ getPerspectRol roleInstance) >>=
