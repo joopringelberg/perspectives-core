@@ -161,6 +161,7 @@ makeTypeTimeOnlyContextStep varName ctype pos = (VarBinding varName (Simple $ Ty
 -- which the unsafeCompiler will ignore.
 makeTypeTimeOnlyRoleStep :: Partial => VarName -> ADT RoleInContext -> ArcPosition -> VarBinding
 makeTypeTimeOnlyRoleStep varName (ST (RoleInContext{context, role})) pos = VarBinding varName (Simple $ TypeTimeOnlyEnumeratedRole pos (unwrap context) (unwrap role))
+makeTypeTimeOnlyRoleStep varName (UET (RoleInContext{context, role})) pos = VarBinding varName (Simple $ TypeTimeOnlyEnumeratedRole pos (unwrap context) (unwrap role))
 
 -- | Produces a step that takes the context of its origin.
 makeContextStep :: VarName -> ArcPosition -> VarBinding

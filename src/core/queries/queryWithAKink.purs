@@ -31,13 +31,12 @@ import Data.Newtype (unwrap)
 import Data.Show.Generic (genericShow)
 import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MP)
 import Perspectives.InvertedQuery (QueryWithAKink(..), backwards)
 import Perspectives.ModelDependencies (mySystem)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, addBinding, lift2, lookupVariableBinding, throwError, withFrame)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.Inversion (invertFunction, queryFunctionIsFunctional, queryFunctionIsMandatory)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, equalsOrGeneralizesDomain, makeComposition, range, replaceDomain, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, composeOverMaybe, domain, makeComposition, range, replaceDomain, roleInContext2Role)
 import Perspectives.Representation.ADT (ADT, allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (getCalculatedProperty)
 import Perspectives.Representation.Class.Property (calculation)
@@ -48,7 +47,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint, prettyPrint')
-import Prelude (class Show, append, bind, discard, join, map, pure, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (class Show, append, bind, discard, eq, join, map, pure, show, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 
 --------------------------------------------------------------------------------------------------------------
 ---- QUERYWITHAKINK
@@ -178,7 +177,12 @@ invert_ q@(BQD dom (BinaryCombinator ComposeF) l r _ f m) = case l of
       --   Nothing, _ -> true
       --   _, _ -> false
       guard $ case range <$> (last right_inverted_steps), domain <$> head left_inverted_steps of
-        Just ranRight, Just domLeft -> ranRight `equalsOrGeneralizesDomain` domLeft
+        -- We had `equalsOrGeneralizesDomain` instead of `eq`. This runs into two implementation problems:
+        --  a. we need `equalsOrGeneralisesRoleInContext`, which is a Monadic function. That seriously complicates the comprehension.
+        --  b. we then need that operation on CDOM (ADT ContextType), which we do not yet have and requires a lot of work.
+        -- Reconsidering, `eq` is probably right anyway. This is because for consequtive query steps, the range of f1 equals 
+        -- the domain of f2 in f1 >> f2. And here we are just juggling around all these combinations.
+        Just ranRight, Just domLeft -> ranRight `eq` domLeft
         -- NOTE that as the backwards part cannot be empty, the next case may not occur.
         _, _ -> false
       -- This is where we invert the order of the steps.
@@ -252,33 +256,38 @@ invert_ q@(SQD dom (VariableLookup varName) _ _ _) = do
     Just qfd -> invert_ qfd
 
 invert_ qfd@(SQD dom@(RDOM roleAdt) f@(PropertyGetter prop@(ENP _)) ran fun man) = do
-  (hasProp :: Boolean) <- lift $ lift $ roleHasProperty roleAdt
+  (hasProp :: Boolean) <- roleHasProperty roleAdt
   if hasProp
     then do
       minvertedF <- invertFunction dom f ran
       case minvertedF of
         Nothing -> pure []
         Just invertedF -> pure [ZQ_ [(SQD ran invertedF dom True True)] Nothing]
-    else ((lift $ lift (expandPropertyQuery roleAdt)) >>= invert_)
+    else (expandPropertyQuery roleAdt) >>= invert_
 
   where
     -- Creates a series of nested binding expressions until the property has been reached.
-    expandPropertyQuery :: ADT RoleInContext -> MP QueryFunctionDescription
+    expandPropertyQuery :: ADT RoleInContext -> PhaseThree QueryFunctionDescription
     expandPropertyQuery adt = do
       hasProp <- roleHasProperty adt
       if hasProp
         then pure (SQD (RDOM adt) (PropertyGetter prop) ran fun man)
         else do 
-          binding <- bindingOfADT adt
-          bindingHasProp <- roleHasProperty binding
-          if bindingHasProp
-            then pure $ makeComposition 
-              (SQD (RDOM adt) (DataTypeGetter FillerF) (RDOM binding) True False)
-              (SQD (RDOM binding) (PropertyGetter prop) ran fun man)
-            else makeComposition <$> pure (SQD (RDOM adt) (DataTypeGetterWithParameter FillerF "direct") (RDOM binding) True False) <*> (expandPropertyQuery binding)
+          mbinding <- lift $ lift $ bindingOfADT adt
+          case mbinding of 
+            Just binding -> do
+              bindingHasProp <- roleHasProperty binding
+              if bindingHasProp
+                then pure $ makeComposition 
+                  (SQD (RDOM adt) (DataTypeGetter FillerF) (RDOM binding) True False)
+                  (SQD (RDOM binding) (PropertyGetter prop) ran fun man)
+                else makeComposition <$> pure (SQD (RDOM adt) (DataTypeGetterWithParameter FillerF "direct") (RDOM binding) True False) <*> (expandPropertyQuery binding)
+            -- No fillers, but we haven't found the property yet. This is an error situation, but the compiler has 
+            -- ensured it cannot happen.
+            Nothing -> throwError (Custom $ "An impossible situation in module Perspectives.Query.Kinked, invert_.expandPropertyQuery. This property cannot be found: " <> show prop)
 
-    roleHasProperty :: ADT RoleInContext -> MP Boolean
-    roleHasProperty adt = allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop)
+    roleHasProperty :: ADT RoleInContext -> PhaseThree Boolean
+    roleHasProperty adt = lift $ lift (allLocallyRepresentedProperties (roleInContext2Role <$> adt) >>= pure <<< isJust <<< (elemIndex prop))
 
 -- The individual takes us to an instance of the range (`ran`), whatever the domain (`dom`) is. RoleIndividual is a constant function.
 -- Its inversion takes us to all instances of the domain.

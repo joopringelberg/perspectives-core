@@ -225,7 +225,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
               \ filled with 'ST EnumeratedRoleType model:System$PerspectivesSystem$User'"
                 case (lookup "model:MyTestDomain$MyUser" dr'.enumeratedRoles) of
                   Nothing -> false
-                  (Just (EnumeratedRole {binding})) -> binding == (ST $ RoleInContext {context: ContextType "model:System$PerspectivesSystem", role: EnumeratedRoleType "model:System$PerspectivesSystem$User"})
+                  (Just (EnumeratedRole {binding})) -> binding == (Just $ ST $ RoleInContext {context: ContextType "model:System$PerspectivesSystem", role: EnumeratedRoleType "model:System$PerspectivesSystem$User"})
 
   -- test "Role has context" do
   --   (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "Context : Domain : MyTestDomain\n  Role : RoleInContext : MyRoleInContext\n    FilledBy : model:MyTestDomain$MyOtherRole" domain
@@ -539,7 +539,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseTwo" do
             -- logShow dr'
             case lookup "model:Feest$Uitje" enumeratedRoles of
               (Just (EnumeratedRole{binding})) -> assert "The binding of Uitje should be an External Role"
-                (binding == (ST $ RoleInContext {context: ContextType "model:Feest$Speeltuin", role: EnumeratedRoleType "model:Feest$Speeltuin$External"}))
+                (binding == (Just $ ST $ RoleInContext {context: ContextType "model:Feest$Speeltuin", role: EnumeratedRoleType "model:Feest$Speeltuin$External"}))
               otherwise -> assert "The binding of Uitje should be an External Role" false
 
   test "Role with a state" do

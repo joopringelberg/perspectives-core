@@ -6,4 +6,4 @@ exports.formatDateTimeImpl = function( epoch, locale, options)
   return new Intl.DateTimeFormat(locale, opts).format( new Date( epoch ) );
 }
 
-exports.pdrVersion = __PDRVersion__;
+exports.pdrVersion = (typeof __PDRVersion__ == 'undefined') ? "" : __PDRVersion__;

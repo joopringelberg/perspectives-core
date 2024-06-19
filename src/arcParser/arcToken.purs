@@ -206,7 +206,7 @@ perspectDef = LanguageDef
                   , "isInState"
 
                   -- Functions in expressions
-                  , "specialisesRoleType"
+                  , "generalisesRoleType"
                   , "roleTypes"
                   , "contextType"
                   , "modelname"

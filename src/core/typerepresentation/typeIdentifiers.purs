@@ -56,7 +56,7 @@ derive instance newtypeContextType :: Newtype ContextType _
 derive instance genericRepContextType :: Generic ContextType _
 
 instance showContextType :: Show ContextType where
-  show i = "ContextType " <> (unwrap i)
+  show i = "ContextType \"" <> (unwrap i) <> "\""
 instance eqContextType :: Eq ContextType where
   eq (ContextType id1) (ContextType id2) = id1 == id2
 instance prettyPrintContextType :: PrettyPrint ContextType where
@@ -70,8 +70,7 @@ derive instance newtypeEnumeratedRolType :: Newtype EnumeratedRoleType _
 derive instance genericRepEnumeratedRolType :: Generic EnumeratedRoleType _
 
 instance showEnumeratedRolType :: Show EnumeratedRoleType where
-  -- show i = "EnumeratedRoleType " <> (unwrap i)
-  show = genericShow
+  show i = "EnumeratedRoleType \"" <> (unwrap i) <> "\""
 instance eqEnumeratedRolType :: Eq EnumeratedRoleType where
   eq (EnumeratedRoleType id1) (EnumeratedRoleType id2) = id1 == id2
 instance ordEnumeratedRoleType :: Ord EnumeratedRoleType where
@@ -153,7 +152,7 @@ newtype EnumeratedPropertyType = EnumeratedPropertyType String
 derive instance newtypeEnumeratedPropertyType :: Newtype EnumeratedPropertyType _
 derive instance genericRepEnumeratedPropertyType :: Generic EnumeratedPropertyType _
 instance showEnumeratedPropertyType :: Show EnumeratedPropertyType where
-  show i = "EnumeratedPropertyType " <> (unwrap i)
+  show i = "EnumeratedPropertyType \"" <> (unwrap i) <> "\""
 instance eqEnumeratedPropertyType :: Eq EnumeratedPropertyType where
   eq (EnumeratedPropertyType id1) (EnumeratedPropertyType id2) = id1 == id2
 instance ordEnumeratedPropertyType :: Ord EnumeratedPropertyType where
@@ -167,7 +166,7 @@ newtype CalculatedPropertyType = CalculatedPropertyType String
 derive instance newtypeCalculatedPropertyType :: Newtype CalculatedPropertyType _
 derive instance genericRepCalculatedPropertyType :: Generic CalculatedPropertyType _
 instance showCalculatedPropertyType :: Show CalculatedPropertyType where
-  show i = "CalculatedPropertyType " <> (unwrap i)
+  show i = "CalculatedPropertyType \"" <> (unwrap i) <> "\""
 instance eqCalculatedPropertyType :: Eq CalculatedPropertyType where
   eq (CalculatedPropertyType id1) (CalculatedPropertyType id2) = id1 == id2
 instance ordCalculatedPropertyType :: Ord CalculatedPropertyType where
@@ -188,8 +187,8 @@ propertytype2string (CP s) = unwrap s
 
 derive instance genericRepPropertyType :: Generic PropertyType _
 instance showPropertyType :: Show PropertyType where
-  show (ENP r) = show r
-  show (CP r) = show r
+  show (ENP r) = "ENP (" <> show r <> ")"
+  show (CP r) = "CP (" <> show r <> ")"
 instance eqPropertyType :: Eq PropertyType where
   eq (ENP _) (CP _) = false
   eq (CP _) (ENP _) = false

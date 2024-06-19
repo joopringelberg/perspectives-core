@@ -40,7 +40,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for_, traverse)
 import Foreign.Object (Object, keys, lookup, union) as OBJ
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), type (~~~>), MP, MonadPerspectives, (###=), (###>>), (###>))
+import Perspectives.CoreTypes (type (~~>), type (~~~>), MP, MonadPerspectives, (###=), (###>), (###>>))
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -54,13 +54,13 @@ import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrSpecialisesADT, equalsOrSpecialisesADT_, reduce, toDisjunctiveNormalForm)
+import Perspectives.Representation.ADT (ADT(..), ExpandedADT, allLeavesInADT, computeExpandedBoolean, equalsOrGeneralises, equalsOrSpecialises, generalises)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Representation.Class.PersistentType (DomeinFileId, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoles, allViews, calculation, getRole, perspectives, perspectivesOfRoleType, roleADT, roleAspects, roleAspectsADT, roleKindOfRoleType, typeIncludingAspects)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, completeExpandedRoleType, expandUnexpandedLeaves, getRole, perspectives, perspectivesOfRoleType, roleADT, roleKindOfRoleType)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -72,7 +72,7 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
 import Perspectives.Utilities (addUnique)
-import Prelude (Unit, append, bind, eq, flip, not, pure, show, unit, ($), (&&), (*>), (/=), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, eq, flip, not, pure, show, unit, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -94,9 +94,6 @@ isMandatory_ et = getEnumeratedRole et >>= pure <<< _.mandatory <<< unwrap
 
 isOptional_ :: EnumeratedRoleType -> MonadPerspectives Boolean
 isOptional_ et = getEnumeratedRole et >>= pure <<< not <<< _.mandatory <<< unwrap
-
-declaredAsPrivate_ :: EnumeratedRoleType -> MonadPerspectives Boolean
-declaredAsPrivate_ et = getEnumeratedRole et >>= pure <<< _.declaredAsPrivate <<< unwrap
 
 -- | The state identifier of the root state of a role has the same string value as the role identifier.
 roleRootState :: EnumeratedRoleType ~~~> StateIdentifier
@@ -134,6 +131,9 @@ isPublic = roleKindOfRoleType >=> \rk -> pure (rk == TI.Public || rk == TI.Publi
 string2RoleType :: String -> MonadPerspectives RoleType
 string2RoleType qualifiedRoleName = getEnumeratedRole (EnumeratedRoleType qualifiedRoleName) *> pure (ENR $ EnumeratedRoleType qualifiedRoleName) <|> pure (CR $ CalculatedRoleType qualifiedRoleName)
 
+string2EnumeratedRoleType :: String -> MonadPerspectives EnumeratedRoleType
+string2EnumeratedRoleType qualifiedRoleName = getEnumeratedRole (EnumeratedRoleType qualifiedRoleName) *> pure (EnumeratedRoleType qualifiedRoleName)
+
 -- | If a role with the given qualified name is available in the Context or its (in)direct aspects,
 -- | return it as a RoleType. From the type we can find out its RoleKind, too.
 lookForRoleType :: String -> (ContextType ~~~> RoleType)
@@ -154,6 +154,31 @@ lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLas
 -- | and then applies a comparison function to the name passed in and the names of all those roles.
 lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> RoleType
 lookForRoleOfADT criterium _ adt =  ArrayT (allRoles adt >>= pure <<< filter criterium)
+
+----------------------------------------------------------------------------------------
+------- FUNCTIONS TO FIND A ROLEINCONTEXT ADT WORKING FROM STRINGS OR ADT'S
+----------------------------------------------------------------------------------------
+
+-- | If a role with the given qualified name is available in the Context or its (in)direct aspects,
+-- | return it as a RoleType. From the type we can find out its RoleKind, too.
+-- lookForRoleType :: String -> (ContextType ~~~> RoleType)
+-- lookForRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextADT >>= lookForRoleTypeOfADT s
+
+-- lookForRoleTypeOfADT :: String -> (ADT ContextType ~~~> RoleType)
+-- lookForRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> ((==) s)) s
+
+-- -- | As lookForRoleType, but then with a local name that should string-match the end of the qualified name.
+-- lookForUnqualifiedRoleType :: String -> ContextType ~~~> RoleType
+-- lookForUnqualifiedRoleType s c = (lift $ getContext c) >>= pure <<< ContextClass.contextADT >>= lookForUnqualifiedRoleTypeOfADT s
+
+-- -- | We simply require the Pattern to match the end of the string.
+-- lookForUnqualifiedRoleTypeOfADT :: String -> ADT ContextType ~~~> RoleType
+-- lookForUnqualifiedRoleTypeOfADT s = lookForRoleOfADT (roletype2string >>> areLastSegmentsOf s) s
+
+-- -- | Constructs the set of all roles in the ADT (recursing on aspects of Enumerated roles)
+-- -- | and then applies a comparison function to the name passed in and the names of all those roles.
+-- lookForRoleOfADT :: (RoleType -> Boolean) -> String -> ADT ContextType ~~~> RoleType
+-- lookForRoleOfADT criterium _ adt =  ArrayT (allRolesInContext adt >>= pure <<< filter criterium)
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS OPERATING DIRECTLY ON CONTEXT TYPE
@@ -286,7 +311,7 @@ lookForProperty criterium adt = ArrayT (allProperties adt >>= pure <<< filter cr
 -- | All properties, computed recursively over binding and Aspects, of the Role.
 propertiesOfRole :: String ~~~> PropertyType
 propertiesOfRole s =
-  ArrayT (getPerspectType (EnumeratedRoleType s) >>= roleADT >>= allProperties <<< map roleInContext2Role)
+  ArrayT (getPerspectType (EnumeratedRoleType s) >>= allRoleProperties)
   <|>
   ArrayT (getPerspectType (CalculatedRoleType s) >>= roleADT >>= allProperties <<< map roleInContext2Role)
 
@@ -294,7 +319,7 @@ propertiesOfRole s =
 ------- FUNCTIONS FOR ASPECTS
 ----------------------------------------------------------------------------------------
 aspectsOfRole :: EnumeratedRoleType ~~~> EnumeratedRoleType
-aspectsOfRole = ArrayT <<< (getPerspectType >=> map (map roleInContext2Role) <<< roleAspects)
+aspectsOfRole = ArrayT <<< (getPerspectType >=> map (map roleInContext2Role) <<< (pure <<< _.roleAspects <<< unwrap))
 
 -- | All types of the role, including the root type itself.
 -- | No doubles.
@@ -420,18 +445,7 @@ computesDatabaseQueryRole qfd = do
     _ -> pure false
   where
     isExternal :: ADT RoleInContext -> MonadPerspectives Boolean
-    isExternal = reduce \(RoleInContext{role}) -> pure $ isExternalRole $ unwrap role
-
---------------------------------------------------------------------------------------------------
----- COMMONTYPESINADT
---------------------------------------------------------------------------------------------------
--- | Compares with commonLeavesInADT (module Perspectives.Representation.ADT).
--- | That function treats each leaf as atomic; here we expand it to the transitive closure of its aspects.
--- | In terms of sets: transform the ADT to Disjunctive Normal Form, expand each type with its aspects
--- |  and then construct the intersection of unions.
-commonTypesInRoleADT :: ADT EnumeratedRoleType ~~~> EnumeratedRoleType
--- commonTypesInADT = unwrap <<< reduce ((pure <<< singleton) :: a -> Identity (Array a))
-commonTypesInRoleADT = ArrayT <$> reduce (runArrayT <<< roleAspectsClosure)
+    isExternal = expandUnexpandedLeaves >=> pure <<< computeExpandedBoolean (\(RoleInContext{role}) -> isExternalRole $ unwrap role)
 
 --------------------------------------------------------------------------------------------------
 ---- ALLTYPESINADT
@@ -448,71 +462,52 @@ allTypesInContextADT :: ADT ContextType ~~~> ContextType
 allTypesInContextADT = ArrayT <<< pure <<< allLeavesInADT >=> contextAspectsClosure
 
 --------------------------------------------------------------------------------------------------
----- EQUALSORGENERALISESROLEADT, EQUALSORSPECIALISESROLEADT, GENERALISESROLEADT, SPECIALISEDROLEADT,
----- SPECIALISESROLETYPE, SPECIALISESROLETYPE_
+---- EQUALSORGENERALISES, EQUALSORSPECIALISES FOR ROLETYPE
 --------------------------------------------------------------------------------------------------
--- | a1 `equalsOrSpecialisesRoleADT` a2
--- | intuitively when a1 is built from a2 (or a1 == a2).
--- | Compares with equalsOrSpecialisesADT (module Perspectives.Representation.ADT)
--- | However, that function works for any a (Ord a, Eq a).
--- | This function works for EnumeratedRoleTypes and takes Aspects into account.
--- | For a function that works with ADT RoleInContext, see: `greaterThanOrEqualTo`.
--- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
-equalsOrSpecialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-equalsOrSpecialisesRoleADT adt1 adt2 = do
-  adt1' <- expandAspects adt1 >>= pure <<< toDisjunctiveNormalForm
-  adt2' <- expandAspects adt2 >>= pure <<< toDisjunctiveNormalForm
-  pure $ equalsOrSpecialisesADT_ adt1' adt2'
-  where
-  expandAspects :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-  expandAspects = reduce (getEnumeratedRole >=> map (map roleInContext2Role) <<< roleAspectsADT)
-
-generalisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-generalisesRoleADT adt1 adt2 = do
-  ne <- pure (adt1 /= adt2)
-  g <- adt1 `equalsOrGeneralisesRoleADT` adt2
-  pure $ ne && g
-
-specialisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-specialisesRoleADT = flip generalisesRoleADT
-
--- | For a function that works with ADT RoleInContext, see: `lessThanOrEqualTo`.
-equalsOrGeneralisesRoleADT :: ADT EnumeratedRoleType -> ADT EnumeratedRoleType -> MP Boolean
-equalsOrGeneralisesRoleADT = flip equalsOrSpecialisesRoleADT
-
--- | R1 `specialisesRoleType` R2 is true, iff R2 is an (indirect) Aspect of R1 or if both are equal.
--- | We want to use this function as the computation behind the query step `specialisesRoleType`:
--- |  filter <expression that yields role types> with specialisesRoleType SomeRole
+-- | t1 <- t2 (NOTICE REVERSED ARROW)
+-- | t1 `generalisesRoleType` t2 is true, if, for example:
+-- |    * t2 is an (indirect) Aspect of t1 or if both are equal.
+-- |    * t2 fills t1.
+-- | The term 'specialisation' should be applied to the level of terms, not to the extension of instances!
+-- | In that sense, a V b is more specialised (extends) than a.
+-- | We want to use this function as the computation behind the query step `generalisesRoleType`:
+-- |  filter <expression that yields role types> with generalisesRoleType SomeRole
 -- | The result must be all role types that, indeed, specialise SomeRole.
--- | hence in the QueryCompiler, we flip `specialisesRoleType`, so we can apply it to SomeRole first
+-- | hence in the QueryCompiler, we flip `generalisesRoleType`, so we can apply it to SomeRole first
 -- | and it is still bound to the second parameter.
 -- | This function yields a single result (it is functional in PL)
-specialisesRoleType :: RoleType -> (RoleType ~~~> Value)
-specialisesRoleType t1 t2 = ArrayT do 
-  x <- (t1 `specialisesRoleType_` t2)
+generalisesRoleType :: RoleType -> (RoleType ~~~> Value)
+generalisesRoleType t1 t2 = ArrayT do 
+  x <- (t1 `generalisesRoleType_` t2)
   pure [Value $ show x]
 
-specialisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
-specialisesRoleType_ t1 t2 = do
-  t1' <- typeIncludingAspects t1
-  t2' <- typeIncludingAspects t2
-  (roleInContext2Role <$> t1') `specialisesRoleADT` (roleInContext2Role <$> t2')
+-- | t1 <- t2 (NOTICE REVERSED ARROW)
+-- | See `generalisesRoleType.`
+generalisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
+generalisesRoleType_ t1 t2 = do 
+  -- expand
+  (et1 :: ExpandedADT RoleInContext) <- completeExpandedRoleType t1
+  (et2 :: ExpandedADT RoleInContext) <- completeExpandedRoleType t2
+  pure (et1 `generalises` et2)
 
 -----------------------------------------------------------
----- LESSTHANOREQUALTO, GREATERTHENOREQUALTO
+---- EQUALSORGENERALISES, EQUALSORSPECIALISES FOR ROLE IN CONTEXT
 -----------------------------------------------------------
--- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
--- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
-lessThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-lessThanOrEqualTo p q = (roleInContext2Role <$> p) `equalsOrGeneralisesRoleADT` (roleInContext2Role <$> q)
+-- | Compares with `equalsOrGeneralises`.
+-- | right -> left (logical implication)
+equalsOrGeneralisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
+equalsOrGeneralisesRoleInContext left right = do 
+  (left' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves left
+  (right' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves right
+  pure (left' `equalsOrGeneralises` right')
 
--- | `q greaterThanOrEqualTo p` means: q is more specific than p, or equal to p
--- | If you use `less specific` instead of `more specific`, flip the arguments.
--- | If you use `more general` instead of `more specific`, flip them, too.
--- | So `less specific` instead of `more general` means flipping twice and is a no-op.
--- | Therefore `less specific` equals `more general`.
-greaterThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-greaterThanOrEqualTo = flip lessThanOrEqualTo
+-- | left -> right
+-- | Compares with `equalsOrSpecialises`.
+equalsOrSpecialisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
+equalsOrSpecialisesRoleInContext left right = do 
+  (left' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves left
+  (right' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves right
+  pure (left' `equalsOrSpecialises` right')
 
 -----------------------------------------------------------
 ---- ISPERSPECTIVEONADT
@@ -520,10 +515,10 @@ greaterThanOrEqualTo = flip lessThanOrEqualTo
 -- | The object of the perspective must be equal to or be a generalisation of the given ADT,
 -- | for the perspective to apply to the ADT.
 -- | <perspective> `isPerspectiveOnADT` <adt>
+-- | objectOfPerspective -> adt
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
--- TODO. #15 Check whether either of the comparants must be extended with its binding.
 isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> MP Boolean
-isPerspectiveOnADT p adt = (roleInContext2Role <$> objectOfPerspective p) `equalsOrGeneralisesRoleADT` (roleInContext2Role <$> adt)
+isPerspectiveOnADT p adt = (objectOfPerspective p) `equalsOrGeneralisesRoleInContext` adt
 
 
 ----------------------------------------------------------------------------------------
@@ -749,11 +744,11 @@ actionStates :: Perspective -> Array StateIdentifier
 actionStates (Perspective {actions}) = stateSpec2StateIdentifier <$> (fromFoldable $ Map.keys (unwrap actions))
 
 -- | perspectiveAspect `isAspectOfPerspective` perspective is true when
--- | the range of the object of `perspective` equalsOrSpecialisesADT the range of the object of `perspectiveAspect`.
+-- | the range of the object of `perspective` equalsOrSpecialises the range of the object of `perspectiveAspect`.
 -- | Notice the `equal` case!
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
-isAspectOfPerspective :: Partial => Perspective -> Perspective -> Boolean
-isAspectOfPerspective perspectiveAspect perspective = (objectOfPerspective perspective) `equalsOrSpecialisesADT` (objectOfPerspective perspectiveAspect)
+isAspectOfPerspective :: Partial => Perspective -> Perspective -> MP Boolean
+isAspectOfPerspective perspectiveAspect perspective = (objectOfPerspective perspective) `equalsOrSpecialisesRoleInContext` (objectOfPerspective perspectiveAspect)
 
 -- | `perspectiveAspect addedToPersective perspective` integreert perspectiveAspect in perspective.
 -- | roleVerbs, propertyVerbs and actions of perspectiveAspect are added to those of perspective.
@@ -774,9 +769,11 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
 -- The function is partial because it should only be used on a QueryFunctionDescription whose range
 -- represents a role type.
 isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boolean)
-isPerspectiveOnSelf qfd = some (
-  lift <<< typeIncludingAspects >=>
-  (\adt -> pure $ (roleRange qfd `equalsOrSpecialisesADT` adt)))
+isPerspectiveOnSelf qfd = 
+  some (\userRole' -> do 
+    expandedADT <- lift $ expandUnexpandedLeaves (roleRange qfd)
+    (lift $ completeExpandedRoleType userRole') >>=
+      (\userRoleAdt -> pure (expandedADT `equalsOrSpecialises` userRoleAdt)))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS

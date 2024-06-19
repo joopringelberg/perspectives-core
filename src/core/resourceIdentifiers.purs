@@ -228,20 +228,22 @@ createPublicIdentifier url s = if isInPublicScheme s
 -- | an URL; make it a Default scheme otherwise
 -- | This function will never create a resource identifier with the model: scheme.
 addSchemeToResourceIdentifier :: Map ResourceType CT.StorageScheme -> ResourceType -> String -> ResourceIdentifier
-addSchemeToResourceIdentifier map t s = case lookup t map of
-  Nothing -> if isUrl s
+addSchemeToResourceIdentifier map t s = if isInPublicScheme s
+  then s
+  else if isUrl s
     then addPublicScheme s
-    else createDefaultIdentifier s
-  Just (CT.Default _) -> createDefaultIdentifier s
-  Just (CT.Local dbName) -> createLocalIdentifier dbName s
-  Just (CT.Remote url) -> createRemoteIdentifier url s
-  
+    else case lookup t map of
+      Nothing -> createDefaultIdentifier s
+      Just (CT.Default _) -> createDefaultIdentifier s
+      Just (CT.Local dbName) -> createLocalIdentifier dbName s
+      Just (CT.Remote url) -> createRemoteIdentifier url s
 
 -----------------------------------------------------------
 -- GET THE SCHEME
 -----------------------------------------------------------
 type Scheme = String
 
+-- | The prefix up to but not including the colon.
 getResourceIdentifierScheme :: ResourceIdentifier -> Maybe Scheme
 getResourceIdentifierScheme s = case match resourceIdentifierRegEx s of 
   Nothing -> Nothing

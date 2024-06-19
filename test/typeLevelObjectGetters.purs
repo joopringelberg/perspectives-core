@@ -18,7 +18,7 @@ import Perspectives.Representation.Class.Role (allProperties, roleADT)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadAndCompileArcFile)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, propertiesOfRole, specialisesRoleType)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, propertiesOfRole, generalisesRoleType)
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP, withSimpleChat, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -61,10 +61,10 @@ theSuite = suite "Perspectives.Types.ObjectGetters" do
     -- logShow r
     liftAff $ assert "There should be 9 roletypes" (length r == 9)
 
-  test "chat:Chat$Initiator `specialisesRoleType` sys:Invitation$Inviter" $ runP $ withSimpleChat do
-    r <- (ENR $ EnumeratedRoleType "model:System$Invitation$Inviter") ###>> specialisesRoleType (ENR $ EnumeratedRoleType "model:SimpleChat$Chat$Initiator")
+  test "chat:Chat$Initiator `generalisesRoleType` sys:Invitation$Inviter" $ runP $ withSimpleChat do
+    r <- (ENR $ EnumeratedRoleType "model:System$Invitation$Inviter") ###>> generalisesRoleType (ENR $ EnumeratedRoleType "model:SimpleChat$Chat$Initiator")
     -- logShow r
-    liftAff $ assert "chat:Chat$Initiator `specialisesRoleType` sys:Invitation$Inviter should be true" (r == Value "true")
+    liftAff $ assert "chat:Chat$Initiator `generalisesRoleType` sys:Invitation$Inviter should be true" (r == Value "true")
 
   test "allProperties, EnumeratedRoleType" $ runP $ withSystem do
     ps1 <- allProperties (ST $ EnumeratedRoleType "model:System$PerspectivesSystem$User")

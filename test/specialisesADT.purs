@@ -9,7 +9,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Representation.ADT2 (ADT(..), DNF, ExpandedADT(..), equalsOrSpecialisesADT, expand)
+import Perspectives.Representation.ADT (ADT(..), DNF, ExpandedADT(..), equalsOrSpecialises, expand)
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, test)
@@ -27,7 +27,7 @@ modelDirectory = "src/model"
 theSuite :: Free TestF Unit
 theSuite = suite "Test.Perspectives.Representation.ADT.SpecialisesADT" do
 
-  test "equalsOrSpecialisesADT" $ runP do
+  test "equalsOrSpecialises" $ runP do
     -- LEFT = ST
     comparisonTest (ST 1) (ST 1)
     comparisonTest (ST 1) (PROD [ST 1])
@@ -52,7 +52,7 @@ theSuite = suite "Test.Perspectives.Representation.ADT.SpecialisesADT" do
     flip negatedComparisonTest (SUM [ST 1, ST 2, ST 3]) (SUM [ST 1, SUM[ ST 1, ST 2, ST 4], SUM [ST 1, ST 3]])
     
     -- Other
-    liftAff $ assert "not (ST 1 <= ST 2)" $ not (unwrap (equalsOrSpecialisesADT <$> expandInIdentity (ST 1) <*> expandInIdentity (ST 2)))
+    liftAff $ assert "not (ST 1 <= ST 2)" $ not (unwrap (equalsOrSpecialises <$> expandInIdentity (ST 1) <*> expandInIdentity (ST 2)))
 
 
 showDNF :: forall a. Show a => String -> DNF a -> MonadPerspectives Unit
@@ -61,23 +61,22 @@ showDNF comment adt = do
   log $ prettyPrint adt
   log "\n" 
 
-expandInIdentity :: ADT String Int -> Identity (ExpandedADT String Int)
+expandInIdentity :: ADT Int -> Identity (ExpandedADT Int)
 expandInIdentity = expand (unsafePartial expandInIdentity')
   where 
-  expandInIdentity' :: Partial => ADT String Int -> Identity (ExpandedADT String Int)
+  expandInIdentity' :: Partial => ADT Int -> Identity (ExpandedADT Int)
   expandInIdentity' adt = case adt of
     ST x -> Identity $ EST x
     UET x -> Identity $ EST x
-    CT label x -> ECT label <$> (expandInIdentity x)
 
-comparisonTest_ :: (Boolean -> Boolean) -> ADT String Int -> ADT String Int -> MonadPerspectives Unit
-comparisonTest_ op left right = liftAff $ assert showComparison (op $ unwrap (equalsOrSpecialisesADT <$> (expandInIdentity left) <*> (expandInIdentity right)))
+comparisonTest_ :: (Boolean -> Boolean) -> ADT Int -> ADT Int -> MonadPerspectives Unit
+comparisonTest_ op left right = liftAff $ assert showComparison (op $ unwrap (equalsOrSpecialises <$> (expandInIdentity left) <*> (expandInIdentity right)))
   where
     showComparison :: String
     showComparison = "\n" <> prettyPrint left <> "\n <= \n" <> prettyPrint right
 
-comparisonTest :: ADT String Int -> ADT String Int -> MonadPerspectives Unit
+comparisonTest :: ADT Int -> ADT Int -> MonadPerspectives Unit
 comparisonTest = comparisonTest_ identity
 
-negatedComparisonTest :: ADT String Int -> ADT String Int -> MonadPerspectives Unit
+negatedComparisonTest :: ADT Int -> ADT Int -> MonadPerspectives Unit
 negatedComparisonTest = comparisonTest_ not

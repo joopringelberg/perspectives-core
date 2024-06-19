@@ -66,7 +66,7 @@ import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), State
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..)) 
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.Range (Duration_(..), Range(..), isDate, isPDuration, isPMonth, isTime, isTimeDuration)
@@ -140,18 +140,18 @@ compileAndSaveRole dom step (CalculatedRole cr@{id, kindOfRole, pos}) considerFu
 -- | Ensures that the range of the QueryFunctionDescription is a qualified
 -- | EnumeratedRole.
 qualifyReturnsClause :: ArcPosition -> QueryFunctionDescription -> PhaseThree QueryFunctionDescription
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args r@(RDOM (ST (RoleInContext{context:embeddingContext, role:computedType}))) isF isM) = do
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreRoleGetter f) args r@(RDOM (UET (RoleInContext{context:embeddingContext, role:computedType}))) isF isM) = do
   -- Note that it doesn't matter if we take the roles from the cache or from
   -- PhaseThreeState: the role identifiers are identical.
   enumeratedRoles <- (lift $ gets _.dfr) >>= pure <<< _.enumeratedRoles
   computedTypeADT <- catchError
-    (ST <$> qualifyLocalEnumeratedRoleName pos (unwrap computedType) (keys enumeratedRoles))
-    (\_ -> lift $ lift $ getEnumeratedRole computedType >>= \(EnumeratedRole{id}) -> pure $ ST id)
+    (UET <$> qualifyLocalEnumeratedRoleName pos (unwrap computedType) (keys enumeratedRoles))
+    (\_ -> lift $ lift $ getEnumeratedRole computedType >>= \(EnumeratedRole{id}) -> pure $ UET id)
   case computedTypeADT of
-    ST qComputedType | computedType == qComputedType -> pure qfd
+    UET qComputedType | computedType == qComputedType -> pure qfd
     _ -> pure (MQD dom' (QF.ExternalCoreRoleGetter f) args r isF isM)
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCorePropertyGetter f) args (VDOM ran mrop) isF isM) = pure qfd
-qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (ST (ContextType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ExternalCoreContextGetter"
+qualifyReturnsClause pos qfd@(MQD dom' (QF.ExternalCoreContextGetter f) args (CDOM (UET (ContextType computedType))) isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ExternalCoreContextGetter"
 qualifyReturnsClause pos qfd@(MQD dom' (QF.ForeignRoleGetter f) args ran isF isM) = throwError $ Custom "qualifyReturnsClause: implement case ForeignRoleGetter"
 qualifyReturnsClause pos qfd = pure qfd
 
@@ -307,14 +307,14 @@ compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
   mindexedContextType <- isIndexedContext ident
   case mindexedContextType of
-    Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (ST indexedContextType)) True True
+    Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
     Nothing -> do
       mindexedRoleType <- isIndexedRole ident
       case mindexedRoleType of
         Just role -> do
           -- For context, we take the syntactically embedding context type of the indexed role.
           context <- lift2 $ enumeratedRoleContextType role
-          pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (ST (RoleInContext {context, role}))) True True
+          pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True
         Nothing -> case currentDomain of
           (CDOM c) -> do
             (rts :: Array RoleType) <- if isTypeUri ident
@@ -324,6 +324,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
               else if ident == "External"
                 then case c of
                   (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
+                  (UET (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
                   otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
                 else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
             case uncons rts of
@@ -345,11 +346,11 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
 compileSimpleStep currentDomain (PublicRole pos ident) = do
   rType <- lift2 $ roleType_ (RoleInstance ident)
   cType <- lift2 $ enumeratedRoleContextType rType
-  pure $ SQD currentDomain (QF.PublicRole (RoleInstance ident)) (RDOM $ ST $ RoleInContext {context: cType, role: rType}) True True
+  pure $ SQD currentDomain (QF.PublicRole (RoleInstance ident)) (RDOM $ UET $ RoleInContext {context: cType, role: rType}) True True
 
 compileSimpleStep currentDomain (PublicContext pos ident) = do
   rType <- lift2 $ contextType_ (ContextInstance ident)
-  pure $ SQD currentDomain (QF.PublicContext (ContextInstance ident)) (CDOM $ ST $ rType) True True
+  pure $ SQD currentDomain (QF.PublicContext (ContextInstance ident)) (CDOM $ UET $ rType) True True
 
 compileSimpleStep currentDomain s@(Value pos range stringRepresentation) = pure $
   SQD currentDomain (QF.Constant range stringRepresentation) (VDOM range Nothing) True True
@@ -358,10 +359,9 @@ compileSimpleStep currentDomain s@(Filler pos membeddingContext) = do
   case currentDomain of
     RDOM (r :: ADT RoleInContext) -> do
       -- The binding of a role is always an ADT RoleInContext.
-      (adtOfBinding :: (ADT RoleInContext)) <- lift2 $ bindingOfADT r
-      case adtOfBinding of
-        UNIVERSAL -> throwError $ RoleHasNoBinding pos (roleInContext2Role <$> r)
-        otherwise -> case membeddingContext of
+      (madtOfBinding :: Maybe (ADT RoleInContext)) <- lift2 $ bindingOfADT r
+      unsafePartial case madtOfBinding of
+        Just adtOfBinding -> case membeddingContext of
           Nothing -> pure $ SQD currentDomain (QF.DataTypeGetter FillerF) (RDOM adtOfBinding) True False
           -- This is the step type "binding in <context type>".
           Just context -> if isTypeUri context
@@ -394,7 +394,7 @@ compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
         -- role (binder).
         Nothing -> do
           EnumeratedRole{context} <- lift2 $ getEnumeratedRole qBinderType
-          pure $ SQD currentDomain (QF.FilledF qBinderType context) (RDOM (ST $ RoleInContext{context, role: qBinderType})) False False
+          pure $ SQD currentDomain (QF.FilledF qBinderType context) (RDOM (UET $ RoleInContext{context, role: qBinderType})) False False
         Just context -> if isTypeUri context
           then pure $ SQD currentDomain (QF.FilledF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder (ContextType context) ) False False
           -- Try to qualify the name within the Domain.
@@ -410,7 +410,7 @@ compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
 compileSimpleStep currentDomain s@(Context pos) = do
   case currentDomain of
     (RDOM (r :: ADT RoleInContext)) -> do
-      (typeOfContext :: ADT ContextType) <- lift2 $ contextOfADT r
+      (typeOfContext :: ADT ContextType) <- pure $ contextOfADT r
       pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext) True True
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
@@ -504,13 +504,13 @@ compileSimpleStep currentDomain s@(RegEx pos (reg :: RegExP)) = do
     otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
 
 compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
-  SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (ST $ ContextType ctype)) True True
+  SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (UET $ ContextType ctype)) True True
 
-compileSimpleStep currentDomain s@(TypeTimeOnlyEnumeratedRole pos ctype rtype) = pure $ SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM $ ST $ RoleInContext {context: ContextType ctype, role: (EnumeratedRoleType rtype)}) True True
+compileSimpleStep currentDomain s@(TypeTimeOnlyEnumeratedRole pos ctype rtype) = pure $ SQD currentDomain (QF.TypeTimeOnlyEnumeratedRoleF rtype) (RDOM $ UET $ RoleInContext {context: ContextType ctype, role: (EnumeratedRoleType rtype)}) True True
 
 compileSimpleStep currentDomain s@(TypeTimeOnlyCalculatedRole pos rtype) = do
   -- Get the ADT for the calculated role.
-  roleAdt <- lift $ lift $ getRoleADTFromString rtype
+  roleAdt <- lift $ lift $ getRoleADTFromString (CalculatedRoleType rtype)
   pure $ SQD currentDomain (QF.TypeTimeOnlyCalculatedRoleF rtype) (RDOM roleAdt) True True
 
 compileSimpleStep currentDomain s@(Extern pos) = do
@@ -528,7 +528,7 @@ compileSimpleStep currentDomain s@(IndexedName pos) = do
 
 compileSimpleStep currentDomain (Identity _) = do
   isFunctional <- case currentDomain of
-    RDOM r -> (lift $ lift $ adtIsFunctional (map roleInContext2Role r)) >>= if _ then pure True else pure False
+    RDOM r -> (lift $ lift $ adtIsFunctional r) >>= if _ then pure True else pure False
     _ -> pure Unknown
   pure $ SQD currentDomain (QF.DataTypeGetter IdentityF) currentDomain isFunctional True
 
@@ -832,13 +832,13 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
                   ComputedRange r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
                   OtherType s -> (lift $ lift $ typeExists (ContextType s)) >>= if _
                     -- Collect Context instances.
-                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (ST (ContextType s))) isFunctional Unknown
+                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (UET (ContextType s))) isFunctional Unknown
 
                     -- Collect role instances. Having no other information, we conjecture these instances to have their
                     -- role type in their lexical context.
                     else do
                       context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType s)
-                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context, role: EnumeratedRoleType s})) isFunctional Unknown
+                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context, role: EnumeratedRoleType s})) isFunctional Unknown
               else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
       else do
         compiledArgs <- traverse (compileStep currentDomain) arguments
@@ -848,7 +848,7 @@ compileComputationStep currentDomain (ComputationStep {functionName, arguments, 
           ComputedRange r -> 
             pure $ MQD currentDomain (QF.ForeignPropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
           OtherType s -> 
-            pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (ST $ RoleInContext {context: ContextType "", role: EnumeratedRoleType s})) Unknown Unknown
+            pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context: ContextType "", role: EnumeratedRoleType s})) Unknown Unknown
 
   -- where
 

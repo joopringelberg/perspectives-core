@@ -36,7 +36,7 @@ import Perspectives.Data.EncodableMap (EncodableMap, empty, lookup, insert)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Calculation, RoleInContext(..))
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ADT, DNF(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -55,10 +55,6 @@ type EnumeratedRoleRecord =
   , _rev :: Revision_
   , displayName :: String
   , kindOfRole :: RoleKind
-  -- An EnumeratedRole instance is public if its context is public,
-  -- unless it has been explicitly declared private.
-  -- TODO. This may be obsolete by now (March 10 2023)
-  , declaredAsPrivate :: Boolean
   , context :: ContextType
   , views :: Array ViewType
   , pos :: ArcPosition
@@ -72,7 +68,8 @@ type EnumeratedRoleRecord =
   -- property values can be saved under their alias name in instances.
   , propertyAliases :: OBJ.Object (EnumeratedPropertyType)
 
-  , binding :: ADT RoleInContext
+  , binding :: Maybe (ADT RoleInContext)
+  , completeType :: DNF RoleInContext
 
   , functional :: Boolean
   , mandatory :: Boolean
@@ -92,20 +89,21 @@ type EnumeratedRoleRecord =
 
   }
 
-defaultEnumeratedRole :: String -> String -> RoleKind -> String -> Boolean -> ArcPosition -> EnumeratedRole
-defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = EnumeratedRole
+defaultEnumeratedRole :: String -> String -> RoleKind -> String -> ArcPosition -> EnumeratedRole
+defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   { id: EnumeratedRoleType qname
   , _rev: Nothing
   , displayName: dname
   , kindOfRole: kindOfRole
-  , declaredAsPrivate
 
   , roleAspects: []
   , properties: []
   , propertyAliases: OBJ.empty
 
   , context: ContextType context
-  , binding: EMPTY
+  -- This means: no restrictions. In order to prohibit a filler, the modeller should have specified "None"
+  , binding: Nothing
+  , completeType: DST $ RoleInContext {context: ContextType context, role: EnumeratedRoleType qname}
 
   , views: []
 
@@ -125,6 +123,7 @@ defaultEnumeratedRole qname dname kindOfRole context declaredAsPrivate pos = Enu
   , indexedRole: Nothing
   , unlinked: false
   , publicUrl: Nothing
+
   }
 
 derive instance genericRepEnumeratedRole :: Generic EnumeratedRole _

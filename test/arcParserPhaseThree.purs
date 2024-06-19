@@ -46,7 +46,7 @@ import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureE
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, TestSuite, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError) 
+import Text.Parsing.Parser (ParseError)
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do
@@ -138,7 +138,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                       (Just (EnumeratedRole{binding})) -> assert
                         "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+                        (binding == (Just $ ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")})))
 
   test "Testing qualifyBindings: qualified reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy model:MyTestDomain$Bound\n  thing Bound (mandatory)" ARC.domain
@@ -160,7 +160,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                       (Just (EnumeratedRole{binding})) -> assert
                         "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+                        (binding == (Just $ ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")})))
 
   test "Testing qualifyBindings: prefixed reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  use my for model:MyTestDomain\n  thing Binder (mandatory) filledBy my:Bound\n  thing Bound (mandatory)" ARC.domain
@@ -182,7 +182,7 @@ theSuite = suite "Perspectives.Parsing.Arc.PhaseThree" do
                       Nothing -> assert "The model should have role 'model:MyTestDomain$Binder'." false
                       (Just (EnumeratedRole{binding})) -> assert
                         "The binding of 'model:MyTestDomain$Binder' should be 'model:MyTestDomain$Bound'"
-                        (binding == ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")}))
+                        (binding == (Just $ ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$Bound")})))
 
   test "Testing qualifyBindings: missing reference." do
     (r :: Either ParseError ContextE) <- {-pure $ unwrap $-} runIndentParser "domain MyTestDomain\n  thing Binder (mandatory) filledBy Bount\n  thing Bound (mandatory)" ARC.domain

@@ -316,6 +316,7 @@ conditionSatisfied :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransa
 conditionSatisfied roleId stateId = do
   compiledState <- getCompiledState stateId
   (Tuple bools (ArrayWithoutDoubles a0) :: WithAssumptions Value) <- lift $ runMonadPerspectivesQuery roleId compiledState.query
+  log $ "We are stil in " <> (show stateId)
   d <- isUndetermined a0
   if (not null a0) && d 
     then pure Undetermined

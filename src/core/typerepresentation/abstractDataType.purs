@@ -31,7 +31,7 @@
 -- |
 -- | * `PROD x EMPTY` equals `EMPTY`
 
-module Perspectives.Representation.ADT where
+module Perspectives.Representation.ADT.Old where
 
 import Data.Array (catMaybes, concat, elemIndex, filter, findIndex, intercalate, intersect, length, nub, null, singleton, uncons, union)
 import Data.Array.Partial (head) as AP
@@ -47,6 +47,7 @@ import Data.Set (fromFoldable, subset)
 import Data.Traversable (traverse)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 import Prelude (class Applicative, class Apply, class Bind, class Eq, class Functor, class Monad, class Ord, class Show, bind, eq, flip, map, pure, show, ($), (&&), (/=), (<$>), (<*>), (<<<), (<>), (==), (>>>))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
@@ -67,6 +68,14 @@ instance showADT :: (Show a) => Show (ADT a) where
   show (SUM adts) = "(" <> "SUM" <> show adts <> ")"
   show (PROD adts) = "(" <> "PROD" <> show adts <> ")"
   show UNIVERSAL = "UNIVERSAL"
+
+instance x :: (Show a) => PrettyPrint (ADT a) where 
+  prettyPrint' t a@(ST _) = t <> show a
+  prettyPrint' t (PROD terms) = t <> "PROD\n" <> (intercalate "\n" $ prettyPrint' (t <> "  ") <$> terms)
+  prettyPrint' t (SUM terms) = t <> "SUM\n" <> (intercalate "\n" $ prettyPrint' (t <> "  ") <$> terms)
+  prettyPrint' t UNIVERSAL = t <> "UNIVERSAL"
+  prettyPrint' t EMPTY = t <> "EMPTY"
+  
 
 instance eqADT :: (Eq a) => Eq (ADT a) where
   eq b1 b2 = genericEq b1 b2
@@ -273,20 +282,20 @@ allLeavesInADT UNIVERSAL = []
 --------------------------------------------------------------------------------------------------
 ---- SPECIALISESADT
 --------------------------------------------------------------------------------------------------
--- | a1 `equalsOrGeneralisesADT` a2
+-- | a1 `equalsOrGeneralises` a2
 -- | intuitively when a2 is built from a1 (or a2 == a1).
 -- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
-equalsOrSpecialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrSpecialisesADT adt1 adt2 = let
+equalsOrSpecialises :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrSpecialises adt1 adt2 = let
   (adt1' :: ADT a) = toDisjunctiveNormalForm adt1
   adt2' = toDisjunctiveNormalForm adt2
   in
-  equalsOrSpecialisesADT_ adt1' adt2'
+  equalsOrSpecialises_ adt1' adt2'
 
--- | a1 `equalsOrSpecialisesADT_` a2
+-- | a1 `equalsOrSpecialises_` a2
 -- | intuitively when a2 is built from a1 (or a2 == a1).
-equalsOrSpecialisesADT_ :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrSpecialisesADT_ a1 a2 = 
+equalsOrSpecialises_ :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrSpecialises_ a1 a2 = 
   case a1 of 
     EMPTY -> true
     UNIVERSAL -> case a2 of 
@@ -297,23 +306,23 @@ equalsOrSpecialisesADT_ a1 a2 =
       UNIVERSAL -> true
       r@(ST _) -> l == r
       PROD rs -> [l] == rs
-      SUM rs -> isJust $ findIndex (\r -> l `equalsOrSpecialisesADT_` r) rs
+      SUM rs -> isJust $ findIndex (\r -> l `equalsOrSpecialises_` r) rs
     PROD ts -> case a2 of
       EMPTY -> false
       UNIVERSAL -> true
       r@(ST _) -> isJust $ elemIndex r ts
       PROD rs -> ts `superset` rs
-      SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialisesADT_` r) rs 
-    SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialisesADT_` a2 else false) true ls
+      SUM rs -> isJust $ findIndex (\r -> PROD ts `equalsOrSpecialises_` r) rs 
+    SUM ls -> foldl (\allTrue l -> if allTrue then l `equalsOrSpecialises_` a2 else false) true ls
   where
   superset :: forall x. Ord x => Eq x => Array x -> Array x -> Boolean
   superset super sub = (fromFoldable sub) `subset` (fromFoldable super)
 
-generalisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-generalisesADT adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralisesADT` adt2
+generalises :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+generalises adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralises` adt2
 
-specialisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-specialisesADT = flip generalisesADT
+specialises :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+specialises = flip generalises
 
-equalsOrGeneralisesADT :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
-equalsOrGeneralisesADT = flip equalsOrSpecialisesADT
+equalsOrGeneralises :: forall a. Ord a => Eq a => ADT a -> ADT a -> Boolean
+equalsOrGeneralises = flip equalsOrSpecialises

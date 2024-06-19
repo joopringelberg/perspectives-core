@@ -29,14 +29,15 @@ import Data.Map (Map, values) as Map
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (typeLevelKeyForContextQueries, typeLevelKeyForFilledQueries, typeLevelKeyForFillerQueries, typeLevelKeyForPropertyQueries, typeLevelKeyForRoleQueries)
+import Perspectives.ArrayUnions (ArrayUnions(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), backwards, forwards)
 import Perspectives.InvertedQueryKey (serializeInvertedQueryKey)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo', addStorableInvertedQuery, getsDF, throwError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, makeComposition, mandatory, range)
-import Perspectives.Representation.ADT (ADT(..), ArrayUnions(..), allLeavesInADT)
+import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription(..), Range, RoleInContext(..), domain, domain2roleInContext, makeComposition, mandatory, range)
+import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Perspective (ModificationSummary)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -240,7 +241,6 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               SQD ran' (FilledF role context) dom' True man')
           filter
       case dom of
-        (RDOM EMPTY) -> pure unit
         _ -> lift $ addStorableInvertedQuery
           { keys: serializeInvertedQueryKey <$> keys 
           , queryType: "RTFillerKey"

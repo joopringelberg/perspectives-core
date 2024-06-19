@@ -20,29 +20,28 @@
 
 -- END LICENSE
 
-module Perspectives.Representation.Class.Role where
-
+module Perspectives.Representation.Class.Role.Old where
+{-
 import Control.Monad.Error.Class (throwError)
 import Control.Plus (empty, map, (<|>))
-import Data.Array (cons, foldMap, uncons)
+import Data.Array (cons, foldMap, null)
 import Data.Map (Map)
-import Data.Maybe (Maybe(..))
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (unwrap)
 import Data.Set (subset, fromFoldable)
-import Data.Traversable (traverse)
+import Data.Traversable (sequence, traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Exception (error) 
-import Foreign.Object (Object, toArrayWithKey) 
+import Effect.Exception (error)
+import Foreign.Object (Object, toArrayWithKey)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, domain2roleType, range, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, domain2roleType, range, roleDomain, roleInContext2Role, roleRange)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
-import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce)
+import Perspectives.Representation.ADT (ADT(..), commonLeavesInADT, product, reduce, toDisjunctiveNormalForm)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.Context (roles)
+import Perspectives.Representation.Class.Context (roles, rolesInContext)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -50,7 +49,7 @@ import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleKind, RoleType(..), ViewType)
-import Prelude (class Show, bind, flip, pure, ($), (<$>), (<<<), (<>), (>=>), (>>=), (<*>))
+import Prelude (class Show, bind, flip, pure, ($), (<$>), (<*>), (<<<), (<>), (>=>), (>>=), (==))
 
 -----------------------------------------------------------
 -- ROLE TYPE CLASS
@@ -60,17 +59,23 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   kindOfRole :: r -> RoleKind
   displayName :: r -> String
   roleAspects :: r -> MonadPerspectives (Array RoleInContext)
+  roleAspectsInProduct :: r -> MonadPerspectives (ADT RoleInContext)
   context :: r -> MP (ADT ContextType)
   contextOfRepresentation :: r -> ContextType
   binding :: r -> MonadPerspectives (ADT RoleInContext)
+  -- When no fillers are allowed, we write EMPTY. However, on constructing the larger types
+  -- for the role, we must leave it out; otherwise these will all end up as empty.
+  bindingInCompoundType :: r -> MonadPerspectives (ADT RoleInContext)
   functional :: r -> MonadPerspectives Boolean
   mandatory :: r -> MonadPerspectives Boolean
   calculation :: r -> MonadPerspectives QueryFunctionDescription
-  -- | The type of the Role. For an EnumeratedRole this is just `ST EnumeratedRoleType`.
+  -- | The type of the Role combined with its Context.
   -- | For a CalculatedRole it is the range of its calculation.
   roleADT :: r -> MonadPerspectives (ADT RoleInContext)
-  -- | The type of the Role, combined with its binding type.
+  -- | The type of the Role, combined with its binding type, in disjunctive normal form.
   roleAndBinding :: r -> MonadPerspectives (ADT RoleInContext)
+  -- | The type of the Role, combined with its binding type and its aspects, in disjunctive normal form.
+  roleAndBindingAndAspects :: r -> MonadPerspectives (ADT RoleInContext)
   -- | The type of the Role, including its direct aspects, including their transitive closure!
   -- | For a CalculatedRole it is the range of its calculation.
   roleAspectsADT :: r -> MonadPerspectives (ADT RoleInContext)
@@ -85,9 +90,11 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   kindOfRole r = (unwrap r).kindOfRole
   displayName r = (unwrap r).displayName
   roleAspects = rangeOfCalculatedRole >=> pure <<< commonLeavesInADT
+  roleAspectsInProduct = rangeOfCalculatedRole
   context r = (rangeOfCalculatedRole >=> contextOfADT >=> \adt -> pure $ product [ST (unwrap r).context, adt]) r
   contextOfRepresentation r = (unwrap r).context
   binding = rangeOfCalculatedRole >=> bindingOfADT
+  bindingInCompoundType r = binding r
   functional r = calculation r >>= pure <<< pessimistic <<< QT.functional
   mandatory r = calculation r >>= pure <<< pessimistic <<< QT.mandatory
   calculation r = case (unwrap r).calculation of
@@ -95,8 +102,9 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
     otherwise -> throwError (error ("Attempt to acces QueryFunctionDescription of a CalculatedRole before the expression has been compiled. This counts as a system programming error." <> (unwrap $ (identifier r :: CalculatedRoleType))))
   roleADT r = calculation r >>= pure <<< unsafePartial domain2roleInContext <<< range
   roleAndBinding = rangeOfCalculatedRole
+  roleAndBindingAndAspects = rangeOfCalculatedRole
   -- Include the transitive closure of the aspects.
-  roleAspectsADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
+  roleAspectsADT = rangeOfCalculatedRole >=> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT) >=> pure <<< toDisjunctiveNormalForm
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
 
@@ -116,9 +124,17 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   kindOfRole r = (unwrap r).kindOfRole
   displayName r = (unwrap r).displayName
   roleAspects r = pure $ _.roleAspects $ unwrap r
+  roleAspectsInProduct r = do 
+    aspects <- roleAspects r
+    if null aspects
+      then pure UNIVERSAL
+      else pure $ PROD (ST <$> aspects)
   context r = pure $ ST $ contextOfRepresentation r
   contextOfRepresentation r = (unwrap r).context
   binding r = pure (unwrap r).binding
+  bindingInCompoundType r = binding r >>= case _ of 
+    EMPTY -> pure UNIVERSAL
+    b -> pure b
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
   calculation r = if (unwrap r).unlinked
@@ -135,15 +151,14 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
       (bool2threeValued (unwrap r).functional)
       (bool2threeValued (unwrap r).mandatory)
   roleADT r = pure $ ST $ RoleInContext {context: (unwrap r).context, role: identifier r}
-  roleAndBinding r = pure $ case (unwrap r).binding of
-    PROD terms -> PROD (cons (ST $ RoleInContext {context: (unwrap r).context, role: identifier r}) terms)
-    EMPTY -> (ST $ RoleInContext {context: (unwrap r).context, role: identifier r})
-    st@(ST _) -> PROD [(ST $ RoleInContext {context: (unwrap r).context, role: identifier r}), st]
-    sum@(SUM _) -> PROD [(ST $ RoleInContext {context: (unwrap r).context, role: identifier r}), sum]
-    UNIVERSAL -> UNIVERSAL
-  roleAspectsADT r@(EnumeratedRole{roleAspects}) = do
+  -- If no fillers are allowed, we leave out the EMPTY ADT that specifies that. Otherwise, 
+  -- roleAndBinding will show up as EMPTY as well because of the rules for PROD.
+  roleAndBinding r = toDisjunctiveNormalForm <<< PROD <$> sequence [roleADT r, bindingInCompoundType r]
+  roleAndBindingAndAspects r = toDisjunctiveNormalForm <<< PROD <$> sequence [roleADT r, bindingInCompoundType r, roleAspectsInProduct r]
+  roleAspectsADT r = do
     radt <- roleADT r
-    product <<< (flip cons [radt]) <$> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
+    roleAspects <- roleAspects r
+    toDisjunctiveNormalForm <<< product <<< (flip cons [radt]) <$> reduce (getEnumeratedRole <<< roleInContext2Role >=> roleAspectsADT)
       (PROD (map ST roleAspects))
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
@@ -184,6 +199,33 @@ adtIsMandatory (PROD adts) = do
 -- EnumeratedRole type.
 adtIsMandatory EMPTY = pure true
 adtIsMandatory UNIVERSAL = pure false
+
+-- | Returns an ADT that includes all types: leaves and intermediate types.
+-- | No type is left unexpanded. An expanded type includes the type itself, its aspects and its binding.
+completeType :: ADT RoleInContext -> MP (ADT RoleInContext)
+completeType = reduce magic >=> pure <<< toDisjunctiveNormalForm
+  where 
+    magic :: RoleInContext -> MP (ADT RoleInContext)
+    magic roleInContext = do
+      (EnumeratedRole role) <- getEnumeratedRole (roleInContext2Role roleInContext)
+      pure role.completeType
+
+-- | This function does not rely on the member completeType of EnumeratedRole.
+computeCompleteType :: ADT RoleInContext -> MP (ADT RoleInContext)
+computeCompleteType = reduce magic >=> pure <<< toDisjunctiveNormalForm
+  where
+    magic :: RoleInContext -> MP (ADT RoleInContext)
+    magic roleInContext = do
+      role <- getEnumeratedRole (roleInContext2Role roleInContext)
+      localTypes <- roleAndBindingAndAspects role
+      b <- binding role
+      aspects <- roleAspects role
+      -- if the localTypes is just the RoleInContext itself, we have reached the bottom.
+      case b, aspects of 
+        EMPTY, [] -> pure $ ST roleInContext
+        _, _ -> do
+          expansion <- reduce magic (PROD [b, PROD (ST <$> aspects)])
+          pure $ PROD [localTypes, expansion]
 
 --------------------------------------------------------------------------------------------------
 ---- PROPERTYSET
@@ -241,35 +283,8 @@ directProperties = reduce magic
 --------------------------------------------------------------------------------------------------
 -- | All fillers of a role (but not the role itself), computed recursively over binding, of the Role ADT.
 -- | UNIVERSAL is treated like EMPTY.
-allFillers :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-allFillers = reduce magic >=> case _ of 
-  PROD as -> case uncons as of 
-    Nothing -> pure $ PROD []
-    -- Slightly shaky but based on the constructon below.
-    Just {head, tail} -> pure $ PROD tail
-  otherwise -> pure otherwise
-  where
-    magic :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-    magic role = do
-      EnumeratedRole{binding} <- getEnumeratedRole role
-      case binding of 
-        EMPTY -> pure $ ST role
-        otherwise -> do
-          expansion <- reduce magic (roleInContext2Role <$> otherwise)
-          pure $ PROD [ST role, expansion]
-
-rolaAndAllFillers :: ADT EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-rolaAndAllFillers = reduce magic
-  where
-    magic :: EnumeratedRoleType -> MP (ADT EnumeratedRoleType)
-    magic role = do
-      EnumeratedRole{binding} <- getEnumeratedRole role
-      case binding of 
-        EMPTY -> pure $ ST role
-        otherwise -> do
-          expansion <- reduce magic (roleInContext2Role <$> otherwise)
-          pure $ PROD [ST role, expansion]
-
+allFillers :: ADT RoleInContext -> MP (ADT RoleInContext)
+allFillers = bindingOfADT
 --------------------------------------------------------------------------------------------------
 ---- ROLESET
 --------------------------------------------------------------------------------------------------
@@ -282,14 +297,23 @@ allRoles = reduce magic
       c <-  getContext ct
       pure $ roles c
 
+-- | The roles of this context and its aspects, recursively.
+allRolesInContext :: ADT ContextType -> MP (Array RoleInContext)
+allRolesInContext = reduce magic
+  where
+    magic :: ContextType -> MP (Array RoleInContext)
+    magic ct = do
+      c <-  getContext ct
+      pure $ rolesInContext c
+
 -----------------------------------------------------------
 -- LESSTHANOREQUALTO
 -----------------------------------------------------------
--- | `p lessThanOrEqualTo q` means: p is less specific than q, or equal to q.
--- | `p lessThanOrEqualTo q` equals: `q greaterThanOrEqualTo p`
--- lessThanOrEqualTo :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
--- lessThanOrEqualTo p q = p `hasNotMorePropertiesThan` q
--- lessThanOrEqualTo p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
+-- | `p equalsOrGeneralisesRoleInContext q` means: p is less specific than q, or equal to q.
+-- | `p equalsOrGeneralisesRoleInContext q` equals: `q equalsOrSpecialisesRoleInContext p`
+-- equalsOrGeneralisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
+-- equalsOrGeneralisesRoleInContext p q = p `hasNotMorePropertiesThan` q
+-- equalsOrGeneralisesRoleInContext p q = (&&) <$> (p `hasNotMorePropertiesThan` q) <*> (subsetPSet <$> actionSet p <*> actionSet q)
 
 hasNotMorePropertiesThan :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
 hasNotMorePropertiesThan p q = subset <$> (allProperties >=> pure <<< fromFoldable) (roleInContext2Role <$> p) <*> (allProperties >=> pure <<< fromFoldable) (roleInContext2Role <$> q)
@@ -313,10 +337,19 @@ externalRoleOfADT = pure <<< map \ctype -> RoleInContext {context: ctype, role: 
 -----------------------------------------------------------
 -- BINDINGOFADT
 -----------------------------------------------------------
--- | The binding of an ADT.
+-- | Applies binding to all leaves in the ADT, but NOT RECURSIVELY.
 bindingOfADT :: ADT RoleInContext -> MP (ADT RoleInContext)
-bindingOfADT = reduce (getEnumeratedRole <<< roleInContext2Role >=> binding)
+bindingOfADT = reduce (getEnumeratedRole <<< roleInContext2Role >=> fillerOrRole)
+  where
+    -- At the recursive bottom, we always end up with an EMPTY binding. 
+    -- That makes bindingOfADT return EMPTY, always, unless we return the leaf without a binding.
+    fillerOrRole :: EnumeratedRole -> MP (ADT RoleInContext)
+    fillerOrRole (EnumeratedRole{id:role, context, binding}) = case binding of 
+      EMPTY -> pure $ ST $ RoleInContext{role, context}
+      x -> pure x
 
+-- | The transitive closure over binding of an ADT.
+-- | Includes all nodes in the (transitively expanded) tree.
 transitiveBindingOfADT :: ADT RoleInContext -> MP (ADT RoleInContext)
 transitiveBindingOfADT = reduce magic
   where
@@ -460,3 +493,5 @@ getRoleADTFromString :: String -> MonadPerspectives (ADT RoleInContext)
 getRoleADTFromString s =
   (getEnumeratedRole (EnumeratedRoleType s) >>= roleADT) <|>
   (getCalculatedRole (CalculatedRoleType s) >>= roleADT)
+
+-}

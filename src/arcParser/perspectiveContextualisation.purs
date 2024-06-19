@@ -5,14 +5,14 @@ import Prelude
 import Control.Monad.Except (Except, runExcept, throwError)
 import Control.Monad.State (StateT, evalStateT, execStateT, get, gets, modify, put)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (Writer, WriterT, execWriter, execWriterT, tell)
-import Data.Array (catMaybes, concat, cons, difference, filter, find, findIndex, foldM, fromFoldable, intercalate, length, many, modifyAt, null)
+import Control.Monad.Writer (WriterT, execWriterT, tell)
+import Data.Array (catMaybes, concat, cons, difference, filter, filterA, findIndex, foldM, fromFoldable, intercalate, length, many, modifyAt, null)
 import Data.Array.Partial (tail, head) as AP
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldlWithIndex)
 import Data.Map (Map, empty, fromFoldable, insert, lookup, values) as Map
 import Data.Map (toUnfoldable)
-import Data.Maybe (Maybe(..), isJust, isNothing)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Traversable (for_, traverse)
 import Data.Tuple (Tuple(..), snd)
@@ -27,16 +27,16 @@ import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, equalsOrGeneralisesADT)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrSpecialises)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (allLocalAliases)
+import Perspectives.Representation.Class.Role (allLocalAliases, completeExpandedType, expandUnexpandedLeaves)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (RoleVerbList)
-import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, lessThanOrEqualTo)
+import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, equalsOrGeneralisesRoleInContext)
 
 contextualisePerspectives :: PhaseThree Unit
 contextualisePerspectives = do
@@ -73,7 +73,7 @@ contextualisePerspectives = do
         -- If an Aspect user role has a perspective on an (Aspect) role that has
         -- been added _as is_ to the user's context, add that perspective to the 
         -- user's perspectives.
-        aspectPerspectives <- pure $ execWriter (for_ userRoleAspects (writePerspectiveOnAddedRole aspectObjectRolesInContext))
+        aspectPerspectives <- lift $ lift $ execWriterT (for_ userRoleAspects (writePerspectiveOnAddedRole aspectObjectRolesInContext))
         rolesWithAspects <- collectRolesWithAspects context
         -- If an Aspect user role has a perspective on an Aspect Object that is 
         -- specialised in the context, where the user does not have a perspective on that 
@@ -97,13 +97,18 @@ contextualisePerspectives = do
         _ -> pure mRole
 
     -- Write an aspect user role perspective (unmodified) if its object generalises (or is equal to) one of the aspect roles that were added to the context (potentalObjects).
-    writePerspectiveOnAddedRole :: Array EnumeratedRoleType -> EnumeratedRole -> Writer (Array Perspective) Unit
-    writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) = do
-      for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> if isJust $ find 
-          (\potentialObject -> (roleInContext2Role <$> (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)) `equalsOrGeneralisesADT` ST potentialObject) 
-          potentialObjects
-        then tell [p]
-        else pure unit
+    writePerspectiveOnAddedRole :: Array EnumeratedRoleType -> EnumeratedRole -> WriterT (Array Perspective) MP Unit
+    writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) =
+      for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> do
+        expandedAspectPerspectivesObject <- lift $ expandUnexpandedLeaves (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
+        found <- not <<< null <$> filterA (lift <<< (\(potentialObject :: EnumeratedRoleType) -> do 
+          expandedPotentialObject <- getEnumeratedRole potentialObject >>= completeExpandedType 
+          -- expandedAspectPerspectivesObject -> expandedPotentialObject
+          pure (expandedAspectPerspectivesObject `equalsOrSpecialises` expandedPotentialObject)
+          )) potentialObjects
+        if found
+          then tell [p]
+          else pure unit
 
     -- Write an aspect user role perspective (contextualised) if its object is specialised in the context,
     -- but only if the user role's own perspectives do not cover that specialisation.
@@ -113,21 +118,21 @@ contextualisePerspectives = do
         -- all role types in the aspect object can be substituted with role types in the context we contextualise in.
         then do
           (substitutions :: Array Substitution) <- pure $ createSubstitutions rolesWithAspects
-          for_ substitutions \substitution -> let
-            (contextualisedObject :: ADT RoleInContext) = contextualiseADT (unsafePartial domain2roleInContext $ range object) context substitution
-            (roleTypes :: Array RoleType) = (ENR <$> allLeavesInADT (roleInContext2Role <$> contextualisedObject))
-            in 
-              if notCoveredByOwnPerspectives contextualisedObject
-                then do
-                  propertyVerbs' <- lift $ applyPropertyMapping contextualisedObject propertyVerbs
-                  tell [Perspective precord 
-                    { object = replaceRange object (RDOM contextualisedObject)
-                    , roleTypes = roleTypes
-                    , displayName = (intercalate ", " (typeUri2LocalName_ <<< roletype2string <$> roleTypes))
-                    -- Apply property mappings found in the contextualisedObject ADT to the propertyVerbs.
-                    , propertyVerbs = propertyVerbs'
-                    }]
-                else pure unit
+          for_ substitutions \substitution -> do
+            (contextualisedObject :: ADT RoleInContext) <- pure $ contextualiseADT (unsafePartial domain2roleInContext $ range object) context substitution
+            (roleTypes :: Array RoleType) <- pure (ENR <$> allLeavesInADT (roleInContext2Role <$> contextualisedObject))
+            covered <- lift $ coveredByOwnPerspectives contextualisedObject
+            if covered
+              then pure unit
+              else do
+                propertyVerbs' <- lift $ applyPropertyMapping contextualisedObject propertyVerbs
+                tell [Perspective precord 
+                  { object = replaceRange object (RDOM contextualisedObject)
+                  , roleTypes = roleTypes
+                  , displayName = (intercalate ", " (typeUri2LocalName_ <<< roletype2string <$> roleTypes))
+                  -- Apply property mappings found in the contextualisedObject ADT to the propertyVerbs.
+                  , propertyVerbs = propertyVerbs'
+                  }]
         else pure unit
 
       where
@@ -143,10 +148,20 @@ contextualisePerspectives = do
 
         -- None of the perspectives in `ownPerspectives` (those of the specialised user role) is on an object (whose range) equals (or is a generalisation of, 
         -- which is unlikely to happen) the contextualised object ADT.
-        notCoveredByOwnPerspectives :: ADT QT.RoleInContext -> Boolean
-        notCoveredByOwnPerspectives objectADT = isNothing $ find
-          (\ownPerspectiveObjectADT -> ownPerspectiveObjectADT `equalsOrGeneralisesADT` objectADT)
+        coveredByOwnPerspectives :: ADT QT.RoleInContext -> MP Boolean
+        coveredByOwnPerspectives objectADT = foldM
+          (\found (ownPerspectiveObjectADT :: ADT RoleInContext) -> if found
+            then pure true
+            -- Does ownPerspectiveObjectADT cover objectADT?
+            -- objectADT -> ownPerspectiveObjectADT
+            -- e.g. objectADT is an Aspect of ownPerspectiveObjectADT, or fills it.
+            else ownPerspectiveObjectADT `equalsOrGeneralisesRoleInContext` objectADT)
+          false
           (ownPerspectives <#> (\(Perspective{object}) -> unsafePartial domain2roleInContext $ range object))
+
+        -- notCoveredByOwnPerspectives objectADT = isNothing $ find
+        --   (\(ownPerspectiveObjectADT :: ADT RoleInContext) -> ownPerspectiveObjectADT `equalsOrGeneralisesRoleInContext` objectADT)
+        --   (ownPerspectives <#> (\(Perspective{object}) -> unsafePartial domain2roleInContext $ range object))
 
         createSubstitutions :: RolesWithAspects -> Array Substitution
         createSubstitutions rwas = case runExcept $ evalStateT (many createSubstitution) (Just (toUnfoldable rwas)) of
@@ -183,7 +198,8 @@ contextualisePerspectives = do
           perspective@(Perspective r@{object, roleVerbs, propertyVerbs, actions}) 
           (Perspective{actions:aspectActions, object:aspectObject, roleVerbs:aspectRoleVerbs, propertyVerbs:aspectPropertyVerbs}) = do
           -- is the object of the perspective a specialisation of the object of the aspect perspective?
-          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `lessThanOrEqualTo` (unsafePartial domain2roleType $ range object))
+          -- aspectObject -> object
+          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `equalsOrGeneralisesRoleInContext` (unsafePartial domain2roleType $ range object))
           if isASpecialisation 
             then 
               pure $ Perspective r 
@@ -261,3 +277,4 @@ addAspectsToExternalRoles = do
         Nothing -> erole
         Just (CONTEXT.Context{contextAspects}) -> EnumeratedRole $ erecord {roleAspects = (\context@(ContextType aspect) -> QT.RoleInContext{context, role: EnumeratedRoleType $ buitenRol aspect}) <$> contextAspects}
       else erole
+

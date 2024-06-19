@@ -30,30 +30,31 @@
 
 module Perspective.InvertedQuery.Indices where
 
-import Control.Monad.Error.Class (catchError)
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Writer (execWriterT, tell)
-import Data.Array (cons, elemIndex)
+import Control.Monad.Writer (WriterT, execWriterT, tell)
+import Data.Array (cons, elemIndex, singleton)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (for)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (empty, lookup)
+import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, (###=))
+import Perspectives.ArrayUnions (ArrayUnions(..))
+import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Identifiers (startsWithSegments, typeUri2typeNameSpace_)
 import Perspectives.Instances.ObjectGetters (context', contextType_)
 import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey(..))
-import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain, domain2roleInContext, domain2roleType, queryFunction, range, roleDomain, roleRange)
-import Perspectives.Representation.ADT (ADT(..), ArrayUnions(..), allLeavesInADT, reduce)
-import Perspectives.Representation.Class.PersistentType (getPerspectType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, bindingOfRole, contextOfRepresentation)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription, RoleInContext(..), domain, domain2roleInContext, domain2roleType, queryFunction, range, roleDomain, roleInContext2Role, roleRange)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInExpandedADT, computeCollection)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, bindingOfADT, completeExpandedFillerRestriction, contextOfRepresentation)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (propertyAliases, roleAspectsClosure)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..))
+import Perspectives.Types.ObjectGetters (roleAspectsClosure)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..))
-import Prelude (class Eq, bind, identity, join, map, not, pure, unit, ($), (&&), (/=), (<#>), (<$>), (<<<), (==), (>>=))
+import Prelude (class Eq, class Ord, Unit, bind, compare, discard, eq, identity, join, map, not, pure, unit, ($), (&&), (/=), (<#>), (<$>), (<<<), (==), (>=>), (>>=))
 
 -- | An InvertedQueryKey is a triplet of types. From a RoleBindingDelta we take the role instances and their
 -- | context instances.
@@ -76,25 +77,27 @@ import Prelude (class Eq, bind, identity, join, map, not, pure, unit, ($), (&&),
 -- | Keys for inverted queries from filled to filler.
 -- | Query the InvertedQueryDatase with these keys computed from a RoleBindingDelta,
 -- | where type SetFirstBinding or ReplaceBinding.
--- | This function starts from a RoleBindingDelta; use `runtimeIndexForFilledQueries` instead if you have the various types.
+-- | This function starts from a RoleBindingDelta; use `runtimeIndexForFilledQueries'` instead if you have the four types.
+-- | Conceptually, the filler fills not only the filled role but also all roles it fills - recursively.
+-- | However, we deal with that outside this function. 
 runtimeIndexForFilledQueries :: Partial => RoleBindingDelta -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-runtimeIndexForFilledQueries (RoleBindingDelta{filled, filledType}) = do 
+runtimeIndexForFilledQueries (RoleBindingDelta{filled, filledType:filledRole_destination}) = do 
   filledContext <- context' filled
-  filledContextType <- contextType_ filledContext
-  -- Don't take the actual filler type; work with the required filler type. That is the type required as binding by the type of the filled.
-  requiredBinding <- bindingOfRole $ ENR filledType
-  results <- for (allLeavesInADT requiredBinding) \(RoleInContext {context:fillerContextType, role: fillerType'}) -> runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType'
-  pure $ join $ ArrayUnions results
+  filledContext_destination <- contextType_ filledContext
+  -- all RoleInContext items in the complete expansion of the declared filler restriction of the filled type, including aspects.
+  fillerRoleInContexts <- getEnumeratedRole filledRole_destination >>= completeExpandedFillerRestriction >>= pure <<< maybe [] allLeavesInExpandedADT
+  pure $ ArrayUnions $ fillerRoleInContexts <#> \(RoleInContext{role:fillerRole_origin, context: fillerContext_origin}) -> 
+    RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}
 
--- | Keys for queries from filler to filled.
-runtimeIndexForFilledQueries' :: ContextType -> EnumeratedRoleType -> ContextType -> EnumeratedRoleType -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType = do
-  fillerCombinations <- roleContextCombinations fillerType fillerContextType
-  filledCombinations <- roleContextCombinations filledType filledContextType
-  pure $ do
-    Tuple fillerRole_origin fillerContext_origin <- fillerCombinations
-    Tuple filledRole_destination filledContext_destination <- filledCombinations
-    pure $ RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}
+-- | Keys for queries from filler to filled, exactly like runtimeIndexForFilledQueries.
+runtimeIndexForFilledQueries' :: EnumeratedRoleType -> ContextType -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
+runtimeIndexForFilledQueries' filledRole_destination filledContext_destination = do
+  -- all RoleInContext items in the complete expansion of the declared filler restriction of the filled type, including aspects.
+  fillerRoleInContexts <- getEnumeratedRole filledRole_destination >>= completeExpandedFillerRestriction >>= pure <<< maybe [] allLeavesInExpandedADT
+  -- Conceptually, the filler fills not only the filled role but also all roles it fills - recursively.
+  -- However, we deal with that outside this function. 
+  pure $ ArrayUnions $ fillerRoleInContexts <#> \(RoleInContext{role:fillerRole_origin, context: fillerContext_origin}) -> 
+    RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}
 
 -- | Keys for inverted queries from filler to filled.
 -- | Query the InvertedQueryDatase with these keys computed from a RoleBindingDelta,
@@ -108,17 +111,16 @@ runtimeIndexForFillerQueries d = do
                 , fillerRole_destination: fillerRole_origin
                 , fillerContext_destination: fillerContext_origin}
 
--- | Keys for queries from filled to filler.
-runtimeIndexForFillerQueries' :: ContextType -> EnumeratedRoleType -> ContextType -> EnumeratedRoleType -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-runtimeIndexForFillerQueries' fillerContextType filledType filledContextType fillerType = do
-  filledCombinations <- roleContextCombinations filledType filledContextType
-  fillerCombinations <- roleContextCombinations fillerType fillerContextType
-  pure $ do
-    Tuple filledRole_origin filledContext_origin <- filledCombinations
-    Tuple fillerRole_destination fillerContext_destination <- fillerCombinations
-    pure $ RTFillerKey {filledRole_origin, filledContext_origin, fillerRole_destination, fillerContext_destination}
+-- | Keys for queries from filler to filled.
+runtimeIndexForFillerQueries' :: EnumeratedRoleType -> ContextType -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
+runtimeIndexForFillerQueries' filledRole_origin filledContext_origin = do
+  -- all RoleInContext items in the complete expansion of the declared filler restriction of the filled type, including aspects.
+  fillerRoleInContexts <- getEnumeratedRole filledRole_origin >>= completeExpandedFillerRestriction >>= pure <<< maybe [] allLeavesInExpandedADT
+  pure $ ArrayUnions $ fillerRoleInContexts <#> \(RoleInContext{role:fillerRole_destination, context: fillerContext_destination}) -> 
+    RTFillerKey {filledRole_origin, filledContext_origin, fillerRole_destination, fillerContext_destination}
 
--- | Construct the combination of the role type and its aspects with their lexical contexts, and add to that the combination of the role type and the instantiation context type.
+-- | Construct the combination of the role type and its aspects 
+-- with their lexical contexts, and add to that the combination of the role type and the instantiation context type.
 roleContextCombinations :: EnumeratedRoleType -> ContextType -> MonadPerspectives (ArrayUnions (Tuple EnumeratedRoleType ContextType))
 roleContextCombinations roleType instantiationContext = do 
   roleTypes <- roleType ###= roleAspectsClosure  
@@ -133,7 +135,8 @@ roleContextCombinations roleType instantiationContext = do
 -- | Keys for queries from role to context.
 -- | Query the InvertedQueryDatase with these keys.
 runtimeIndexForContextQueries :: EnumeratedRoleType -> ContextInstance -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-runtimeIndexForContextQueries r c = contextType_ c >>= roleContextCombinations r >>= pure <<< (map \(Tuple role_origin context_destination) -> RTContextKey {role_origin, context_destination})
+runtimeIndexForContextQueries r c = contextType_ c >>= roleContextCombinations r >>= 
+  pure <<< (map \(Tuple role_origin context_destination) -> RTContextKey {role_origin, context_destination})
 
 -- | Keys for queries from context to role.
 -- | Query the InvertedQueryDatase with these keys.
@@ -183,14 +186,22 @@ runtimeIndexForPropertyQueries typeOfInstanceOnPath typeOfPropertyBearingInstanc
 -----------------------------------------------------------
 -- | Compute the keys for the filled step.
 -- | Is exactly like typeLevelKeyForFillerQueries, but with role and domain reversed.
+-- | In compile time, we just describe a single step in type space. However, as these types may be compound (ADTs are composed types),
+-- | we compute all individual RoleInContext combinations that with certainty describe the origin and those that describe the destination
+-- | of the step and then make all combinations.
 typeLevelKeyForFilledQueries :: Partial => QueryFunctionDescription -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
 typeLevelKeyForFilledQueries qfd | isFilledF (queryFunction qfd) = 
-  reduce 
-    (\(RoleInContext{role:fillerType, context:fillerContextType}) -> 
-      reduce 
-        (\(RoleInContext{role:filledType, context:filledContextType}) -> runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType)
-        (domain2roleInContext $ range qfd))
-    (domain2roleInContext $ domain qfd)
+  do 
+    -- domain of the qfd represents the filler roles;
+    -- All RoleInContext items in the domain of the query.
+    (fillerRoleInContexts :: Array RoleInContext) <- pure $ computeCollection singleton (domain2roleInContext $ domain qfd)
+    -- range represents the filled roles.
+    -- all RoleInContext items in the range of the query.
+    (filledRoleInContexts :: Array RoleInContext) <- pure $ computeCollection singleton (domain2roleInContext $ range qfd)
+    pure $ ArrayUnions do
+      RoleInContext{role:filledRole_destination, context: filledContext_destination} <- filledRoleInContexts
+      RoleInContext{role:fillerRole_origin, context: fillerContext_origin} <- fillerRoleInContexts
+      pure $ RTFilledKey {fillerRole_origin, fillerContext_origin, filledRole_destination, filledContext_destination}
 
 isFilledF :: QueryFunction -> Boolean
 isFilledF qf = case qf of
@@ -200,20 +211,23 @@ isFilledF qf = case qf of
 -- | Compute the keys for the filledBy (Filler) step.
 -- | Is exactly like typeLevelKeyForFilledQueries, but with role and domain reversed.
 typeLevelKeyForFillerQueries :: Partial => QueryFunctionDescription -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
-typeLevelKeyForFillerQueries qfd = if (isFiller (queryFunction qfd))
-  then reduce 
-    (\(RoleInContext{role:fillerType, context:fillerContextType}) -> 
-      reduce 
-        (\(RoleInContext{role:filledType, context:filledContextType}) -> runtimeIndexForFillerQueries' fillerContextType filledType filledContextType fillerType)
-        (domain2roleInContext $ domain qfd))
-    (domain2roleInContext $ range qfd)
-  else pure $ ArrayUnions []
+typeLevelKeyForFillerQueries qfd | isFiller (queryFunction qfd)=
+  do 
+    -- domain of the qfd represents the filler roles;
+    -- All RoleInContext items in the domain of the query.
+    (fillerRoleInContexts :: Array RoleInContext) <- pure $ computeCollection singleton (domain2roleInContext $ domain qfd)
+    -- range represents the filled roles.
+    -- all RoleInContext items in the range of the query.
+    (filledRoleInContexts :: Array RoleInContext) <- pure $ computeCollection singleton (domain2roleInContext $ range qfd)
+    pure $ ArrayUnions do
+      RoleInContext{role:filledRole_origin, context: filledContext_origin} <- filledRoleInContexts
+      RoleInContext{role:fillerRole_destination, context: fillerContext_destination} <- fillerRoleInContexts
+      pure $ RTFillerKey {fillerRole_destination, fillerContext_destination, filledRole_origin, filledContext_origin}
   
-  where
-    isFiller :: QueryFunction -> Boolean
-    isFiller (DataTypeGetter FillerF) = true
-    isFiller (DataTypeGetterWithParameter FillerF _) = true
-    isFiller _ = false
+isFiller :: QueryFunction -> Boolean
+isFiller (DataTypeGetter FillerF) = true
+isFiller (DataTypeGetterWithParameter FillerF _) = true
+isFiller _ = false
 
 -- | The EnumeratedPropertyType is defined on the EnumeratedRoleType. It is either defined in its namespace, or 
 -- | it is added as an Aspect property. In the latter case, if the (Maybe EnumeratedPropertyType) part is a Just value,
@@ -225,6 +239,17 @@ data PropertyBearer =
     EnumeratedRoleType              -- The type of the instance bearing the property (this may be a filler of the instance the query is applied to)
     EnumeratedRoleType              -- The type of the instance the query is applied to 
 
+instance Ord PropertyBearer where
+  compare (PropertyBearer finalprop1 malias1 bearer1 origin1) (PropertyBearer finalprop2 malias2 bearer2 origin2) = 
+    if finalprop1 `eq` finalprop2
+      then if malias1 `eq` malias2
+        then if bearer1 `eq` bearer2
+          then origin1 `compare` origin2
+        else compare bearer1 bearer2
+      else compare malias1 malias2
+    else compare finalprop1 finalprop2
+    
+
 instance Eq PropertyBearer where
   eq (PropertyBearer prop1 mprop1 bearingrole1 querysteprole1) (PropertyBearer prop2 mprop2 bearingrole2 querysteprole2) = 
     prop1 == prop2 && 
@@ -235,24 +260,29 @@ instance Eq PropertyBearer where
 -- | Find the EnumeratedRoleType whose instances can actually store values for the property type.
 -- | If the property type turns out to be an alias, return the original property (the final destination or key under which a value will be stored)
 -- | and include the alias in a Maybe value.
-getPropertyTypeBearingRoleInstances :: EnumeratedPropertyType -> ADT RoleInContext -> MonadPerspectives (ArrayUnions PropertyBearer)
-getPropertyTypeBearingRoleInstances prop adt = reduce reducer adt
-  where
-  reducer :: RoleInContext -> MonadPerspectives (ArrayUnions PropertyBearer)
-  reducer ric@(RoleInContext {role:eroleType}) = do 
-    aliases <- catchError (propertyAliases eroleType) \e -> pure empty
-    case lookup (unwrap prop) aliases of
-      Just destination -> pure $ ArrayUnions [PropertyBearer destination (Just prop) eroleType eroleType]
+getPropertyTypeBearingRoleInstances :: EnumeratedPropertyType -> ADT RoleInContext -> MP (ArrayUnions PropertyBearer)
+getPropertyTypeBearingRoleInstances prop adt = ArrayUnions <$> execWriterT (descendInFiller adt)
+  where 
+
+    descendInFiller :: ADT RoleInContext -> WriterT (Array PropertyBearer) MP Unit
+    descendInFiller adt' = do 
+      -- Using the Traversable instance, we replace all terminal RoleInContext values with one or zero PropertyBearers. 
+      -- We then collect them using foldMapADT (computeCollection) and tell them in the WriterT monad.
+      lift ((for adt' ((getEnumeratedRole <<< roleInContext2Role) >=> getPropertyBearers)) >>= pure <<< computeCollection identity) >>= tell
+      mfiller <- lift (bindingOfADT adt')
+      case mfiller of 
+        Nothing -> pure unit
+        Just filler -> descendInFiller filler
+
+    getPropertyBearers :: EnumeratedRole -> MP (Array PropertyBearer)
+    getPropertyBearers (EnumeratedRole {propertyAliases, id:eroleType}) = case lookup (unwrap prop) propertyAliases of
+      Just destination -> pure $ [PropertyBearer destination (Just prop) eroleType eroleType]
       Nothing -> do
         allProps <- allLocallyRepresentedProperties (ST eroleType)
         if isJust $ elemIndex (ENP prop) allProps
-          then pure $ ArrayUnions [PropertyBearer prop Nothing eroleType eroleType]
-          else (bindingOfADT (ST ric)) >>= reduce reducer >>= pure <<< map replaceTypeOfInstanceOnpath
-    where
-    -- By recursively replacing the fourth member with the eroleType that was passed in, we make sure
-    -- that in the end we have the type that figured in the query itself (on the path).
-    replaceTypeOfInstanceOnpath :: PropertyBearer -> PropertyBearer
-    replaceTypeOfInstanceOnpath (PropertyBearer prop1 mprop1 bearingrole1 _) = (PropertyBearer prop1 mprop1 bearingrole1 eroleType)
+          then pure $ [PropertyBearer prop Nothing eroleType eroleType]
+          else pure $ []
+
 
 typeLevelKeyForPropertyQueries :: EnumeratedPropertyType -> QueryFunctionDescription -> MonadPerspectives (Array RunTimeInvertedQueryKey)
 typeLevelKeyForPropertyQueries p qfd = do 
@@ -270,7 +300,7 @@ typeLevelKeyForPropertyQueries p qfd = do
 typeLevelKeyForRoleQueries :: QueryFunctionDescription -> MonadPerspectives (ArrayUnions RunTimeInvertedQueryKey)
 typeLevelKeyForRoleQueries qfd =
   for 
-    (allLeavesInADT (unsafePartial roleRange qfd)) 
+    (computeCollection singleton (unsafePartial roleRange qfd)) 
     (\(RoleInContext{context, role}) -> roleContextCombinations role context) 
   >>= pure <<< (map \(Tuple role_destination context_origin) -> RTRoleKey {context_origin, role_destination}) <<< join <<< ArrayUnions
 
@@ -280,6 +310,6 @@ typeLevelKeyForContextQueries qfd =
   -- Notice that we first collect all leaves and then traverse them with roleContextCombinations. This is because we do not have a Traversable instance of
   -- ADT and this is semantically equivalent.
   for 
-    (allLeavesInADT (unsafePartial roleDomain qfd)) 
+    (computeCollection singleton (unsafePartial roleDomain qfd)) 
     (\(RoleInContext{context, role}) -> roleContextCombinations role context) 
   >>= pure <<< (map \(Tuple role_origin context_destination) -> RTContextKey {role_origin, context_destination}) <<< join <<< ArrayUnions

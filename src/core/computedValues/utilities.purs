@@ -175,7 +175,7 @@ evalExpression expr roleId@(RoleInstance id) = do
         Left e -> pure $ show (PSPE e)
         Right parseTree' -> do 
           (t :: Either MultiplePerspectivesErrors QueryFunctionDescription) <- lift $ lift $ evalPhaseTwo' 
-            (compileExpression (RDOM $ ST $ RoleInContext {context: ct, role: rt}) parseTree')
+            (compileExpression (RDOM $ UET $ RoleInContext {context: ct, role: rt}) parseTree')
           case t of 
             Left errs -> pure $ show (PSPE errs)
             Right qfd -> do 

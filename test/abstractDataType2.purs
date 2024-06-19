@@ -17,7 +17,7 @@ import Data.Traversable (traverse)
 import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Representation.ADT2 (ADT(..), DNF, ExpandedADT(..), HArray(..), collect, computeBoolean, computeCollection, expand, foldMapADT, toDisjunctiveNormalForm)
+import Perspectives.Representation.ADT (ADT(..), DNF, ExpandedADT(..), HArray(..), collect, computeBoolean, computeCollection, expand, foldMapADT, toDisjunctiveNormalForm)
 import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, test)
@@ -31,13 +31,12 @@ modelDirectory = "src/model"
 -- Edit persistenceAPI.js first by declaring Pouchdb like this:
 -- var PouchDB = require('pouchdb');
 
-t1 :: ADT String Int
+t1 :: ADT Int
 t1 = (PROD
         [ ST 1
         , UET 2
-        , CT "some label" (ST 3)
         , SUM [ST 1, ST 2]
-        , PROD [ST 3, CT "some label" (ST 3)]
+        , PROD [ST 3]
         ])
 
 theSuite :: Free TestF Unit
@@ -52,9 +51,8 @@ theSuite = suite "Test.Perspectives.Representation.ADT" do
       (PROD
         [ ST 1
         , UET 2
-        , CT "some label" (ST 3)
         , SUM [ST 1, ST 2]
-        , PROD [ST 3, CT "some label" (ST 3)]
+        , PROD [ST 3]
         ])
 
   test "Foldable" $ runP do
@@ -62,9 +60,8 @@ theSuite = suite "Test.Perspectives.Representation.ADT" do
       (PROD
         [ ST 1
         , UET 2
-        , CT "some label" (ST 3)
         , SUM [ST 1, ST 2]
-        , PROD [ST 3, CT "some label" (ST 3)]
+        , PROD [ST 3]
         ])
 
     showFold "foldMap Conj even: true if all even numbers" $ foldMap (Conj <<< even) t1
@@ -116,22 +113,19 @@ theSuite = suite "Test.Perspectives.Representation.ADT" do
     showFold "foldMap Array: collect all terminals in Array" $ flip collect t1 (unsafePartial 
       \adt -> case adt of 
         ST a -> [show a]
-        UET a -> [show a]
-        CT label _ -> [label])
+        UET a -> [show a])
 
-expandInArray :: Partial => ADT String Int -> Array (ExpandedADT String Int)
+expandInArray :: Partial => ADT Int -> Array (ExpandedADT Int)
 expandInArray adt = case adt of
   ST x -> [EST x]
   UET x -> [EST x]
-  CT label x -> ECT label <$> (expandInArray x)
 
-expandInIdentity :: Partial => ADT String Int -> Identity (ExpandedADT String Int)
+expandInIdentity :: Partial => ADT Int -> Identity (ExpandedADT Int)
 expandInIdentity adt = case adt of
   ST x -> Identity $ EST x
   UET x -> Identity $ EST x
-  CT label x -> ECT label <$> (expandInIdentity x)
 
-showADT :: forall a. Show a => String -> ADT String a -> MonadPerspectives Unit
+showADT :: forall a. Show a => String -> ADT a -> MonadPerspectives Unit
 showADT comment adt = do 
   log comment 
   log $ prettyPrint adt
@@ -142,7 +136,7 @@ showFold comment result = do
   log comment
   log (" " <> show result <> "\n")
 
-showExpandedADT :: forall a. Show a => String -> ExpandedADT String a -> MonadPerspectives Unit
+showExpandedADT :: forall a. Show a => String -> ExpandedADT a -> MonadPerspectives Unit
 showExpandedADT comment adt = do 
   log comment 
   log $ prettyPrint adt

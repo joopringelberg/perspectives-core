@@ -37,6 +37,7 @@ import Effect.Exception (error)
 import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledQueries', runtimeIndexForFillerQueries', runtimeIndexForPropertyQueries)
+import Perspectives.ArrayUnions (ArrayUnions(..))
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
@@ -56,7 +57,7 @@ import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
 import Perspectives.Query.QueryTypes (RoleInContext(..), isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances)
-import Perspectives.Representation.ADT (ArrayUnions(..), allLeavesInADT)
+import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, tryGetState)
 import Perspectives.Representation.Class.Role (bindingOfRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -70,7 +71,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM, prettyPrint)
-import Prelude (Unit, bind, discard, flip, join, map, not, pure, show, unit, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), (*>))
+import Prelude (Unit, bind, discard, flip, join, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. #12 Check the way state-conditional verbs are combined to establish whether a peer should receive a delta.
@@ -387,14 +388,14 @@ addDeltasForPerspectiveObjects filled = do
     isPerspectiveObject :: InvertedQuery -> Boolean
     isPerspectiveObject (InvertedQuery{forwardsCompiled}) = isNothing forwardsCompiled
 
+-- | This function SHOULD NOT handle the roles that are filled by the filled role; instead, it should be applied in a 
+-- | recursive context that handles that. See usersWithPerspectiveOnRoleBinding, statesAndPeersForRoleInstanceToRemove
 usersWithPerspectiveOnRoleBinding' :: RoleInstance -> RoleInstance -> Maybe RoleInstance -> RoleBindingDeltaType -> Boolean -> MonadPerspectivesTransaction (Array RoleInstance)
 usersWithPerspectiveOnRoleBinding' filled filler moldFiller deltaType runForwards = do
   filledType <- lift (filled ##>> OG.roleType)
-  fillerType <- lift (filler ##>> OG.roleType)
-  fillerContextType <- lift $ enumeratedRoleContextType fillerType
   filledContextType <- lift $ enumeratedRoleContextType filledType
   -- Includes calculations from all types of filledType.
-  (ArrayUnions fillerKeys) <- lift $ unsafePartial runtimeIndexForFillerQueries' fillerContextType filledType filledContextType fillerType
+  (ArrayUnions fillerKeys) <- lift $ unsafePartial runtimeIndexForFillerQueries' filledType filledContextType
   fillerCalculations <- lift (getFillerQueries compileBoth fillerKeys)
   -- FILLER step
   -- These are inverted queries that begin with the filler step starting from filled.
@@ -407,7 +408,7 @@ usersWithPerspectiveOnRoleBinding' filled filler moldFiller deltaType runForward
       )
   -- FILLED step
   -- These are inverted queries that begin with the filled step starting from filler.
-  (ArrayUnions filledKeys) <- lift $ unsafePartial runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType
+  (ArrayUnions filledKeys) <- lift $ unsafePartial runtimeIndexForFilledQueries' filledType filledContextType
   filledCalculations <- lift (getFilledQueries compileBoth filledKeys)
   (users2 :: Array RoleInstance) <- concat <$> for filledCalculations
       (\iq -> if isForSelfOnly iq
@@ -435,22 +436,26 @@ usersWithPerspectiveOnRoleBinding' filled filler moldFiller deltaType runForward
 -- | For a role that is filled by a public role, follow all queries from that filled role
 -- | that come from the filler role.
 -- | This will add the relevant InvertedQueryResults (for STATE EVALUATION) to the current Transaction.
-reEvaluatePublicFillerChanges :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+reEvaluatePublicFillerChanges :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Unit
 reEvaluatePublicFillerChanges filled filler = do
   filledType <- lift (filled ##>> OG.roleType)
   filledContextType <- lift ( filled ##>> context >=> OG.contextType)
   -- Don't take the actual filler type; work with the required filler type. That is the type required as binding by the type of the filled.
-  requiredBinding <- lift $ bindingOfRole $ ENR filledType
-  results <- lift $ for (allLeavesInADT requiredBinding) \(RoleInContext {context:fillerContextType, role: fillerType'}) -> runtimeIndexForFilledQueries' fillerContextType filledType filledContextType fillerType'
-  (ArrayUnions filledKeys) <- pure $ join $ ArrayUnions results
-  -- Fetch and compile these queries.
-  filledCalculations <- lift (getFilledQueries compileBoth filledKeys)  
-  concat <$> for filledCalculations
-      (\iq -> if isForSelfOnly iq
-        -- These inverted queries skip the first step and so must be applied to the filled itself.
-        then handleSelfOnlyQuery iq filled filler
-        else handleBackwardQuery filled iq >>= pure <<< join <<< map snd
-    )
+  mfillerRequirements <- lift $ bindingOfRole $ ENR filledType
+  case mfillerRequirements of 
+    Nothing -> pure unit
+    Just fillerRequirements -> do 
+      results <- lift $ for (allLeavesInADT fillerRequirements) \(RoleInContext {context:fillerContextType, role: fillerType'}) -> 
+        runtimeIndexForFilledQueries' filledType filledContextType
+      (ArrayUnions filledKeys) <- pure $ join $ ArrayUnions results
+      -- Fetch and compile these queries.
+      filledCalculations <- lift (getFilledQueries compileBoth filledKeys)  
+      for_ filledCalculations
+          (\iq -> if isForSelfOnly iq
+            -- These inverted queries skip the first step and so must be applied to the filled itself.
+            then void $ handleSelfOnlyQuery iq filled filler
+            else void $ handleBackwardQuery filled iq >>= pure <<< join <<< map snd
+        )
 
 -- | Runs the forward part of the QueryWithAKink. That is part of the original query. Assumptions collected
 -- | during evaluation are turned into Deltas for peers with a perspective and collected in the current transaction.

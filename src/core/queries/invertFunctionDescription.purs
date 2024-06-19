@@ -57,8 +57,8 @@ invertFunction dom qf ran = case qf of
     -- We must qualify FilledF with the type that is filled.
     -- That is the domain, here!
     FillerF -> case dom of
-      (RDOM EMPTY) -> pure $ Nothing
       (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ FilledF role context
+      (RDOM (UET (RoleInContext{context,role}))) -> pure $ Just $ FilledF role context
       otherwise -> pure $ Nothing
     ExternalRoleF -> pure $ Just $ DataTypeGetter ContextF
     -- Identity steps add nothing to the query and can be left out.
@@ -80,7 +80,6 @@ invertFunction dom qf ran = case qf of
     GetRoleInstancesForContextFromDatabaseF -> pure $ Just $ DataTypeGetter ContextF
     SpecialisesRoleTypeF -> pure $ Nothing
     FillerF -> case dom of
-      (RDOM EMPTY) -> pure $ Nothing
       (RDOM (ST (RoleInContext{context,role}))) -> pure $ Just $ FilledF role context
       otherwise -> pure $ Nothing
     -- A lot of cases will never be seen in a regular query.
@@ -99,6 +98,7 @@ invertFunction dom qf ran = case qf of
     -- NOTE: this is a shortcut that depends on a naming convention. It allows us to **not** make this function in MP.
     isExternalRole :: Domain -> Boolean
     isExternalRole (RDOM (ST (RoleInContext {role}))) = unwrap role `endsWithSegments` "External"
+    isExternalRole (RDOM (UET (RoleInContext {role}))) = unwrap role `endsWithSegments` "External"
     isExternalRole _ = false
 
 -- | Checks whether the QueryFunction returns just a single result.
@@ -166,14 +166,13 @@ domain2RoleType (RDOM adt) = fromJust <$> domain2RoleType' adt
   where
   domain2RoleType' :: Partial => ADT RoleInContext -> PhaseThree (Maybe EnumeratedRoleType)
   domain2RoleType' (ST a) = pure $ Just $ roleInContext2Role a
+  domain2RoleType' (UET a) = pure $ Just $ roleInContext2Role a
   domain2RoleType' (SUM adts) = do
     (roles :: Array EnumeratedRoleType) <- catMaybes <$> traverse domain2RoleType' adts
     pure $ head roles
   domain2RoleType' (PROD adts) = do
     (roles :: Array EnumeratedRoleType) <- catMaybes <$> traverse domain2RoleType' adts
     pure $ head roles
-  domain2RoleType' EMPTY = pure Nothing
-  domain2RoleType' UNIVERSAL = pure Nothing
 
 domain2PropertyType :: Partial => Domain -> PropertyType
 domain2PropertyType (VDOM _ (Just pt)) = pt

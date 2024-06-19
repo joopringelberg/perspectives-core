@@ -38,9 +38,13 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Data.EncodableMap (EncodableMap(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
-import Perspectives.Representation.Class.Role (class RoleClass, expansionOfRole, getRole, perspectives, roleKindOfRoleType, typeOfRole)
+import Perspectives.Query.QueryTypes (Calculation(..), domain2roleType, range, roleInContext2Role)
+import Perspectives.Representation.ADT (commonLeavesInADT)
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
+import Perspectives.Representation.Class.Role (class RoleClass, Role(..), getRole, perspectives, roleKindOfRoleType, typeOfRole)
+import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (RoleKind(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
 import Perspectives.Representation.UserGraph (Edges(..), UserGraph(..))
 
 -- | In this module we don't treat (user) roles as RoleInContexts. This means that Aspect user roles
@@ -86,6 +90,14 @@ buildUserGraph = do
       CR croleType -> do
         expansion <- getRole source >>= pure <<< map ENR <<< expansionOfRole
         pure $ flip Tuple edges <$> (cons source expansion)
+
+    -- Partial, because of the embedded case and because domain2roleType is Partial because it just handles
+    -- RDOM cases.
+    -- | The same result as roleAspects, but not in MonadPerspectives.
+    expansionOfRole :: Partial => Role -> Array EnumeratedRoleType
+    expansionOfRole (E (EnumeratedRole {id:i})) = [i]
+    expansionOfRole (C role@(CalculatedRole {calculation})) = roleInContext2Role <$> (commonLeavesInADT $ domain2roleType $ range $ (case calculation of Q qd -> qd))
+    -- calculation role
 
     -- Apply the Filler Rule: When U1 has a perspective on U2, we connect U1 to U2 in the
     -- User Graph. The Filler Rule says we should connect filler F of U1 to U2 as well

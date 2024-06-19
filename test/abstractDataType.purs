@@ -51,7 +51,7 @@ theSuite = suite  "Perspectives.Representation.ADT" do
                       -- logShow b
                       assert "binding of 'model:MyTestDomain$Role' is '(ST (EnumeratedRoleType \"model:MyTestDomain$YetAnotherRole\"))'"
                         -- (b == NOTYPE)
-                        (b == (ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")})))
+                        (b == Just (ST (RoleInContext {context: (ContextType "model:MyTestDomain"), role: (EnumeratedRoleType "model:MyTestDomain$YetAnotherRole")})))
                   case lookup "model:MyTestDomain$AnotherRole" calculatedRoles of
                     Nothing -> assert "There should be a role 'model:MyTestDomain$AnotherRole'" false
                     Just arl -> do

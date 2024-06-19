@@ -34,7 +34,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, filter, filterA, head, index, length, singleton, union, unsafeIndex)
 import Data.Either (Either(..), hush)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
@@ -430,8 +430,10 @@ compileContextAssignment (UQD _ (QF.CreateContext qualifiedContextTypeIdentifier
           for_ roleTypesToCreate \roleTypeToCreate -> do
             -- Get the context types whose external roles may be bound to this role type we're about to create.
             -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
-            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
-              >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) 
+              >>= pure <<< (map contextOfADT) 
+              >>= pure <<< (map allLeavesInADT))
+              >>= maybe (pure []) (filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier))
             contextTypesToCreate' <- if length contextTypesToCreate > 1 
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate
@@ -490,8 +492,10 @@ compileContextAssignment (UQD _ (QF.CreateContext_ qualifiedContextTypeIdentifie
       roleTypeToFill <- lift $ roleType_ roleInstance
       -- Get the context types whose external roles may be bound to this role type we're about to fill.
       -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
-      contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToFill) >>= contextOfADT >>= pure <<< allLeavesInADT)
-        >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+      contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToFill) 
+        >>= pure <<< (map contextOfADT) 
+        >>= pure <<< (map allLeavesInADT))
+        >>= maybe (pure []) (filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier))
       -- We can only create one context instance for this roleInstance. 
       -- Arbitrarily, we choose the first context type:
       case head contextTypesToCreate of
@@ -595,8 +599,10 @@ compileContextCreatingAssignments (UQD _ (QF.CreateContext qualifiedContextTypeI
           concat <$> for roleTypesToCreate \roleTypeToCreate -> do
             -- Get the context types whose external roles may be bound to this role type we're about to create.
             -- Keep only those that are a specialisation of qualifiedContextTypeIdentifier.
-            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) >>= contextOfADT >>= pure <<< allLeavesInADT)
-              >>= filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier)
+            contextTypesToCreate <- lift (bindingOfRole (ENR roleTypeToCreate) 
+              >>= pure <<< (map contextOfADT) 
+              >>= pure <<< (map allLeavesInADT))
+              >>= maybe (pure []) (filterA \cType -> lift (cType ###>> hasContextAspect qualifiedContextTypeIdentifier))
             contextTypesToCreate' <- if length contextTypesToCreate > 1 
               then pure $ filter ((notEq) qualifiedContextTypeIdentifier) contextTypesToCreate
               else pure contextTypesToCreate

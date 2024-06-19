@@ -264,8 +264,9 @@ domain model://perspectives.domains#BrokerServices
 
       -- Create an account on the RabbitMQ server. It is ready for the AccountHolder to listen to,
       -- but no other users can reach him yet.
-      -- Notice that this state will never be active if the Visitor executes SignUp.
-      state PrepareAccount = not exists binding
+      -- We'll know the BrokerContract has arrived at the Administrator after a peer executed Signup,
+      -- when a Queue already exists.
+      state PrepareAccount = (not exists binding) and not exists context >> Queues
         on entry
           do for BrokerContract$Administrator
             letA 
@@ -283,7 +284,7 @@ domain model://perspectives.domains#BrokerServices
                 AccountPassword,
                 queueid)
       
-      state StartService = exists binding
+      state StartService = (exists binding) and context >> extern >> Registered
         on entry
           do for AccountHolder
             bind_ (sys:MySystem >> extern) to (context >> EmptyQueue)

@@ -47,21 +47,21 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
+import Perspectives.Representation.ADT (ADT(..), ExpandedADT, allLeavesInADT, equalsOrGeneralises, equalsOrSpecialises)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (allFillers, bindingOfADT, rolaAndAllFillers, roleAspectsADT, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (completeExpandedFillerRestriction, expandUnexpandedLeaves, roleKindOfRoleType)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleADT, externalRole, greaterThanOrEqualTo, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, specialisesRoleType_)
-import Prelude (bind, discard, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>), (>=>), (>>=), (||))
+import Perspectives.Types.ObjectGetters (externalRole, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, generalisesRoleType_)
+import Prelude (bind, discard, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>), (>>=), (||))
 
 ------------------------------------------------------------------------------------
 ------ MONAD TYPE FOR DESCRIPTIONCOMPILER
@@ -213,11 +213,11 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           Nothing -> do 
           -- It is an error if qualifiedContextTypeIdentifier is not a specialisation of RootContext.
             er <- lift $ lift $ externalRole qualifiedContextTypeIdentifier
-            allowed <- lift $ lift ((ENR er) `specialisesRoleType_` (ENR $ EnumeratedRoleType rootContext))
+            allowed <- lift $ lift ((ENR er) `generalisesRoleType_` (ENR $ EnumeratedRoleType rootContext))
             if allowed
               then case mnameGetterDescription of
-                Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte (CDOM $ ST qualifiedContextTypeIdentifier) True True
-                Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte nameGetterDescription (CDOM $ ST qualifiedContextTypeIdentifier) True True
+                Nothing -> pure $ UQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte (CDOM $ UET qualifiedContextTypeIdentifier) True True
+                Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateRootContext qualifiedContextTypeIdentifier) cte nameGetterDescription (CDOM $ UET qualifiedContextTypeIdentifier) True True
               else throwError $ NotARootContext start end qualifiedContextTypeIdentifier
 
       CreateContext_ {contextTypeIdentifier, localName, roleExpression, start, end} -> do
@@ -248,11 +248,15 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             Unknown -> throwError $ MaybeNotFunctional f.start f.end bindingExpression
             False -> throwError $ NotFunctional f.start f.end bindingExpression
           else pure unit
-        -- the possible bindings of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (bindings).
+        -- the possible fillers of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (fillers).
         qualifies <- do
-          (possibleBinding :: ADT EnumeratedRoleType) <- lift $ lift (allFillers (ST qualifiedRoleIdentifier))
-          bindings' <- lift $ lift $ rolaAndAllFillers (roleInContext2Role <$> (unsafePartial domain2roleType (range bindings)))
-          lift $ lift (possibleBinding `equalsOrGeneralisesRoleADT` bindings')
+          (mfillerRestriction :: Maybe (ExpandedADT RoleInContext)) <- lift $ lift (getEnumeratedRole qualifiedRoleIdentifier >>= completeExpandedFillerRestriction)
+          (fillers :: ExpandedADT RoleInContext) <- lift $ lift $ expandUnexpandedLeaves (unsafePartial domain2roleType (range bindings))
+          case mfillerRestriction of
+            Nothing -> pure true
+            Just fillerRestriction -> do
+              -- fillerRestriction -> fillers
+              pure (fillerRestriction `equalsOrSpecialises` fillers)
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True
@@ -268,7 +272,10 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
 
       Unbind f@{bindingExpression, roleIdentifier} -> do
         (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
-        -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType (local name should resolve w.r.t. the binders of the bindings). We try to resolve in the model and then filter candidates on whether they bind the bindings. If they don't, the expression has no meaning.
+        -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType 
+        -- (local name should resolve w.r.t. the binders of the bindings). 
+        -- We try to resolve in the model and then filter candidates on whether they bind the bindings. 
+        -- If they don't, the expression has no meaning.
         (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
         pure $ UQD originDomain (QF.Unbind qualifiedRoleIdentifier) bindings originDomain True True
 
@@ -387,16 +394,17 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           (ct :: ADT ContextType) <- case range contextFunctionDescription of
             (CDOM ct') -> pure ct'
             otherwise -> throwError $ NotAContextDomain contextFunctionDescription otherwise start end
-          mrt <- if isTypeUri roleIdentifier
+          rtarr <- if isTypeUri roleIdentifier
             then if isExternalRole roleIdentifier
               then pure [ENR $ EnumeratedRoleType roleIdentifier]
               else lift2 $ runArrayT $ lookForRoleTypeOfADT roleIdentifier ct
             else if roleIdentifier == "External"
               then case ct of
                 (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
+                (UET (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
                 otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
               else lift2 (ct ###= lookForUnqualifiedRoleTypeOfADT roleIdentifier)
-          case head mrt of
+          case head rtarr of
             Just et@(ENR _) -> pure et
             Just ct'@(CR _) -> pure ct'
             otherwise -> throwError $ ContextHasNoRole ct roleIdentifier start end
@@ -423,23 +431,30 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             otherwise -> throwError $ RoleHasNoEnumeratedProperty rt propertyIdentifier start end
 
         -- | If the name is unqualified, look for an EnumeratedRole with matching local name in the Domain.
-        -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. In other words: whether the candidate could bind it (the second argument).
+        -- | Then, we check whether a candidate's binding type equals the second argument, or is less specialised. 
+        -- | In other words: whether the candidate could bind it (the second argument).
         qualifyBinderType :: Maybe String -> ADT QT.RoleInContext -> ArcPosition -> ArcPosition -> PhaseThree (Maybe EnumeratedRoleType)
         qualifyBinderType Nothing _ _ _ = pure Nothing
-        qualifyBinderType (Just ident) bindings start end = if isTypeUri ident
+        qualifyBinderType (Just ident) fillers start end = if isTypeUri ident
           then pure $ Just $ EnumeratedRoleType ident
           else do
+            -- The expansion of the fillers
+            (expandedFillers :: ExpandedADT RoleInContext) <- lift $ lift $ expandUnexpandedLeaves fillers
             -- EnumeratedRoles in the model with (end)matching name.
             (enumeratedRoles :: Object EnumeratedRole) <- getsDF _.enumeratedRoles
             (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
-            -- EnumeratedRoles that can bind `bindings`. Notice that we must apply restrictions found on Aspects as well.
-            (candidates :: Array EnumeratedRole) <- (filterA 
-              (lift <<< lift <<< (roleAspectsADT >=> bindingOfADT >=> greaterThanOrEqualTo bindings))
+            -- EnumeratedRoles that can be filled with `fillers`.
+            (candidates :: Array EnumeratedRole) <- lift $ lift (filterA (\(candidate :: EnumeratedRole) -> do
+              (mexpandedCandidateRestriction :: Maybe (ExpandedADT RoleInContext)) <- completeExpandedFillerRestriction candidate
+              case mexpandedCandidateRestriction of 
+                Nothing -> pure true
+                -- The restriction on filling the candidate must be equal to or more general (less specialised) than the fillers.
+                Just expandedCandidateRestriction -> pure (expandedCandidateRestriction `equalsOrGeneralises` expandedFillers))
               nameMatches)
             case head candidates of
               Nothing -> if null nameMatches
                 then throwError $ UnknownRole start ident
-                else throwError $ LocalRoleDoesNotBind start end ident bindings
+                else throwError $ LocalRoleDoesNotBind start end ident fillers
               (Just (EnumeratedRole {id:candidate})) | length candidates == 1 -> pure $ Just candidate
               otherwise -> throwError $ NotUniquelyIdentifying start ident (identifier_ <$> candidates)
 

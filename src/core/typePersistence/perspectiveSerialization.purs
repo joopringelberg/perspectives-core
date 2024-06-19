@@ -27,7 +27,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, concat, cons, elemIndex, filter, filterA, find, findIndex, foldl, head, intersect, modifyAt, nub, null, uncons, union)
-import Data.Maybe (Maybe(..), fromJust, isJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (Regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -156,7 +156,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
   roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
-  contextTypesToCreate <- (lift $ allLeavesInADT <<< map roleInContext2Role <$> 
+  contextTypesToCreate <- (lift $ maybe [] (allLeavesInADT <<< map roleInContext2Role) <$> 
       (bindingOfADT $ unsafePartial domain2roleType (range object)))
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole

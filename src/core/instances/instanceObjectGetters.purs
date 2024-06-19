@@ -60,9 +60,11 @@ import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, tryGetPerspectRol)
 import Perspectives.PerspectivesState (contextCache, roleCache)
+import Perspectives.Query.QueryTypes (RoleInContext)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.PersistentType (getContext, getEnumeratedRole)
-import Perspectives.Representation.Class.Role (actionsOfRoleType)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, completeDeclaredFillerRestriction, declaredTypeWithoutFiller)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
@@ -219,6 +221,19 @@ binding_ r = (try $ getPerspectRol r) >>=
       case rol_binding role of
         Nothing -> pure Nothing
         (Just b) -> pure $ Just b
+
+completeRuntimeType :: RoleInstance -> MP (ADT RoleInContext)
+completeRuntimeType rid = do 
+  role <- roleType_ rid >>= getEnumeratedRole 
+  crt <- declaredTypeWithoutFiller role
+  mb <- binding_ rid
+  case mb of 
+    Nothing -> do
+      mrestrictions <- completeDeclaredFillerRestriction role
+      case mrestrictions of 
+        Nothing -> pure crt
+        Just restrictions -> pure $ SUM [crt, restrictions]
+    Just b -> (\adt -> SUM[crt, adt]) <$> completeRuntimeType b
 
 allFillers :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 allFillers rid = do 

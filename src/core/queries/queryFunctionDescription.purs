@@ -45,7 +45,7 @@ import Data.Traversable (foldMap, traverse)
 import Foreign (ForeignError(..), fail, unsafeToForeign)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression.AST (Step)
-import Perspectives.Representation.ADT (ADT(..), equalsOrGeneralisesADT)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic, and, or)
@@ -191,6 +191,10 @@ contextDomain :: Partial => QueryFunctionDescription -> ADT ContextType
 contextDomain r = case domain r of
   CDOM ct -> ct
 
+contextRange :: Partial => QueryFunctionDescription -> ADT ContextType
+contextRange r = case range r of
+  CDOM ct -> ct
+
 domain :: QueryFunctionDescription -> Range
 domain (SQD d _ _ _ _) = d
 domain (UQD d _ _ _ _ _) = d
@@ -306,11 +310,6 @@ data Domain =
   | VDOM RAN.Range (Maybe PropertyType)
   | ContextKind
   | RoleKind
-
-equalsOrGeneralizesDomain :: Domain -> Domain -> Boolean
-equalsOrGeneralizesDomain (RDOM adt1) (RDOM adt2) = equalsOrGeneralisesADT adt1 adt2
-equalsOrGeneralizesDomain (CDOM adt1) (CDOM adt2) = equalsOrGeneralisesADT adt1 adt2
-equalsOrGeneralizesDomain d1 d2 = d1 == d2
 
 type Range = Domain
 

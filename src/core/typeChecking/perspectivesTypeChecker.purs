@@ -32,21 +32,21 @@ import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Error.Boundaries (handlePerspectContextError)
 import Perspectives.InstanceRepresentation (PerspectContext, pspType)
-import Perspectives.Instances.ObjectGetters (context', contextType_, roleType_)
+import Perspectives.Instances.ObjectGetters (completeRuntimeType)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..))
+import Perspectives.Representation.ADT (ExpandedADT, equalsOrSpecialises)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (bindingOfRole, kindOfRole, transitiveBindingOfADT)
+import Perspectives.Representation.Class.Role (completeExpandedFillerRestriction, expandUnexpandedLeaves, kindOfRole)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType, RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (lessThanOrEqualTo)
+import Perspectives.Types.ObjectGetters (equalsOrGeneralisesRoleInContext)
 import Prelude (Unit, bind, discard, pure, unit, ($), (<<<), (==), (>=>), (>>=))
 
 checkDomeinFile :: DomeinFile -> MonadPerspectives (Array PerspectivesError)
@@ -100,10 +100,14 @@ checkContext c = do
       -- The restrictions on filling this role must be equal to or a specialisation of 
       -- that of its aspects.
       for_ roleAspects \(QT.RoleInContext{role}) -> do
-        EnumeratedRole{binding:aspectBinding, pos:aspectPos, displayName:aspectDisplayName} <- lift $ getEnumeratedRole role
-        (lift $ aspectBinding `lessThanOrEqualTo` binding) >>= if _
-          then pure unit
-          else fail $ FillerRestrictionNotAnAspectSubtype pos aspectPos displayName aspectDisplayName
+        EnumeratedRole{binding:maspectBinding, pos:aspectPos, displayName:aspectDisplayName} <- lift $ getEnumeratedRole role
+        case maspectBinding, binding of
+          Just aspectBinding, Just bnd -> 
+            -- aspectBinding -> bnd
+            (lift $ aspectBinding `equalsOrGeneralisesRoleInContext` bnd) >>= if _
+              then pure unit
+              else fail $ FillerRestrictionNotAnAspectSubtype pos aspectPos displayName aspectDisplayName
+          _, _ -> pure unit
 
     throwOnCycle :: Array ContextType -> Context -> MP Unit
     throwOnCycle path next = if (isJust $ elemIndex (identifier next) path)
@@ -122,21 +126,29 @@ checkContext c = do
 -- | The allowed filler of the given role type to be filled (including those of its Aspects!) must be equal to or more general than the type of the proposed filler.
 -- | The type of the proposed filler may not be equal to the given role type (we disallow a role filling itself).
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
-checkBinding :: RoleType -> RoleInstance -> MP Boolean
+-- checkBinding :: RoleType -> RoleInstance -> MP Boolean
+-- checkBinding filledType filler = do
+--   -- If the model is not available locally, try to get it from the repository.
+--   (fillerType :: EnumeratedRoleType) <- roleType_ filler
+--   fillerContextType <- (context' >=> contextType_) filler
+--   if filledType == ENR fillerType
+--     then pure false
+--     else do
+--       fillerADT <- pure $ ST $ QT.RoleInContext {context: fillerContextType, role: fillerType}
+--       -- The filledType has restrictions on the fillers that it allows.
+--       -- These restrictions can be modeled with the filledType itself, but
+--       -- the restrictions of all of its Aspects count as well.
+--       (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
+--       -- Take the transitive closure over binding.
+--       fillers' <- transitiveBindingOfADT fillerADT
+--       filleds' <- transitiveBindingOfADT filledTypeAllowedFiller
+--       filleds' `equalsOrGeneralisesRoleInContext` fillers'
+
+checkBinding :: EnumeratedRoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
-  -- If the model is not available locally, try to get it from the repository.
-  (fillerType :: EnumeratedRoleType) <- roleType_ filler
-  fillerContextType <- (context' >=> contextType_) filler
-  if filledType == ENR fillerType
-    then pure false
-    else do
-      -- (fillerADT :: ADT QT.RoleInContext) <- (getEnumeratedRole >=> roleAndBinding) fillerType 
-      fillerADT <- pure $ ST $ QT.RoleInContext {context: fillerContextType, role: fillerType}
-      -- The filledType has restrictions on the fillers that it allows.
-      -- These restrictions can be modeled with the filledType itself, but
-      -- the restrictions of all of its Aspects count as well.
-      (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
-      -- Take the transitive closure over binding.
-      fillers' <- transitiveBindingOfADT fillerADT
-      filleds' <- transitiveBindingOfADT filledTypeAllowedFiller
-      filleds' `lessThanOrEqualTo` fillers'
+  (mrestriction :: Maybe (ExpandedADT QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeExpandedFillerRestriction
+  (fillerType :: ExpandedADT QT.RoleInContext) <- completeRuntimeType filler >>= expandUnexpandedLeaves
+  case mrestriction of 
+    -- restriction -> fillerType
+    Just restriction -> pure (restriction `equalsOrSpecialises` fillerType)
+    Nothing -> pure true

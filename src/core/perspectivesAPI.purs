@@ -45,7 +45,7 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
+import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api 
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (RoleProp(..), deleteProperty, getPropertyBearingRoleInstance, saveFile, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
@@ -86,7 +86,7 @@ import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2RoleType)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2EnumeratedRoleType, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
 import Simple.JSON (read, unsafeStringify, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
@@ -544,7 +544,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- The context type given in object must be described in a locally installed model.
     -- {request: "CheckBinding", predicate: localRolName, object: rolInstance}
     Api.CheckBinding -> do 
-      typeOfRoleToBindTo <- string2RoleType predicate
+      typeOfRoleToBindTo <- string2EnumeratedRoleType predicate
       (try $ getPerspectRol (RoleInstance object)) >>=
         case _ of
           Left err -> do

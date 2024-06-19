@@ -188,7 +188,7 @@ simpleStep' =
   <|>
   Simple <$> (RoleTypes <$> (getPosition <* reserved "roleTypes"))
   <|>
-  Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "specialisesRoleType") <*> arcIdentifier)
+  Simple <$> (SpecialisesRoleType <$> (getPosition <* reserved "generalisesRoleType") <*> arcIdentifier)
   <|>
   Simple <$> (IsInState <$> (getPosition <* reserved "isInState") <*> arcIdentifier)
   <|>
@@ -196,7 +196,7 @@ simpleStep' =
   -- VARIABLE MUST BE LAST!
   <|>
   Simple <$> (Variable <$> getPosition <*> lowerCaseName)
-  ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, specialisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count, "
+  ) <?> "binding, binder, context, extern, this, modelname, contextType, roleTypes, generalisesRoleType, a valid variablename (lowercase only) or a number, boolean, string (between double quotes), date (between single quotes), email address or a monoid function (sum, product, minimum, maximum) or count, "
 
 -- | Parses just the regular expression; not "matches", which is interpreted like ">>".
 -- | We expect an expression like this: "..."gimyu

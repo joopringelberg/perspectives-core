@@ -216,7 +216,7 @@ updateModel arrWithModelName arrWithDependencies versions = try
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)
     allModelsInUse = do
       system <- getMySystem
-      propGetter <- getDynamicPropertyGetter DEP.modelURI (ST (EnumeratedRoleType DEP.modelsInUse))
+      propGetter <- getDynamicPropertyGetter DEP.modelURI (UET (EnumeratedRoleType DEP.modelsInUse))
       values <- (ContextInstance system) ##= (getEnumeratedRoleInstances (EnumeratedRoleType DEP.modelsInUse) >=> propGetter)
       pure $ DomeinFileId <<< unwrap <$> values
 

@@ -80,7 +80,6 @@ newtype RoleE = RoleE
   { id :: String
   , kindOfRole :: RoleKind
   , roleParts :: List RolePart
-  , declaredAsPrivate :: Boolean
   , pos :: ArcPosition}
 
 -- TODO: het verschil tussen conjunctie en disjunctie bij FilledByAttribute.

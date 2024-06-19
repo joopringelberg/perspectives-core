@@ -58,7 +58,7 @@ main = runTest do
   -- GUID.theSuite
   -- DFE.theSuite
   -- RB.theSuite
-  -- ROLE.theSuite
-  DNF.theSuite
-  ADT2.theSuite
-  SPECADT.theSuite
+  ROLE.theSuite
+  -- DNF.theSuite
+  -- ADT2.theSuite
+  -- SPECADT.theSuite

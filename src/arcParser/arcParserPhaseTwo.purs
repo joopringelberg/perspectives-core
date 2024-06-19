@@ -61,7 +61,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), DomeinFileId(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType(..), externalRoleType_, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.View (View(..)) as VIEW
-import Prelude (bind, discard, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
+import Prelude (bind, discard, flip, map, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
 
 -------------------
 traverseDomain :: ContextE -> PhaseTwo DomeinFile
@@ -90,10 +90,10 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
         otherwise -> false) contextParts)) of          
           Nothing -> do
             -- Add a default state for the external role.
-            state <- pure $ constructState (StateIdentifier $ contextIdentifier <> "$External") (Q $ trueCondition (CDOM $ ST (ContextType contextIdentifier))) (Cnt (ContextType contextIdentifier)) []
+            state <- pure $ constructState (StateIdentifier $ contextIdentifier <> "$External") (Q $ trueCondition (CDOM $ UET (ContextType contextIdentifier))) (Cnt (ContextType contextIdentifier)) []
             modifyDF (\domeinFile -> addStatesToDomeinFile [state] domeinFile)
             -- Add a definition for the external role; it apparently hasn't been declared in the source.
-            pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, declaredAsPrivate: false, pos})) contextParts
+            pure $ Cons (RE (RoleE{id: "External", kindOfRole: TI.ExternalRole, roleParts: Nil, pos})) contextParts
           otherwise -> pure contextParts
       context' <- foldM handleParts context contextParts'
       modifyDF (\domeinFile -> addContextToDomeinFile context' domeinFile)
@@ -215,9 +215,9 @@ traverseRoleE r ns = if isCalculatedRole r
       otherwise -> false) roleParts))
 
 traverseEnumeratedRoleE :: RoleE -> Namespace -> PhaseTwo Role
-traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, declaredAsPrivate, pos}) ns = do
+traverseEnumeratedRoleE (RoleE {id, kindOfRole, roleParts, pos}) ns = do
   -- TODO. Controleer op dubbele definities.
-  role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns declaredAsPrivate pos)
+  role <- pure (defaultEnumeratedRole (ns <> "$" <> id) id kindOfRole ns pos)
   traverseEnumeratedRoleE_ role roleParts
 
 traverseEnumeratedRoleE_ :: EnumeratedRole -> List RolePart -> PhaseTwo Role
@@ -263,9 +263,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
     handleParts roleName (EnumeratedRole roleUnderConstruction) UnlinkedAttribute = pure (EnumeratedRole $ roleUnderConstruction {unlinked = true})
 
     -- FILLEDBYATTRIBUTE
-    handleParts roleName (EnumeratedRole roleUnderConstruction@{binding}) (FilledByAttribute bnd context) = do
+    handleParts roleName (EnumeratedRole roleUnderConstruction@{id, binding}) (FilledByAttribute bnd context) = do
       if bnd == "None"
-        then pure (EnumeratedRole $ roleUnderConstruction {binding = UNIVERSAL})
+        then pure (EnumeratedRole $ roleUnderConstruction {binding = Just $ ST $ RoleInContext {role: id, context}})
         else do
           -- If the RoleKind is ContextRole, we should construct the name of the External
           -- Role of the binding (which then is a Context)
@@ -280,7 +280,9 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
           -- Note that `context` may not yet be fully qualified.
           -- It may also be unspecified, coded as an empty string.
           -- PhaseThree will resolve both issues.
-          pure (EnumeratedRole $ roleUnderConstruction {binding = addToADT binding (RoleInContext {context, role: EnumeratedRoleType expandedBnd})})
+          pure (EnumeratedRole $ roleUnderConstruction {binding = case binding of 
+            Nothing -> Just $ UET (RoleInContext {context, role: EnumeratedRoleType expandedBnd})
+            Just _ -> map ((flip addToADT) (RoleInContext {context, role: EnumeratedRoleType expandedBnd})) binding})
 
     -- ROLEASPECT
     handleParts roleName (EnumeratedRole roleUnderConstruction@{context, roleAspects, propertyAliases}) (RoleAspect a pos' mPropertyMapping) = do
@@ -339,21 +341,10 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
     -- Notice that we treat roles as units here; not as collections of properties!
     addToADT :: ADT RoleInContext -> RoleInContext -> ADT RoleInContext
     addToADT adt roleInContext = case adt of
-      EMPTY -> ST roleInContext
-      SUM terms -> SUM $ cons (ST roleInContext) terms
-      p@(PROD _) -> SUM [p, ST roleInContext]
-      s@(ST _) -> SUM [s, ST roleInContext]
-      UNIVERSAL -> ST roleInContext
-
-    -- We we add roleName as another conjunct of a product type.
-    -- `roleName` should be qualified.
-    multiplyWithADT :: ADT EnumeratedRoleType -> String -> ADT EnumeratedRoleType
-    multiplyWithADT adt roleName = case adt of
-      EMPTY -> EMPTY
-      p@(SUM _) -> PROD [p, ST $ EnumeratedRoleType roleName]
-      PROD terms -> PROD $ cons (ST $ EnumeratedRoleType roleName) terms
-      s@(ST _) -> PROD [s, ST $ EnumeratedRoleType roleName]
-      UNIVERSAL -> UNIVERSAL
+      s@(UET _) ->  PROD [s, UET roleInContext]
+      SUM terms -> PROD $ cons (UET roleInContext) terms
+      p@(PROD _) -> PROD [p, UET roleInContext]
+      s@(ST _) -> PROD [s, UET roleInContext]
 
     -- Insert a Property type into a Role type.
     insertPropertyInto :: Property.Property -> EnumeratedRole -> EnumeratedRole
