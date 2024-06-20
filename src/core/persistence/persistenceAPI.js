@@ -3,8 +3,8 @@
 
 // NOTE. We have to decide in coding time whether to include the browser or the Node version
 // Otherwise, we'd carry the Node code to the browser and vice versa.
-// var PouchDB = require('pouchdb-browser').default;
-var PouchDB = require('pouchdb');
+var PouchDB = require('pouchdb-browser').default;
+// var PouchDB = require('pouchdb');
 
 function convertPouchError( originalE )
 {
@@ -73,7 +73,7 @@ exports.createDatabaseImpl = function( databaseName )
     // NOTE. We have to decide in coding time whether to include the browser or the Node version.
     // Node doesn't know fetch.
     // Outcomment when running Node!
-    // , {fetch: captureFetch} 
+    , {fetch: captureFetch} 
     );
 }
 
@@ -84,7 +84,7 @@ exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
     // NOTE. We have to decide in coding time whether to include the browser or the Node version.
     // Node doesn't know fetch.
     // Outcomment when running Node!
-    // , fetch: captureFetch 
+    , fetch: captureFetch 
     });
   return new P(databaseName);
 }
