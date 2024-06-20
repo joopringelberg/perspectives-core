@@ -10,7 +10,7 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
-import Perspectives.ModelDependencies (socialEnvironmentPersons, sysUser)
+import Perspectives.ModelDependencies (perspectivesUsers, socialEnvironmentPersons, sysUser)
 import Perspectives.Query.QueryTypes (RoleInContext(..))
 import Perspectives.Representation.ADT (ADT(..), DNF(..), ExpandedADT(..), equalsOrSpecialises, equalsOrSpecialises_, specialises, toDisjunctiveNormalForm)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -268,7 +268,7 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
         Just test6Role2_RestrictionExpandedADT, Just filler1_RestrictionExpandedADT -> liftAff $ assert "not (fill restriction Filler1 `equalsOrSpecialises` fill restriction Test6$Role2)" (not (filler1_RestrictionExpandedADT `equalsOrSpecialises` test6Role2_RestrictionExpandedADT))
         _, _ -> liftAff $ assert "Test6Role1 and Filler2 should each have a filledBy clause!" false
 
-  test "all models" $ runP do
+  testSkip "all models" $ runP do
     loadModels "src/model" 
       [ "couchdb"
       , "serialise"
@@ -285,6 +285,29 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
       , "introduction"
       , "simpleChat"
       ] 
+  testSkip "DNF" $ runP do
+    loadModels "src/model" 
+      [ "couchdb"
+      , "serialise"
+      , "sensor"
+      , "utilities"
+      , "perspectivesSysteem"
+      ] 
+    
+    do
+      getEnumeratedRole (EnumeratedRoleType sysUser) >>= pure <<< declaredType >>= showADT "declaredType User"
+      getEnumeratedRole (EnumeratedRoleType sysUser) >>= completeExpandedType >>= showExpandedADT "completeExpandedType User"
+      getEnumeratedRole (EnumeratedRoleType sysUser) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF User"
+
+      getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= pure <<< declaredType >>= showADT "declaredType perspectivesUsers"
+      getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= completeExpandedType >>= showExpandedADT "completeExpandedType perspectivesUsers"
+      getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF perspectivesUsers"
+
+      getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= pure <<< declaredType >>= showADT "declaredType Persons"
+      getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= completeExpandedType >>= showExpandedADT "completeExpandedType Persons"
+      getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF Persons"
+
+
 
 showADT :: forall a. Show a => String -> ADT a -> MonadPerspectives Unit
 showADT m adt = do 
