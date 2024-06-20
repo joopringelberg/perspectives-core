@@ -209,7 +209,7 @@ expandAspects = expand $ unsafePartial
     (ST a) -> pure $ EST a
     UET a -> do 
       role@(EnumeratedRole{roleAspects}) <- getEnumeratedRole (roleInContext2Role a)
-      expandedAspects' <- for roleAspects (getEnumeratedRole <<< roleInContext2Role >=> completeExpandedType)
+      expandedAspects' <- for roleAspects (getEnumeratedRole <<< roleInContext2Role >=> declaredTypeWithoutFiller >=> expandAspects)
       -- the function below is responsibly Partial, because
       -- we know by construction that the declared type of a role 
       -- is either ST or UET.
