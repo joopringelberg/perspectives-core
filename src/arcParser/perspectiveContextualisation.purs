@@ -100,6 +100,7 @@ contextualisePerspectives = do
     writePerspectiveOnAddedRole :: Array EnumeratedRoleType -> EnumeratedRole -> WriterT (Array Perspective) MP Unit
     writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) =
       for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> do
+        -- Include fillers in the expansion.
         expandedAspectPerspectivesObject <- lift $ expandUnexpandedLeaves (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
         found <- not <<< null <$> filterA (lift <<< (\(potentialObject :: EnumeratedRoleType) -> do 
           expandedPotentialObject <- getEnumeratedRole potentialObject >>= completeExpandedType 

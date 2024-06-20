@@ -200,6 +200,23 @@ expandUnexpandedLeaves = expand $ unsafePartial
           Nothing -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
           Just expandedFiller -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) (cons expandedFiller expandedAspects'))
 
+-- | The recursive expansion of all aspects of the ADT. NOT INCLUDING FILLERS!
+expandAspects :: ADT RoleInContext -> MP (ExpandedADT RoleInContext)
+expandAspects = expand $ unsafePartial 
+  -- the function below is intentionally and responsibly Partial, because 
+  -- by construction `expand` only applies it to the two cases below.
+  case _ of 
+    (ST a) -> pure $ EST a
+    UET a -> do 
+      role@(EnumeratedRole{roleAspects}) <- getEnumeratedRole (roleInContext2Role a)
+      expandedAspects' <- for roleAspects (getEnumeratedRole <<< roleInContext2Role >=> completeExpandedType)
+      -- the function below is responsibly Partial, because
+      -- we know by construction that the declared type of a role 
+      -- is either ST or UET.
+      case declaredType role of 
+        ST ric -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
+        UET ric -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
+
 typeToRole :: ExpandedADT RoleInContext -> MP (ExpandedADT EnumeratedRole)
 typeToRole = traverse (getEnumeratedRole <<< roleInContext2Role)
 
@@ -208,7 +225,7 @@ typeToRole = traverse (getEnumeratedRole <<< roleInContext2Role)
 -----------------------------------------------------------
 -- | The sum of the declared types of the aspects of the role, if any, expressed as an Abstract Data Type of role in context.
 expandedAspects :: EnumeratedRole -> MP (ExpandedADT RoleInContext)
-expandedAspects = declaredAspects >=> expandUnexpandedLeaves
+expandedAspects = declaredAspects >=> expandAspects
 
 completeExpandedType :: EnumeratedRole -> MP (ExpandedADT RoleInContext)
 completeExpandedType r = completeDeclaredType r >>= expandUnexpandedLeaves
@@ -362,7 +379,7 @@ collectOverRoleInContextADT f = traverse (getEnumeratedRole >=> f) >=> pure <<< 
 collectOverEnumeratedRoleExpansionWithoutFillers :: forall a. Ord a => ExtractorOnEnumeratedRole a -> CollectorOverEnumeratedRoleExpansion a
 collectOverEnumeratedRoleExpansionWithoutFillers f role = 
   declaredTypeWithoutFiller role >>= 
-  expandUnexpandedLeaves >>= 
+  expandAspects >>= 
   typeToRole >>= 
   pure <<< computeExpandedCollection f
 

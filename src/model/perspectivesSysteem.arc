@@ -505,7 +505,7 @@ domain model://perspectives.domains#System
         on entry
           do for Inviter
             letA
-              transaction <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with generalisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
+              transaction <- callExternal ser:SerialiseFor( ((filter origin >> context >> contextType >> roleTypes with specialisesRoleType model://perspectives.domains#System$Invitation$Invitee) orElse [role model://perspectives.domains#System$Invitation$Invitee])) returns String
               invitation <- callExternal util:CreateInvitation( CompleteMessage, transaction, ConfirmationCode ) returns String
             in
               create file ("invitation_of_" + InviterLastName + ".json") as "text/json" in SerialisedInvitation for origin
