@@ -29,7 +29,7 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT)
 import Control.Monad.State as State
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons, filter, null, singleton, some, uncons)
+import Data.Array (catMaybes, cons, filter, null, singleton, some, uncons)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (over, unwrap)
 import Data.Traversable (for)
@@ -41,7 +41,7 @@ import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, modifyDF, withDomeinFile)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.QueryTypes (RoleInContext, roleInContext2Role)
+import Perspectives.Query.QueryTypes (roleInContext2Role)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
@@ -107,17 +107,14 @@ inferFromAspectRoles = do
           pure head
 
     -- TODO: beslis of en hoe de binding restrictie geexpandeerd wordt. Nu laten we het bij de declared binding.
-    -- The restriction on role fillers is the PRODUCT of the restrictions of the aspects (including that modelled with the role itself)
+    -- The restriction on role fillers is the SUM of the restrictions of the aspects (including that modelled with the role itself)
     -- Assuming we've inferred bindings for all aspects _before_ we infer bindings for the role itself, we just have to deal 
     -- with the direct aspects.
-    -- inferBinding :: EnumeratedRole -> PhaseThree EnumeratedRole
-    -- inferBinding r = lift $ lift $ do
-    --   ownBinding <- binding r
-    --   aspects <- roleAspects r
-    --   -- An aspect may have no binding restrictions, which is represented as EMPTY. Don't include that in the PRODUCT.
-    --   completeBinding <- product <<< filter isNotEmpty <<< cons ownBinding <$> for (roleInContext2Role <$> aspects) (getEnumeratedRole >=> binding)
-    --   pure $ over EnumeratedRole (\rr -> rr {binding = completeBinding}) r
-    --   where
-    --   isNotEmpty :: ADT RoleInContext -> Boolean
-    --   isNotEmpty EMPTY = false
-    --   isNotEmpty _ = true
+    inferBinding :: EnumeratedRole -> PhaseThree EnumeratedRole
+    inferBinding r = lift $ lift $ do
+      ownBinding <- binding r
+      -- An aspect may have no binding restrictions.
+      completeBinding <- catMaybes <<< cons ownBinding <$> for (roleInContext2Role <$> (unwrap r).roleAspects) (getEnumeratedRole >=> binding)
+      if null completeBinding
+        then pure r
+        else pure $ over EnumeratedRole (\rr -> rr {binding = Just $ SUM completeBinding}) r
