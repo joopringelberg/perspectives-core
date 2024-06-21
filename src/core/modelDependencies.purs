@@ -135,6 +135,9 @@ indexedRoleName = "model://perspectives.domains#System$PerspectivesSystem$Indexe
 indexedContext :: String
 indexedContext = "model://perspectives.domains#System$PerspectivesSystem$IndexedContexts"
 
+indexedContextFuzzies :: String
+indexedContextFuzzies = "model://perspectives.domains#System$PerspectivesSystem$IndexedContextsFuzzies"
+
 indexedContextName :: String
 indexedContextName = "model://perspectives.domains#System$PerspectivesSystem$IndexedContexts$Name"
 

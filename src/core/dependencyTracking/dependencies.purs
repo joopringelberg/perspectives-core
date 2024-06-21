@@ -40,6 +40,7 @@ import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (ApiEffect, Response(..), CorrelationIdentifier)
 import Perspectives.CoreTypes (class Persistent, type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery, (###=))
 import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
+import Perspectives.ModelDependencies (indexedContextFuzzies)
 import Perspectives.Persistent (entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -197,6 +198,13 @@ findRoleStateRequests (RoleInstance roleId) = do
   case lookup roleId r of
     Nothing -> pure []
     Just typesForResource -> pure $ maybe [] identity (lookup "model://perspectives.domains#System$Role$State" typesForResource)
+
+findIndexedContextNamesRequests :: ContextInstance -> MP (Array CorrelationIdentifier)
+findIndexedContextNamesRequests (ContextInstance cid) = do
+  r <- queryAssumptionRegister
+  case lookup cid r of
+    Nothing -> pure []
+    Just typesForResource -> pure $ maybe [] identity (lookup indexedContextFuzzies typesForResource)
 
 isRegistered :: CorrelationIdentifier -> Assumption -> MP Boolean
 isRegistered corrId assumption = findDependencies assumption >>= pure <<<

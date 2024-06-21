@@ -23,16 +23,24 @@
 module Perspectives.Fuzzysort where
 
 import Control.Monad.AvarMonadAsk (gets)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Writer (tell)
 import Data.Maybe (fromJust)
 import Data.Newtype (unwrap)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn2, runEffectFn2)
-import Foreign.Object (Object, fromFoldable, keys, lookup)
+import Foreign.Object (fromFoldable, keys, lookup)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives)
-import Prelude (bind, map, pure, ($), (<$>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
+import Perspectives.ModelDependencies (indexedContextFuzzies)
+import Perspectives.Names (getMySystem)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Value(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..))
+import Prelude (bind, map, pure, ($), (<$>), discard)
+import Simple.JSON (writeJSON)
 
 -- const result = fuzzysort.single('query', 'some string that contains my query.')
 -- // exact match returns a score of 0. lower is worse
@@ -59,11 +67,14 @@ matchStrings = runEffectFn2 matchStringsImpl
 
 -- | Return an object whose keys are Indexed Context Names and whose values are
 -- | the actual context identifiers.
-matchIndexedContextNames :: String -> MonadPerspectives (Object String)
-matchIndexedContextNames s = do
-  indexedNames <- gets _.indexedContexts
+-- | If s is the empty string, all IndexedContextNames will be returned.
+matchIndexedContextNames :: String -> ContextInstance ~~> Value
+matchIndexedContextNames s _ = ArrayT do
+  indexedNames <- lift $ gets _.indexedContexts
   sortedMatches <- liftEffect $ matchStrings s (keys indexedNames)
   (matchingIndexedNames :: Array String) <- pure (_.target <$> sortedMatches)
-  pure $ fromFoldable (map
+  mysystem <- lift $ getMySystem
+  tell $ ArrayWithoutDoubles [RoleAssumption (ContextInstance mysystem) (EnumeratedRoleType indexedContextFuzzies)]
+  pure [Value $ writeJSON $ fromFoldable (map
     (\iname -> Tuple iname (unwrap $ unsafePartial $ fromJust $ lookup iname indexedNames))
-    matchingIndexedNames)
+    matchingIndexedNames)]

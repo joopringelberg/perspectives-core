@@ -59,12 +59,13 @@ import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (addRoleInstanceToContext, setProperty)
 import Perspectives.ContextAndRole (changeRol_isMe, getNextRolIndex)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, (##=), (###=), IndexedResource(..))
-import Perspectives.Deltas (addCreatedContextToTransaction, deltaIndex, insertDelta)
+import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addCreatedContextToTransaction, deltaIndex, insertDelta)
+import Perspectives.DependencyTracking.Dependency (findIndexedContextNamesRequests)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
 import Perspectives.Instances.ObjectGetters (isMe)
-import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
+import Perspectives.Names (expandDefaultNamespaces, getMySystem, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (getIndexedResourceToCreate)
@@ -310,4 +311,7 @@ lookupOrCreateContextInstance ctype id contextConstructor = do
       liftAff $ log $ "Adding indexed context " <> indexedName
       lift $ lift $ modify \ps -> ps {indexedContexts = insert indexedName cid ps.indexedContexts}
       lift $ scheduleIndexedResourceCreation (IndexedContext cid indexedName)
+      -- QUERY UPDATES
+      mysystem <- lift $ lift $ getMySystem
+      lift ((lift $ findIndexedContextNamesRequests (ContextInstance mysystem)) >>= addCorrelationIdentifiersToTransactie)
       pure cid

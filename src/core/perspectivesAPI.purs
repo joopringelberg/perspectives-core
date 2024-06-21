@@ -45,7 +45,7 @@ import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Class (decode)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api 
+import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
 import Perspectives.Assignment.Update (RoleProp(..), deleteProperty, getPropertyBearingRoleInstance, saveFile, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
@@ -63,7 +63,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance, constructConte
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Names (expandDefaultNamespaces)
+import Perspectives.Names (expandDefaultNamespaces, getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
@@ -88,7 +88,7 @@ import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUse
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2EnumeratedRoleType, string2RoleType)
 import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
-import Simple.JSON (read, unsafeStringify, writeJSON)
+import Simple.JSON (read, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -303,9 +303,9 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- { request: "GetLocalRoleSpecialisation", subject: contextInstance, predicate: localAspectName}
     Api.GetLocalRoleSpecialisation -> registerSupportedEffect corrId setter (contextType >=> (liftToInstanceLevel $ localRoleSpecialisation predicate)) (ContextInstance subject) onlyOnce
     -- {request: "matchContextName", subject: name}
-    Api.MatchContextName -> do
-      matches <- matchIndexedContextNames subject
-      sendResponse (Result corrId [writeJSON matches]) setter
+    Api.MatchContextName -> do 
+      mysystem <- getMySystem
+      registerSupportedEffect corrId setter (matchIndexedContextNames subject) (ContextInstance mysystem) onlyOnce
     Api.GetCouchdbUrl -> do
       url <- gets \s -> maybe "" identity s.couchdbUrl
       sendResponse (Result corrId [url]) setter
