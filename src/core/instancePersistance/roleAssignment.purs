@@ -34,8 +34,11 @@ import Perspectives.InstanceRepresentation (PerspectRol)
 import Perspectives.Instances.ObjectGetters (contextType)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Prelude (Unit, bind, discard, pure, unit, ($), (>>=))
+import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
+import Prelude (Unit, bind, discard, pure, unit, ($), (>>=), (==))
 
 -- | In the context of the roleInstance, find the role that is me and set its isMe to true.
 -- | Set the me of the context to that role.
@@ -61,7 +64,7 @@ roleIsNotMe roleId = (lift $ try $ getPerspectRol roleId) >>=
     \role -> do
       lift $ cacheAndSave roleId (changeRol_isMe role false)
 
--- | Set isMe of the roleInstance to true.
+-- | Set isMe of the roleInstance to true, but only if the role is a user role.
 -- | Set me of the context to the roleInstance.
 roleIsMe :: RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
 roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
@@ -69,9 +72,13 @@ roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
     \ctxt -> (lift $ try $ getPerspectRol roleId) >>=
       handlePerspectRolError "roleIsMe"
         \role -> do
-          (lift $ findMeRequests contextId)  >>= addCorrelationIdentifiersToTransactie
-          lift $ cacheAndSave roleId (changeRol_isMe role true)
-          lift $ cacheAndSave contextId (changeContext_me ctxt (Just roleId))
+          rt <- lift $ getEnumeratedRole (rol_pspType role)
+          if kindOfRole rt == UserRole
+            then do
+              (lift $ findMeRequests contextId)  >>= addCorrelationIdentifiersToTransactie
+              lift $ cacheAndSave roleId (changeRol_isMe role true)
+              lift $ cacheAndSave contextId (changeContext_me ctxt (Just roleId))
+            else pure unit
 
 -- | <fillerId> `fillerNoLongerPointsTo` <filledId>
 -- | Break the link from filler to filled (FILLS link)

@@ -70,13 +70,15 @@ import Perspectives.Persistent (getPerspectRol, saveEntiteit, tryGetPerspectEnti
 import Perspectives.PerspectivesState (getIndexedResourceToCreate)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
+import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
-import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..), roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleKind(..), RoleType(..), roletype2string)
 import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', guid)
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Types.ObjectGetters (indexedContextName, indexedRoleName, publicUserRole)
-import Prelude (Unit, bind, discard, eq, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=))
+import Prelude (Unit, bind, discard, eq, pure, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>>=), (&&))
 
 -- | Construct a context from the serialization. If a context with the given id exists, returns a PerspectivesError.
 -- | Calls setFirstBinding on each role.
@@ -196,7 +198,8 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSer
       Nothing -> Just <$> (createAndAddRoleInstance_ roleType contextId r false)
       Just b -> do 
         me <- lift (isMe $ RoleInstance b)
-        Just <$> (createAndAddRoleInstance_ roleType contextId r me)
+        isUserRole <- lift (getEnumeratedRole roleType >>= \rl -> pure $ eq (kindOfRole rl) UserRole)
+        Just <$> (createAndAddRoleInstance_ roleType contextId r (me && isUserRole))
 
 createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
 createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSerialization{id: mRoleId, properties, binding}) isMe = lookupOrCreateRoleInstance roleType
