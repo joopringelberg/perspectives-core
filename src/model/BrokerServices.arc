@@ -335,6 +335,11 @@ domain model://perspectives.domains#BrokerServices
       perspective on Queues
         only (CreateAndFill)
         props (QueueName) verbs (Consult, SetPropertyValue)
+      
+      -- If this contract is due to self-signup, Administrator needs this perspective to know that this contract
+      -- fills an Accounts role in the service
+      perspective on extern
+        props (Name) verbs (Consult)
 
       screen "Create Broker Contract"
         row 

@@ -36,7 +36,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), externalRoleType, propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (RoleVerbList)
-import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, equalsOrGeneralisesRoleInContext)
+import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectRoles, aspectsOfRole, equalsOrSpecialisesRoleInContext)
 
 contextualisePerspectives :: PhaseThree Unit
 contextualisePerspectives = do
@@ -156,7 +156,7 @@ contextualisePerspectives = do
             -- Does ownPerspectiveObjectADT cover objectADT?
             -- objectADT -> ownPerspectiveObjectADT
             -- e.g. objectADT is an Aspect of ownPerspectiveObjectADT, or fills it.
-            else ownPerspectiveObjectADT `equalsOrGeneralisesRoleInContext` objectADT)
+            else objectADT `equalsOrSpecialisesRoleInContext` ownPerspectiveObjectADT)
           false
           (ownPerspectives <#> (\(Perspective{object}) -> unsafePartial domain2roleInContext $ range object))
 
@@ -200,7 +200,7 @@ contextualisePerspectives = do
           (Perspective{actions:aspectActions, object:aspectObject, roleVerbs:aspectRoleVerbs, propertyVerbs:aspectPropertyVerbs}) = do
           -- is the object of the perspective a specialisation of the object of the aspect perspective?
           -- aspectObject -> object
-          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `equalsOrGeneralisesRoleInContext` (unsafePartial domain2roleType $ range object))
+          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `equalsOrSpecialisesRoleInContext` (unsafePartial domain2roleType $ range object))
           if isASpecialisation 
             then 
               pure $ Perspective r 
