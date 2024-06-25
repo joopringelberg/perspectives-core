@@ -38,7 +38,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
-import Prelude (Unit, bind, discard, pure, unit, ($), (>>=), (==))
+import Prelude (Unit, bind, discard, pure, unit, ($), (>>=), (==), (||))
 
 -- | In the context of the roleInstance, find the role that is me and set its isMe to true.
 -- | Set the me of the context to that role.
@@ -73,7 +73,7 @@ roleIsMe roleId contextId = (lift $ try $ getPerspectContext contextId) >>=
       handlePerspectRolError "roleIsMe"
         \role -> do
           rt <- lift $ getEnumeratedRole (rol_pspType role)
-          if kindOfRole rt == UserRole
+          if kindOfRole rt == UserRole || kindOfRole rt == Public || kindOfRole rt == PublicProxy
             then do
               (lift $ findMeRequests contextId)  >>= addCorrelationIdentifiersToTransactie
               lift $ cacheAndSave roleId (changeRol_isMe role true)

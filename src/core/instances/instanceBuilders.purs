@@ -42,10 +42,11 @@ module Perspectives.Instances.Builders
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
+import Data.Array (elemIndex)
 import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (forWithIndex)
@@ -199,7 +200,7 @@ createAndAddRoleInstance roleType@(EnumeratedRoleType rtype) contextId r@(RolSer
       Nothing -> Just <$> (createAndAddRoleInstance_ roleType contextId r false)
       Just b -> do 
         me <- lift (isMe $ RoleInstance b)
-        isUserRole <- lift (getEnumeratedRole roleType >>= \rl -> pure $ eq (kindOfRole rl) UserRole)
+        isUserRole <- lift (getEnumeratedRole roleType >>= \rl -> pure $ isJust $ elemIndex (kindOfRole rl) [UserRole, Public, PublicProxy])
         Just <$> (createAndAddRoleInstance_ roleType contextId r (me && isUserRole))
 
 createAndAddRoleInstance_ :: EnumeratedRoleType -> String -> RolSerialization -> Boolean -> MonadPerspectivesTransaction RoleInstance
