@@ -26,8 +26,8 @@ module Perspectives.TypePersistence.ContextSerialisation where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (length)
-import Data.Maybe (Maybe(..))
+import Data.Array (catMaybes, head, length)
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
@@ -38,12 +38,15 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (typeUri2ModelUri_)
 import Perspectives.Query.Interpreter (lift2MPQ)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Query.UnsafeCompiler (compileFunction)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
+import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Simple.JSON (writeJSON)
+import Unsafe.Coerce (unsafeCoerce)
 
 newtype SerialisedScreen = SerialisedScreen String
 derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
@@ -141,6 +144,7 @@ instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef wh
   addPerspectives (ColumnElementD re) user ctxt = ColumnElementD <$> addPerspectives re user ctxt
   addPerspectives (TableElementD re) user ctxt = TableElementD <$> addPerspectives re user ctxt
   addPerspectives (FormElementD re) user ctxt = FormElementD <$> addPerspectives re user ctxt
+  addPerspectives (MarkDownElementD re) user ctxt = MarkDownElementD <$> addPerspectives re user ctxt
 
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
   addPerspectives (TabDef r) user ctxt = do
@@ -149,13 +153,14 @@ instance addPerspectivesTabDef  :: AddPerspectives TabDef where
 
 instance addPerspectivesColumnDef  :: AddPerspectives ColumnDef where
   addPerspectives (ColumnDef cols) user ctxt = do
-    cols' <- traverse (\a -> addPerspectives a user ctxt) cols
-    pure $ ColumnDef cols'
+    cols' <- traverse (traverseScreenElement user ctxt) cols
+    pure $ ColumnDef (catMaybes cols')
 
 instance addPerspectivesRowDef  :: AddPerspectives RowDef where
   addPerspectives (RowDef cols) user ctxt = do
-    cols' <- traverse (\a -> addPerspectives a user ctxt) cols
-    pure $ RowDef cols'
+    cols' <- traverse (traverseScreenElement user ctxt) cols
+    -- A MarkDownDef with a condition that fails should not be in the end result.
+    pure $ RowDef (catMaybes cols')
 
 instance addPerspectivesTableDef  :: AddPerspectives TableDef where
   addPerspectives (TableDef widgetCommonFields) user ctxt = do
@@ -172,3 +177,45 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
       widgetCommonFields
       ctxt
     pure $ FormDef widgetCommonFields {perspective = Just perspective}
+
+instance AddPerspectives MarkDownDef where
+  addPerspectives md@(MarkDownConstantDef _) user ctxt = pure md
+  addPerspectives md@(MarkDownExpressionDef _) user ctxt = pure md
+  addPerspectives (MarkDownPerspectiveDef {widgetFields, condition}) user ctxt = do
+    perspective <- perspectiveForContextAndUserFromId
+      user
+      widgetFields
+      ctxt
+    pure $ MarkDownPerspectiveDef {widgetFields: widgetFields {perspective = Just perspective}, condition}
+
+traverseScreenElement :: RoleInstance -> ContextInstance -> ScreenElementDef -> AssumptionTracking (Maybe ScreenElementDef)
+traverseScreenElement user ctxt a = case a of 
+      MarkDownElementD mddef -> map MarkDownElementD <$> unsafePartial case mddef of 
+        -- We transform the markdown string to html client side.
+        sed@(MarkDownConstantDef {condition}) -> conditionally condition (pure $ Just sed)
+        MarkDownExpressionDef {textQuery, condition} -> conditionally condition 
+          do 
+            (textGetter :: ContextInstance ~~> Value) <- lift $ unsafeCoerce compileFunction textQuery
+            (textA :: Array Value) <- runArrayT $ textGetter ctxt
+            pure $ Just $ MarkDownExpressionDef {textQuery, condition, text: maybe Nothing (Just <<< unwrap) (head textA)}
+        MarkDownPerspectiveDef {widgetFields, condition} -> conditionally condition
+          do 
+            perspective <- perspectiveForContextAndUserFromId
+              user
+              widgetFields
+              ctxt
+            pure $ Just $ MarkDownPerspectiveDef { widgetFields: widgetFields {perspective = Just perspective}, condition}
+      (other :: ScreenElementDef) -> Just <$> addPerspectives other user ctxt
+
+    where
+      conditionally :: Maybe QueryFunctionDescription -> AssumptionTracking (Maybe MarkDownDef) -> AssumptionTracking (Maybe MarkDownDef)
+      conditionally condition f = case condition of 
+        Nothing -> f
+        Just c -> do
+          (criterium :: ContextInstance ~~> Value) <- lift $ unsafeCoerce compileFunction c
+          -- evaluate the condition in the current context
+          shouldBeShown <- runArrayT $ criterium ctxt
+          case head shouldBeShown of 
+            Just (Value "true") -> f
+            -- The condition should be strictly true.
+            _ -> pure $ Nothing

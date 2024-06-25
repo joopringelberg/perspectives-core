@@ -576,6 +576,7 @@ order (VDOM ran _) a b f c = ArrayT do
       -- Compare durations as Numbers. NOTE that we can only compare exactly equal Duration_ s!
       -- E.g. Days with Days, but not Days with Minutes.
       RAN.PDuration _ -> singleton <<< show <$> (compareFun <$> (parseNumber a') <*> (parseNumber b'))
+      RAN.PMarkDown -> pure [show $ compareFun a' b']
     _, _ -> pure []
   where
     compareFun :: forall a. Ord a => a -> a -> Boolean

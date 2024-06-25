@@ -36,7 +36,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- RANGE
 -----------------------------------------------------------
 -- | PDate is represented as SerializableDateTime.
-data Range = PString | PBool | PNumber | PDate | PDateTime | PTime | PEmail | PFile | PDuration Duration_
+data Range = PString | PBool | PNumber | PDate | PDateTime | PTime | PEmail | PFile | PDuration Duration_ | PMarkDown
 
 derive instance genericRange :: Generic Range _
 
@@ -62,6 +62,7 @@ instance readForeignRange :: ReadForeign Range where
       "PTime" -> pure PTime
       "PEmail" -> pure PEmail
       "PFile" -> pure PFile
+      "PMarkDown" -> pure PMarkDown
   -- readImpl r = enumReadForeign r
 
 instance rangeShow :: Show Range where

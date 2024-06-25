@@ -51,10 +51,25 @@ domain model://joopringelberg.nl#TestBindingen
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on Tests
         all roleverbs
-        props (TestNaam) verbs (Consult, SetPropertyValue)
+        props (TestNaam, Explanation) verbs (Consult, SetPropertyValue)
         props (TestSucceeded) verbs (Consult)
+      perspective on MarkDown
+        all roleverbs
+        props (MD) verbs (SetPropertyValue)
+      
+      screen "MarkDown testing"
+        row
+          -- MarkDownConstant
+          markdown <## Dit is Markdown! 
+                    En dit is de tweede paragraaf.
+                   >
+        row 
+          form MarkDown
 
     context Tests (relational) filledBy Test
+
+    thing MarkDown
+      property MD (MarkDown)
 
   case Test
     external 

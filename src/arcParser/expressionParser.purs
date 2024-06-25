@@ -24,14 +24,14 @@ module Perspectives.Parsing.Arc.Expression where
 
 import Control.Alt ((<|>))
 import Control.Lazy (defer)
-import Data.Array (elemIndex, fromFoldable, many)
+import Data.Array (elemIndex, fold, fromFoldable, many, replicate)
 import Data.DateTime (Date, DateTime(..), Hour, Time(..))
 import Data.Either (Either(..))
 import Data.Enum (toEnum)
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.String (length)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll)
 import Data.String.CodeUnits as SCU
 import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
@@ -45,10 +45,10 @@ import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Duration_(..), Range(..))
 import Perspectives.Time (date2String, dateTime2String, time2String)
-import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>), eq)
+import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>), eq, (/=))
 import Text.Parsing.Parser (fail)
 import Text.Parsing.Parser.Combinators (between, lookAhead, manyTill, option, optionMaybe, try, (<?>))
-import Text.Parsing.Parser.String (char)
+import Text.Parsing.Parser.String (char, satisfy)
 import Text.Parsing.Parser.Token (alphaNum)
 
 step :: IP Step
@@ -168,6 +168,8 @@ simpleStep' =
   <|>
   Simple <$> (Value <$> getPosition <*> pure PString <*> token.stringLiteral)
   <|>
+  Simple <$> (Value <$> getPosition <*> pure PMarkDown <*> markDownLiteral)
+  <|>
   Simple <$> (Value <$> getPosition <*> pure PBool <*> boolean)
   <|>
   Simple <$> (Value <$> getPosition <*> pure PNumber <*> (token.integer >>= pure <<< show))
@@ -245,6 +247,7 @@ propertyRange = (reserved "Boolean" *> (pure $ PBool)
   <|> reserved "Minute" *> (pure $ (PDuration Minute_))
   <|> reserved "Second" *> (pure $ (PDuration Second_))
   <|> reserved "MilliSecond" *> (pure $ (PDuration MilliSecond_))
+  <|> reserved "MarkDown" *> (pure $ PMarkDown)
   )
 
 -- | Parse a time. Succeeds if the Time component of parseDateTime is empty.
@@ -532,3 +535,22 @@ computationStep = do
   computedType <- reserved "returns" *> ((OtherType <$> arcIdentifier) <|> (ComputedRange <$> propertyRange))
   end <- getPosition
   pure $ Computation $ ComputationStep {functionName, arguments: (fromFoldable arguments), computedType, start, end}
+
+-- | Anything between '<' and '<'
+markDownLiteral :: IP String
+markDownLiteral = (go <?> "MarkDown") <* token.whiteSpace
+  where
+    go :: IP String
+    go = do
+        (ArcPosition {column}) <- getPosition
+        chars <- between (char '<') (char '>' <?> "end of MarkDown (>). ") (many markDownChar)
+        pure $ fixIndentation column $ SCU.fromCharArray chars
+
+    markDownChar :: IP Char
+    markDownChar = satisfy \c -> c /= '>'
+
+    -- Replace each occurrence of a newline character followed by n spaces by
+    -- a newline character followed by (n-startColumn) spaces. 
+    -- This allows for the formatting of markdown at any position, where the starting '<' character should be to the left of all markdown lines.
+    fixIndentation :: Int -> String -> String
+    fixIndentation startColumn s = replaceAll (Pattern $ fold $ replicate startColumn " ") (Replacement "") s

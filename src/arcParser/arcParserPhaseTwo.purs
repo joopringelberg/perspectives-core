@@ -304,7 +304,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
               -- NOTICE that the destinations may be underqualified. We will fix that in PhaseThree.
             , propertyAliases = maybe propertyAliases (union propertyAliases) mPropertyMapping'
             })
-        else throwError $ NotWellFormedName pos' a
+        else throwError $ NotWellFormedName pos' a 
 
     -- INDEXEDROLE
     handleParts roleName (EnumeratedRole roleUnderConstruction) (IndexedRole indexedName pos') = do

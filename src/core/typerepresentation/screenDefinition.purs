@@ -31,6 +31,7 @@ import Data.Show.Generic (genericShow)
 import Foreign (F, Foreign, ForeignError(..), fail)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
@@ -63,13 +64,16 @@ data ScreenElementDef =
   | ColumnElementD ColumnDef
   | TableElementD TableDef
   | FormElementD FormDef
+  | MarkDownElementD MarkDownDef
 
 newtype RowDef = RowDef (Array ScreenElementDef)
 newtype ColumnDef = ColumnDef (Array ScreenElementDef)
 newtype TableDef = TableDef WidgetCommonFieldsDef
 newtype FormDef = FormDef WidgetCommonFieldsDef
-
-
+data MarkDownDef = 
+  MarkDownConstantDef {text :: String, condition :: Maybe QueryFunctionDescription} |
+  MarkDownPerspectiveDef { widgetFields :: WidgetCommonFieldsDef, condition :: Maybe QueryFunctionDescription} |
+  MarkDownExpressionDef {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String}
 -----------------------------------------------------------
 -- WIDGETS
 -----------------------------------------------------------
@@ -107,6 +111,7 @@ derive instance genericTableDef :: Generic TableDef _
 derive instance genericTableDef' :: Generic TableDef' _
 derive instance genericFormDef :: Generic FormDef _
 derive instance genericFormDef' :: Generic FormDef' _
+derive instance Generic MarkDownDef _
 
 -----------------------------------------------------------
 -- SHOW INSTANCES
@@ -118,6 +123,7 @@ instance showRowDef :: Show RowDef where show x = genericShow x
 instance showColumnDef :: Show ColumnDef where show x = genericShow x
 instance showTableDef :: Show TableDef where show = genericShow
 instance showFormDef :: Show FormDef where show = genericShow
+instance Show MarkDownDef where show = genericShow
 
 -----------------------------------------------------------
 -- EQ INSTANCES
@@ -129,6 +135,7 @@ instance eqRowDef :: Eq RowDef where eq a b = genericEq a b
 instance eqColumnDef :: Eq ColumnDef where eq a b = genericEq a b
 instance eqTableDef :: Eq TableDef where eq = genericEq
 instance eqFormDef :: Eq FormDef where eq = genericEq
+instance Eq MarkDownDef where eq = genericEq
 
 -----------------------------------------------------------
 -- WRITEFOREIGN INSTANCES
@@ -142,6 +149,7 @@ instance writeForeignScreenElementDef :: WriteForeign ScreenElementDef where
   writeImpl (ColumnElementD c) = write { elementType: "ColumnElementD", element: c}
   writeImpl (TableElementD t) = write { elementType: "TableElementD", element: t}
   writeImpl (FormElementD f) = write { elementType: "FormElementD", element: f}
+  writeImpl (MarkDownElementD f) = write { elementType: "MarkDownElementD", element: f}
 
 instance writeForeignTabDef :: WriteForeign TabDef where
   writeImpl (TabDef widgetCommonFields) = write widgetCommonFields
@@ -154,6 +162,10 @@ instance WriteForeign TableDef where
   writeImpl (TableDef fields) = write { tag: "TableDef", fields}
 instance WriteForeign FormDef where
   writeImpl (FormDef fields) = write { tag: "FormDef", fields}
+instance WriteForeign MarkDownDef where
+  writeImpl (MarkDownConstantDef f) = write { tag: "MarkDownConstantDef", element: f}
+  writeImpl (MarkDownPerspectiveDef f) = write { tag: "MarkDownPerspectiveDef", element: f}
+  writeImpl (MarkDownExpressionDef f) = write { tag: "MarkDownExpressionDef", element: f}
 
 instance WriteForeign ScreenKey where
   writeImpl (ScreenKey ct rt) = writeImpl {ct, rt}
@@ -171,6 +183,12 @@ instance ReadForeign ScreenElementDef where
       "ColumnElementD" -> ColumnElementD <$> ((read' element) :: F ColumnDef)
       "TableElementD" -> TableElementD <$> ((read' element) :: F TableDef)
       "FormElementD" -> FormElementD <$> ((read' element) :: F FormDef)
+      "MarkDownElementD" -> do 
+        ({tag, element:subElement} :: {tag :: String, element :: Foreign}) <- read' element
+        unsafePartial $ case tag of
+          "MarkDownConstantDef" -> MarkDownElementD <<< MarkDownConstantDef <$> ((read' subElement) :: F {text :: String, condition :: Maybe QueryFunctionDescription})
+          "MarkDownPerspectiveDef" -> MarkDownElementD <<< MarkDownPerspectiveDef <$> ((read' subElement) :: F { widgetFields :: WidgetCommonFieldsDef, condition :: Maybe QueryFunctionDescription})
+          "MarkDownExpressionDef" -> MarkDownElementD <<< MarkDownExpressionDef <$> ((read' subElement) :: F {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String})
 
 instance ReadForeign ScreenKey where
   readImpl f = do 

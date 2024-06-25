@@ -54,8 +54,8 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutoma
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.InvertedQuery.Storable (StoredQueries)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
+import Perspectives.Parsing.Arc.AST (MarkDownE(..), RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -67,7 +67,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyD
 import Perspectives.Parsing.Arc.Position (ArcPosition, arcParserStartPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Persistent (getDomeinFile)
-import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName, qualifyLocalContextName)
+import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalContextName, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (completeInversions)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
@@ -85,7 +85,7 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveMustBeSynchronized, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
+import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
@@ -1365,6 +1365,7 @@ handleScreens screenEs = do
             screenElementDef (AST.ColumnElement colE) = column colE
             screenElementDef (AST.TableElement tableE) = TableElementD <$> table tableE
             screenElementDef (AST.FormElement formE) = FormElementD <$> form formE
+            screenElementDef (AST.MarkDownElement markdownE) = MarkDownElementD <$> markdown markdownE
 
             functionalWidget :: Boolean
             functionalWidget = true
@@ -1377,6 +1378,22 @@ handleScreens screenEs = do
 
             form :: AST.FormE -> PhaseThree FormDef
             form (AST.FormE fields) = FormDef <$> widgetCommonFields fields functionalWidget
+
+            markdown :: AST.MarkDownE -> PhaseThree MarkDownDef
+            markdown (MarkDownConstant { text, condition, context:ctxt}) = do
+              text' <- unsafePartial case text of 
+                Simple (Value _ _ t) -> pure t
+              condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
+              pure $ MarkDownConstantDef {text: text', condition: condition'}
+            markdown (MarkDownPerspective {widgetFields, condition}) = do
+              widgetFields' <- widgetCommonFields widgetFields functionalWidget
+              condition' <- traverse (compileStep (CDOM $ ST (roleIdentification2Context widgetFields.perspective))) condition
+              pure $ MarkDownPerspectiveDef {widgetFields: widgetFields', condition: condition'}
+            markdown (MarkDownExpression {text, condition, context:ctxt}) = do
+              text' <- compileStep (CDOM $ ST ctxt) text
+              condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
+              pure $ MarkDownExpressionDef {textQuery: text', condition: condition', text: Nothing}
+
 
             widgetCommonFields :: AST.WidgetCommonFields -> Boolean -> PhaseThree WidgetCommonFieldsDef
             widgetCommonFields {title:title', perspective, propsOrView, propertyVerbs, roleVerbs, start:start', end:end'} isFunctionalWidget = do

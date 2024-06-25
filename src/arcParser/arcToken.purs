@@ -225,6 +225,8 @@ perspectDef = LanguageDef
                   , "row"
                   , "column"
                   , "form"
+                  , "markdown"
+                  , "when"
                   , "table"
 
                   ]

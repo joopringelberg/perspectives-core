@@ -24,7 +24,7 @@ module Perspectives.Query.ExpandPrefix where
 
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -281,6 +281,20 @@ instance containsPrefixesTableE :: ContainsPrefixes TableE where
 instance containsPrefixesFormE :: ContainsPrefixes FormE where
   expandPrefix (FormE wcf)= FormE <$> expandPrefixWidgetCommonFields wcf
 
+instance ContainsPrefixes MarkDownE where
+  expandPrefix (MarkDownConstant {text, condition, context}) = do 
+    condition' <- traverse expandPrefix condition
+    pure $ MarkDownConstant {text, condition:condition', context}
+  expandPrefix (MarkDownExpression {text, condition, context}) = do 
+    text' <- expandPrefix text
+    condition' <- traverse expandPrefix condition
+    pure $ MarkDownExpression {text:text', condition:condition', context}
+  expandPrefix (MarkDownPerspective {widgetFields, condition}) = do 
+    widgetFields' <- expandPrefixWidgetCommonFields widgetFields
+    condition' <- traverse expandPrefix condition
+    pure $ MarkDownPerspective {widgetFields:widgetFields', condition:condition'}
+
+
 expandPrefixWidgetCommonFields :: WidgetCommonFields-> PhaseTwo WidgetCommonFields
 expandPrefixWidgetCommonFields cf@{perspective} = do
     perspective' <- expandPrefix perspective
@@ -302,3 +316,4 @@ instance containsPrefixesScreenElement :: ContainsPrefixes ScreenElement where
   expandPrefix (ColumnElement r) = ColumnElement <$> expandPrefix r
   expandPrefix (TableElement r) = TableElement <$> expandPrefix r
   expandPrefix (FormElement r) = FormElement <$> expandPrefix r
+  expandPrefix (MarkDownElement r) = MarkDownElement <$> expandPrefix r

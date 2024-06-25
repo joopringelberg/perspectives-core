@@ -374,6 +374,7 @@ data ScreenElement =
   | ColumnElement ColumnE
   | TableElement TableE
   | FormElement FormE
+  | MarkDownElement MarkDownE
 
 --------------------------------------------------------------------------------
 ---- TAB, ROW, COLUMN
@@ -404,6 +405,14 @@ type WidgetCommonFields =
 ---- TABLE
 --------------------------------------------------------------------------------
 newtype TableE = TableE WidgetCommonFields
+
+--------------------------------------------------------------------------------
+---- MARKDOWN
+--------------------------------------------------------------------------------
+data MarkDownE = 
+  MarkDownConstant {text :: Step, condition :: Maybe Step, context :: ContextType} |
+  MarkDownPerspective {widgetFields :: WidgetCommonFields, condition :: Maybe Step} |
+  MarkDownExpression {text :: Step, condition :: Maybe Step, context :: ContextType}
 
 --------------------------------------------------------------------------------
 ---- INSTANCES
@@ -503,3 +512,6 @@ derive instance newtypeTableE :: Newtype TableE _
 
 derive instance genericForm :: Generic FormE _
 instance showForm :: Show FormE where show = genericShow
+
+derive instance Generic MarkDownE _
+instance Show MarkDownE where show = genericShow

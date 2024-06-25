@@ -87,7 +87,7 @@ domain model://joopringelberg.nl#TestQueries
     state NoManager = not exists Manager
       on entry 
         do for Initializer
-          bind sys:Me to Manager
+          bind sys:SocialMe to Manager
 
     -- This state has been seen to become active after creating TheEmbeddedContext.
     state State1 = exists TheEmbeddedContext
@@ -149,6 +149,9 @@ domain model://joopringelberg.nl#TestQueries
         defaults
       perspective on AnotherRole
         defaults
+      perspective on MarkDown
+        all roleverbs
+        props (MD, ShowIt) verbs (Consult, SetPropertyValue)
       
       screen "TestQueries"
         row
@@ -157,12 +160,35 @@ domain model://joopringelberg.nl#TestQueries
           form "Thing1 in EmbeddedContext" Thing1InEmbeddedContext
         row 
           form "AnotherRole" AnotherRole
+        row
+          -- MarkDownConstant:
+          markdown <## Markdown! 
+                    De bron van deze tekst is het model.
+                   >
+        -- Editing MarkDown in a form:
+        row 
+          column
+            form "Very Simple MarkDown Editor" MarkDown
+          -- MarkDownExpression
+          column
+            markdown MarkDown >> MD
+              when MarkDown >> ShowIt
+        -- MarkDownPerspective
+        row
+          column
+            markdown MarkDown
+              props (MD) verbs (Consult, SetPropertyValue)
+
+    thing MarkDown
+      property MD (MarkDown)
+        minLength = 100
+      property ShowIt (Boolean)
 
     context TheEmbeddedContext filledBy EmbeddedContext
       aspect tq:TQAspect$EC
       on entry
         do for Initializer
-          bind sys:Me to EmbeddedUser in binding >> context
+          bind sys:SocialMe to EmbeddedUser in binding >> context
       -- This state has been seen to become active after creating it and its filler.
       -- This state has been seen to become active after filling it.
       -- This state has been seen to become inactive after removing the filler.

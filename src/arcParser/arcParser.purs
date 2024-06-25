@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -1372,6 +1372,7 @@ screenElementE = withPos do
     "column" -> ColumnElement <$> columnE
     "table" -> reserved "table" *> (TableElement <$> tableE)
     "form" -> reserved "form" *> (FormElement <$> formE)
+    "markdown" -> reserved "markdown" *> (MarkDownElement <$> markdownE)
     -- NOTE: extend message when a new widget is added.
     _ -> fail "Only `row`, `column`, `table` and `form` are allowed here. "
 
@@ -1418,3 +1419,25 @@ formE = FormE <$> widgetCommonFields
 
 tableE :: IP TableE
 tableE = TableE <$> widgetCommonFields
+
+markdownE :: IP MarkDownE
+markdownE = do
+  s <- lookAhead step
+  case s of 
+    (Simple (ArcIdentifier pos id)) -> do 
+      widgetFields <- widgetCommonFields
+      condition <- optionMaybe (reserved "when" *> step)
+      sameOrOutdented'
+      pure $ MarkDownPerspective {widgetFields, condition}
+    Simple (Value pos PMarkDown _) -> do 
+      text <- step
+      condition <- optionMaybe (reserved "when" *> step)
+      context <- getCurrentContext
+      sameOrOutdented'
+      pure $ MarkDownConstant {text, condition, context}
+    _ -> do 
+      text <- step
+      condition <- optionMaybe (reserved "when" *> step)
+      context <- getCurrentContext
+      sameOrOutdented'
+      pure $ MarkDownExpression {text, condition, context}
