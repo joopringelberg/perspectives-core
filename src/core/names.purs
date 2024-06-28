@@ -78,6 +78,7 @@ defaultNamespaces = OBJ.fromFoldable
   , Tuple "sens" "model://perspectives.domains#Sensor"
   , Tuple "rabbit" "model://perspectives.domains#RabbitMQ"
   , Tuple "files" "model://perspectives.domains#Files"
+  , Tuple "bs" "model://perspectives.domains#BrokerServices"
   ]
 
 defaultIndexedNames :: MonadPerspectives (OBJ.Object String)

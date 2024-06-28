@@ -49,6 +49,7 @@ import Perspectives.External.CoreModuleList (isExternalCoreModule)
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (endsWithSegments, isExternalRole, isTypeUri, qualifyWith, typeUri2ModelUri)
 import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
+import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, makeContextStep, makeIdentityStep, stepContainsVariableReference)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
@@ -66,7 +67,7 @@ import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), State
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
 import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..)) 
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.QueryFunction (FunctionName(..), isFunctionalFunction)
 import Perspectives.Representation.Range (Duration_(..), Range(..), isDate, isPDuration, isPMonth, isTime, isTimeDuration)
@@ -305,17 +306,26 @@ compileStep currentDomain (Computation st) = compileComputationStep currentDomai
 ------------------------------------------------------------------------------------
 compileSimpleStep :: Domain -> SimpleStep -> FD
 compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
-  mindexedContextType <- isIndexedContext ident
-  case mindexedContextType of
-    Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
-    Nothing -> do
-      mindexedRoleType <- isIndexedRole ident
-      case mindexedRoleType of
-        Just role -> do
+  -- The next line just looks for indexed contexts in the current model.
+  mLocalIndexedContextType <- isIndexedContext ident
+  mIndexedContextType <- lift $ lift $ (lookupIndexedContext ident >>= traverse contextType_)
+  case mLocalIndexedContextType, mIndexedContextType of
+    Just indexedContextType, Nothing -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
+    Nothing, Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
+    _, _ -> do
+      -- The next line just looks for indexed roles in the current model.
+      mLocalIndexedRoleType <- isIndexedRole ident
+      mIndexedRoleType <- lift $ lift (lookupIndexedRole ident >>= traverse roleType_)
+      case mLocalIndexedRoleType, mIndexedRoleType of
+        Just role, Nothing -> do
           -- For context, we take the syntactically embedding context type of the indexed role.
           context <- lift2 $ enumeratedRoleContextType role
           pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True
-        Nothing -> case currentDomain of
+        Nothing, Just role -> do
+          -- For context, we take the syntactically embedding context type of the indexed role.
+          context <- lift2 $ enumeratedRoleContextType role
+          pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True
+        _, _ -> case currentDomain of
           (CDOM c) -> do
             (rts :: Array RoleType) <- if isTypeUri ident
               then if isExternalRole ident
