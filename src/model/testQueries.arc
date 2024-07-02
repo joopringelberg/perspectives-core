@@ -152,8 +152,17 @@ domain model://joopringelberg.nl#TestQueries
       perspective on MarkDown
         all roleverbs
         props (MD, ShowIt) verbs (Consult, SetPropertyValue)
+      action MakeAnEmbeddedContext
+        create context EmbeddedContext bound to TheEmbeddedContext
+      perspective on Pages
+        all roleverbs
+        props (Title) verbs (Consult, SetPropertyValue)
+      perspective on Pages >> binding >> context >> Author
+        all roleverbs
       
       screen "TestQueries"
+        row 
+          table Pages
         row
           form "TheEmbeddedContext" TheEmbeddedContext
         row
@@ -168,18 +177,19 @@ domain model://joopringelberg.nl#TestQueries
         -- Editing MarkDown in a form:
         row 
           column
-            form "Very Simple MarkDown Editor" MarkDown
-          -- MarkDownExpression
+            -- Table for role with MarkDown property.
+            table "Very Simple MarkDown Editor" MarkDown
           column
-            markdown MarkDown >> MD
-              when MarkDown >> ShowIt
-        -- MarkDownPerspective
+            -- MarkDownPerspective; renders as just blocks of MarkDown.
+            markdown MarkDown
+              props (MD) verbs (Consult)
         row
           column
+            -- MarkDownPerspective; renders as a stack of textareas.
             markdown MarkDown
               props (MD) verbs (Consult, SetPropertyValue)
 
-    thing MarkDown
+    thing MarkDown (relational)
       property MD (MarkDown)
         minLength = 100
       property ShowIt (Boolean)
@@ -205,6 +215,11 @@ domain model://joopringelberg.nl#TestQueries
       property Prop3 (Boolean)
     
     thing Thing1InEmbeddedContext = TheEmbeddedContext >> binding >> context >> Thing1
+
+    context Pages (relational) filledBy PerspectivesPage
+      on entry
+        do for Manager
+          bind currentactor to Author in binding >> context
 
   case EmbeddedContext
     aspect sys:ContextWithNotification
@@ -258,3 +273,53 @@ domain model://joopringelberg.nl#TestQueries
         defaults
       perspective on extern
         defaults
+
+  case PerspectivesPage
+    external 
+      property Title (String)
+
+    user Author filledBy sys:TheWorld$PerspectivesUsers
+      perspective on TextBlocks
+        only (Create, Remove)
+        props (MD, Condition, Title) verbs (Consult, SetPropertyValue)
+        props (RawConditionResult, ShowBlock) verbs (Consult)
+      screen "MarkDown Editing"
+        row
+          column
+            table "Text blocks" TextBlocks
+              props (Title, Condition) verbs (Consult, SetPropertyValue)
+          column
+            table "Conditions" TextBlocks
+              props (RawConditionResult) verbs (Consult)
+        row
+          -- editor
+          column
+            markdown TextBlocks
+              props (MD, Condition) verbs (Consult, SetPropertyValue) 
+          -- preview
+          column
+            markdown TextBlocks
+              props (MD) verbs (Consult) 
+              -- LET OP: na de verandering is alleen ShowBlock nog nodig.
+              when ShowBlock
+
+    thing TextBlocks (relational)
+      property Title (String)
+      property MD (MarkDown)
+        minLength = 100
+      property Condition (String)
+      property RawConditionResult = callExternal util:EvalExpression( Condition ) returns String
+      property ConditionResult = RawConditionResult >> callExternal util:SelectR( "^result#(.*)" ) returns String
+      property ShowBlock = (exists ConditionResult) and ConditionResult == "true"
+    
+    -- public Visitor at "https://perspectives.domains/cw_servers_and_repositories/" = sys:SocialMe
+    -- user Visitor = sys:SocialMe
+    --   perspective on TextBlocks
+    --     props (MD, Condition, RawConditionResult, ConditionResult, ShowBlock) verbs (Consult)
+    --   screen
+    --     row 
+    --       -- Conditional read only view of blocks.
+    --       markdown TextBlocks
+    --         props (MD) verbs (Consult)
+    --         when ShowBlock
+

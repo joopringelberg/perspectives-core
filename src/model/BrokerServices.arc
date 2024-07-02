@@ -169,7 +169,21 @@ domain model://perspectives.domains#BrokerServices
         only (Create, Fill)
       perspective on bs:MyBrokers >> PublicBrokers
         only (CreateAndFill)
-      screen "Broker service"
+      screen 
+        row
+          markdown <# Broker service
+                    This is a 'broker service'. It is a program running on 
+                    a webserver that programs use to exchange messages. MyContexts
+                    installations use it to synchronize information.
+                   >
+        row
+          markdown <## Do you want to add this service?
+                    This service is not yet available in your installation.
+                    You might want to add it so you can sign up to it afterwards in order
+                    to connect to other people on MyContexts.
+                    [[action: AddThisServer|Add the service]]
+                   >
+            when not exists bs:MyBrokers >> Contracts
         row
           form "This service" External
             props (Name) verbs (Consult)
