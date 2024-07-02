@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.Perspective where
 
-import Data.Array (concat, elemIndex, findIndex, foldl, fromFoldable, length, null)
+import Data.Array (concat, cons, elemIndex, findIndex, foldl, fromFoldable, length, null)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
 import Data.List (findIndex) as LST
@@ -212,6 +212,8 @@ expandPropSet allProps Universal = allProps
 expandPropSet _ Empty = []
 expandPropSet _ (PSet as) = as
 
+addProperty :: Partial => PropertyVerbs -> PropertyType -> PropertyVerbs
+addProperty (PropertyVerbs (PSet props) verbs) prop = PropertyVerbs (PSet (cons prop props)) verbs
 
 isMutatingVerbSet :: ExplicitSet PropertyVerb -> Boolean
 isMutatingVerbSet s = case expandVerbs s of

@@ -356,7 +356,7 @@ showPath = maybe "" (append "$")
 ---- SCREEN
 --------------------------------------------------------------------------------
 newtype ScreenE = ScreenE
-  { title :: String
+  { title :: Maybe String
   , tabs :: Maybe (List TabE)
   , rows :: Maybe (List RowE)
   , columns :: Maybe (List ColumnE)
@@ -410,9 +410,9 @@ newtype TableE = TableE WidgetCommonFields
 ---- MARKDOWN
 --------------------------------------------------------------------------------
 data MarkDownE = 
-  MarkDownConstant {text :: Step, condition :: Maybe Step, context :: ContextType} |
-  MarkDownPerspective {widgetFields :: WidgetCommonFields, condition :: Maybe Step} |
-  MarkDownExpression {text :: Step, condition :: Maybe Step, context :: ContextType}
+  MarkDownConstant {text :: Step, condition :: Maybe Step, context :: ContextType, start :: ArcPosition, end :: ArcPosition} |
+  MarkDownPerspective {widgetFields :: WidgetCommonFields, condition :: Maybe String, start :: ArcPosition, end :: ArcPosition} |
+  MarkDownExpression {text :: Step, condition :: Maybe Step, context :: ContextType, start :: ArcPosition, end :: ArcPosition} 
 
 --------------------------------------------------------------------------------
 ---- INSTANCES

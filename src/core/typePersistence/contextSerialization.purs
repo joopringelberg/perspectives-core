@@ -72,7 +72,7 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
     then do 
       row <- pure $ Just $ makeRow <$> perspectives
       pure $ ScreenDefinition
-        { title: ""
+        { title: Nothing
         , tabs: Nothing
         , rows: row
         , columns: Nothing
@@ -80,7 +80,7 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
     else do
       tabs <- pure $ Just $ makeTab <$> perspectives
       pure $ ScreenDefinition
-        { title: ""
+        { title: Nothing
         , tabs
         , rows: Nothing
         , columns: Nothing
@@ -181,12 +181,12 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
 instance AddPerspectives MarkDownDef where
   addPerspectives md@(MarkDownConstantDef _) user ctxt = pure md
   addPerspectives md@(MarkDownExpressionDef _) user ctxt = pure md
-  addPerspectives (MarkDownPerspectiveDef {widgetFields, condition}) user ctxt = do
+  addPerspectives (MarkDownPerspectiveDef {widgetFields, conditionProperty}) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
       user
       widgetFields
       ctxt
-    pure $ MarkDownPerspectiveDef {widgetFields: widgetFields {perspective = Just perspective}, condition}
+    pure $ MarkDownPerspectiveDef {widgetFields: widgetFields {perspective = Just perspective}, conditionProperty}
 
 traverseScreenElement :: RoleInstance -> ContextInstance -> ScreenElementDef -> AssumptionTracking (Maybe ScreenElementDef)
 traverseScreenElement user ctxt a = case a of 
@@ -198,13 +198,13 @@ traverseScreenElement user ctxt a = case a of
             (textGetter :: ContextInstance ~~> Value) <- lift $ unsafeCoerce compileFunction textQuery
             (textA :: Array Value) <- runArrayT $ textGetter ctxt
             pure $ Just $ MarkDownExpressionDef {textQuery, condition, text: maybe Nothing (Just <<< unwrap) (head textA)}
-        MarkDownPerspectiveDef {widgetFields, condition} -> conditionally condition
+        MarkDownPerspectiveDef {widgetFields, conditionProperty} -> 
           do 
             perspective <- perspectiveForContextAndUserFromId
               user
               widgetFields
               ctxt
-            pure $ Just $ MarkDownPerspectiveDef { widgetFields: widgetFields {perspective = Just perspective}, condition}
+            pure $ Just $ MarkDownPerspectiveDef { widgetFields: widgetFields {perspective = Just perspective}, conditionProperty}
       (other :: ScreenElementDef) -> Just <$> addPerspectives other user ctxt
 
     where

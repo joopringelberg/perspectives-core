@@ -46,7 +46,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, insert, keys, lookup, singleton, unions)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>))
+import Perspectives.CoreTypes (type (~~~>), MP, MonadPerspectives, forceTypeArray, (###=), (###>>), (###>))
 import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup, keys, addAll) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
@@ -69,7 +69,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspective
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalContextName, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (completeInversions)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd, functional)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, toDisjunctiveNormalForm, transform)
@@ -82,13 +82,13 @@ import Perspectives.Representation.Class.Role (Role(..), allProperties, complete
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveMustBeSynchronized, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), addProperty, createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveMustBeSynchronized, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and)
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, optimistic, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
@@ -1367,11 +1367,11 @@ handleScreens screenEs = do
             screenElementDef (AST.FormElement formE) = FormElementD <$> form formE
             screenElementDef (AST.MarkDownElement markdownE) = MarkDownElementD <$> markdown markdownE
 
-            functionalWidget :: Boolean
-            functionalWidget = true
+            functionalWidget :: ThreeValuedLogic
+            functionalWidget = True
 
-            relationalWidget :: Boolean
-            relationalWidget = false
+            relationalWidget :: ThreeValuedLogic
+            relationalWidget = False
 
             table :: AST.TableE -> PhaseThree TableDef
             table (AST.TableE fields) = TableDef <$> widgetCommonFields fields relationalWidget
@@ -1385,17 +1385,32 @@ handleScreens screenEs = do
                 Simple (Value _ _ t) -> pure t
               condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
               pure $ MarkDownConstantDef {text: text', condition: condition'}
-            markdown (MarkDownPerspective {widgetFields, condition}) = do
-              widgetFields' <- widgetCommonFields widgetFields functionalWidget
-              condition' <- traverse (compileStep (CDOM $ ST (roleIdentification2Context widgetFields.perspective))) condition
-              pure $ MarkDownPerspectiveDef {widgetFields: widgetFields', condition: condition'}
-            markdown (MarkDownExpression {text, condition, context:ctxt}) = do
+            markdown (MarkDownPerspective {widgetFields, condition, start:s, end:e}) = do
+              case condition of 
+                Nothing -> do 
+                  widgetFields' <- widgetCommonFields widgetFields Unknown
+                  pure $ MarkDownPerspectiveDef {widgetFields: widgetFields', conditionProperty: Nothing}
+                Just conditionProp -> do 
+                  (objectRoleType :: RoleType) <- unsafePartial ARRP.head <$> collectRoles widgetFields.perspective
+                  mconditionProperty <- lift $ lift (objectRoleType ###> (lookForUnqualifiedPropertyType_ conditionProp))
+                  case mconditionProperty of 
+                    -- The condition property cannot be recognised as a property of the role with the markdown property.
+                    Nothing -> throwError (UnknownMarkDownConditionProperty s e conditionProp objectRoleType)
+                    Just conditionProperty -> do 
+                      -- add the conditionProperty to the widgetFields!
+                      widgetFields' <- widgetCommonFields widgetFields Unknown
+                      pure $ MarkDownPerspectiveDef {widgetFields: widgetFields' {propertyVerbs = (flip (unsafePartial addProperty) conditionProperty) <$> widgetFields'.propertyVerbs}, conditionProperty: Just conditionProperty}
+            markdown (MarkDownExpression {text, condition, context:ctxt, start:start', end:end'}) = do
               text' <- compileStep (CDOM $ ST ctxt) text
-              condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
-              pure $ MarkDownExpressionDef {textQuery: text', condition: condition', text: Nothing}
+              -- The resulting QueryFunctionDescription should be functional.
+              if functional text' `eq` True
+                then do
+                  condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
+                  pure $ MarkDownExpressionDef {textQuery: text', condition: condition', text: Nothing}
+                else throwError (MarkDownExpressionMustBeFunctional start' end')
 
 
-            widgetCommonFields :: AST.WidgetCommonFields -> Boolean -> PhaseThree WidgetCommonFieldsDef
+            widgetCommonFields :: AST.WidgetCommonFields -> ThreeValuedLogic -> PhaseThree WidgetCommonFieldsDef
             widgetCommonFields {title:title', perspective, propsOrView, propertyVerbs, roleVerbs, start:start', end:end'} isFunctionalWidget = do
               -- From a RoleIdentification that represents the object,
               -- find the relevant Perspective.
@@ -1405,11 +1420,17 @@ handleScreens screenEs = do
               (objectRoleType :: RoleType) <- unsafePartial ARRP.head <$> collectRoles perspective
               -- Check the Cardinality
               (lift2 $ roleTypeIsFunctional objectRoleType) >>= if _
-                then if isFunctionalWidget
+                -- object is functional
+                then if optimistic isFunctionalWidget 
+                  -- we're ok with either True or Unknown (MarkDownPerspectiveDef).
                   then pure unit
+                  -- but not with False.
                   else throwError (WidgetCardinalityMismatch start' end')
-                else if not isFunctionalWidget
+                -- object is relational
+                else if not $ pessimistic isFunctionalWidget
+                  -- we're ok with either True or Unknown (MarkDownPerspectiveDef).
                   then pure unit
+                  -- but not with False
                   else throwError (WidgetCardinalityMismatch start' end')
               -- All properties defined on this object role.
               allProps <- lift2 ((roleADTOfRoleType objectRoleType >>= allProperties <<< map roleInContext2Role))

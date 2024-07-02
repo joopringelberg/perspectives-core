@@ -310,18 +310,18 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
   mLocalIndexedContextType <- isIndexedContext ident
   mIndexedContextType <- lift $ lift $ (lookupIndexedContext ident >>= traverse contextType_)
   case mLocalIndexedContextType, mIndexedContextType of
-    Just indexedContextType, Nothing -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
-    Nothing, Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
+    Just indexedContextType, _ -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
+    _, Just indexedContextType -> pure $ SQD currentDomain (QF.ContextIndividual (ContextInstance ident)) (CDOM (UET indexedContextType)) True True
     _, _ -> do
       -- The next line just looks for indexed roles in the current model.
       mLocalIndexedRoleType <- isIndexedRole ident
       mIndexedRoleType <- lift $ lift (lookupIndexedRole ident >>= traverse roleType_)
       case mLocalIndexedRoleType, mIndexedRoleType of
-        Just role, Nothing -> do
+        Just role, _ -> do
           -- For context, we take the syntactically embedding context type of the indexed role.
           context <- lift2 $ enumeratedRoleContextType role
           pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True
-        Nothing, Just role -> do
+        _, Just role -> do
           -- For context, we take the syntactically embedding context type of the indexed role.
           context <- lift2 $ enumeratedRoleContextType role
           pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True

@@ -1336,7 +1336,7 @@ screenE :: IP ScreenE
 screenE = withPos do
   start <- getPosition
   reserved "screen"
-  title <- token.stringLiteral
+  title <- optionMaybe token.stringLiteral
   keyword <- scanIdentifier
   subject <- getSubject
   context <- getCurrentContext
@@ -1423,21 +1423,25 @@ tableE = TableE <$> widgetCommonFields
 markdownE :: IP MarkDownE
 markdownE = do
   s <- lookAhead step
+  start <- getPosition
   case s of 
     (Simple (ArcIdentifier pos id)) -> do 
       widgetFields <- widgetCommonFields
-      condition <- optionMaybe (reserved "when" *> step)
+      condition <- optionMaybe (reserved "when" *> arcIdentifier)
       sameOrOutdented'
-      pure $ MarkDownPerspective {widgetFields, condition}
+      end <- getPosition
+      pure $ MarkDownPerspective {widgetFields, condition, start, end} 
     Simple (Value pos PMarkDown _) -> do 
       text <- step
       condition <- optionMaybe (reserved "when" *> step)
       context <- getCurrentContext
       sameOrOutdented'
-      pure $ MarkDownConstant {text, condition, context}
+      end <- getPosition
+      pure $ MarkDownConstant {text, condition, context, start, end}
     _ -> do 
       text <- step
       condition <- optionMaybe (reserved "when" *> step)
       context <- getCurrentContext
       sameOrOutdented'
-      pure $ MarkDownExpression {text, condition, context}
+      end <- getPosition
+      pure $ MarkDownExpression {text, condition, context, start, end}

@@ -460,7 +460,8 @@ traverseCalculatedRoleE_ role@(CalculatedRole{id:roleName, kindOfRole}) rolePart
     -- SCREENE
     handleParts e@(CalculatedRole roleUnderConstruction@{kindOfRole:kind}) (Screen s@(ScreenE{start, end})) = if kind == TI.UserRole || kind == TI.Public
       then do
-        void $ lift $ modify \st@{screens} -> st {screens = Cons s screens}
+        screen' <- expandPrefix s
+        void $ lift $ modify \st@{screens} -> st {screens = Cons screen' screens}
         pure e
       else throwError (ScreenForUserRoleOnly start end)
 

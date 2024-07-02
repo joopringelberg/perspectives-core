@@ -33,7 +33,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
-import Perspectives.Representation.TypeIdentifiers (ContextType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleType)
 import Perspectives.Representation.Verbs (RoleVerb)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
@@ -49,7 +49,7 @@ import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeIm
 -- | The PropertyVerbs and RoleVerb Array are used to filter the full perspective the user has on a the role.
 
 newtype ScreenDefinition = ScreenDefinition
-  { title :: String
+  { title :: Maybe String
   , tabs :: Maybe (Array TabDef)
   -- Will be an array of ColumnElementD elements.
   , rows :: Maybe (Array ScreenElementDef)
@@ -72,7 +72,7 @@ newtype TableDef = TableDef WidgetCommonFieldsDef
 newtype FormDef = FormDef WidgetCommonFieldsDef
 data MarkDownDef = 
   MarkDownConstantDef {text :: String, condition :: Maybe QueryFunctionDescription} |
-  MarkDownPerspectiveDef { widgetFields :: WidgetCommonFieldsDef, condition :: Maybe QueryFunctionDescription} |
+  MarkDownPerspectiveDef { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType} |
   MarkDownExpressionDef {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String}
 -----------------------------------------------------------
 -- WIDGETS
@@ -187,7 +187,7 @@ instance ReadForeign ScreenElementDef where
         ({tag, element:subElement} :: {tag :: String, element :: Foreign}) <- read' element
         unsafePartial $ case tag of
           "MarkDownConstantDef" -> MarkDownElementD <<< MarkDownConstantDef <$> ((read' subElement) :: F {text :: String, condition :: Maybe QueryFunctionDescription})
-          "MarkDownPerspectiveDef" -> MarkDownElementD <<< MarkDownPerspectiveDef <$> ((read' subElement) :: F { widgetFields :: WidgetCommonFieldsDef, condition :: Maybe QueryFunctionDescription})
+          "MarkDownPerspectiveDef" -> MarkDownElementD <<< MarkDownPerspectiveDef <$> ((read' subElement) :: F { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType})
           "MarkDownExpressionDef" -> MarkDownElementD <<< MarkDownExpressionDef <$> ((read' subElement) :: F {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String})
 
 instance ReadForeign ScreenKey where

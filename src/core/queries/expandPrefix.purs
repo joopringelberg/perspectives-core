@@ -282,17 +282,17 @@ instance containsPrefixesFormE :: ContainsPrefixes FormE where
   expandPrefix (FormE wcf)= FormE <$> expandPrefixWidgetCommonFields wcf
 
 instance ContainsPrefixes MarkDownE where
-  expandPrefix (MarkDownConstant {text, condition, context}) = do 
+  expandPrefix (MarkDownConstant {text, condition, context, start, end}) = do 
     condition' <- traverse expandPrefix condition
-    pure $ MarkDownConstant {text, condition:condition', context}
-  expandPrefix (MarkDownExpression {text, condition, context}) = do 
+    pure $ MarkDownConstant {text, condition:condition', context, start, end}
+  expandPrefix (MarkDownExpression {text, condition, context, start, end}) = do 
     text' <- expandPrefix text
     condition' <- traverse expandPrefix condition
-    pure $ MarkDownExpression {text:text', condition:condition', context}
-  expandPrefix (MarkDownPerspective {widgetFields, condition}) = do 
+    pure $ MarkDownExpression {text:text', condition:condition', context, start, end}
+  expandPrefix (MarkDownPerspective {widgetFields, condition, start, end}) = do 
     widgetFields' <- expandPrefixWidgetCommonFields widgetFields
-    condition' <- traverse expandPrefix condition
-    pure $ MarkDownPerspective {widgetFields:widgetFields', condition:condition'}
+    condition' <- traverse expandNamespace condition
+    pure $ MarkDownPerspective {widgetFields:widgetFields', condition:condition', start, end}
 
 
 expandPrefixWidgetCommonFields :: WidgetCommonFields-> PhaseTwo WidgetCommonFields
