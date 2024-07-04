@@ -42,13 +42,13 @@ module Perspectives.Instances.Builders
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Except (ExceptT)
 import Control.Monad.Writer (WriterT, lift, runWriterT, tell)
-import Data.Array (elemIndex)
+import Data.Array (catMaybes, elemIndex)
 import Data.Array.NonEmpty (NonEmptyArray, toArray)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Aff.AVar (put)
@@ -127,33 +127,29 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           pure $ toArray (snd <$> rolInstances')
 
         lift $ lift $ void $ saveEntiteit contextInstanceId
+        -- If the context type has a public role, create an instance of its proxy.
+        publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
+        publicRoleInstances <- catMaybes <$> for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
+          \t -> lift $ createAndAddRoleInstance 
+            t 
+            (unwrap contextInstanceId) 
+            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+
         -- Add a UniverseRoleDelta to the Transaction for the external role.
         -- As we've just constructed the context and its external role, no need to
         -- catch errors rising from not being able to exchange the identifier for the
         -- resources.
         PerspectRol{universeRoleDelta, contextDelta} <- lift $ lift $ getPerspectRol buitenRol
-        lift $ insertDelta (DeltaInTransaction{ users, delta: universeRoleDelta}) (i)
+        lift $ insertDelta (DeltaInTransaction{ users: users <> publicRoleInstances, delta: universeRoleDelta}) (i)
         -- Add a UniverseContextDelta to the Transaction with the union of the users of the RoleBindingDeltas.
-        lift $ insertDelta (DeltaInTransaction{ users, delta: universeContextDelta}) (i + 1)
+        lift $ insertDelta (DeltaInTransaction{ users: users <> publicRoleInstances, delta: universeContextDelta}) (i + 1)
         -- Add the ContextDelta for the external role to the transaction.
-        lift $ insertDelta (DeltaInTransaction{ users, delta: contextDelta}) (i + 2)
+        lift $ insertDelta (DeltaInTransaction{ users: users <> publicRoleInstances, delta: contextDelta}) (i + 2)
         -- Add the context as a createdContext to the transaction
         lift $ addCreatedContextToTransaction contextInstanceId
-        -- If the context type has a public role, create an instance of its proxy.
-        publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
-        for_ (EnumeratedRoleType <<< roletype2string <$> publicRoles) 
-          \t -> (do 
-            mproxy <- lift $ createAndAddRoleInstance 
-              t 
-              (unwrap contextInstanceId) 
-              (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
-            case mproxy of 
-              -- As the proxy of the public role is just another user, we have to make sure it will receive all deltas necessary
-              -- according to its perspectives.
-              Just proxy -> lift (contextInstanceId `serialisedAsDeltasFor` proxy)
-              -- This will never happen.
-              Nothing -> pure unit
-              )
+        -- As the proxy of the public role is just another user, we have to make sure it will receive all deltas necessary
+        -- according to its perspectives.
+        for_ publicRoleInstances \proxy -> lift (contextInstanceId `serialisedAsDeltasFor` proxy)
         pure contextInstanceId 
   where
 
