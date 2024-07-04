@@ -35,7 +35,7 @@ import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (StateT, gets, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons) as ARR
-import Data.Array (elemIndex)
+import Data.Array (elemIndex, nub)
 import Data.Array.NonEmpty (NonEmptyArray, singleton) as NA
 import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_, traverse_)
@@ -135,7 +135,7 @@ serialisePerspectiveForUser ::
   MonadPerspectivesTransaction Unit
 serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, propertyVerbs, selfOnly, isSelfPerspective}) = do
   (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
-  serialiseRoleInstancesAndProperties cid users object visiblePropertyTypes selfOnly isSelfPerspective
+  serialiseRoleInstancesAndProperties cid users object (nub visiblePropertyTypes) selfOnly isSelfPerspective
 
 -- | MODEL DEPENDENCY IN THIS FUNCTION. The correct operation of this function depends on
 -- | model:System. The role model:System$PerspectivesSystem$User should have a property with
