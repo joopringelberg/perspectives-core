@@ -713,7 +713,7 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
   -- It is as if all these filled roles now have a (changed) value for this property.
   nub <<< concat <$> for allFilleds \roleWithPropertyValue' -> do
     -- Each roleWithPropertyValue role might be a perspective object.
-    contextInstance <- lift $ context' roleWithPropertyValue
+    contextInstance <- lift $ context' roleWithPropertyValue'
     rType <- lift (roleWithPropertyValue' ##>> OG.roleType)
     -- For each of them: get and compile perspective object queries for the step from that roleWithPropertyValue role to its context
     -- (there may be state queries or calculated object queries that run through this segment, too, but we're not interested in them).
@@ -722,7 +722,7 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
     (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries rType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter isPerspectiveObject
     -- Then for each query: apply it to obtain users that have a perspective on the roleWithPropertyValue role.
     nub <<< concat <$> for contextCalculations \iq@(InvertedQuery{statesPerProperty}) -> do 
-      cwus <- usersWithAnActivePerspective roleWithPropertyValue iq
+      cwus <- usersWithAnActivePerspective roleWithPropertyValue' iq
       -- Then restrict the properties of the query to `property` and `replacementProperty` and, for the users computed, apply computeProperties in order to add roleWithPropertyValue role deltas and property deltas.
       cwus' <- pure (filter (\(Tuple context users) -> not $ null users) cwus)
       if null cwus'
@@ -730,8 +730,8 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
         else if isForSelfOnly iq
           -- If iq has the selfOnly modifier, the perspective object equals the user role that has the perspective.
           -- Only compute the property for that role instance!
-          then computeProperties [(singletonPath (R roleWithPropertyValue))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) [(Tuple contextInstance [roleWithPropertyValue])]
-          else computeProperties [(singletonPath (R roleWithPropertyValue))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) cwus'
+          then computeProperties [(singletonPath (R roleWithPropertyValue'))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) [(Tuple contextInstance [roleWithPropertyValue'])]
+          else computeProperties [(singletonPath (R roleWithPropertyValue'))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) cwus'
       pure $ concat (snd <$> cwus)
   
   where 
