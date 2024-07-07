@@ -395,7 +395,7 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
   for_ (unwrap publicKeys) \{deltas:keyDeltas} -> for_ keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
 
   -- Process all deltas.
-  for_ deltas verifyAndExcecuteDelta
+  void $ for deltas verifyAndExcecuteDelta
   where
     verifyAndExcecuteDelta :: SignedDelta -> MonadPerspectivesTransaction Unit
     verifyAndExcecuteDelta s = (lift $ verifyDelta s) >>= executeDelta s
@@ -456,7 +456,8 @@ expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
       notWhenPublicSubject rec a = (lift $ isPublic rec.subject) >>= if _ then pure Nothing else a
 
 executeDeltas :: Array Delta -> MonadPerspectivesTransaction Unit
-executeDeltas deltas = for_ deltas case _ of 
+-- We use `for` rather than `for_` because the latter folds from the right, starting with the last element.
+executeDeltas deltas = void $ for deltas case _ of 
   UCD s d -> executeUniverseContextDelta d s
   URD s d -> executeUniverseRoleDelta d s
   CDD s d -> executeContextDelta d s
