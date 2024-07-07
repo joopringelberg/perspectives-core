@@ -24,7 +24,7 @@ module Perspectives.Deltas where
 
 import Control.Monad.AvarMonadAsk (modify, gets) as AA
 import Control.Monad.State.Trans (StateT, execStateT, get, lift, modify, put)
-import Data.Array (catMaybes, concat, elemIndex, filterA, foldl, head, length, nub, null, snoc, union)
+import Data.Array (catMaybes, concat, elemIndex, filterA, foldl, head, insertAt, length, nub, null, snoc, union)
 import Data.DateTime.Instant (toDateTime)
 import Data.Map (Map, empty, filter, insert, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust)
@@ -218,7 +218,9 @@ insertDelta dt@(DeltaInTransaction{users}) i = do
         { deltas =
           if isJust $ elemIndex dt deltas
             then deltas
-            else snoc deltas dt
+            else case insertAt i dt deltas of
+              Nothing -> snoc deltas dt
+              Just deltas' -> deltas'
         , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
         })
 
