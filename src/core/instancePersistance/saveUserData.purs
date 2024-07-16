@@ -357,6 +357,8 @@ setBinding roleId newBindingId msignedDelta = (lift $ try $ getPerspectRol roleI
   handlePerspectRolError' "setBinding" []
     \(filled :: PerspectRol) -> if isJust $ rol_binding filled
       then replaceBinding roleId newBindingId msignedDelta
+      -- Since in all cases that setBinding is called, the role instances involved do already exist, we can just
+      -- insert all context serialisation deltas for a new peer right at the end of the array of deltas.
       else setFirstBinding roleId newBindingId msignedDelta
 
 

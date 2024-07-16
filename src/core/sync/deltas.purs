@@ -62,7 +62,7 @@ import Perspectives.Sync.Transaction (PublicKeyInfo, Transaction(..), Transactio
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..), addToTransactionForPeer, transactieID)
 import Perspectives.Types.ObjectGetters (isPublicProxy)
 import Perspectives.UnschemedIdentifiers (UnschemedResourceIdentifier, unschemePerspectivesUser)
-import Prelude (Unit, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (Unit, add, bind, discard, eq, flip, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (writeJSON)
 
 -- | Splits the transaction in versions specific for each peer and sends them.
@@ -139,7 +139,7 @@ type TransactionPerUser = Map.Map TransactionDestination TransactionForPeer
 -- | `users` in DeltaInTransaction will not always be model://perspectives.domains#System$PerspectivesSystem$User instances.
 transactieForEachUser :: Transaction -> MonadPerspectives TransactionPerUser
 transactieForEachUser t@(Transaction tr@{timeStamp, deltas, userRoleBottoms, publicKeys}) = do
-  execStateT (for_ deltas \(DeltaInTransaction{users, delta}) -> do
+  execStateT (void $ for deltas \(DeltaInTransaction{users, delta}) -> do
     system <- lift getMySystem
     -- Lookup the ultimate filler for all users in the delta.
     (sysUsers :: Array TransactionDestination) <- pure $ catMaybes (flip Map.lookup userRoleBottoms <$> users)
@@ -190,36 +190,43 @@ computeUserRoleBottom rid = ((map ENR <<< roleType_ >=> isPublicProxy) rid) >>= 
 -- |    * public roles
 -- |    * instances of sys:PerspectivesSystem$User, but not the one that equals the local sys:Me.
 addDelta :: DeltaInTransaction -> MonadPerspectivesTransaction Unit
-addDelta dt@(DeltaInTransaction{users}) = do 
+addDelta (DeltaInTransaction deltarecord@{users}) = do 
   -- NOTE. Even though we try not to create deltas with roles that represent me, on system installation this can go wrong.
   users' <- lift $ filterA notIsMe users
   if null users'
     then pure unit
     else do
       newUserBottoms <- lift (concat <$> for users' computeUserRoleBottom)
-      AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
+      newDelta <- pure (DeltaInTransaction deltarecord{users = users'})
+      AA.modify (over Transaction \t@{deltas, userRoleBottoms, insertionPoint} -> t 
         { deltas =
-          if isJust $ elemIndex dt deltas
+          if isJust $ elemIndex newDelta deltas
             then deltas
-            else snoc deltas dt
+            else case insertionPoint of 
+              Nothing -> snoc deltas newDelta
+              Just i -> case insertAt i newDelta deltas of
+                Nothing -> snoc deltas newDelta
+                Just deltas' -> deltas'
         , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
+        , insertionPoint = (add 1) <$> insertionPoint
         })
 
 -- | Insert the delta at the index, unless it is already in the transaction or there are no users (and ignore the own user).
 insertDelta :: DeltaInTransaction -> Int -> MonadPerspectivesTransaction Unit
-insertDelta dt@(DeltaInTransaction{users}) i = do
+insertDelta (DeltaInTransaction deltarecord@{users}) i = do
   -- NOTE. Even though we try not to create deltas with roles that represent me, on system installation this can go wrong.
   users' <- lift $ filterA notIsMe users
   if null users'
     then pure unit
     else do
       (newUserBottoms :: Array (Tuple RoleInstance TransactionDestination)) <- lift (concat <$> for users' computeUserRoleBottom)
+      newDelta <- pure (DeltaInTransaction deltarecord{users = users'})
       AA.modify (over Transaction \t@{deltas, userRoleBottoms} -> t 
         { deltas =
-          if isJust $ elemIndex dt deltas
+          if isJust $ elemIndex newDelta deltas
             then deltas
-            else case insertAt i dt deltas of
-              Nothing -> snoc deltas dt
+            else case insertAt i newDelta deltas of
+              Nothing -> snoc deltas newDelta
               Just deltas' -> deltas'
         , userRoleBottoms = foldl (\userBottoms' (Tuple role user) -> Map.insert role user userBottoms') userRoleBottoms newUserBottoms
         })
@@ -248,7 +255,7 @@ addCreatedRoleToTransaction rid =
 
 addPublicKeysToTransaction :: Transaction -> MonadPerspectives Transaction
 addPublicKeysToTransaction (Transaction tr@{deltas}) = do 
-  publicKeys :: Map.Map PerspectivesUser PublicKeyInfo <- execStateT (for_ deltas addPublicKeyInfo) Map.empty
+  publicKeys :: Map.Map PerspectivesUser PublicKeyInfo <- execStateT (void $ for deltas addPublicKeyInfo) Map.empty
   pure $ Transaction tr { publicKeys = ENCMAP.EncodableMap publicKeys}
 
   where

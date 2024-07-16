@@ -364,7 +364,7 @@ executeTransaction t = try (verifyTransaction t) >>= case _ of
     case mcryptoKey of 
       Nothing -> do 
         cryptoKey <- liftAff $ deserializeJWK key
-        for_ keyDeltas \d@(SignedDelta{author}) -> if author == authorOfKey
+        void $ for keyDeltas \d@(SignedDelta{author}) -> if author == authorOfKey
           then (lift $ lift $ verifyDelta' d (Just cryptoKey)) >>=
             case _ of 
               Nothing -> throwError (error $ "Cannot verify key of author: " <> show author)
@@ -392,7 +392,7 @@ executeTransaction' :: TransactionForPeer -> MonadPerspectivesTransaction Unit
 executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
 
   -- Add all public key information (possibly leading to more TheWorld$PerspectivesUsers instances).
-  for_ (unwrap publicKeys) \{deltas:keyDeltas} -> for_ keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
+  for_ (unwrap publicKeys) \{deltas:keyDeltas} -> void $ for keyDeltas \s@(SignedDelta{encryptedDelta}) -> executeDelta s (Just encryptedDelta)
 
   -- Process all deltas.
   void $ for deltas verifyAndExcecuteDelta

@@ -30,11 +30,10 @@ import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (nub, sort)
 import Data.Either (Either(..))
-import Data.Foldable (for_)
 import Data.List.NonEmpty (head)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (ForeignError(..), MultipleErrors)
@@ -120,7 +119,7 @@ incomingPost = do
         Just stompClient -> do
           (transactions :: Array OutgoingTransaction) <- sort <<< nub <$> traverse (getDocument_ postDB) waitingTransactions
           -- We do not delete here; only when we receive the receipt.
-          for_ transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (writeJSON transaction)
+          void $ for transactions \(OutgoingTransaction{_id, receiver, transaction}) -> liftEffect $ sendToTopic stompClient receiver _id (writeJSON transaction)
         _ -> pure unit
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.

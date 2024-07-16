@@ -134,7 +134,7 @@ handleSelfOnlyQuery (InvertedQuery{backwardsCompiled, forwardsCompiled, descript
     Just bw -> do
       (Tuple _ assumptions) <- lift $ runMonadPerspectivesQuery userRoleArgForBackwardsQuery (unsafeCoerce bw)
       -- Turn assumptions into deltas for the peers.
-      for_ (unwrap assumptions) (createDeltasFromAssumption peers)
+      void $ for (unwrap assumptions) (createDeltasFromAssumption peers)
   -- Return peers
   pure peers
   where
@@ -633,7 +633,7 @@ createDeltasFromAssumption users (Property roleInstance propertyType) = do
     handlePerspectRolError "createDeltasFromAssumption.Property"
       \(PerspectRol{propertyDeltas}) -> case lookup (unwrap propertyType) propertyDeltas of
         Nothing -> pure unit
-        Just deltas -> for_ deltas \propertyDelta -> addDelta $ DeltaInTransaction {users, delta: propertyDelta}
+        Just deltas -> void $ for deltas \propertyDelta -> addDelta $ DeltaInTransaction {users, delta: propertyDelta}
 
 createDeltasFromAssumption users (Context roleInstance) = do
   ctxt <- lift (roleInstance ##>> OG.context)

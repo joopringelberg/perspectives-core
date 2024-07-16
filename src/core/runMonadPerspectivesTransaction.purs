@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (concat, difference, filter, filterA, fromFoldable, index, length, nub, null, reverse, sort, unsafeIndex)
+import Data.Array (concat, difference, filter, filterA, fromFoldable, index, length, nub, null, sort, unsafeIndex)
 import Data.Foldable (for_)
 import Data.Map as MAP
 import Data.Maybe (Maybe(..), fromJust, isNothing)
@@ -34,7 +34,7 @@ import Data.Traversable (for, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Effect.Aff.AVar (new, put, take, tryRead)
 import Effect.Class.Console (log)
-import Effect.Exception (error) 
+import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CollectAffectedContexts (reEvaluatePublicFillerChanges)
 import Perspectives.ContextStateCompiler (enteringState, evaluateContextState, exitingState)
@@ -62,7 +62,7 @@ import Perspectives.Sync.HandleTransaction (executeDeltas, expandDeltas)
 import Perspectives.Sync.InvertedQueryResult (InvertedQueryResult(..))
 import Perspectives.Sync.Transaction (Transaction(..), TransactionDestination(..), createTransaction)
 import Perspectives.Types.ObjectGetters (contextRootStates, publicUrl_, roleRootStates)
-import Prelude (Unit, bind, discard, flip, join, not, pure, show, unit, ($), (*>), (+), (<$>), (<<<), (<>), (>), (>=>), (>>=), (||))
+import Prelude (Unit, bind, discard, flip, join, not, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (>), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
@@ -132,25 +132,25 @@ phase1 share authoringRole r = do
   -- filter them on every recursive call to phase1, to see whether they have exited or not.
   AA.modify (\t -> over Transaction (\tr -> tr {createdContexts = [], createdRoles = [], rolesToExit = []}) t)
   -- Enter the rootState of new contexts.
-  for_ createdContexts
+  void $ for createdContexts
     \ctxt -> do
       states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
       -- Provide a new frame for the current context variable binding.
       oldFrame <- lift pushFrame
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
-      catchError (for_ states (enteringState ctxt))
+      catchError (void $ for states (enteringState ctxt))
         \e -> logPerspectivesError $ Custom ("Cannot enter context state for " <> show ctxt <>  ", because " <> show e)
       lift $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
-  for_ createdRoles
+  void $ for createdRoles
     \rid -> do
       ctxt <- lift (rid ##>> context)
       states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
       oldFrame <- lift pushFrame
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
-      catchError (for_ states (enteringRoleState rid))
+      catchError (void $ for states (enteringRoleState rid))
         \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
       lift $ restoreFrame oldFrame
   -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
@@ -158,7 +158,7 @@ phase1 share authoringRole r = do
   if not $ null rolesThatHaveNotExited
     then log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
     else pure unit
-  for_ rolesThatHaveNotExited
+  void $ for rolesThatHaveNotExited
     \rid -> do
       ctxt <- lift (rid ##>> context)
       states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
@@ -169,7 +169,7 @@ phase1 share authoringRole r = do
           lift $ addBinding "currentcontext" [unwrap ctxt]
           stateEvaluationAndQueryUpdatesForRole rid
           -- Error boundary.
-          catchError (for_ states (exitingRoleState rid))
+          catchError (void $ for states (exitingRoleState rid))
             \e -> do 
               logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
               lift $ restoreFrame oldFrame
@@ -180,7 +180,7 @@ phase1 share authoringRole r = do
       ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
       _ -> pure false)
     scheduledAssignments
-  for_ contextsThatHaveNotExited (unsafePartial exitContext)
+  void $ for contextsThatHaveNotExited (unsafePartial exitContext)
     -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
     -- to preserve the invariant.
   AA.modify (\t -> over Transaction (\tr -> tr
@@ -199,7 +199,7 @@ phase1 share authoringRole r = do
     then phase1 share authoringRole r
     else do 
       -- Unbind roles and execute destructive effects.
-      for_ (reverse scheduledAssignments) case _ of
+      void $ for scheduledAssignments case _ of
         RoleUnbinding filled mNewFiller msignedDelta -> log ("Remove filler of " <> unwrap filled) *> changeRoleBinding filled mNewFiller
         ExecuteDestructiveEffect functionName origin values -> log ("DestructiveEffect: " <> functionName) *> executeEffect functionName origin values
         _ -> pure unit
@@ -249,32 +249,28 @@ phase2 share authoringRole r = do
         else pure MAP.empty
 
       -- Collect all deltas in order, add the public resource schemes and remove doubles. Then execute.
-      publicDeltas <- nub <<< concat <<< fromFoldable <<< MAP.values <$>
-        forWithIndex publicRoleTransactions
-          \destination publicRoleTransaction -> case destination of 
-            (PublicDestination userId) -> do
-              userType <- lift $ roleType_ userId
-              mUrl <- lift $ publicUrl_ userType
-              case mUrl of
-                Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> show userId <> "')")
-                Just (Q qfd) -> do 
-                  ctxt <- lift $ (userId ##>> context)
-                  urlComputer <- lift $ context2propertyValue qfd
-                  (Value url) <- lift (ctxt ##>> urlComputer)
-                  expandDeltas publicRoleTransaction url
-                Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
-            Peer _ -> pure []
-
-      -- Those deltas for public roles aren't sent anywhere but executed
-      -- right here. Notice that no changes to local state will result from executing such a transaction.
-      -- (except that public instances will be cached)
-      -- Run embedded, do not share.
-      if null publicDeltas
-        then pure unit
-        else lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas publicDeltas)
+      void $ forWithIndex publicRoleTransactions
+        \destination publicRoleTransaction -> case destination of 
+          (PublicDestination userId) -> do
+            userType <- lift $ roleType_ userId
+            mUrl <- lift $ publicUrl_ userType
+            case mUrl of
+              Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> show userId <> "')")
+              Just (Q qfd) -> do 
+                ctxt <- lift $ (userId ##>> context)
+                urlComputer <- lift $ context2propertyValue qfd
+                (Value url) <- lift (ctxt ##>> urlComputer)
+                deltas <- expandDeltas publicRoleTransaction url
+              -- These deltas for a public role aren't sent anywhere but executed
+              -- right here. Notice that no changes to local state will result from executing such a transaction.
+              -- (except that public instances will be cached)
+              -- Run embedded, do not share.
+                lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas deltas)
+              Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
+          Peer _ -> pure unit
 
       -- Now finally remove contexts and roles.
-      for_ (reverse scheduledAssignments) case _ of
+      void $ for scheduledAssignments case _ of
         ContextRemoval ctxt authorizedRole -> lift (log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole)
         RoleRemoval rid -> lift (log ("Remove role " <> unwrap rid) *> removeRoleInstance rid)
         _ -> pure unit
@@ -285,7 +281,7 @@ phase2 share authoringRole r = do
       if not $ null modelsToBeRemoved
         then log ("Will remove these models: " <> show modelsToBeRemoved)
         else pure unit
-      lift $ for_ modelsToBeRemoved tryRemoveEntiteit
+      lift $ void $ for modelsToBeRemoved tryRemoveEntiteit
       Transaction {postponedStateEvaluations, correlationIdentifiers} <- AA.get
       if null postponedStateEvaluations
         then do 
@@ -372,13 +368,13 @@ exitContext (ContextRemoval ctxt authorizedRole) = do
       oldFrame <- lift pushFrame
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
-      catchError (for_ states (exitingState ctxt))
+      catchError (void $ for states (exitingState ctxt))
         \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
       lift $ restoreFrame oldFrame
 
 evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
 evaluateStates stateEvaluations =
-  for_ stateEvaluations \s -> case s of
+  void $ for stateEvaluations \s -> case s of
     ContextStateEvaluation stateId contextId -> do
       -- Provide a new frame for the current context variable binding.
       oldFrame <- lift pushFrame
@@ -534,7 +530,7 @@ detectPublicStateChanges = do
     then do
       clearPublicRolesJustLoaded
       runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType sysUser)
-        (for_ publicRoles f)
+        (void $ for publicRoles f)
       detectPublicStateChanges
     else pure unit
   
@@ -542,4 +538,4 @@ detectPublicStateChanges = do
     f :: RoleInstance -> MonadPerspectivesTransaction Unit 
     f filler = do 
       (filledCandidates :: Array RoleInstance) <- lift $ filler2filledFromDatabase_ (Filler_ filler)
-      for_ filledCandidates (flip reEvaluatePublicFillerChanges filler)
+      void $ for filledCandidates (flip reEvaluatePublicFillerChanges filler)

@@ -91,6 +91,8 @@ newtype Transaction = Transaction (TransactionRecord
   -- A Transaction for the users TheWorld and SocialEnvironment. Included as uninterpreted data to avoid
   -- module cycles. Use read_ to transform to Maybe TransactionForPeer.
   , identityDocument :: Maybe UninterpretedTransactionForPeer
+  -- Maybe an index where to insert deltas.
+  , insertionPoint :: Maybe Int
   ))
 
 data TransactionDestination = PublicDestination RoleInstance | Peer UnschemedResourceIdentifier
@@ -155,6 +157,7 @@ instance ReadForeign Transaction where
       , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
       , identityDocument: Nothing
+      , insertionPoint: Nothing
       }
 
 derive newtype instance ReadForeign Transaction'
@@ -193,6 +196,7 @@ createTransaction authoringRole =
       , publicKeys: ENCMAP.empty
       , postponedStateEvaluations: []
       , identityDocument: Nothing
+      , insertionPoint: Nothing
     }
 
 -- | We consider a Transaction to be 'empty' when it shows no difference to the clone of the original.
@@ -214,4 +218,3 @@ newtype UninterpretedTransactionForPeer = UninterpretedTransactionForPeer Foreig
 derive instance Newtype UninterpretedTransactionForPeer _
 instance Show UninterpretedTransactionForPeer where show _ = "UninterpretedTransactionForPeer"
 instance PrettyPrint UninterpretedTransactionForPeer where prettyPrint' t _ = t <> "UninterpretedTransactionForPeer"
- 
