@@ -25,7 +25,7 @@ module Perspectives.RunMonadPerspectivesTransaction where
 import Control.Monad.AvarMonadAsk (get, gets, modify) as AA
 import Control.Monad.Error.Class (catchError, throwError)
 import Control.Monad.Reader (lift, runReaderT)
-import Data.Array (concat, difference, filter, filterA, fromFoldable, index, length, nub, null, sort, unsafeIndex)
+import Data.Array (difference, filter, filterA, index, length, null, sort, unsafeIndex)
 import Data.Foldable (for_)
 import Data.Map as MAP
 import Data.Maybe (Maybe(..), fromJust, isNothing)

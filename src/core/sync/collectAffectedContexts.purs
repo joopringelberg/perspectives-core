@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, nub, null, union)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, intersect, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (isEmpty)
@@ -34,19 +34,19 @@ import Data.Newtype (unwrap)
 import Data.Traversable (for, for_, traverse, traverse_)
 import Data.Tuple (Tuple(..), snd)
 import Effect.Exception (error)
-import Foreign.Object (lookup)
+import Foreign.Object (lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspective.InvertedQuery.Indices (runTimeIndexForRoleQueries, runtimeIndexForContextQueries, runtimeIndexForFilledQueries', runtimeIndexForFillerQueries', runtimeIndexForPropertyQueries)
 import Perspectives.ArrayUnions (ArrayUnions(..))
 import Perspectives.Assignment.SerialiseAsDeltas (getPropertyValues, serialiseDependencies)
 import Perspectives.ContextAndRole (isDefaultContextDelta)
 import Perspectives.CoreTypes (type (~~>), InformedAssumption(..), MP, MonadPerspectivesTransaction, runMonadPerspectivesQuery, (##=), (##>), (##>>))
-import Perspectives.Data.EncodableMap (EncodableMap, filterKeys)
+import Perspectives.Data.EncodableMap (EncodableMap, filterKeys, lookup)
 import Perspectives.Deltas (addDelta)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allFillers, binding, context, context', contextIsInState, contextType, getFilledRoles, getRecursivelyAllFilledRoles, notIsMe, roleIsInState, roleType_)
+import Perspectives.Instances.ObjectGetters (allFillers, binding, context, context', contextIsInState, contextType, getActiveRoleStates_, getFilledRoles, getRecursivelyAllFilledRoles, notIsMe, roleIsInState, roleType_)
 import Perspectives.Instances.ObjectGetters (context, contextType, roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.InvertedQuery.Storable (getContextQueries, getFilledQueries, getFillerQueries, getPropertyQueries, getRoleQueries)
@@ -71,7 +71,7 @@ import Perspectives.Sync.Transaction (Transaction(..))
 import Perspectives.Types.ObjectGetters (enumeratedRoleContextType)
 import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(..))
 import Perspectives.Utilities (findM, prettyPrint)
-import Prelude (Unit, bind, discard, flip, join, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, flip, join, map, not, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO. #12 Check the way state-conditional verbs are combined to establish whether a peer should receive a delta.
@@ -631,7 +631,7 @@ createDeltasFromAssumption users (Property roleInstance propertyType) = do
   magic ctxt (SerializableNonEmptyArray $ ANE.singleton roleInstance) rtype users
   (try $ lift $ getPerspectRol roleInstance) >>=
     handlePerspectRolError "createDeltasFromAssumption.Property"
-      \(PerspectRol{propertyDeltas}) -> case lookup (unwrap propertyType) propertyDeltas of
+      \(PerspectRol{propertyDeltas}) -> case OBJ.lookup (unwrap propertyType) propertyDeltas of
         Nothing -> pure unit
         Just deltas -> void $ for deltas \propertyDelta -> addDelta $ DeltaInTransaction {users, delta: propertyDelta}
 
@@ -712,14 +712,15 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
   allFilleds <- lift $ cons roleWithPropertyValue <$> getRecursivelyAllFilledRoles roleWithPropertyValue
   -- It is as if all these filled roles now have a (changed) value for this property.
   nub <<< concat <$> for allFilleds \roleWithPropertyValue' -> do
-    -- Each roleWithPropertyValue role might be a perspective object.
+    -- Each roleWithPropertyValue' role might be a perspective object.
     contextInstance <- lift $ context' roleWithPropertyValue'
     rType <- lift (roleWithPropertyValue' ##>> OG.roleType)
+    states <- lift (getActiveRoleStates_ roleWithPropertyValue')
     -- For each of them: get and compile perspective object queries for the step from that roleWithPropertyValue role to its context
     -- (there may be state queries or calculated object queries that run through this segment, too, but we're not interested in them).
     -- These can be Enumerated user role instances from the same context, but also Enumerated user role instance computed by an inverted Calculated Perspective object.
     -- We can understand a calculated perspective object from another context than its users equally well as a calculated user in the context of the perspective object! 
-    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries rType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter isPerspectiveObject
+    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries rType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter (isPerspectiveObject states)
     -- Then for each query: apply it to obtain users that have a perspective on the roleWithPropertyValue role.
     nub <<< concat <$> for contextCalculations \iq@(InvertedQuery{statesPerProperty}) -> do 
       cwus <- usersWithAnActivePerspective roleWithPropertyValue' iq
@@ -735,9 +736,16 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
       pure $ concat (snd <$> cwus)
   
   where 
-    isPerspectiveObject :: InvertedQuery -> Boolean
-    isPerspectiveObject (InvertedQuery{forwardsCompiled}) = isNothing forwardsCompiled
-
+    -- It must be a perspective on the right property! 
+    isPerspectiveObject :: Array StateIdentifier -> InvertedQuery -> Boolean
+    isPerspectiveObject states (InvertedQuery{forwardsCompiled, statesPerProperty}) = if isNothing forwardsCompiled
+      then supportsProperty (ENP property) states || supportsProperty (ENP replacementProperty) states
+      else false
+      where
+        supportsProperty :: PropertyType -> Array StateIdentifier -> Boolean
+        supportsProperty p activeStates = case lookup p statesPerProperty of 
+          Nothing -> false
+          Just requiredStates -> not $ null $ intersect activeStates requiredStates
 
 compileBoth :: InvertedQuery -> MP InvertedQuery
 compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompiled}) = case backwardsCompiled of
