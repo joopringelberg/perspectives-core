@@ -25,8 +25,8 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
-import Control.Plus (empty)
-import Data.Array (catMaybes, concat, cons, elemIndex, filter, findIndex, foldMap, foldl, head, index, length, null, singleton, union)
+import Control.Plus (empty) as Plus
+import Data.Array (catMaybes, concat, cons, elemIndex, filter, findIndex, foldMap, foldl, head, index, length, nub, null, singleton, union)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Iterable (toArray)
@@ -38,11 +38,12 @@ import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, for_, traverse)
+import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Aff.AVar (AVar, tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Foreign.Object (Object, keys, lookup, values)
+import Foreign.Object (Object, empty, keys, lookup, values)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_isMe, rol_properties, rol_pspType)
@@ -72,7 +73,7 @@ import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
-import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
+import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<#>))
 import Simple.JSON (readJSON)
 
 -----------------------------------------------------------
@@ -168,7 +169,7 @@ getContextActions userRoleType userRoleInstance cid = ArrayT do
 
 -- | Returns the name of the model that defines the context type as a String Value.
 contextModelName :: ContextInstance ~~> Value
-contextModelName (ContextInstance cid) = maybe empty (pure <<< Value) (typeUri2ModelUri cid)
+contextModelName (ContextInstance cid) = maybe Plus.empty (pure <<< Value) (typeUri2ModelUri cid)
 
 indexedContextName :: ContextInstance ~~> Value
 indexedContextName = contextType >=> \cType -> ArrayT $ do
@@ -278,11 +279,13 @@ getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ ge
   handlePerspectRolError' "getFilledRoles" []
     \(filler :: IP.PerspectRol) -> case rol_gevuldeRol filler filledContextType filledType of
       {context:ct, role, instances} -> do
+        -- FilledRolesAssumption RoleInstance ContextType EnumeratedRoleType
         tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId ct role]
         pure instances
 
 -- NOTA BENE: this function will push an Assumption for every filled role step, even if it leads to no result.
 -- So the entire filled tree on fillerId will be searched and added.
+-- OBSOLETE
 getRecursivelyFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execWriterT $ depthFirst fillerId
   where
@@ -297,24 +300,41 @@ getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execW
 
 getRecursivelyFilledRoles' :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRecursivelyFilledRoles' filledContextType filledType fillerId = ArrayT do 
-  results <- lift (execWriterT $ depthFirst fillerId [])
+  -- As we perform a depth-first search, the same assumption may 
+  results <- lift $ nub <$> (execWriterT $ depthFirst fillerId)
   for_ results (tell <<< ArrayWithoutDoubles <<< fst)
   pure $ join (snd <$> results)
   where
-    depthFirst :: RoleInstance -> Array RoleInstance -> WriterT (Array (Tuple (Array InformedAssumption) (Array RoleInstance))) MonadPerspectives Unit
-    depthFirst rid assumptions = do 
+    depthFirst ::RoleInstance -> WriterT (Array (Tuple (Array InformedAssumption) (Array RoleInstance))) MonadPerspectives Unit
+    depthFirst rid = do 
       Tuple rids (ArrayWithoutDoubles ass) <- lift $ runMonadPerspectivesQuery rid (getFilledRoles filledContextType filledType)
       if null rids
+        -- Not found. Now see if any other filled role eventually fills an instance of filledType.
         then do 
-          allFilleds <- lift $ getAllFilledRoles rid
-          for_ allFilleds \filled -> depthFirst filled (cons filled assumptions) 
+          -- The first index of the filledRoles administration is the String representation of the type of the context of the filled role, 
+          -- the second is the string representation of the type of the filled role.
+          filledRoles <- lift $ getFilledRolesAdministration rid
+          -- All these filled roles are an assumption, whether or not they lead to a result. 
+          -- This is because one of them may later actually fill an instance of the filledType and then we want to know.
+          tell [(Tuple 
+            (concat (values <$> (forWithIndex filledRoles (\contextOfFilledRole filledRoles' -> 
+              (keys filledRoles') <#> (\typeOfFilledRole -> FilledRolesAssumption fillerId (ContextType contextOfFilledRole) (EnumeratedRoleType typeOfFilledRole))))) )
+            [])]
+          for_ (concat $ concat $ values <$> values filledRoles) depthFirst
+        -- Found. 
         else do 
           tell [Tuple ass rids]
+    getFilledRolesAdministration :: RoleInstance -> MonadPerspectives (Object (Object (Array RoleInstance)))
+    getFilledRolesAdministration rid = (try $ getPerspectRol rid) >>=
+      handlePerspectRolError' "getRecursivelyFilledRoles'" empty
+        \(filler :: IP.PerspectRol) -> pure (rol_gevuldeRollen filler)
+
 
 getAllFilledRoles :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 getAllFilledRoles rid = (try $ getPerspectRol rid) >>=
-  handlePerspectRolError' "getFilledRoles" []
+  handlePerspectRolError' "getAllFilledRoles" []
     \(filler :: IP.PerspectRol) -> pure $ concat $ concat (values <$> values (rol_gevuldeRollen filler))
+
 
 getRecursivelyAllFilledRoles :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 getRecursivelyAllFilledRoles rid = do 
@@ -617,7 +637,7 @@ roleIsInState stateId ri = getActiveRoleStates_ ri >>= pure <<< isJust <<< elemI
 
 -- | Returns the name of the model that defines the role type as a String Value.
 roleModelName :: RoleInstance ~~> Value
-roleModelName (RoleInstance rid) = maybe empty (pure <<< Value) (typeUri2ModelUri rid)
+roleModelName (RoleInstance rid) = maybe Plus.empty (pure <<< Value) (typeUri2ModelUri rid)
 
 -- | Return the value of the local property "Name", or return the last segment of the role type name.
 getRoleName :: RoleInstance ~~> Value

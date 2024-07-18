@@ -106,6 +106,7 @@ import Data.Map (Map)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Nullable (Nullable)
+import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (Aff, Fiber, throwError)
@@ -289,6 +290,7 @@ instance eqInformedAssumption :: Eq InformedAssumption where
 instance showInformedAssumption :: Show InformedAssumption where
   show = genericShow
 
+instance Ord InformedAssumption where compare = genericCompare
 
 -----------------------------------------------------------
 -- MONADPERSPECTIVES

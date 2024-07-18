@@ -112,7 +112,7 @@ type RolRecord = PouchbdDocumentFields
   , binding :: Filler
   -- The four fields below could also be modeled as Maybe values.
   , properties :: F.Object (Array Value)
-  -- The first index is the String representation of the ContextType, the second that of the EnumeratedRoleType.
+  -- The first index is the String representation of the type of the context of the filled role, the second is the string representation of the type of the flled role.
   , filledRoles :: F.Object (F.Object (Array RoleInstance))
   , occurrence :: Int
   , isMe :: Boolean

@@ -357,37 +357,6 @@ usersWithPerspectiveOnRoleBinding delta@(RoleBindingDelta dr@{filled, filler:mbi
       filler <- fillers
       pure $ Tuple filled' filler
 
--- | If the role instance is the object of a perspective, add deltas to the transaction for the user(s) of that perspective
--- | so that they will receive the data they have access to according to the perspective.
--- | These will be RoleBindingDeltas and PropertyDeltas.
-addDeltasForPerspectiveObjects :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
-addDeltasForPerspectiveObjects filled = do
-  allFilleds <- lift $ cons filled <$> getRecursivelyAllFilledRoles filled
-  nub <<< concat <$> for allFilleds \filled' -> do
-    -- Each filled role might be a perspective object.
-    contextInstance <- lift $ context' filled
-    filledType <- lift (filled' ##>> OG.roleType)
-    -- For each of them: get and compile perspective object queries for the step from that filled role to its context.
-    -- (there may be state queries or calculated object queries that run through this segment, too, but we're not interested in them)
-    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries filledType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter isPerspectiveObject
-    -- Then for each query: apply it to obtain users that have a perspective on the filled role.
-    nub <<< concat <$> for contextCalculations \iq@(InvertedQuery{statesPerProperty}) -> do 
-    -- If iq has the selfOnly modifier, we must apply a new algorithm to the roleInstance and the roleInstance.
-      -- users <- if isForSelfOnly iq
-      --   then handleSelfOnlyQuery iq filled filled
-      --   else handleBackwardQuery filled iq
-      cwus <- handleBackwardQuery filled iq
-      -- Then take the properties of the query and, for the users computed, apply computeProperties in order to add filled role deltas and property deltas.
-      us <- pure (filter (\(Tuple context users) -> not $ null users) cwus)
-      if null us
-        then pure unit
-        else computeProperties [(singletonPath (R filled))] statesPerProperty us
-      pure $ concat (snd <$> cwus)
-  
-  where 
-    isPerspectiveObject :: InvertedQuery -> Boolean
-    isPerspectiveObject (InvertedQuery{forwardsCompiled}) = isNothing forwardsCompiled
-
 -- | This function SHOULD NOT handle the roles that are filled by the filled role; instead, it should be applied in a 
 -- | recursive context that handles that. See usersWithPerspectiveOnRoleBinding, statesAndPeersForRoleInstanceToRemove
 usersWithPerspectiveOnRoleBinding' :: RoleInstance -> RoleInstance -> Maybe RoleInstance -> RoleBindingDeltaType -> Boolean -> MonadPerspectivesTransaction (Array RoleInstance)
@@ -429,6 +398,41 @@ usersWithPerspectiveOnRoleBinding' filled filler moldFiller deltaType runForward
       concat <<< map snd <$> (concat <$> for fillerCalculations (handleBackwardQuery oldFiller))
     otherwise -> pure []
   lift $ filterA notIsMe (nub $ union users1 (users2 `union` users3))
+
+-- | If the role instance is the object of a perspective, add deltas to the transaction for the user(s) of that perspective
+-- | so that they will receive the data they have access to according to the perspective.
+-- | These will be RoleBindingDeltas and PropertyDeltas.
+addDeltasForPerspectiveObjects :: RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+addDeltasForPerspectiveObjects filled = do
+  allFilleds <- lift $ cons filled <$> getRecursivelyAllFilledRoles filled
+  -- Now compute all context-user combinations that have a perspective on this object
+  nub <<< concat <$> for allFilleds \filled' -> do
+    -- Each filled role might be a perspective object.
+    contextInstance <- lift $ context' filled
+    filledType <- lift (filled' ##>> OG.roleType)
+    -- For each of them: get and compile perspective object queries for the step from that filled role to its context.
+    -- (there may be state queries or calculated object queries that run through this segment, too, but we're not interested in them)
+    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries filledType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter isPerspectiveObject
+    -- Then for each query: apply it to obtain users that have a perspective on the filled role.
+    nub <<< concat <$> for contextCalculations \iq@(InvertedQuery{statesPerProperty}) -> do 
+    -- TODO!!
+    -- If iq has the selfOnly modifier, we must apply a new algorithm to the roleInstance and the roleInstance.
+      -- users <- if isForSelfOnly iq
+      --   then handleSelfOnlyQuery iq filled filled
+      --   else handleBackwardQuery filled iq
+      cwus <- handleBackwardQuery filled iq
+      -- Then take the properties of the query and, for the users computed, apply computeProperties in order to add filled role deltas and property deltas.
+      us <- pure (filter (\(Tuple context users) -> not $ null users) cwus)
+      if null us
+        then pure unit
+        -- This function serialises dependencies from the interpretation result to deltas and adds them to the transaction for the users.
+        else computeProperties [(singletonPath (R filled))] statesPerProperty us
+      pure $ concat (snd <$> cwus)
+  
+  where 
+    isPerspectiveObject :: InvertedQuery -> Boolean
+    isPerspectiveObject (InvertedQuery{forwardsCompiled}) = isNothing forwardsCompiled
+
 
 -----------------------------------------------------------
 -- RE-EVALUATE CONSEQUENCES OF CHANGES TO PUBLIC FILLERS
@@ -707,6 +711,10 @@ aisInPropertyDelta
 -- | If the role instance or any of the roles it fills is the object of a perspective, add deltas to the transaction for the user(s) of that perspective
 -- | so that they will receive deltas that inform them about the property change.
 -- | These will be RoleBindingDeltas and PropertyDeltas.
+-- | This function has similarity to `addDeltasForPerspectiveObjects`. However, a major difference is that with `addDeltasForPropertyChange`
+-- | we have a single property and we also have the role instance that represents a value for that property.
+-- | With `addDeltasForPerspectiveObjects` we have multiple properties, take state into account and look for the property on the fillers
+-- | of the role instance.
 addDeltasForPropertyChange :: RoleInstance -> EnumeratedPropertyType -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)
 addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = do
   allFilleds <- lift $ cons roleWithPropertyValue <$> getRecursivelyAllFilledRoles roleWithPropertyValue

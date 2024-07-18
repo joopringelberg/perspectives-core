@@ -49,15 +49,16 @@ import Foreign.Object (lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction, (###=), (##=))
 import Perspectives.Deltas (addDelta, addPublicKeysToTransaction)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (roleType_)
+import Perspectives.Instances.ObjectGetters (binding_, roleType_)
 import Perspectives.ModelDependencies (idProperty, sysUser)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Query.Interpreter (interpret)
-import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, singletonPath)
+import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, consOnMainPath, singletonPath)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -66,7 +67,7 @@ import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), 
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
+import Perspectives.Types.ObjectGetters (enumeratedRolePropertyTypes_, perspectivesClosure_, propertiesInPerspective)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Simple.JSON (unsafeStringify, write)
 
@@ -144,7 +145,7 @@ serialiseRoleInstancesAndProperties ::
   ContextInstance ->                   -- The context instance for which we serialise roles and properties.
   NA.NonEmptyArray RoleInstance ->     -- User Role instances to serialise for. These have a single type.
   QueryFunctionDescription ->          -- Find object role instances with this description.
-  Array PropertyType ->                 -- PropertyTypes whose values on the role instances should be serialised.
+  Array PropertyType ->                -- PropertyTypes whose values on the role instances should be serialised.
   Boolean ->                           -- true iff the perspective is selfonly.
   Boolean ->                           -- true iff the object of the perspective equals its subject.
   MonadPerspectivesTransaction Unit
@@ -184,7 +185,26 @@ serialiseRoleInstancesAndProperties cid users object properties selfOnly isPersp
 getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
 getPropertyValues pt dep = do
   calc <- lift $ lift $ (PClass.getProperty >=> PClass.getCalculation) pt
-  interpret calc dep
+  -- Calculate the DependencyPath that leads to the filler whose type supports the property. Start from that.
+  -- This is to accomodate overloaded fillers.
+  pathToRoleWithProperty <- unsafePartial computePathToFillerWithProperty dep
+  interpret calc pathToRoleWithProperty
+  where
+  computePathToFillerWithProperty :: Partial => DependencyPath ~~> DependencyPath
+  computePathToFillerWithProperty path@{head} = ArrayT case head of 
+    R rid -> do 
+      localProps <- lift $ (roleType_ >=> enumeratedRolePropertyTypes_) rid
+      if isJust $ elemIndex pt localProps
+        -- The type of the role instance support the property. Return the path
+        then pure [path]
+        -- The type of the role instance doesn't support the property. Compute the path that leads to its filler
+        else do 
+          mfiller <- lift $ binding_ rid
+          case mfiller of
+            -- We cannot find the filler that supports this property.
+            Nothing -> pure []
+            -- Contintue with the filler and add a step to the path.
+            Just b -> runArrayT $ computePathToFillerWithProperty (consOnMainPath (R b) dep)
 
 serialiseDependencies :: Array RoleInstance -> NonEmptyList Dependency -> MonadPerspectivesTransaction Unit
 serialiseDependencies users deps = void $ runStateT (serialiseDependencies_ users deps) []
