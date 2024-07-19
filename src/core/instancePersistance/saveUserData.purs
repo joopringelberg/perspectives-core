@@ -72,7 +72,7 @@ import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..)
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getRoleOnClipboard, getUnlinkedRoleInstances, isMe, roleType_)
 import Perspectives.ModelDependencies (cardClipBoard)
 import Perspectives.Names (getMySystem)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit)
+import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, tryGetPerspectContext, tryGetPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
@@ -95,53 +95,75 @@ import Simple.JSON (writeJSON)
 -- | Add the role instance to the end of the roles to exit.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.
 -- | (we build a last-in, last-out stack of destructive effects)
-scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit
+scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit 
 scheduleRoleRemoval id = do
-  contextOfRole <- lift (id ##>> context)
-  -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
-  contextIsScheduledToBeRemoved <- gets (\(Transaction{scheduledAssignments}) -> isJust $ find
-    (case _ of
-      ContextRemoval ctxt _ -> ctxt == contextOfRole
-      _ -> false)
-    scheduledAssignments)
-  roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
-  if contextIsScheduledToBeRemoved || roleIsUntouchable
-    then pure unit
-    else do 
-      modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
-        { rolesToExit = rolesToExit `union` [id]
-        , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
-        })
-      clipboard <- lift getRoleOnClipboard
-      case clipboard of 
-        Nothing -> pure unit
-        Just r -> if r == id
-          then do 
-            s <- lift $ getMySystem
-            deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard)
-          else pure unit
+  -- It may happen that two public roles with the same address both have a perspective on this role instance.
+  -- In that case, we remove the instance for the first public role (in a random order). 
+  -- We should check whether it is still there before we try to remove it.
+  if isInPublicScheme (unwrap id)
+    then (lift $ tryGetPerspectRol id) >>= case _ of 
+      Nothing -> pure unit
+      Just _ -> f
+    else f
+  where 
+    f :: MonadPerspectivesTransaction Unit
+    f = do
+      contextOfRole <- lift (id ##>> context)
+      -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
+      contextIsScheduledToBeRemoved <- gets (\(Transaction{scheduledAssignments}) -> isJust $ find
+        (case _ of
+          ContextRemoval ctxt _ -> ctxt == contextOfRole
+          _ -> false)
+        scheduledAssignments)
+      roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
+      if contextIsScheduledToBeRemoved || roleIsUntouchable
+        then pure unit
+        else do 
+          modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+            { rolesToExit = rolesToExit `union` [id]
+            , scheduledAssignments = scheduledAssignments `union` [RoleRemoval id]
+            })
+          clipboard <- lift getRoleOnClipboard
+          case clipboard of 
+            Nothing -> pure unit
+            Just r -> if r == id
+              then do 
+                s <- lift $ getMySystem
+                deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard)
+              else pure unit
 
 -- | Schedules all roles in the context, including its external role, for removal.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.
 -- | (we build a last-in, last-out stack of destructive effects)
 scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
-scheduleContextRemoval authorizedRole id = (lift $ try $ getPerspectContext id) >>=
-  handlePerspectContextError "scheduleContextRemoval"
-  \(ctxt@(PerspectContext{rolInContext, buitenRol:br, pspType:contextType})) -> do
-    unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
-    unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
-    allRoleInstances <- pure $ (cons br $ unlinkedInstances <> (concat $ values rolInContext))
-    clipboard <- lift getRoleOnClipboard
-    case clipboard of 
-      Just roleOnClipboard -> if isJust $ elemIndex roleOnClipboard allRoleInstances
-        then do 
-          s <- lift $ getMySystem
-          deleteProperty [RoleInstance (buitenRol s)] (EnumeratedPropertyType cardClipBoard)
-        else pure unit
-      _ -> pure unit
-    modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
-      { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
-      , rolesToExit = nub $ rolesToExit <> allRoleInstances})
+scheduleContextRemoval authorizedRole id = 
+  -- It may happen that two public roles with the same address both have a perspective on this context instance.
+  -- In that case, we remove the instance for the first public role (in a random order). 
+  -- We should check whether it is still there before we try to remove it.
+  if isInPublicScheme (unwrap id)
+    then (lift $ tryGetPerspectContext id) >>= case _ of 
+      Nothing -> pure unit
+      Just _ -> f
+    else f
+  where 
+    f :: MonadPerspectivesTransaction Unit
+    f = (lift $ try $ getPerspectContext id) >>=
+      handlePerspectContextError "scheduleContextRemoval"
+      \(ctxt@(PerspectContext{rolInContext, buitenRol:br, pspType:contextType})) -> do
+        unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
+        unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
+        allRoleInstances <- pure $ (cons br $ unlinkedInstances <> (concat $ values rolInContext))
+        clipboard <- lift getRoleOnClipboard
+        case clipboard of 
+          Just roleOnClipboard -> if isJust $ elemIndex roleOnClipboard allRoleInstances
+            then do 
+              s <- lift $ getMySystem
+              deleteProperty [RoleInstance (buitenRol s)] (EnumeratedPropertyType cardClipBoard)
+            else pure unit
+          _ -> pure unit
+        modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
+          { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
+          , rolesToExit = nub $ rolesToExit <> allRoleInstances})
 
 -- Only called when the external role is also 'bound' in a DBQ role.
 removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTransaction Unit
