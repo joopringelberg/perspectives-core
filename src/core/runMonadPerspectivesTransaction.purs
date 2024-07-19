@@ -236,7 +236,7 @@ phase2 share authoringRole r = do
     || (not $ null (tr.createdContexts `difference` createdContexts))
     || (not $ null (tr.createdRoles `difference` createdRoles)) )
   if reRunPhase1
-    then phase1 share authoringRole r
+    then log "Rerun phase1" *> phase1 share authoringRole r
     else do
       -- Invariant: there are no rolesToExit, no createdContexts, no createdRoles. 
       -- Nor will there be RoleUnbinding or ExecuteDestructiveEffect items in scheduledAssignments.
@@ -268,7 +268,8 @@ phase2 share authoringRole r = do
                 lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas deltas)
               Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
           Peer _ -> pure unit
-
+      -- Remove the deltas; we don't want to execute them again.
+      AA.modify (\t -> over Transaction (\tr -> tr {deltas = []}) t)
       -- Now finally remove contexts and roles.
       void $ for scheduledAssignments case _ of
         ContextRemoval ctxt authorizedRole -> lift (log ("Remove context " <> unwrap ctxt) *> removeContextInstance ctxt authorizedRole)
@@ -455,17 +456,17 @@ runEmbeddedIfNecessary share authoringRole a = do
       -- Because the transactionFlag AVar is empty (== the flag is down), we know a transaction is running.
       -- 1. Raise the flag, put 0 in it (we don't count embedded transactions)
       _ <- lift $ put 0 t
-      log "Starting embedded transaction."
+      log "Starting embedded transaction because it was necessary."
       -- 2. Run the transaction (this is guaranteed to lower and raise the flag again because of an internal error boundary, setting it to 1 - but it may throw again!).
       catchError 
         do
           result <- runMonadPerspectivesTransaction' share authoringRole a
           -- 2. Lower it again.
-          log "Ending embedded transaction."
+          log "Ending transaction that needed to be embedded."
           _ <- lift $ take t
           pure result
         \e -> do
-          log ("Ending embedded transaction in failure. " <> show e)
+          log ("Ending transaction that needed to be embedded in failure. " <> show e)
           _ <- lift $ take t
           throwError e
 
