@@ -458,6 +458,7 @@ domain model://perspectives.domains#CouchdbManagement
         do for CBAdmin
           callEffect cdb:DeleteCouchdbDatabase( BaseUrl, DatabaseName )
 
+    -- Owner will be an Admin of the BespokeDatabase.
     user Owner filledBy CouchdbServer$Accounts, CouchdbServer$Admin
       perspective on External
         props (Public, Description) verbs (Consult, SetPropertyValue)
@@ -787,7 +788,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on Versions
-        props (Versions$Version, Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName) verbs (Consult)
+        props (Versions$Version, Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName, Patch, Build) verbs (Consult)
         action StartUsing
           -- This method also adds an instance of ModelsInUse and adds the VersionedModelURI to property ModelToRemove.
           -- It also sets InstalledPatch and InstalledBuild.

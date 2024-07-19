@@ -159,8 +159,13 @@ domain model://joopringelberg.nl#TestQueries
         props (Title) verbs (Consult, SetPropertyValue)
       perspective on Pages >> binding >> context >> Author
         all roleverbs
+      perspective on TestBinding
+        all roleverbs
+        props (Name) verbs (Consult, SetPropertyValue)
       
       screen "TestQueries"
+        row 
+          table TestBinding
         row 
           table Pages
         row
@@ -220,6 +225,30 @@ domain model://joopringelberg.nl#TestQueries
       on entry
         do for Manager
           bind currentactor to Author in binding >> context
+    
+    context TestBinding (relational) filledBy SomeContext
+
+  case SomeContext
+    external
+      property Name (String)
+
+    user Author = sys:SocialMe
+      perspective on SubContexts
+        all roleverbs
+        props (SomeProperty) verbs (Consult, SetPropertyValue)
+
+    public Visitor at "https://perspectives.domains/cw_or3rqch6p8/" = sys:SocialMe
+      perspective on SubContexts
+        props (SomeProperty) verbs (Consult)
+      perspective on extern
+        props (Name) verbs (Consult)
+    
+    context SubContexts (relational) filledBy SubContext
+
+    case SubContext
+      external
+        property SomeProperty (String)
+
 
   case EmbeddedContext
     aspect sys:ContextWithNotification
