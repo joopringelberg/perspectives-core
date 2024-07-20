@@ -29,8 +29,8 @@ import Data.Array (fromFoldable)
 import Data.Int (toNumber)
 import Data.JSDate (toISOString)
 import Data.List (find, List(..), concat, filter, many, some, null, singleton, (:))
-import Data.List.NonEmpty (toList)
-import Data.Maybe (Maybe(..))
+import Data.List.NonEmpty (NonEmptyList, toList, singleton) as LNE
+import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
 import Data.String (trim)
 import Data.String.CodeUnits (fromCharArray)
@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -64,7 +64,7 @@ import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVe
 import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=), (||))
 import Text.Parsing.Indent (checkIndent, sameOrIndented, withPos)
 import Text.Parsing.Parser (fail, failWithPosition)
-import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, try, (<?>))
+import Text.Parsing.Parser.Combinators (between, lookAhead, option, optionMaybe, sepBy, sepBy1, try, (<?>))
 import Text.Parsing.Parser.String (char, eof, satisfy)
 
 contextE :: IP ContextPart
@@ -461,7 +461,7 @@ enumeratedRole_ :: String -> RoleKind -> ArcPosition
 enumeratedRole_ uname knd pos = do
   attributes <- option Nil roleAttributes
   filledBy' <- filledBy
-  pure {uname, knd, pos, parts: attributes <> filledBy', isEnumerated: true}
+  pure {uname, knd, pos, parts: maybe attributes (flip (:) attributes) filledBy', isEnumerated: true}
   where
     -- | We cannot use token.commaSep or sebBy to separate the role attributes;
     -- | it will cause looping as long as it is used
@@ -485,12 +485,21 @@ enumeratedRole_ uname knd pos = do
 
 -- | This parser always succeeds.
 -- | If it detects no filledBy clause, it leaves consumed state as it is and returns Nil.
+-- | filledBy SomeRole, AnotherRole
+-- | Here `SomeRole` and `AnotherRole` are alternatives.
+-- | filledBy SomeRole + AnotherRole
+-- | Here both are required: that is, only instances that have both types are allowed to fill this role.
 -- Implementation note: we cannot know, here, whether the filler is Calculated or
 -- Enumerated. This will be fixed in PhaseThree.
-filledBy :: IP (List RolePart)
-filledBy = option Nil (reserved "filledBy" *> (toList <$> token.commaSep1 filler))
+filledBy :: IP (Maybe RolePart)
+filledBy = optionMaybe (reserved "filledBy" *> 
+  (
+    (try (FilledBySpecifications <<< Alternatives <$> token.parens (token.commaSep1 filler)))
+    <|> (try (FilledBySpecifications <<< Combination <$> token.parens (plusSep filler)))
+    <|> (FilledBySpecifications <<< Alternatives <<< LNE.singleton <$> (try filler))
+  ))
   where
-    filler :: IP RolePart
+    filler :: IP FilledByAttribute
     filler = do
       role <- arcIdentifier
       mcontext <- optionMaybe (reserved "in" *> arcIdentifier)
@@ -498,6 +507,12 @@ filledBy = option Nil (reserved "filledBy" *> (toList <$> token.commaSep1 filler
         Nothing -> do
           pure $ FilledByAttribute role (ContextType "")
         Just context -> pure $ FilledByAttribute role (ContextType context)
+    plus :: IP String
+    plus = token.symbol "+"
+
+    plusSep :: forall a . IP a -> IP (LNE.NonEmptyList a)
+    plusSep p = sepBy1 p plus
+
 
 -- | rolePart =
 -- |   <perspectiveOn> |
@@ -689,7 +704,7 @@ viewE = do
   pos <- getPosition
   uname <- reserved "view" *> arcIdentifier
   refs <- sameOrIndented *> (token.parens (token.commaSep1 arcIdentifier))
-  pure $ VE $ ViewE {id: uname, viewParts: toList refs, pos: pos}
+  pure $ VE $ ViewE {id: uname, viewParts: LNE.toList refs, pos: pos}
 
 -- Nothing `appendSegment` s = Just s
 -- Just m `appendSegment` s = Just m$s

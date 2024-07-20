@@ -121,6 +121,7 @@ phaseThree_ df@{id, referredModels} postponedParts screens = do
   indexedRoles <- unions <$> traverse (getDomeinFile >=> pure <<< indexedRoles) referredModels
   (Tuple ei {dfr, invertedQueries}) <- runPhaseTwo_' 
     (do
+      addAspectsToExternalRoles
       checkAspectRoleReferences
       inferFromAspectRoles
       qualifyBindings
@@ -131,7 +132,6 @@ phaseThree_ df@{id, referredModels} postponedParts screens = do
       -- As all Calculated roles and Properties are now compiled, we can safely compile public Url calculations.
       compilePublicUrls
       qualifyPropertyReferences
-      addAspectsToExternalRoles
       computeCompleteEnumeratedTypes
       handlePostponedStateQualifiedParts
       compileStateQueries

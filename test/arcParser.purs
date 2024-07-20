@@ -2,10 +2,12 @@ module Test.Parsing.Arc where
 
 import Prelude
 
+import Control.Alternative (class Alternative)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Free (Free)
 import Data.Either (Either(..))
 import Data.List (List(..), filter, findIndex, head, index, length, (:))
+import Data.List.NonEmpty (length) as LNE
 import Data.Maybe (Maybe(..), isJust)
 import Effect.Class.Console (log, logShow)
 import Effect.Exception (message)
@@ -13,7 +15,7 @@ import Node.Encoding as ENC
 import Node.FS.Aff (readTextFile)
 import Node.Path as Path
 import Perspectives.Parsing.Arc (automaticEffectE, contextE, domain, propertyE, thingRoleE, userRoleE, viewE)
-import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), StateQualifiedPart, StateSpecification(..), ViewE(..))
+import Perspectives.Parsing.Arc.AST (ContextE(..), ContextPart(..), FilledBySpecification(..), PropertyE(..), PropertyPart(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), StateQualifiedPart, StateSpecification(..), ViewE(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier)
 import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
@@ -41,7 +43,7 @@ theSuite = suite "Perspectives.Parsing.Arc" do
   test "arcIdentifier on simple name" do
     (r :: Either ParseError String) <- {-pure $ unwrap $-} runIndentParser "MyTestDomain" arcIdentifier
     case r of
-      (Left e) -> assert (show e) false
+      (Left e) -> assert (show e) false 
       (Right id) -> do
         assert "'MyTestDomain' should be parsed as a valid identifier" (id == "MyTestDomain")
 
@@ -173,9 +175,11 @@ theSuite = suite "Perspectives.Parsing.Arc" do
       (Left e) -> assert (show e) false
       (Right rl@(RE (RoleE{roleParts}))) -> do
         assert "Role should have two FilledBy attributes"
-          (2 == (length (filter (case _ of
-            (FilledByAttribute _ _) -> true
-            otherwise -> false) roleParts)))
+          (1 == (length (filter (case _ of 
+            FilledBySpecifications spec -> (case spec of
+              (Alternatives atts) -> LNE.length atts == 2
+              otherwise -> false)
+            _ -> false) roleParts)))
       otherwise -> assert "Role should have parts" false
 
   test "Role with two properties" do
