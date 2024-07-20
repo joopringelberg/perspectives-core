@@ -27,6 +27,7 @@ import Prelude
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.List (List)
+import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
@@ -90,7 +91,7 @@ data RolePart =
   FunctionalAttribute Boolean |
   MandatoryAttribute Boolean |
   UnlinkedAttribute |
-  FilledByAttribute String ContextType |
+  FilledBySpecifications FilledBySpecification |
   Calculation Step Boolean |
   RoleAspect String ArcPosition (Maybe PropertyMapping) |
   IndexedRole String ArcPosition |
@@ -98,6 +99,8 @@ data RolePart =
   Screen ScreenE |
   PublicUrl Step
 
+data FilledBySpecification = Alternatives (NonEmptyList FilledByAttribute) | Combination (NonEmptyList FilledByAttribute)
+data FilledByAttribute = FilledByAttribute String ContextType
 --------------------------------------------------------------------------------
 ---- PROPERTYMAPPING
 --------------------------------------------------------------------------------
@@ -436,6 +439,12 @@ instance showRoleE :: Show RoleE where show = genericShow
 
 derive instance genericRoleElement :: Generic RolePart _
 instance showRoleElement :: Show RolePart where show = genericShow
+
+derive instance Generic FilledBySpecification _
+instance Show FilledBySpecification where show = genericShow
+
+derive instance Generic FilledByAttribute _
+instance Show FilledByAttribute where show = genericShow
 
 derive instance Generic PropertyMapping _
 instance Show PropertyMapping where show = genericShow
