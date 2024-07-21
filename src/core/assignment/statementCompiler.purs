@@ -49,11 +49,11 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT(..), ExpandedADT, allLeavesInADT, equalsOrGeneralises, equalsOrSpecialises)
+import Perspectives.Representation.ADT (ADT(..), DNF, allLeavesInADT, equalsOrGeneralises_, equalsOrSpecialises_)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, getEnumeratedProperty, getEnumeratedRole)
 import Perspectives.Representation.Class.Property (range) as PT
-import Perspectives.Representation.Class.Role (completeExpandedFillerRestriction, expandUnexpandedLeaves, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (completeDeclaredFillerRestriction, roleKindOfRoleType, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -250,13 +250,13 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           else pure unit
         -- the possible fillers of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (fillers).
         qualifies <- do
-          (mfillerRestriction :: Maybe (ExpandedADT RoleInContext)) <- lift $ lift (getEnumeratedRole qualifiedRoleIdentifier >>= completeExpandedFillerRestriction)
-          (fillers :: ExpandedADT RoleInContext) <- lift $ lift $ expandUnexpandedLeaves (unsafePartial domain2roleType (range bindings))
+          (mfillerRestriction :: Maybe (DNF RoleInContext)) <- lift $ lift (getEnumeratedRole qualifiedRoleIdentifier >>= completeDeclaredFillerRestriction >>= traverse toDisjunctiveNormalForm_)
+          (fillers :: DNF RoleInContext) <- lift $ lift $ toDisjunctiveNormalForm_ (unsafePartial domain2roleType (range bindings))
           case mfillerRestriction of
             Nothing -> pure true
             Just fillerRestriction -> do
               -- fillerRestriction -> fillers
-              pure (fillerRestriction `equalsOrSpecialises` fillers)
+              pure (fillerRestriction `equalsOrSpecialises_` fillers)
         if qualifies
           -- Create a function description that describes the actual role creating and binding.
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True
@@ -439,17 +439,17 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           then pure $ Just $ EnumeratedRoleType ident
           else do
             -- The expansion of the fillers
-            (expandedFillers :: ExpandedADT RoleInContext) <- lift $ lift $ expandUnexpandedLeaves fillers
+            (expandedFillers :: DNF RoleInContext) <- lift $ lift $ toDisjunctiveNormalForm_ fillers
             -- EnumeratedRoles in the model with (end)matching name.
             (enumeratedRoles :: Object EnumeratedRole) <- getsDF _.enumeratedRoles
             (nameMatches :: Array EnumeratedRole) <- pure (filter (\(EnumeratedRole{id:roleId}) -> (unwrap roleId) `endsWithSegments` ident) (values enumeratedRoles))
             -- EnumeratedRoles that can be filled with `fillers`.
             (candidates :: Array EnumeratedRole) <- lift $ lift (filterA (\(candidate :: EnumeratedRole) -> do
-              (mexpandedCandidateRestriction :: Maybe (ExpandedADT RoleInContext)) <- completeExpandedFillerRestriction candidate
+              (mexpandedCandidateRestriction :: Maybe (DNF RoleInContext)) <- completeDeclaredFillerRestriction candidate >>= traverse toDisjunctiveNormalForm_
               case mexpandedCandidateRestriction of 
                 Nothing -> pure true
                 -- The restriction on filling the candidate must be equal to or more general (less specialised) than the fillers.
-                Just expandedCandidateRestriction -> pure (expandedCandidateRestriction `equalsOrGeneralises` expandedFillers))
+                Just expandedCandidateRestriction -> pure (expandedCandidateRestriction `equalsOrGeneralises_` expandedFillers))
               nameMatches)
             case head candidates of
               Nothing -> if null nameMatches

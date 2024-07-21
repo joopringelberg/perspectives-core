@@ -244,6 +244,19 @@ completeExpandedRoleType (CR cr) = getCalculatedRole cr >>=
   expandUnexpandedLeaves
 
 -----------------------------------------------------------
+-- ADT RoleInContext TO DNF
+-- NOTICE: this function can be applied only when member `completeType` of EnumeratedRoleType has been constructed in Perspectives.Parsing.Arc.PhaseThree.
+-----------------------------------------------------------
+toDisjunctiveNormalForm_ :: ADT RoleInContext -> MP (DNF RoleInContext)
+toDisjunctiveNormalForm_ adt = case adt of 
+  ST (RoleInContext{role}) -> getEnumeratedRole role >>= pure <<< _.completeType <<< unwrap
+  -- In the disjunctive normal form we have no UET.
+  -- We have a tree built from EST, ECT, ESUM and EPROD.
+  UET (RoleInContext{role}) -> getEnumeratedRole role >>= pure <<< _.completeType <<< unwrap
+  SUM as -> for as toDisjunctiveNormalForm_ >>= pure <<< unsafePartial flattenSums
+  PROD as -> for as toDisjunctiveNormalForm_ >>= pure <<< unsafePartial distribute
+
+-----------------------------------------------------------
 -- CONTEXTOFADT
 -----------------------------------------------------------
 -- | Context 'mapped' over ADT. Note that we cannot just use the Functor instance, as we have to 

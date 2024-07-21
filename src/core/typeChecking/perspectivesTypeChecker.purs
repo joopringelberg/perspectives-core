@@ -27,6 +27,7 @@ import Control.Monad.Except (catchError, lift, throwError)
 import Data.Array (cons, elemIndex)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), isJust)
+import Data.Traversable (traverse)
 import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, MP)
 import Perspectives.DomeinFile (DomeinFile)
@@ -36,12 +37,12 @@ import Perspectives.Instances.ObjectGetters (completeRuntimeType)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ExpandedADT, equalsOrSpecialises)
+import Perspectives.Representation.ADT (DNF, equalsOrSpecialises_)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (completeExpandedFillerRestriction, expandUnexpandedLeaves, kindOfRole)
+import Perspectives.Representation.Class.Role (completeDeclaredFillerRestriction, kindOfRole, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -146,9 +147,10 @@ checkContext c = do
 
 checkBinding :: EnumeratedRoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
-  (mrestriction :: Maybe (ExpandedADT QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeExpandedFillerRestriction
-  (fillerType :: ExpandedADT QT.RoleInContext) <- completeRuntimeType filler >>= expandUnexpandedLeaves
+  -- (mrestriction :: Maybe (ExpandedADT QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeExpandedFillerRestriction
+  (mrestriction :: Maybe (DNF QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeDeclaredFillerRestriction >>= traverse toDisjunctiveNormalForm_
+  (fillerType :: DNF QT.RoleInContext) <- completeRuntimeType filler >>= toDisjunctiveNormalForm_
   case mrestriction of 
     -- restriction -> fillerType
-    Just restriction -> pure (restriction `equalsOrSpecialises` fillerType)
+    Just restriction -> pure (restriction `equalsOrSpecialises_` fillerType)
     Nothing -> pure true

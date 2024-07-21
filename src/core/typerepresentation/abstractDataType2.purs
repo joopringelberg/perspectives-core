@@ -46,7 +46,7 @@ import Data.Traversable (class Traversable, sequenceDefault, traverse)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Applicative, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, bind, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<*>), (<<<), (<>))
+import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, bind, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<*>), (<<<), (<>), (>>=))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 --------------------------------------------------------------------------------------------------
@@ -217,12 +217,17 @@ transform f adt = case adt of
 
 -- | Like expand, but with the added possibility of reducing a node to Nothing.
 -- | NOTE: the result is not an ExpandedADT; just ADT.
-expandAndReduce :: forall a m. Applicative m => (ADT a -> m (Maybe (ADT a))) -> ADT a -> m (Maybe (ADT a))
+expandAndReduce :: forall a m. Bind m => Applicative m => (ADT a -> m (Maybe (ADT a))) -> ADT a -> m (Maybe (ADT a))
 expandAndReduce f adt = case adt of
   a@(ST _) -> f a
   a@(UET _) -> f a
-  PROD as -> Just <<< PROD <<< catMaybes <$> (traverse (expandAndReduce f) as)
-  SUM as -> Just <<< SUM <<< catMaybes <$> (traverse (expandAndReduce f) as)
+  -- PROD as -> Just <<< PROD <<< catMaybes <$> (traverse (expandAndReduce f) as)
+  PROD as -> traverse (expandAndReduce f) as >>= \r -> case catMaybes r of 
+    [] -> pure Nothing
+    terms -> pure $ Just $ PROD terms
+  SUM as -> (traverse (expandAndReduce f) as) >>= \r -> case catMaybes r of
+    [] -> pure Nothing
+    terms -> pure $ Just $ SUM terms
 
 --------------------------------------------------------------------------------------------------
 ---- HARRAY: AN ARRAY THAT HAS AN INSTANCE OF HEYTINGALGEBRA
@@ -239,7 +244,10 @@ fromHArray (HArray a) = a
 -- An HArray constructed with conj or disj will not have duplicates.
 instance (Ord a, Eq a) => HeytingAlgebra (HArray a) where
   ff = HArray []
+  -- It would be reasonable to have tt be Everything.
+  -- However, we cannot handle that in practice. We never want Everything in our computation.
   tt = Everything
+  -- tt = HArray []
   conj l r = case l, r of
     (HArray a), (HArray b) -> HArray (intersect (nub a) b)
     (HArray a), Everything -> HArray $ nub a
@@ -337,32 +345,31 @@ toDisjunctiveNormalForm adt = case adt of
   ESUM as -> unsafePartial flattenSums $ map toDisjunctiveNormalForm as
   EPROD as -> unsafePartial distribute (map toDisjunctiveNormalForm as)
 
+-- the argument is the product of applying toDisjunctiveNormalForm to an array of ADT - so it must
+-- be an array of SUM (PROD ST)
+flattenSums :: forall a. Eq a => Ord a => Partial => Array (DNF a) -> DNF a
+flattenSums sums = DSUM $ nub $ concat (sums <#>
+  (\a -> case a of 
+    DSUM ds -> ds))
+
+-- Because of context we can safely assume that adts is an Array of (SUM [(PROD [ST])])
+distribute :: forall a. Eq a => Ord a => Partial => Array (DNF a) -> DNF a
+distribute adts = DSUM $ nub $ (matrixMultiply $ adts <#> (\sum -> case sum of
+  DSUM products -> products <#> (\product -> case product of 
+    DPROD ps -> Conjunct ps))) <#> \(Conjunct terms) -> DPROD terms
+
+matrixMultiply :: forall b. Ord b => Array (Array (Conjunct b)) -> Array (Conjunct b)
+matrixMultiply conjuncts = case uncons conjuncts of
+  Nothing -> []
+  Just {head, tail} -> if null tail
+    then head
+    else foldl multiply head tail
   where
-    -- the argument is the product of applying toDisjunctiveNormalForm to an array of ADT - so it must
-    -- be an array of SUM (PROD ST)
-    flattenSums :: Partial => Array (DNF a) -> DNF a
-    flattenSums sums = DSUM $ nub $ concat (sums <#>
-      (\a -> case a of 
-        DSUM ds -> ds))
-
-    -- Because of context we can safely assume that adts is an Array of (SUM [(PROD [ST])])
-    distribute :: Partial => Array (DNF a) -> DNF a
-    distribute adts = DSUM $ nub $ (matrixMultiply $ adts <#> (\sum -> case sum of
-      DSUM products -> products <#> (\product -> case product of 
-        DPROD ps -> Conjunct ps))) <#> \(Conjunct terms) -> DPROD terms
-
-    matrixMultiply :: forall b. Ord b => Array (Array (Conjunct b)) -> Array (Conjunct b)
-    matrixMultiply conjuncts = case uncons conjuncts of
-      Nothing -> []
-      Just {head, tail} -> if null tail
-        then head
-        else foldl multiply head tail
-      where
-      multiply :: Array (Conjunct b) -> Array (Conjunct b) -> Array (Conjunct b)
-      multiply cjs1 cjs2 = do
-        Conjunct cj1 <- cjs1
-        Conjunct cj2 <- cjs2
-        pure $ Conjunct $ nub $ cj1 <> cj2
+  multiply :: Array (Conjunct b) -> Array (Conjunct b) -> Array (Conjunct b)
+  multiply cjs1 cjs2 = do
+    Conjunct cj1 <- cjs1
+    Conjunct cj2 <- cjs2
+    pure $ Conjunct $ nub $ cj1 <> cj2
 
 newtype Conjunct a = Conjunct (Array a)
 
@@ -422,12 +429,21 @@ equalsOrSpecialises_ = unsafePartial equalsOrSpecialises'
 specialises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 specialises = flip generalises
 
+specialises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+specialises_ = flip generalises_
+
 -- | left `equalsOrGeneralises` right
 -- | left <- right (NOTICE REVERSED ARROW)
 equalsOrGeneralises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 equalsOrGeneralises = flip equalsOrSpecialises
 
+equalsOrGeneralises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+equalsOrGeneralises_ = flip equalsOrSpecialises_
+
 -- | left `generalises` right
 -- | left <- right (NOTICE REVERSED ARROW)
 generalises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 generalises adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralises` adt2
+
+generalises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+generalises_ dnf1 dnf2 = dnf1 /= dnf2 && dnf1 `equalsOrGeneralises_` dnf2

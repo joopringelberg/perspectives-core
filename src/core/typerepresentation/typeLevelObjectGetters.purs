@@ -54,13 +54,13 @@ import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), ExpandedADT, allLeavesInADT, computeExpandedBoolean, equalsOrGeneralises, equalsOrSpecialises, generalises)
+import Perspectives.Representation.ADT (ADT(..), DNF, allLeavesInADT, computeExpandedBoolean, equalsOrSpecialises_, generalises_)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Representation.Class.PersistentType (DomeinFileId, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, completeExpandedRoleType, expandUnexpandedLeaves, getRole, perspectives, perspectivesOfRoleType, roleADT, roleKindOfRoleType)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, expandUnexpandedLeaves, getRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleKindOfRoleType, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -486,9 +486,9 @@ generalisesRoleType t1 t2 = ArrayT do
 generalisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
 generalisesRoleType_ t1 t2 = do 
   -- expand
-  (et1 :: ExpandedADT RoleInContext) <- completeExpandedRoleType t1
-  (et2 :: ExpandedADT RoleInContext) <- completeExpandedRoleType t2
-  pure (et1 `generalises` et2)
+  (et1 :: DNF RoleInContext) <- (roleADTOfRoleType >=> toDisjunctiveNormalForm_) t1
+  (et2 :: DNF RoleInContext) <- (roleADTOfRoleType >=> toDisjunctiveNormalForm_) t2
+  pure (et1 `generalises_` et2)
 
 -----------------------------------------------------------
 ---- EQUALSORGENERALISES, EQUALSORSPECIALISES FOR ROLE IN CONTEXT
@@ -496,18 +496,15 @@ generalisesRoleType_ t1 t2 = do
 -- | Compares with `equalsOrGeneralises`.
 -- | right -> left (logical implication)
 equalsOrGeneralisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
-equalsOrGeneralisesRoleInContext left right = do 
-  (left' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves left
-  (right' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves right
-  pure (left' `equalsOrGeneralises` right')
+equalsOrGeneralisesRoleInContext = flip equalsOrSpecialisesRoleInContext
 
 -- | left -> right
 -- | Compares with `equalsOrSpecialises`.
 equalsOrSpecialisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
 equalsOrSpecialisesRoleInContext left right = do 
-  (left' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves left
-  (right' :: ExpandedADT RoleInContext) <- expandUnexpandedLeaves right
-  pure (left' `equalsOrSpecialises` right')
+  (left' :: DNF RoleInContext) <- toDisjunctiveNormalForm_ left
+  (right' :: DNF RoleInContext) <- toDisjunctiveNormalForm_ right
+  pure (left' `equalsOrSpecialises_` right')
 
 -----------------------------------------------------------
 ---- ISPERSPECTIVEONADT
@@ -771,9 +768,9 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
 isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boolean)
 isPerspectiveOnSelf qfd = 
   some (\userRole' -> do 
-    expandedADT <- lift $ expandUnexpandedLeaves (roleRange qfd)
-    (lift $ completeExpandedRoleType userRole') >>=
-      (\userRoleAdt -> pure (expandedADT `equalsOrSpecialises` userRoleAdt)))
+    dnf <- lift $ toDisjunctiveNormalForm_ (roleRange qfd)
+    (lift $ roleADTOfRoleType userRole') >>= lift <<< toDisjunctiveNormalForm_ >>=
+      (\userRoleDNF -> pure (dnf `equalsOrSpecialises_` userRoleDNF)))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS

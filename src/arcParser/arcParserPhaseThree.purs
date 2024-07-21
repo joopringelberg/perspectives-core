@@ -1762,7 +1762,7 @@ isCoherentStateSpecification stateSpec = case stateSpec of
 ----------------------------------------------------------------------------------------
 ------- COMPUTECOMPLETEENUMERATEDTYPES
 ----------------------------------------------------------------------------------------
-
+-- | Not to be executed before all EnumeratedRoleTypes have been fully constructed.
 computeCompleteEnumeratedTypes :: PhaseThree Unit
 computeCompleteEnumeratedTypes = do
   df@{id, enumeratedRoles} <- lift $ State.gets _.dfr

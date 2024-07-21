@@ -27,10 +27,10 @@ import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrSpecialises)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrSpecialises_)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (allLocalAliases, completeExpandedType, expandUnexpandedLeaves)
+import Perspectives.Representation.Class.Role (allLocalAliases, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec)
@@ -101,11 +101,11 @@ contextualisePerspectives = do
     writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) =
       for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> do
         -- Include fillers in the expansion.
-        expandedAspectPerspectivesObject <- lift $ expandUnexpandedLeaves (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
+        aspectPerspectivesObjectDNF <- lift $ toDisjunctiveNormalForm_ (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
         found <- not <<< null <$> filterA (lift <<< (\(potentialObject :: EnumeratedRoleType) -> do 
-          expandedPotentialObject <- getEnumeratedRole potentialObject >>= completeExpandedType 
+          expandedPotentialObject <- getEnumeratedRole potentialObject >>= pure <<< _.completeType <<< unwrap 
           -- expandedAspectPerspectivesObject -> expandedPotentialObject
-          pure (expandedAspectPerspectivesObject `equalsOrSpecialises` expandedPotentialObject)
+          pure (aspectPerspectivesObjectDNF `equalsOrSpecialises_` expandedPotentialObject)
           )) potentialObjects
         if found
           then tell [p]

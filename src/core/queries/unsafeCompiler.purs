@@ -65,12 +65,12 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, RoleInContext, domain, domain2PropertyRange, domain2contextType, domain2roleType, range, roleInContext2Role)
-import Perspectives.Representation.ADT (ADT(..), DNF, equalsOrSpecialises_, toDisjunctiveNormalForm)
+import Perspectives.Representation.ADT (ADT(..), DNF, equalsOrSpecialises_)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
 import Perspectives.Representation.Class.Property (getPropertyType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, completeExpandedType, expandUnexpandedLeaves)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -968,7 +968,7 @@ getDynamicPropertyGetterFromLocalName ln adt = do
 
 getFillerTypeRecursively :: ADT RoleInContext -> RoleInstance ~~> RoleInstance
 getFillerTypeRecursively adt r = do 
-  adtDnf <- lift $ lift $ (expandUnexpandedLeaves adt >>= pure <<< toDisjunctiveNormalForm)
+  adtDnf <- lift $ lift $ (toDisjunctiveNormalForm_ adt)
   ArrayT $ (lift $ try $ getPerspectRol r) >>=
     handlePerspectRolError' "binding" [] (depthFirst adtDnf)
   where
@@ -979,7 +979,7 @@ getFillerTypeRecursively adt r = do
         Nothing -> pure []
         Just b -> do 
           bRole <- lift $ getPerspectRol b
-          roleDnf <- lift (getEnumeratedRole (rol_pspType bRole) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm)
+          roleDnf <- lift (getEnumeratedRole (rol_pspType bRole) >>= pure <<< _.completeType <<< unwrap)
           -- adtDnf -> roleDnf
           -- e.g. adtDnf is an aspect of roleDnf or fills it.
           if adtDnf `equalsOrSpecialises_` roleDnf

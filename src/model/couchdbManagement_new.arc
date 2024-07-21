@@ -459,7 +459,7 @@ domain model://perspectives.domains#CouchdbManagement
           callEffect cdb:DeleteCouchdbDatabase( BaseUrl, DatabaseName )
 
     -- Owner will be an Admin of the BespokeDatabase.
-    user Owner filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+    user Owner filledBy (CouchdbServer$Accounts, CouchdbServer$Admin)
       perspective on External
         props (Public, Description) verbs (Consult, SetPropertyValue)
         props (DatabaseLocation) verbs (Consult)
@@ -667,7 +667,7 @@ domain model://perspectives.domains#CouchdbManagement
             table Manifests
     
     
-    user Accounts (relational, unlinked) filledBy CouchdbServer$Accounts, CouchdbServer$Admin
+    user Accounts (relational, unlinked) filledBy (CouchdbServer$Accounts, CouchdbServer$Admin)
 
     -- The instances of Repository are published in the cw_servers_and_repositories database.
     public Visitor at extern >> ServerUrl + "cw_servers_and_repositories/" = sys:Me
@@ -754,7 +754,7 @@ domain model://perspectives.domains#CouchdbManagement
     context Repository (functional) = extern >> binder Manifests >> context >> extern
 
     -- Inherits credentials for the ServerUrl and RepositoryUrl, and write access to the ModelsDatabase and the InstancesDatabase of the Repository.
-    user Author (relational) filledBy Repository$Authors, Repository$Admin
+    user Author (relational) filledBy (Repository$Authors, Repository$Admin)
       perspective on extern
         props (Description, IsLibrary, VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
