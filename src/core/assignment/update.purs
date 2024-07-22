@@ -318,12 +318,14 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
         Just (RoleProp propertyBearingInstance replacementProperty) -> (lift $ try $ getPerspectRol propertyBearingInstance) >>= handlePerspectRolError "addProperty"
           \(propertyBearingInstanceRole :: PerspectRol) -> do
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
+            -- Even when the property is Private or Local, we should do this, as the computation also triggers actions.
             users <- aisInPropertyDelta 
               roleInstanceOnpath 
               propertyBearingInstance 
               propertyName 
               replacementProperty 
               (rol_pspType propertyBearingInstanceRole)
+            -- TODO: Only when the property is not Local!
             deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
                 delta <- case msignedDelta of
                   Nothing -> do
@@ -339,6 +341,8 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       }
                     signDelta (writeJSON $ stripResourceSchemes delta)
                   Just signedDelta -> pure signedDelta
+                -- TODO: For a Private property, remove users that are not another installation of the own user.
+                -- NOTICE: probably self-synchronisation (keeping installations of the same user up to date) currently doesn't work.
                 addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
             -- Look for requests for the original property AND the replacement property (if any).
