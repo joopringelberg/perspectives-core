@@ -89,7 +89,7 @@ import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (addAttachment) as P
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
-import Perspectives.PerspectivesState (contextCache, getPerspectivesUser, roleCache)
+import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), cacheEntity)
@@ -164,7 +164,8 @@ pendingInvitations _ = try
   >>= handleExternalFunctionError "model://perspectives.domains#Couchdb$PendingInvitations"
   
 -- | Overwrites the model currently residing in the local models database.
--- | Takes care of inverted queries.
+-- | Takes care of inverted queries in Couchdb.
+-- | Clears the query cache in PerspectivesState.
 -- | Clears compiled states from cache.
 -- | The first argument should contain the model name ("model://some.domain#Something@<SemVer>"), 
 -- | The second argument should contain the string representation of a boolean value.
@@ -296,6 +297,9 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
     else pure unit
 
   lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
+  -- As we have the new definitions of invertedQueries in place in the database, we should now clear the cache in PerspectivesState
+  -- to prevent old versions of being used.
+  lift clearQueryCache
 
   -- Distribute upstream state notifications over the other domains.
   forWithIndex_ upstreamStateNotifications
