@@ -26,12 +26,12 @@ module Perspectives.TypePersistence.ContextSerialisation where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, head, length)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Array (catMaybes, cons, filter, head, length)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking)
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, (###=))
 import Perspectives.Data.EncodableMap (lookup)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -45,6 +45,7 @@ import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..),
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
+import Perspectives.Types.ObjectGetters (contextAspectsClosure)
 import Simple.JSON (writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -54,14 +55,26 @@ derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
 screenForContextAndUser :: RoleInstance -> RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
 screenForContextAndUser userRoleInstance userRoleType contextType contextInstance = do
   DomeinFile df <- lift2MPQ $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ $ unwrap contextType)
-  case lookup (ScreenKey contextType userRoleType) df.screens of
-    Just s -> do
-      -- Now populate the screen definition with instance data.
-      (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
-      pure $ SerialisedScreen $ writeJSON screenInstance
-    Nothing -> do
-      screenInstance <- lift $ constructDefaultScreen userRoleInstance userRoleType contextInstance
-      pure $ SerialisedScreen $ writeJSON screenInstance
+  -- We should take aspects in consideration!
+  -- `userRoleType` may have been added as an aspect user role to `contextType`. In such a case we will never find 
+  -- a screen with the key `ScreenKey contextType userRoleType`, but (assuming the aspect added to the contextType is A) we will 
+  -- find a screen with `ScreenKey A userRoleType`.
+  -- We don't look up screens defined for aspects of a user role type.
+  aspects <- lift2MPQ (contextType ###= contextAspectsClosure)
+  typesWithScreen <- pure $ filter (\aspect -> isJust $ lookup (ScreenKey aspect userRoleType) df.screens) (cons contextType aspects)
+  case head typesWithScreen of 
+    Just typeWithScreen -> case lookup (ScreenKey typeWithScreen userRoleType) df.screens of
+      Just s -> do
+        -- Now populate the screen definition with instance data.
+        (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
+        pure $ SerialisedScreen $ writeJSON screenInstance
+      Nothing -> defaultScreen
+    Nothing -> defaultScreen
+  where 
+  defaultScreen :: MonadPerspectivesQuery SerialisedScreen
+  defaultScreen = do
+    screenInstance <- lift $ constructDefaultScreen userRoleInstance userRoleType contextInstance
+    pure $ SerialisedScreen $ writeJSON screenInstance
 
 -- | A screen with a tab for each perspective the user has in this context.
 constructDefaultScreen :: RoleInstance -> RoleType -> ContextInstance -> AssumptionTracking ScreenDefinition
