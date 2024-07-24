@@ -255,17 +255,20 @@ phase2 share authoringRole r = do
             userType <- lift $ roleType_ userId
             mUrl <- lift $ publicUrl_ userType
             case mUrl of
-              Nothing -> throwError (error $ "sendTransactie finds a user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> show userId <> "')")
+              Nothing -> throwError (error $ "A user role type that is neither the system User nor a public role: " <> show userType <> " ('" <> show userId <> "')")
               Just (Q qfd) -> do 
                 ctxt <- lift $ (userId ##>> context)
                 urlComputer <- lift $ context2propertyValue qfd
-                (Value url) <- lift (ctxt ##>> urlComputer)
-                deltas <- expandDeltas publicRoleTransaction url
-              -- These deltas for a public role aren't sent anywhere but executed
-              -- right here. Notice that no changes to local state will result from executing such a transaction.
-              -- (except that public instances will be cached)
-              -- Run embedded, do not share.
-                lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas deltas)
+                murl <- lift (ctxt ##> urlComputer)
+                case murl of 
+                  Just (Value url) -> do 
+                    deltas <- expandDeltas publicRoleTransaction url
+                  -- These deltas for a public role aren't sent anywhere but executed
+                  -- right here. Notice that no changes to local state will result from executing such a transaction.
+                  -- (except that public instances will be cached)
+                  -- Run embedded, do not share.
+                    lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas deltas)
+                  Nothing -> throwError (error $ "Cannot compute a URL to publish to for this user role type and instance: " <> show userType <> " ('" <> show userId <> "')")
               Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
           Peer _ -> pure unit
       -- Remove the deltas; we don't want to execute them again.

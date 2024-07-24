@@ -46,7 +46,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_binding, rol_context, rol_id, rol_pspType)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, AssumptionTracking, liftToInstanceLevel, (###=), (##>>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, AssumptionTracking, liftToInstanceLevel, (###=), (##>>), (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
@@ -1055,8 +1055,10 @@ getPublicUrl ctxt = do
     case publicUrl of 
       Just (Q qfd) -> do
         urlComputer <- context2propertyValue qfd
-        (Value url) <- ctxt ##>> urlComputer
-        pure $ Just $ ensureTerminalSlash url
+        murl <- ctxt ##> urlComputer
+        case murl of 
+          Just (Value url) -> pure $ Just $ ensureTerminalSlash url
+          Nothing ->  throwError (error $ "Cannot compute a URL to publish to for this user role type and context instance: " <> show r <> " ('" <> show ctxt <> "')")
       _ -> pure Nothing
 
 ensureTerminalSlash :: String -> String
