@@ -26,26 +26,29 @@ module Perspectives.TypePersistence.ContextSerialisation where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, cons, filter, head, length)
-import Data.Maybe (Maybe(..), isJust, maybe)
+import Data.Array (catMaybes, elemIndex, filter, head, length, null, filterA)
+import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, (###=))
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, MPQ, (###=))
 import Perspectives.Data.EncodableMap (lookup)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (typeUri2ModelUri_)
+import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (compileFunction)
+import Perspectives.Representation.Class.Role (perspectivesOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType)
-import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
+import Perspectives.Representation.Perspective (Perspective(..), StateSpec(..))
+import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..), WidgetCommonFieldsDef)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType(..))
+import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser', serialisePerspective)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
-import Perspectives.Types.ObjectGetters (contextAspectsClosure)
+import Perspectives.Types.ObjectGetters (allEnumeratedRoles, aspectsOfRole, contextAspectsClosure)
 import Simple.JSON (writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -55,22 +58,133 @@ derive instance newTypeSerialisedScreen :: Newtype SerialisedScreen _
 screenForContextAndUser :: RoleInstance -> RoleType -> ContextType -> (ContextInstance ~~> SerialisedScreen)
 screenForContextAndUser userRoleInstance userRoleType contextType contextInstance = do
   DomeinFile df <- lift2MPQ $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ $ unwrap contextType)
-  -- We should take aspects in consideration!
-  -- `userRoleType` may have been added as an aspect user role to `contextType`. In such a case we will never find 
-  -- a screen with the key `ScreenKey contextType userRoleType`, but (assuming the aspect added to the contextType is A) we will 
-  -- find a screen with `ScreenKey A userRoleType`.
-  -- We don't look up screens defined for aspects of a user role type.
-  aspects <- lift2MPQ (contextType ###= contextAspectsClosure)
-  typesWithScreen <- pure $ filter (\aspect -> isJust $ lookup (ScreenKey aspect userRoleType) df.screens) (cons contextType aspects)
-  case head typesWithScreen of 
-    Just typeWithScreen -> case lookup (ScreenKey typeWithScreen userRoleType) df.screens of
-      Just s -> do
-        -- Now populate the screen definition with instance data.
-        (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
-        pure $ SerialisedScreen $ writeJSON screenInstance
-      Nothing -> defaultScreen
-    Nothing -> defaultScreen
+  case lookup (ScreenKey contextType userRoleType) df.screens of
+    Just s -> populateScreen s
+    Nothing -> do 
+      -- We should take aspects in consideration!
+      -- `userRoleType` may have been added as an aspect user role to `contextType`. In such a case we will never find 
+      -- a screen with the key `ScreenKey contextType userRoleType`, but (assuming the aspect added to the contextType is A) we will 
+      -- find a screen with `ScreenKey A userRoleType`.
+      -- We don't look up screens defined for aspects of a user role type.
+      aspects <- lift2MPQ (contextType ###= contextAspectsClosure)
+      typesWithScreen <- pure $ filter (\aspect -> isJust $ lookup (ScreenKey aspect userRoleType) df.screens) aspects
+      -- TODO. ALS we een aspect scherm overnemen, dan moeten we dat nalopen.
+      case head typesWithScreen of 
+        Just typeWithScreen -> case lookup (ScreenKey typeWithScreen userRoleType) df.screens of
+          Just s -> do 
+            -- Dit kan dus niet. Wat wel kan is direct een geserialiseerd perspectief aan de WidgetCommonFieldsDef toevoegen.
+            -- dus contextualiseer het perspectief ter plekke en roep dan een variant perspectiveForContextAndUserFromId aan,
+            -- die het gecontextualiseerde perspectief inzet.
+            -- Het resultaat invoegen in WidgetCommonDieldsDef.
+            mscreen <- contextualiseScreen s 
+            case mscreen of 
+              Nothing -> defaultScreen
+              Just contextualisedScreen -> pure $ SerialisedScreen $ writeJSON contextualisedScreen
+          Nothing -> defaultScreen
+        Nothing -> defaultScreen
   where 
+  contextualiseScreen :: ScreenDefinition -> MonadPerspectivesQuery (Maybe ScreenDefinition)
+  contextualiseScreen (ScreenDefinition{title, tabs, rows, columns}) = do
+    tabs' <- emptyArrayToNothing <<< map catMaybes <$> (for tabs (traverse contextualiseTab))
+    rows' <- emptyArrayToNothing <<< map catMaybes <$> (for rows (traverse contextualiseScreenElementDef))
+    columns' <- (emptyArrayToNothing <<< map catMaybes) <$> (for columns (traverse contextualiseScreenElementDef))
+    pure $ Just $ ScreenDefinition{title, tabs: tabs', rows: rows', columns: columns'}
+  
+  emptyArrayToNothing :: forall a. Maybe (Array a) -> Maybe (Array a)
+  emptyArrayToNothing marr = case marr of 
+    Nothing -> Nothing
+    Just arr -> if null arr 
+      then Nothing
+      else Just arr
+  
+  contextualiseTab :: TabDef -> MPQ (Maybe TabDef)
+  contextualiseTab (TabDef {title, elements}) = do 
+    elements' <- catMaybes <$> (for elements contextualiseScreenElementDef)
+    if null elements'
+      then pure Nothing 
+      else pure $ Just $ TabDef {title, elements: elements'}
+  
+  contextualiseScreenElementDef :: ScreenElementDef -> MPQ (Maybe ScreenElementDef)
+  contextualiseScreenElementDef (RowElementD e) = map RowElementD <$> contextualiseRowDef e
+  contextualiseScreenElementDef (ColumnElementD e) = map ColumnElementD <$> contextualiseColumnDef e
+  contextualiseScreenElementDef (TableElementD e) = map TableElementD <$> contextualiseTableDef e
+  contextualiseScreenElementDef (FormElementD e) = map FormElementD <$> contextualiseFormDef e
+  contextualiseScreenElementDef (MarkDownElementD e) = map MarkDownElementD <$> contextualiseMarkDownDef e
+
+  contextualiseRowDef :: RowDef -> MPQ (Maybe RowDef)
+  contextualiseRowDef (RowDef elements) = do
+    elements' <- catMaybes <$> (for elements contextualiseScreenElementDef)
+    if null elements'
+      then pure Nothing
+      else pure $ Just $ RowDef elements'
+
+  contextualiseColumnDef :: ColumnDef -> MPQ (Maybe ColumnDef)
+  contextualiseColumnDef (ColumnDef elements) = do
+    elements' <- catMaybes <$> (for elements contextualiseScreenElementDef)
+    if null elements'
+      then pure Nothing 
+      else pure $ Just $ ColumnDef elements'
+
+  contextualiseTableDef :: TableDef -> MPQ (Maybe TableDef)
+  contextualiseTableDef (TableDef widgetFields) = map TableDef <$> contextualiseWidgetCommonFields widgetFields
+
+  contextualiseFormDef :: FormDef -> MPQ (Maybe FormDef)
+  contextualiseFormDef (FormDef widgetFields) = map FormDef <$> contextualiseWidgetCommonFields widgetFields
+
+  contextualiseMarkDownDef :: MarkDownDef -> MPQ (Maybe MarkDownDef)
+  contextualiseMarkDownDef md = case md of 
+    MarkDownPerspectiveDef {widgetFields, conditionProperty} -> do 
+      mwidgetFields <- contextualiseWidgetCommonFields widgetFields
+      case mwidgetFields of 
+        Just widgetFields' -> pure $ Just $ MarkDownPerspectiveDef {widgetFields: widgetFields', conditionProperty}
+        Nothing -> pure Nothing
+    _ -> pure $ Just md
+  
+  contextualiseWidgetCommonFields :: WidgetCommonFieldsDef -> MPQ (Maybe WidgetCommonFieldsDef)
+  contextualiseWidgetCommonFields wc@{perspectiveId, propertyVerbs, roleVerbs, userRole} = do
+    contextStates <- lift (map ContextState <$> (runArrayT $ getActiveStates contextInstance))
+    subjectStates <- lift (map SubjectState <$> (runArrayT $ getActiveRoleStates userRoleInstance))
+    allPerspectives <- lift2MPQ $ perspectivesOfRoleType userRole
+    perspective <- pure $ unsafePartial fromJust $ head (filter
+      (\(Perspective{id}) -> id == perspectiveId)
+      allPerspectives)
+    mperspective <- contextualisePerspective perspective
+    for mperspective (serialise contextStates subjectStates)
+    where 
+      serialise :: Array StateSpec -> Array StateSpec -> Perspective -> MPQ WidgetCommonFieldsDef
+      serialise contextStates subjectStates perspective = do 
+        serialisedPerspective <- lift $ serialisePerspective contextStates subjectStates contextInstance userRole propertyVerbs roleVerbs perspective
+        pure $ wc {perspective = Just serialisedPerspective}
+  
+  contextualisePerspective :: Perspective -> MPQ (Maybe Perspective)
+  contextualisePerspective p@(Perspective pr) = if pr.isEnumerated 
+    then do 
+      -- since the perspective is enumerated, we know there is but a single, EnumeratedRoleType in `roleTypes`.
+      roleType <- pure (unsafePartial fromJust $ head pr.roleTypes) >>= unsafePartial case _ of ENR roleType -> pure roleType
+      allRoles <- lift2MPQ (contextType ###= allEnumeratedRoles)
+      if isJust $ elemIndex roleType allRoles
+        -- The context has the roleType, probably as an aspect role.
+        then pure $ Just p 
+        -- find a role in contextType that has roleType as aspect
+        else do 
+          rolesWithAspect <- filterA 
+            (\erole -> do
+              aspects <- lift2MPQ (erole ###= aspectsOfRole)
+              pure $ isJust $ elemIndex roleType aspects)
+            allRoles
+          case head rolesWithAspect of 
+            -- No role has the type we're looking for. This perspective should not be used in the screen.
+            Nothing -> pure Nothing
+            -- This role has roleType as aspect. Contextualise the perspective.
+            Just roleWithAspect -> pure $ Just $ Perspective pr { roleTypes = [ENR roleWithAspect], displayName = show roleWithAspect }
+    -- A calculated perspective may work. We cannot say.
+    else pure $ Just p
+
+  populateScreen :: ScreenDefinition -> MonadPerspectivesQuery SerialisedScreen
+  populateScreen s = do 
+    -- Now populate the screen definition with instance data.
+    (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
+    pure $ SerialisedScreen $ writeJSON screenInstance
   defaultScreen :: MonadPerspectivesQuery SerialisedScreen
   defaultScreen = do
     screenInstance <- lift $ constructDefaultScreen userRoleInstance userRoleType contextInstance
