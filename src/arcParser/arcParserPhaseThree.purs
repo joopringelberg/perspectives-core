@@ -79,6 +79,7 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getContext, getEnumeratedRole, tryGetPerspectType)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, completeExpandedType, displayName, displayNameOfRoleType, getCalculation, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional)
+import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -542,7 +543,18 @@ handlePostponedStateQualifiedParts = do
     stateSpec2States :: AST.StateSpecification -> PhaseThree (Array StateIdentifier)
     stateSpec2States spec = case spec of
       -- Execute the effect for all subjects in the context state.
-      AST.ContextState ctx mpath -> pure [(StateIdentifier $ (maybe (unwrap ctx) (maybeQualifyWith (unwrap ctx)) mpath))]
+      -- We add aspect states here in order to accommodate aspect roles when we establish in runtime of InvertedQueries whether
+      -- they support a particular property in de context states.
+      AST.ContextState ctx mpath -> do 
+        (stateName :: String) <- pure (maybe (unwrap ctx) (maybeQualifyWith (unwrap ctx)) mpath)
+        -- Now if this is a context type, add all the aspects.
+        (mContextType :: Maybe Context) <- lift2 $ tryGetPerspectType (ContextType stateName)
+        case mContextType of 
+          Nothing -> pure [StateIdentifier stateName]
+          Just context -> do 
+            aspects <- lift2 ((ContextType stateName) ###= contextAspectsClosure)
+            pure (StateIdentifier <<< unwrap <$> (cons (ContextType stateName) aspects))
+        -- pure [(StateIdentifier $ contextType mpath)]
       -- Execute the effect for each qualifiedUser in each of the subject states.
       -- Note that the subjects in whose states we execute, do not need be the qualified users we execute for:
       -- 'do this automatically for me when you are at home' illustrates this independence.
