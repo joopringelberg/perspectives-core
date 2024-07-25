@@ -67,7 +67,7 @@ import Perspectives.Names (expandDefaultNamespaces, getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Persistent (getPerspectRol)
+import Perspectives.Persistent (getPerspectRol, saveMarkedResources)
 import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
@@ -152,7 +152,7 @@ decodeRequest f = case unwrap $ runExceptT (decode f) of
         , contextDescription: unsafeToForeign ""
         , rolDescription: Nothing
         , authoringRole: Nothing
-        , onlyOnce: false}
+        , onlyOnce: false} 
 
 
 consumeRequest :: Consumer Request MonadPerspectives Unit
@@ -678,6 +678,12 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             ctxt <- (RoleInstance subject) ##>> context
             void $ runMonadPerspectivesTransaction authoringRole (setPreferredUserRoleType ctxt [roleType])
             sendResponse (Result corrId ["true"]) setter)
+      \e -> sendResponse (Error corrId (show e)) setter
+    
+    Api.Save -> catchError 
+      (do
+        saveMarkedResources
+        sendResponse (Result corrId ["true"]) setter)
       \e -> sendResponse (Error corrId (show e)) setter
 
     Api.Unsubscribe -> unregisterSupportedEffect corrId
