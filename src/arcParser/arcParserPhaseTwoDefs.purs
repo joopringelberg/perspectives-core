@@ -139,8 +139,7 @@ evalPhaseTwo_' computation drf indexedContexts indexedRoles = evalStateT (runExc
 -- type PhaseTwo a = PhaseTwo' a Identity
 type PhaseTwo = PhaseTwo' Aff
 
--- | A Monad based on MonadPerspectives, with state that indicates whether the Subject of
--- | an Action is a Bot, and allows exceptions.
+-- | A Monad based on MonadPerspectives that allows PerspectivesErrors.
 type PhaseThree = PhaseTwo' MonadPerspectives
 
 lift2 :: forall a. MonadPerspectives a -> PhaseThree a

@@ -55,7 +55,7 @@ import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (MultiplePerspectivesErrors)
 import Perspectives.Persistence.State (getSystemIdentifier)
-import Perspectives.Query.ExpandPrefix (expandPrefix)
+import Perspectives.Query.ExpandPrefix (ensureModel, expandPrefix)
 import Perspectives.Query.ExpressionCompiler (compileExpression)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..))
 import Perspectives.Query.UnsafeCompiler (compileFunction)
@@ -63,7 +63,7 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.ResourceIdentifiers (createCuid)
-import Prelude (class Show, bind, pure, show, ($), (<<<), (<>), (>=>), (>>=))
+import Prelude (class Show, bind, discard, pure, show, void, ($), (<<<), (<>), (>=>), (>>=))
 import Simple.JSON (writeJSON)
 import Text.Parsing.Parser (ParseError)
 import Unsafe.Coerce (unsafeCoerce)
@@ -174,6 +174,7 @@ evalExpression expr roleId@(RoleInstance id) = do
       case s of 
         Left e -> pure $ show (PSPE e)
         Right parseTree' -> do 
+          lift $ lift $ void $ ensureModel parseTree'
           (t :: Either MultiplePerspectivesErrors QueryFunctionDescription) <- lift $ lift $ evalPhaseTwo' 
             (compileExpression (RDOM $ UET $ RoleInContext {context: ct, role: rt}) parseTree')
           case t of 
