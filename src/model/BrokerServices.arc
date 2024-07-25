@@ -74,6 +74,7 @@ domain model://perspectives.domains#BrokerServices
       perspective on Contracts
         view BrokerContract$External$ForAccountHolder verbs (Consult)
       perspective on PublicBrokers
+        only (Create, Fill, Remove)
         props (Name) verbs (Consult)
         in object state NoContract
           perspective on PublicBrokers >> binding >> context >> Accounts
@@ -99,12 +100,36 @@ domain model://perspectives.domains#BrokerServices
         tab "My Contracts"
           row
             table "My Contracts" Contracts
-        tab "Brokers"
+        tab "Brokers" default
           row 
             table ManagedBrokers
               only (Create, Remove)
+          row
+            markdown <## Get connected
+                      MyContexts is most useful when you connect to other people. 
+                      This installation has not yet a means to connect to others. 
+                      Move to the [[link:pub:https://perspectives.domains/cw_or3rqch6p8/#k0bal5u2vg$External|Perspectives Broker Service]] 
+                      page to get online. You will read further instructions there.
+                     >
+              when not (exists bs:MyBrokers >> PublicBrokers)
+            markdown <## Sign up to a service
+                      You cannot yet connect to peers, but a service to do so is available below.
+                      Select a row with a service (there is probably just one) by clicking it.
+                      Then, in the toolbar below, click the bolt icon. A menu will drow down.
+                      Click the "SignUp" item. 
+
+                      A little later, an icon will appear in the top left part of your screen, 
+                      indicating you can now connect with peers.
+                      >
+              when (exists bs:MyBrokers >> PublicBrokers) and (not exists bs:MyBrokers >> Contracts)
+            markdown <## You can connect to peers
+                      This installation is subscribed to a Broker Service and is able to exchange information 
+                      automatically with peers you are in contact with.
+                     >
+              when exists bs:MyBrokers >> Contracts
           row 
             table PublicBrokers
+              only (Remove)
 
 
   -- A Managed service.
@@ -183,7 +208,13 @@ domain model://perspectives.domains#BrokerServices
                     to connect to other people on MyContexts.
                     [[action: AddThisServer|Add the service]]
                    >
-            when not exists bs:MyBrokers >> Contracts
+            when not (exists bs:MyBrokers >> PublicBrokers)
+          markdown <## Service available, sign up!
+                    This service is available in your installation. However, you have not signed up to it.
+                    Move to the [[link:model://perspectives.domains#BrokerServices$MyBrokers|Broker Services Management]] 
+                    page to read how to sign up.
+                   >
+            when (exists bs:MyBrokers >> PublicBrokers) and (not exists bs:MyBrokers >> Contracts)
         row
           form "This service" External
             props (Name) verbs (Consult)
