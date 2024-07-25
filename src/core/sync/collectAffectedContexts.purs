@@ -25,7 +25,7 @@ module Perspectives.CollectAffectedContexts where
 import Control.Monad.AvarMonadAsk (modify) as AA
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
-import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, intersect, nub, null, union)
+import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (isEmpty)
@@ -728,11 +728,15 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
     -- (there may be state queries or calculated object queries that run through this segment, too, but we're not interested in them).
     -- These can be Enumerated user role instances from the same context, but also Enumerated user role instance computed by an inverted Calculated Perspective object.
     -- We can understand a calculated perspective object from another context than its users equally well as a calculated user in the context of the perspective object! 
-    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries rType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter (isPerspectiveObject states)
-    -- Then for each query: apply it to obtain users that have a perspective on the roleWithPropertyValue role.
+    -- Not all inverted queries are of interest to the current property change. We start by filtering out queries that don't mention the property at all.
+    (contextCalculations :: (Array InvertedQuery)) <- (lift $ runtimeIndexForContextQueries rType contextInstance >>= getContextQueries compileBoth <<< unwrap) >>= pure <<< filter isPerspectiveObject
+    -- Then for each query: apply it to obtain users that have a perspective on the roleWithPropertyValue role. State is being taken into consideration here,
+    -- but only for the context calculation itself. Not for the computation of the property!
     nub <<< concat <$> for contextCalculations \iq@(InvertedQuery{statesPerProperty}) -> do 
       cwus <- usersWithAnActivePerspective roleWithPropertyValue' iq
       -- Then restrict the properties of the query to `property` and `replacementProperty` and, for the users computed, apply computeProperties in order to add roleWithPropertyValue role deltas and property deltas.
+      -- Do so only when the subject state requirement of the inverted query is met by the actual state of the subjects.
+      -- (computeProperties takes care of that)
       cwus' <- pure (filter (\(Tuple context users) -> not $ null users) cwus)
       if null cwus'
         then pure unit
@@ -745,15 +749,10 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
   
   where 
     -- It must be a perspective on the right property! 
-    isPerspectiveObject :: Array StateIdentifier -> InvertedQuery -> Boolean
-    isPerspectiveObject states (InvertedQuery{forwardsCompiled, statesPerProperty}) = if isNothing forwardsCompiled
-      then supportsProperty (ENP property) states || supportsProperty (ENP replacementProperty) states
+    isPerspectiveObject :: InvertedQuery -> Boolean
+    isPerspectiveObject (InvertedQuery{forwardsCompiled, statesPerProperty}) = if isNothing forwardsCompiled
+      then (isJust $ lookup (ENP property) statesPerProperty) || (isJust $ lookup (ENP replacementProperty) statesPerProperty)
       else false
-      where
-        supportsProperty :: PropertyType -> Array StateIdentifier -> Boolean
-        supportsProperty p activeStates = case lookup p statesPerProperty of 
-          Nothing -> false
-          Just requiredStates -> not $ null $ intersect activeStates requiredStates
 
 compileBoth :: InvertedQuery -> MP InvertedQuery
 compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompiled}) = case backwardsCompiled of
