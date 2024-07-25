@@ -1358,9 +1358,9 @@ handleScreens screenEs = do
 
           where
             tab :: AST.TabE -> PhaseThree TabDef
-            tab (AST.TabE tabTitle screenElements) = do
+            tab (AST.TabE tabTitle isDefault screenElements) = do
               screenElementDefs <- traverse screenElementDef screenElements
-              pure $ TabDef {title: tabTitle, elements: (fromFoldable screenElementDefs)}
+              pure $ TabDef {title: tabTitle, isDefault, elements: (fromFoldable screenElementDefs)}
 
             row :: AST.RowE -> PhaseThree ScreenElementDef
             row (AST.RowE screenElements) = do

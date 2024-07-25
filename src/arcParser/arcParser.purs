@@ -1371,7 +1371,8 @@ screenE = withPos do
     _ -> fail "Only `tab`, `row` and `column` are allowed here. "
 
 tabE :: IP TabE
-tabE = reserved "tab" *> (TabE <$> token.stringLiteral <*> nestedBlock (defer \_ -> screenElementE))
+tabE = reserved "tab" *> (TabE <$> token.stringLiteral <*> option false (reserved "default" *> pure true) <*> nestedBlock (defer \_ -> screenElementE))
+
 
 rowE :: IP RowE
 rowE = reserved "row" *> (RowE <$> nestedBlock (defer \_ -> screenElementE))

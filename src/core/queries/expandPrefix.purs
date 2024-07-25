@@ -307,9 +307,9 @@ instance containsPrefixesColumnE :: ContainsPrefixes ColumnE where
   expandPrefix (ColumnE scrEls) = ColumnE <$> (traverse expandPrefix scrEls)
 
 instance containsPrefixesTabE :: ContainsPrefixes TabE where
-  expandPrefix (TabE title scrEls) = do
+  expandPrefix (TabE title isDefault scrEls) = do
     scrEls' <- traverse expandPrefix scrEls
-    pure $ TabE title scrEls'
+    pure $ TabE title isDefault scrEls'
 
 instance containsPrefixesScreenElement :: ContainsPrefixes ScreenElement where
   expandPrefix (RowElement r) = RowElement <$> expandPrefix r

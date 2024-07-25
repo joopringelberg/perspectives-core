@@ -25,7 +25,7 @@ module Perspectives.TypePersistence.ContextSerialisation where
 
 import Prelude
 
-import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Class (lift) 
 import Data.Array (catMaybes, elemIndex, filter, head, length, null, filterA)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
@@ -98,11 +98,11 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
       else Just arr
   
   contextualiseTab :: TabDef -> MPQ (Maybe TabDef)
-  contextualiseTab (TabDef {title, elements}) = do 
+  contextualiseTab (TabDef {title, isDefault, elements}) = do 
     elements' <- catMaybes <$> (for elements contextualiseScreenElementDef)
     if null elements'
       then pure Nothing 
-      else pure $ Just $ TabDef {title, elements: elements'}
+      else pure $ Just $ TabDef {title, isDefault, elements: elements'}
   
   contextualiseScreenElementDef :: ScreenElementDef -> MPQ (Maybe ScreenElementDef)
   contextualiseScreenElementDef (RowElementD e) = map RowElementD <$> contextualiseRowDef e
@@ -229,6 +229,7 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
             else TableElementD $ TableDef widgetCommonFields
         in TabDef
           { title: displayName
+          , isDefault: false
           , elements: [
             RowElementD (RowDef [ element ])
           ]}
@@ -276,7 +277,7 @@ instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef wh
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
   addPerspectives (TabDef r) user ctxt = do
     elements <- traverse (\a -> addPerspectives a user ctxt) r.elements
-    pure $ TabDef {title: r.title, elements}
+    pure $ TabDef {title: r.title, isDefault: r.isDefault, elements}
 
 instance addPerspectivesColumnDef  :: AddPerspectives ColumnDef where
   addPerspectives (ColumnDef cols) user ctxt = do

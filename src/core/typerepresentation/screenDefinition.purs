@@ -57,7 +57,7 @@ newtype ScreenDefinition = ScreenDefinition
   , columns :: Maybe (Array ScreenElementDef)
   }
 
-newtype TabDef = TabDef {title :: String, elements :: (Array ScreenElementDef)}
+newtype TabDef = TabDef {title :: String, isDefault :: Boolean, elements :: (Array ScreenElementDef)}
 
 data ScreenElementDef =
   RowElementD RowDef

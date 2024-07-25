@@ -150,6 +150,7 @@ perspectDef = LanguageDef
                   , "only"
                   , "except"
                   , "defaults"
+                  , "default"
                   , "selfonly"
 
                   -- States

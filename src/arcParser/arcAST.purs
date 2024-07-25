@@ -382,7 +382,9 @@ data ScreenElement =
 --------------------------------------------------------------------------------
 ---- TAB, ROW, COLUMN
 --------------------------------------------------------------------------------
-data TabE = TabE String (List ScreenElement)
+-- | The String is the tab title. 
+-- | When the Boolean is true, it is the default tab.
+data TabE = TabE String Boolean (List ScreenElement)
 newtype RowE = RowE (List ScreenElement)
 newtype ColumnE = ColumnE (List ScreenElement)
 
