@@ -1,6 +1,7 @@
-domain model://joopringelberg.nl#HyperContext
+domain model://perspectives.domains#HyperContext
   use sys for model://perspectives.domains#System
-  use ht for model://joopringelberg.nl#HyperContext
+  use ht for model://perspectives.domains#HyperContext
+  use cm for model://perspectives.domains#CouchdbManagement
 
   -------------------------------------------------------------------------------
   ---- SETTING UP
@@ -42,31 +43,47 @@ domain model://joopringelberg.nl#HyperContext
 
     user Manager filledBy sys:TheWorld$PerspectivesUsers
       perspective on Pages
-        defaults
+        all roleverbs
+        props (Title) verbs (Consult, SetPropertyValue)
+      perspective on Pages >> binding >> context >> Author
+        only (Create, Fill)
       perspective on PublicPageCollections
         defaults
+      screen
+        row
+          table Pages
+        row
+          table PublicPageCollections
 
     context Pages (relational) filledBy Page
-      on entry
-        do for Manager
-          bind currentactor to Author in binding >> context
+      state PageAvailable = exists binding
+        on entry
+          do for Manager
+            bind currentactor to Author in origin >> binding >> context
 
     context PublicPageCollections (relational) filledBy PublicPageCollection
 
   case Page
     external 
       property Title (String)
+      property ShowAllBlocks (Boolean)
 
     user Author filledBy sys:TheWorld$PerspectivesUsers
+      perspective on extern
+        props (Title, ShowAllBlocks) verbs (Consult, SetPropertyValue)
       perspective on TextBlocks
         only (Create, Remove)
         props (MD, Condition, Title) verbs (Consult, SetPropertyValue)
-        props (RawConditionResult, ShowBlock) verbs (Consult)
+        props (RawConditionResult, ShowBlock, ShowToAuthor) verbs (Consult)
       perspective on LinkedPages
         all roleverbs
         props (Title) verbs (Consult, SetPropertyValue)
+      perspective on LinkedPages >> binding >> context >> Author
+        only (Create, Fill)
 
       screen "Page Editor"
+        row
+          form External
         row
           column
             table "Text blocks" TextBlocks
@@ -85,8 +102,7 @@ domain model://joopringelberg.nl#HyperContext
           column
             markdown TextBlocks
               props (MD) verbs (Consult) 
-              -- LET OP: na de verandering is alleen ShowBlock nog nodig.
-              when ShowBlock
+              when ShowToAuthor
 
     thing TextBlocks (relational)
       property Title (String)
@@ -96,10 +112,25 @@ domain model://joopringelberg.nl#HyperContext
       property RawConditionResult = callExternal util:EvalExpression( Condition ) returns String
       property ConditionResult = RawConditionResult >> callExternal util:SelectR( "^result#(.*)" ) returns String
       property ShowBlock = (exists ConditionResult) and ConditionResult == "true"
+      property ShowToAuthor = ShowBlock or context >> extern >> ShowAllBlocks
     
     context LinkedPages (relational) filledBy (Page, PublicPage)
+      state PageAvailable = exists binding
+        on entry
+          do for Author
+            bind currentactor >> binding to Author in origin >> binding >> context
 
     user Reader (relational) filledBy sys:TheWorld$PerspectivesUsers
+      perspective on TextBlocks
+        props (MD, Condition, RawConditionResult, ConditionResult, ShowBlock) verbs (Consult)
+      screen
+        row 
+          -- Conditional read only view of blocks.
+          markdown TextBlocks
+            props (MD) verbs (Consult)
+            when ShowBlock
+    
+    user TestReader = sys:SocialMe
       perspective on TextBlocks
         props (MD, Condition, RawConditionResult, ConditionResult, ShowBlock) verbs (Consult)
       screen
@@ -115,7 +146,12 @@ domain model://joopringelberg.nl#HyperContext
     external 
       property Name (String)
     
-    user Author filledBy (sys:TheWorld$PerspectivesUsers + sys:WithCredentials)
+    user Creator = sys:SocialMe
+      perspective on Author
+        only (Create, Fill)
+        props (FirstName, LastName) verbs (Consult)
+    
+    user Author filledBy (sys:TheWorld$PerspectivesUsers + cm:BespokeDatabase$Owner)
       perspective on extern
         props (Name) verbs (Consult, SetPropertyValue)
       perspective on EntryPoint
@@ -124,15 +160,21 @@ domain model://joopringelberg.nl#HyperContext
       perspective on PublicPages
         all roleverbs
         props (Title) verbs (Consult, SetPropertyValue)
+      perspective on PublicPages >> binding >> context >> Author
+        only (Create, Fill)
       screen "Public Page Collection"
         row 
           form External
         row 
-          form EntryPoint
+          form "Entrypoint" EntryPoint
         row 
-          table PublicPages
+          table "Public Pages" PublicPages
     
     context PublicPages (relational) filledBy PublicPage
+      state PageAvailable = exists binding
+        on entry
+          do for Author
+            bind currentactor to Author in origin >> binding >> context
 
     context EntryPoint filledBy PublicPage
 
@@ -140,10 +182,13 @@ domain model://joopringelberg.nl#HyperContext
     aspect ht:Page
 
     context LinkedPages (relational) filledBy PublicPage
+      aspect ht:Page$LinkedPages
 
-    public Visitor at extern >> binder PublicPages >> context >> Author >> AuthorizedDomain = sys:SocialMe
+    public Visitor at extern >> binder PublicPages >> context >> Author >> BespokeDatabaseUrl = sys:SocialMe
       perspective on ht:Page$TextBlocks
         props (MD, Condition, RawConditionResult, ConditionResult, ShowBlock) verbs (Consult)
+      perspective on LinkedPages
+        props (Title) verbs (Consult)
       -- perspective on Author
       --   props (FirstName, LastName) verbs (Consult)
       screen
@@ -153,13 +198,7 @@ domain model://joopringelberg.nl#HyperContext
             props (MD) verbs (Consult)
             when ShowBlock
 
-    user Author
-      aspect ht:Page$Author
-      -- Notice that these are PublicPage$LinkedPages, as opposed to 
-      -- Page$LinkedPages!
-      perspective on LinkedPages
-        all roleverbs
-        props (Title) verbs (Consult, SetPropertyValue)
+    aspect user ht:Page$Author
 
     aspect thing ht:Page$TextBlocks
 
