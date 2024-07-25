@@ -216,7 +216,7 @@ domain model://perspectives.domains#CouchdbManagement
       
       perspective on BespokeDatabases
         all roleverbs
-        props (OwnerName) verbs (Consult)
+        props (OwnerName, Description) verbs (Consult)
         props (Endorsed) verbs (SetPropertyValue)
       
       perspective on Admin
@@ -460,6 +460,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     -- Owner will be an Admin of the BespokeDatabase.
     user Owner filledBy (CouchdbServer$Accounts, CouchdbServer$Admin)
+      property BespokeDatabaseUrl = context >> extern >> DatabaseLocation
       perspective on External
         props (Public, Description) verbs (Consult, SetPropertyValue)
         props (DatabaseLocation) verbs (Consult)
