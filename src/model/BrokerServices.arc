@@ -157,7 +157,8 @@ domain model://perspectives.domains#BrokerServices
       property ContractPeriod (Day)
       property GracePeriod (Day)
       property TerminationPeriod (Day)
-  
+      property ServiceDescription (MarkDown)
+        minLength = 100  
       
     user Administrator filledBy sys:TheWorld$PerspectivesUsers
       -- The credentials of Administrator for the remote RabbitMQ server.
@@ -172,18 +173,18 @@ domain model://perspectives.domains#BrokerServices
         props (FirstName, LastName) verbs (Consult)
         props (AdminUserName, AdminPassword) verbs (SetPropertyValue)
       perspective on extern
-        props (Name, Url, ManagementEndpoint, SelfRegisterEndpoint, Exchange) verbs (Consult, SetPropertyValue)
+        props (Name, Url, ManagementEndpoint, SelfRegisterEndpoint, Exchange, ServiceDescription) verbs (Consult, SetPropertyValue)
         props (PublicUrl) verbs (Consult)
 
     user Guest = sys:Me
       perspective on Administrator
         only (Fill, Create)
       perspective on extern
-        props (PublicUrl) verbs (SetPropertyValue)
+        props (PublicUrl, ServiceDescription) verbs (SetPropertyValue)
 
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Name, SelfRegisterEndpoint, PublicUrl, Url, Exchange) verbs (Consult)
+        props (Name, SelfRegisterEndpoint, PublicUrl, Url, Exchange, ServiceDescription) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
       perspective on Accounts
@@ -201,6 +202,9 @@ domain model://perspectives.domains#BrokerServices
                     a webserver that programs use to exchange messages. MyContexts
                     installations use it to synchronize information.
                    >
+        row
+          markdown External
+            props (ServiceDescription) verbs (Consult)
         row
           markdown <## Do you want to add this service?
                     This service is not yet available in your installation.

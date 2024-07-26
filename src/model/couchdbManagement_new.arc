@@ -238,7 +238,7 @@ domain model://perspectives.domains#CouchdbManagement
               --props (Name) verbs (SetPropertyValue)
           row
             table "Admins" Admin
-        tab "Repositories"
+        tab "Repositories" default
           row 
             table Repositories
         tab "Accounts"
@@ -606,7 +606,7 @@ domain model://perspectives.domains#CouchdbManagement
             form "Repository information" External
           row
             form "Administrator" Admin
-        tab "Manifests"
+        tab "Manifests" default
           row
             table Manifests
         tab "Authors"
