@@ -19,9 +19,9 @@ cd .spago
 ##### AVAR-MONADASK #####
 cd avar-monadask/
 
-rm -Rf v2.1.1
+rm -Rf v2.2.0
 
-ln -s ../../../purescript-avar-monadask v2.1.1
+ln -s ../../../purescript-avar-monadask v2.2.0
 
 cd ..
 
@@ -34,12 +34,12 @@ ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
-#### PERSPECTIVES-v2.14.0 #####
+#### PERSPECTIVES-v2.15.0 #####
 cd apitypes
 
-rm -Rf v2.14.0
+rm -Rf v2.15.0
 
-ln -s ../../../perspectives-apitypes v2.14.0
+ln -s ../../../perspectives-apitypes v2.15.0
 
 cd ..
 

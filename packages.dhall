@@ -27,7 +27,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/purescript-avar-monadask.git"
     , version =
-        "v2.1.1"
+        "v2.2.0"
     }
 
   with kishimen =
@@ -63,7 +63,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/perspectives-apitypes.git"
     , version =
-        "v2.14.0"
+        "v2.15.0"
     }
 
   with perspectives-utilities =
