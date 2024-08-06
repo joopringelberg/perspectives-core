@@ -41,7 +41,7 @@ import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalO
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (modelsDatabaseName)
+import Perspectives.Extern.Couchdb (modelsDatabaseName, updateModel)
 import Perspectives.Extern.Utilities (pdrVersion)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.ModelDependencies (sysUser)
@@ -49,6 +49,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (createDatabase, databaseInfo, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.SetupCouchdb (setContext2RoleView, setFilled2FillerView, setFiller2FilledView, setRole2ContextView)
@@ -76,6 +77,7 @@ runDataUpgrades = do
   ----------------------------------------------------------------------------------------
   runUpgrade installedVersion "0.24.1" addFixingUpdates 
   runUpgrade installedVersion "0.24.2" indexedQueries 
+  runUpgrade installedVersion "0.25.0" updateModels0250
 
 
 
@@ -130,3 +132,13 @@ indexedQueries = do
   case r of
     Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors))
     Right success -> saveMarkedResources
+
+updateModels0250 :: MonadPerspectives Unit
+updateModels0250 = runMonadPerspectivesTransaction'
+  false
+  (ENR $ EnumeratedRoleType sysUser)
+  do
+    updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BodiesWithAccounts@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#CouchdbManagement@2.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")

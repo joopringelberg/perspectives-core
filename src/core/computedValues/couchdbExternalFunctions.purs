@@ -172,7 +172,7 @@ pendingInvitations _ = try
 -- | The third argument is an array with an instance of the role ModelsInuse.
 -- | If no SemVer is given, will try to load the unversioned model (if any).
 updateModel :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-updateModel arrWithModelName arrWithDependencies versions = try 
+updateModel arrWithModelName arrWithDependencies _ = try 
   (case head arrWithModelName of
     -- fail silently
     Nothing -> pure unit
