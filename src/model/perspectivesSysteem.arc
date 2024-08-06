@@ -300,12 +300,12 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user Installer
       perspective on StartContexts
-        only (CreateAndFill)
+        only (CreateAndFill, Remove)
       perspective on IndexedContexts
-        only (Create, Fill)
+        only (Create, Fill, Remove)
         props (IndexedContexts$Name) verbs (SetPropertyValue)
       perspective on IndexedRoles
-        only (Create, Fill)
+        only (Create, Fill, Remove)
         props (IndexedRoles$Name) verbs (SetPropertyValue)
       perspective on BaseRepository
         only (CreateAndFill)
