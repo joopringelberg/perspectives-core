@@ -48,7 +48,7 @@ import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_isMe, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), AssumptionTracking, InformedAssumption(..), MP, MonadPerspectives, runMonadPerspectivesQuery, (##>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, runMonadPerspectivesQuery, (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
 import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
@@ -283,24 +283,9 @@ getFilledRoles filledContextType filledType fillerId = ArrayT $ (lift $ try $ ge
         tell $ ArrayWithoutDoubles [FilledRolesAssumption fillerId ct role]
         pure instances
 
--- NOTA BENE: this function will push an Assumption for every filled role step, even if it leads to no result.
--- So the entire filled tree on fillerId will be searched and added.
--- OBSOLETE
-getRecursivelyFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execWriterT $ depthFirst fillerId
-  where
-    depthFirst :: RoleInstance -> WriterT (Array RoleInstance) AssumptionTracking Unit
-    depthFirst rid = do 
-      r <- lift $ runArrayT $ getFilledRoles filledContextType filledType rid
-      if null r
-        then do 
-          allFilleds <- lift $ lift $ getAllFilledRoles rid
-          for_ allFilleds depthFirst
-        else tell r
-
 getRecursivelyFilledRoles' :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
 getRecursivelyFilledRoles' filledContextType filledType fillerId = ArrayT do 
-  -- As we perform a depth-first search, the same assumption may 
+  -- As we perform a depth-first search, the same assumption may occur multiple times.
   results <- lift $ nub <$> (execWriterT $ depthFirst fillerId)
   for_ results (tell <<< ArrayWithoutDoubles <<< fst)
   pure $ join (snd <$> results)
@@ -309,6 +294,7 @@ getRecursivelyFilledRoles' filledContextType filledType fillerId = ArrayT do
     depthFirst rid = do 
       Tuple rids (ArrayWithoutDoubles ass) <- lift $ runMonadPerspectivesQuery rid (getFilledRoles filledContextType filledType)
       if null rids
+      -- LET OP: nemen we de assumpties `ass` wel mee?
         -- Not found. Now see if any other filled role eventually fills an instance of filledType.
         then do 
           -- The first index of the filledRoles administration is the String representation of the type of the context of the filled role, 
@@ -316,7 +302,7 @@ getRecursivelyFilledRoles' filledContextType filledType fillerId = ArrayT do
           filledRoles <- lift $ getFilledRolesAdministration rid
           -- All these filled roles are an assumption, whether or not they lead to a result. 
           -- This is because one of them may later actually fill an instance of the filledType and then we want to know.
-          tell [(Tuple 
+          tell [Tuple ass rids, (Tuple 
             (concat (values <$> (forWithIndex filledRoles (\contextOfFilledRole filledRoles' -> 
               (keys filledRoles') <#> (\typeOfFilledRole -> FilledRolesAssumption fillerId (ContextType contextOfFilledRole) (EnumeratedRoleType typeOfFilledRole))))) )
             [])]

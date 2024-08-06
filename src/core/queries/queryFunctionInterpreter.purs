@@ -580,6 +580,8 @@ interpretSQD qfd a = case a.head of
 
       otherwise -> throwError (error $ "(head is RoleKind) No implementation in Perspectives.Query.Interpreter for " <> show qfd <> " and " <> show roleType)
 
+-- NOTE: in contrast with Perspectives.Instances.ObjectGetters.getRecursivelyFilledRoles', this function returns
+-- no result if filled role is found.
 getRecursivelyFilledRoles :: ContextType -> EnumeratedRoleType -> (RoleInstance ~~> DependencyPath)
 getRecursivelyFilledRoles filledContextType filledType fillerId = ArrayT $ execWriterT $ depthFirst fillerId (singletonPath (R fillerId))
   where
@@ -603,17 +605,6 @@ pushAssumptionsForDependencyPath dp = for_ (allPaths dp)
         rType <- lift (rid ##>> roleType)
         tell $ ArrayWithoutDoubles[FilledRolesAssumption rid cType rType]
       _ -> pure unit))
-
--- | NOTE: this function is not in use.
-getRecursivelyFilledRolesAssumptions :: Partial => ContextType -> EnumeratedRoleType -> (RoleInstance ~~> RoleInstance)
-getRecursivelyFilledRolesAssumptions filledContextType filledType fillerId = ArrayT $ do
-  paths <- runArrayT $ getRecursivelyFilledRoles filledContextType filledType fillerId
-  for_ paths pushAssumptionsForDependencyPath
-  pure (map dPathToRoleInstance paths)
-  where
-    dPathToRoleInstance :: Partial => DependencyPath -> RoleInstance
-    dPathToRoleInstance {head} = case head of
-      R rid -> rid
 
 getFillerTypeRecursively :: ADT RoleInContext -> RoleInstance ~~> DependencyPath
 getFillerTypeRecursively adt r = do 
