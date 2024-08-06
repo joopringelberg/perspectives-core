@@ -37,7 +37,7 @@ import Data.Array.Partial (head) as ARRP
 import Data.Either (Either(..))
 import Data.Foldable (for_, traverse_)
 import Data.Identity as Identity
-import Data.List (List, filterM, fromFoldable) as LIST
+import Data.List (List, filter, filterM, fromFoldable) as LIST
 import Data.Maybe (Maybe(..), fromJust, isJust, isNothing, maybe)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), indexOf)
@@ -79,7 +79,6 @@ import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getContext, getEnumeratedRole, tryGetPerspectType)
 import Perspectives.Representation.Class.Role (Role(..), allProperties, completeExpandedType, displayName, displayNameOfRoleType, getCalculation, getRole, getRoleType, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleTypeIsFunctional)
-import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.Context (Context(..)) as CTXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -484,14 +483,24 @@ compilePublicUrls = do
 
 handlePostponedStateQualifiedParts  :: PhaseThree Unit
 handlePostponedStateQualifiedParts = do
+  postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
   df@{id} <- lift $ State.gets _.dfr
   withDomeinFile
     id
     (DomeinFile df)
-    do
-      postponedStateQualifiedParts <- lift $ State.gets _.postponedStateQualifiedParts
-      for_ postponedStateQualifiedParts (unsafePartial handlePart)
+    (for_ (LIST.filter isPerspectiveContribution postponedStateQualifiedParts) (unsafePartial handlePart))
+  df' <- lift $ State.gets _.dfr
+  withDomeinFile
+    id
+    (DomeinFile df')
+    (for_ (LIST.filter (not <<< isPerspectiveContribution) postponedStateQualifiedParts) (unsafePartial handlePart))
   where
+
+    isPerspectiveContribution :: AST.StateQualifiedPart -> Boolean
+    isPerspectiveContribution (AST.R _) = true
+    isPerspectiveContribution (AST.P _) = true
+    isPerspectiveContribution (AST.SO _) = true
+    isPerspectiveContribution _ = false
 
     collectRoleInContexts :: RoleIdentification -> PhaseThree (ADT QT.RoleInContext)
     -- A single role type will result from this case, but it may be a calculated role!
@@ -548,7 +557,7 @@ handlePostponedStateQualifiedParts = do
       AST.ContextState ctx mpath -> do 
         (stateName :: String) <- pure (maybe (unwrap ctx) (maybeQualifyWith (unwrap ctx)) mpath)
         -- Now if this is a context type, add all the aspects.
-        (mContextType :: Maybe Context) <- lift2 $ tryGetPerspectType (ContextType stateName)
+        (mContextType :: Maybe CTXT.Context) <- lift2 $ tryGetPerspectType (ContextType stateName)
         case mContextType of 
           Nothing -> pure [StateIdentifier stateName]
           Just context -> do 
