@@ -158,10 +158,17 @@ domain model://perspectives.domains#CouchdbManagement
         perspective of Admin 
           perspective on extern >> binder CouchdbServers
             only (Create, Fill)
+        perspective of Accounts
+          perspective on extern >> binder CouchdbServers
+            only (Create, Fill)
         on entry
           do for Admin
             bind origin to CouchdbServers in cm:MyCouchdbApp
+          do for Accounts
+            bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Admin
+            "You now have an account with CouchdbServer {Name}"
+          notify Accounts
             "You now have an account with CouchdbServer {Name}"
 
         
@@ -327,7 +334,7 @@ domain model://perspectives.domains#CouchdbManagement
             table "Admins" Admin
           row
             table Accounts
-        tab "Repositories"
+        tab "Repositories" default
           row
             table Repositories
         tab "My databases"
@@ -663,7 +670,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (RepositoryUrl) verbs (Consult)
           row 
             table "Authors" Authors
-        tab "Manifests"
+        tab "Manifests" default
           row
             table Manifests
     
@@ -745,6 +752,21 @@ domain model://perspectives.domains#CouchdbManagement
       -- This property must be published.
       -- PDRDEPENDENCY
       property VersionToInstall (String)
+      property RecomputeVersionToInstall (Boolean)
+      
+      -- This might become a standard pattern.
+      -- It is triggered by setting RecomputeVersionToInstall to true on removing a Version.
+      state RecomputeVersion = RecomputeVersionToInstall
+        on entry
+          do for Author
+            -- However, when we enter this state, the Version role instance hasn't yet been actually removed.
+            -- We then cause this state to exit.
+            RecomputeVersionToInstall = false
+        on exit
+          do for Author
+            -- By the time the exit is evaluated, the Version role instance has been removed and HighestVersion 
+            -- evaluates to the correct value.
+            VersionToInstall = HighestVersion
     
     -- Embedded contexts are not removed automatically with their embedder!
     on exit
@@ -757,7 +779,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- Inherits credentials for the ServerUrl and RepositoryUrl, and write access to the ModelsDatabase and the InstancesDatabase of the Repository.
     user Author (relational) filledBy (Repository$Authors, Repository$Admin)
       perspective on extern
-        props (Description, IsLibrary, VersionToInstall) verbs (Consult, SetPropertyValue)
+        props (Description, IsLibrary, VersionToInstall, RecomputeVersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
         only (Create, Fill, Remove, CreateAndFill)
         props (Versions$Version, Description) verbs (Consult, SetPropertyValue)
@@ -771,7 +793,7 @@ domain model://perspectives.domains#CouchdbManagement
         create role Versions
       
       screen "Model Manifest"
-        tab "Versions"
+        tab "Versions" default
           row 
             form "This Manifest" External
           row
@@ -838,6 +860,9 @@ domain model://perspectives.domains#CouchdbManagement
               -- dit werkt
               Patch = 0
               Build = 0
+      on exit
+        do for Author
+          RecomputeVersionToInstall = true for context >> extern
 
   case VersionedModelManifest
     aspect sys:VersionedModelManifest
@@ -913,7 +938,7 @@ domain model://perspectives.domains#CouchdbManagement
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
       screen "Model version"
-        tab "Version"
+        tab "Version" default
           row
             form External
         tab "Authors"
