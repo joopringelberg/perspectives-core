@@ -182,7 +182,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
         -- else combine the verbs from all active states.
         Just verbs -> (intersect verbs $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
-    , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
+    , actions: nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     , contextTypesToCreate
     , contextType: cType
@@ -438,7 +438,7 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContex
         { roleId: (unwrap roleId)
         , objectStateBasedRoleVerbs
         , propertyValues: fromFoldable valuesAndVerbs
-        , actions: concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
+        , actions: nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
         , objectStateBasedProperties
         , publicUrl
       }
