@@ -1,65 +1,205 @@
-a5cd5c3c - 46 minutes ago, Version 2.24.0
-f13172d9 - 28 hours ago, runtimeOptions for runPDR, reCreateInstances and resetAccount. Version numbers
-aae4c2b1 - 3 days ago, Handshake on an invitation
-171e890e - 4 days ago, Fixed transaction import
-eac577db - 4 days ago, Creating an invitation
-30a8eed3 - 4 days ago, Fixed inversion of PendingInvitations
-0d35542f - 6 days ago, Only check new public key deltas in a transaction.
-018fd02c - 7 days ago, Inversion of PendingInvitations
-2025a073 - 7 days ago, Fixed version issues with recompiling repository models
-966b2195 - 7 days ago, Better serialisation of screendefinition.
-cd73cd85 - 8 days ago, From author in delta to role identifier
-ce5d5da8 - 8 days ago, Admin is now a multirole
-78dbb65f - 8 days ago, Removing old models
-bb93e09e - 8 days ago, Public keys in the models
-95075fed - 8 days ago, Fetch attachment with documentname instead of model name
-53faafe9 - 8 days ago, The author of a Delta may have the public scheme
-0e8cf911 - 10 days ago, ContextDeltas for external roles
-6d1be5fa - 10 days ago, Wrapped periodic saving task in 'try'
-55ebc47d - 12 days ago, fixed decodeDate
-673c24b9 - 13 days ago, Public keys for public contexts
-be584e7e - 2 weeks ago, Sending public keys in a transaction
-1fbbe70d - 2 weeks ago, Named roles
-9a84c831 - 3 weeks ago, Cryptographic signing of delta
-25f094e5 - 4 weeks ago, Saving local copies of DomeinFile
-13b1bda7 - 4 weeks ago, Proper handling of DomeinFile attachments
-2006a3c2 - 4 weeks ago, Handling attachments
-3f417295 - 4 weeks ago, Serializing DateTime
-bd62f68f - 4 weeks ago, Forgot to commit these files.
-e1ca0a5f - 4 weeks ago, Adding CouchdbManagement to re-create instances
-e4802e92 - 4 weeks ago, all view getters complemented with cache filtering
-b9237bcd - 4 weeks ago, Fixing database views
-a1bf3a3e - 4 weeks ago, Reading instances
-29c36bb6 - 4 weeks ago, Resource _id was equal to id
-093724aa - 4 weeks ago, Fixing minor serialization errors
-b4606f0a - 4 weeks ago, Re-creating instances
-e3305292 - 4 weeks ago, Json for Affjax
-8af8979c - 4 weeks ago, Some model changes
-5f497a0f - 4 weeks ago, Cleaning up packages
-e2a6609d - 4 weeks ago, Encode/Decode replaced by WriteForeign/ReadForeign
-138763dd - 5 weeks ago, Save models after recompilation
-45ad1e33 - 5 weeks ago, Compacter serialisation of QueryFunction
-c1dc9d38 - 5 weeks ago, Fuzzysort can now return all options
-1e685f3f - 5 weeks ago, Development and production build
-8a1e1884 - 5 weeks ago, QueryFunction serialization
-d86a42ff - 5 weeks ago, 'manual' saving in database
-276e1e8d - 7 weeks ago, Periodically saving to database
-98de250f - 7 weeks ago, Inverted query comprehension
-65e7ebb8 - 7 weeks ago, Query inversion optimalisation
-95fe8175 - 8 weeks ago, Added missing case OrElseF to interpreter
-c91f442a - 8 weeks ago, PerspectivesSysteem
-b429d1ac - 8 weeks ago, Fixed storing public perspective
-58368686 - 8 weeks ago, Fixed inversion of Individuals
-a2316446 - 8 weeks ago, Synchronizing multiple installations
-f972ca1d - 9 weeks ago, Added missing perspective on Persons
-28be88be - 9 weeks ago, Fixed inversion of Role- and ContextIndividual
-4a2607f4 - 9 weeks ago, The inversion of 'individual' steps
-99abac7e - 10 weeks ago, Improving binding test & runtime options
-90018e7a - 10 weeks ago, Several issues wrt queries and filtering
-06ed28c4 - 2 months ago, The previous way of storing inverted queries
-1a5d7384 - 2 months ago, Fixed conversion to normal form of ADT
-0b5a3509 - 2 months ago, Better test on possible binding
-de5a46fc - 3 months ago, RuntimeOptions
-2cb295a4 - 3 months ago, System model evolution
-c2b6fb7c - 3 months ago, Reading SystemParameters in PL
-33580897 - 3 months ago, Fixed: exists on a context type
+3622ae15 - 10 days ago, Tagged version v0.25.0
+0097076d - 10 days ago, default tabs for couchdbmanagement. A customizable text per brokerservice
+0358962c - 11 days ago, On evaluating an expression entered through the user interface, we should scan for types in namespaces that do not yet have a corresponding model in the installation.
+4c9e0796 - 11 days ago, Fixed filledBy clauses in PerspectivesSystem
+289cac6a - 11 days ago, A mechanism to specify a default tab in a screen layout
+27056cb7 - 11 days ago, MarkDown instructions for adding service and signing up
+ca69e042 - 11 days ago, Fixed modelling of url for a bespoke database
+136cba8d - 11 days ago, HyperText model is in working order.
+b1a2f466 - 11 days ago, Api.Save now works.
+15b26a48 - 11 days ago, Filtering inverted queries on working out how to synchronise a property change turned out to be over-restrictive.
+e5b8f1d6 - 11 days ago, On computing states for a context, to be stored in InvertedQueries, we now include aspect states. This accomodates aspect roles added as is to a context.
+4fa5087e - 12 days ago, Runtime contextualisation of a screen for an aspect user role
+6999f082 - 12 days ago, We now catch the situation that the url of a public user role cannot be computed. This gives a more informative error on the console.
+a10359c0 - 13 days ago, We now take context aspects into consideration on looking for screen definitions for a particular user role type.
+860e9ff3 - 2 weeks ago, Some comments pertaining to local and private property modifiers.
+1bef8a0d - 2 weeks ago, Clearing the query cache after model update.
+10579d72 - 2 weeks ago, Optimised type checking + error fixed
+048d4f74 - 2 weeks ago, Merge branch 'master' of https://github.com/joopringelberg/perspectives-core
+d457deb2 - 2 weeks ago, Requiring multiple types for role filling
+066d99cd - 2 weeks ago, Requiring multiple types for role filling
+730165d6 - 2 weeks ago, Small model modifications.
+2e20fe58 - 2 weeks ago, After executing the public deltas in a transaction, we remove them. There may be reasons to recursively execute phase2 again and we don't want to execute the public deltas again!
+e797e5a9 - 2 weeks ago, Before removing a public resource, we first check whether it still exists. This is because multiple public roles may store their resources in the same location and they may share the same resources.
+0f7b1b18 - 3 weeks ago, Taking overloaded fillers into account in the query interpreter. Fixed assumption gathering in getRecursivelyFilledRoles'
+98592817 - 3 weeks ago, Finally solved the problem of serialisation for Public Roles.
+6bf79283 - 3 weeks ago, Taking care of the order in which deltas are constructed, gathered and executed. On adding a new peer to a context, we now insert the serialisation of that context before the deltas that construct the peer.
+4ec78fd5 - 4 weeks ago, for_ processes right to left instead of left to right... using void $ for instead to process deltas.
+a10f5230 - 4 weeks ago, Fixed delta insertion
+d59dab75 - 5 weeks ago, Fixed addDeltasForPropertyChange
+b8f52726 - 5 weeks ago, Better handling of proxies for public roles. We now serialise the deltas for the context and its external contexts unconditionally
+406cfb38 - 5 weeks ago, On serialising a perspective, properties might be serialised twice.
+bf602202 - 5 weeks ago, Introductionary markdown text for Broker Service. Testing Perspectives Pages in TestQueries
+c03144c9 - 5 weeks ago, Markdown handling * title of screen is now optional * error messaging for markdown now includes positions * the perspective variant of markdown handles relational roles * we properly expand prefixes in markdown conditions * fixed handling indexed contexts and roles
+5919a0f6 - 5 weeks ago, Better recognition of indexed names in expressions. BrokerServices now has a standard prefix in the core.
+9b9ff08f - 6 weeks ago, MarkDown! This commit introduces a 'markdown' syntax that allow for embedding markdown in a model file. It also enables us to enter markdown text in a form and render it dynamically. Finally, rendering can be made conditional on an expression.
+6984890b - 6 weeks ago, The test on user role kind now accepts Public and PublicProxy, too.
+a360e695 - 6 weeks ago, Unfinished work on aspect binding restriction inference
+53432568 - 6 weeks ago, retrieving indexed context names is now a live query.
+cc13aa7f - 6 weeks ago, Fixed establishing whether a role represents the end user.
+cf4e2e40 - 6 weeks ago, Fixed aspect perspective contextualisation.
+dc0f7a95 - 7 weeks ago, Fixed aspect expanding and removed a superfluous definition of DomeinFileName.
+8fb4a855 - 7 weeks ago, Role test
+133dfce4 - 7 weeks ago, computing local properties
+011a7904 - 7 weeks ago, Revert persistence API to browser.
+d7e7ea4b - 7 weeks ago, Fixed error introduced by find and replace.
+8ebb379e - 7 weeks ago, This massive commit brings a further overhauled version of Abstract Data Type. It also has a completely new way of comparing types (based on the semantics of propositional logic). All applications of these comparing functions have been tested. All models compile.
+f8e73eb5 - 8 weeks ago, A completely new and well-tested version of the Abstract Data Type.
+8b79c56f - 8 weeks ago, First implementation of a new ADT
+93f4a40c - 9 weeks ago, Selfonly for property changes
+af1db1a3 - 10 weeks ago, fixed the predicate in addDeltasForPropertyChange
+1cfade6f - 10 weeks ago, InvertedQueries are now cached.
+d4dde3bd - 10 weeks ago, getRecursivelyAllFilledRoles
+cc11c63d - 10 weeks ago, We no longer compile the perspectives objects of the Visitor role; just for the VisitorProxy roles.
+9e18a44e - 10 weeks ago, A new way of synchronizing perspective properties.
+0e50133e - 2 months ago, Work on the problem of filling a role with a specialisation of what is required.
+aa8cf77c - 2 months ago, Finishing touches to creating a public version of the broker.
+50960fda - 2 months ago, executeContextDelta replace existing ContextDeltas for external roles, causing a lot of problems with signatures and keys later on.
+619ddb09 - 2 months ago, computation of properties in collectAffectedContexts in runForwardsComputation used a method that did not push Filler assumptions.
+dbad6535 - 2 months ago, Fixed the case that was missed in QueryInterpreter. Brought computation of properties more in line with the ordinary getter in UnsafeCompiler.
+04824c3c - 2 months ago, Erroneously ignored the computation of 'me' in createAndAddRoleInstance.
+f4723493 - 3 months ago, Refactoring to bring more type information to schemed and unschemed identifiers.
+cc9fc13c - 3 months ago, Removed the TransferFileParser
+8faccd06 - 3 months ago, Mostly a reversion to earlier state.
+c88f720a - 3 months ago, A better implementation of isMe.
+745dfb53 - 3 months ago, The topic for AMQP messages is now the user identifier stripped from its storage scheme.
+33bf98d1 - 3 months ago, We no longer set the connection state to false in the PDR when the Stomp broker reports an error.
+6b4e8af8 - 3 months ago, isPublicIdentifierMe gefixed
+d1b4d237 - 3 months ago, isMe now handles public identifiers correctly.
+9bb592c0 - 3 months ago, Transaction identifier cannot be based on user identifier with pub: scheme.
+1770616a - 3 months ago, Merge branch 'WhereIWantToGoTo'
+18e35dde - 3 months ago, CouchdbManagement now provides the argument to use the domain name check.
+255ef69d - 3 months ago, The domain declaration in an arc source file should match the declaration in the manifest, otherwise we will not compile.
+4e08a834 - 3 months ago, selfRegisterWithRabbitMQ returned a Boolean, but it should be a Value.
+62e42d1b - 3 months ago, Previously we excluded any inverse query result obtained from public contexts. This is too narrow. We now just exclude user role instances that have a public type.
+8b7d2d3e - 3 months ago, Final changes to make self registration work.
+3bc064c2 - 3 months ago, The serialisation user now has a last name, so there is no longer a blank entry in Contacts.
+9f156aee - 3 months ago, Adding a public broker to one's installation.
+0c4f5ae1 - 3 months ago, Make a Bespoke database public if the user says so.
+e5b2b389 - 3 months ago, Ignore inverted query results that are public identifiers.
+514aad1d - 3 months ago, Extending store inverted queries.
+1d2fad26 - 3 months ago, Added positions to the error message ContextHasNoRole
+15197977 - 3 months ago, We now have a perspective on disconnections that were initiated by others.
+693f08af - 3 months ago, Disconnecting works!
+fe97c86f - 3 months ago, model:System: we can now set the Cancelled state by hand in TheSocialEnvironment.
+276efaff - 3 months ago, SimpleChat restored.
+29b6ed93 - 3 months ago, System$Contacts are now PerspectivesUsers.
+47aeacc5 - 3 months ago, Some model changes due to me-socialme change.
+b14e6653 - 3 months ago, Tightening the screws: we now remove an entity from the list of resources to be saved only AFTER taking it from cache.
+77663422 - 3 months ago, Before decaching a public resource, we now check if it is lined up to be saved. In that case, we do not decache!
+cf5aecdb - 3 months ago, Fixed getPropertyFromTelescope: forgot to push a property assumption if nothing is found.
+9c121ad0 - 3 months ago, Deleted some unused functions to change revision of resources.
+374ac83d - 3 months ago, We now search the full chain of fillers for a property value.
+674d11fe - 3 months ago, Fixed BrokerServices
+3689ae4f - 3 months ago, We now initialize the PerspectivesUsers instance that is read from an Identity document to have isMe=true.
+6ab8ce71 - 3 months ago, Fixed small error in previous commit.
+395988a4 - 3 months ago, We may have in fact an indexed instance of a type and still create another instance
+b79fc198 - 3 months ago, Using sys:SocialMe rather than sys:Me.
+4a464e21 - 3 months ago, More informative error message when creating account fails.
+50331019 - 3 months ago, Some small refactorings actually belonging to the previous commit.
+b5400492 - 3 months ago, We now read the IdentityDocument in the function that creates the initial instances.
+4bf89c05 - 3 months ago, A previous change to connecting through AMQP was incorrect.
+28443ece - 3 months ago, Fixed getPropertyFromTelescope.
+5aff00ab - 3 months ago, Fixed the type checker
+9e583636 - 3 months ago, On finally saving resources, we catch errors per resource now.
+1fba4a2f - 3 months ago, Fixed the identities and their importing.
+23292db1 - 3 months ago, We now actually create the PerspectivesUser instance with the value that is passed in on creating an account
+b4e67eab - 3 months ago, TransactionForPeer now has perspectivesSystem
+bd6807c5 - 3 months ago, 'author' is no longer part of Transaction.
+97590404 - 3 months ago, PerspectivesUser is now in MonadPerspectivesState.
+df9c463b - 3 months ago, newtypes for PerspectivesUser and PerspectivesSystemUser
+64c22081 - 3 months ago, Fixed assumption setting in computing a property.
+6c883e21 - 3 months ago, External role aspects could be added just a little earlier in the compilation process.
+01b05c29 - 4 months ago, Aspects and renamed properties are handled well in state query inversions.
+1bd4eb1e - 4 months ago, Complete inverted query testing wrt non-aspect states
+654455c9 - 4 months ago, Refactored the entire machine that executes transactions.
+3a84f393 - 4 months ago, Disj instead of Conj over the bools that represent whether an assumption is touched by a removal!
+3864b3c9 - 4 months ago, Take a resource from the list of items to be saved right before removing it, instead of just after, makes a difference.
+0d78653d - 4 months ago, Fixed the new execution model.
+e7760048 - 4 months ago, Fixed the computation of isUntouchable.
+0eece8ee - 4 months ago, fixed dataUpgrade string replacement in model:System
+ad4f761b - 4 months ago, Fixed compiling models on the repository
+ec79cb85 - 4 months ago, Fixing model:System in the dataUpgrade for 0.22.0
+02f87a07 - 4 months ago, A screen for the Manager of TestQueries
+b14631aa - 4 months ago, Fixed model uploading and downloading
+13d1aad9 - 4 months ago, Fixed saving the inverted queries attachment of a DomeinFile in the repository.
+9e718360 - 4 months ago, Adapted models to the new notification system.
+f1a87376 - 4 months ago, Fixed error in aspect inference. An aspect without filler restriction should not contribute to the filler restriction of a role (it added EMPTY).
+8e5fef0a - 4 months ago, refactored the GetPerspective API function interface.
+d83ec4c6 - 4 months ago, We now check the clipboard when we delete a context instance.
+0f0b5f09 - 4 months ago, A new execution model
+15587c76 - 4 months ago, Removed some dead code.
+d9136df3 - 4 months ago, Some clarification in parameter naming and distinguishing filler from filled.
+60938273 - 4 months ago, Fixed inverse queries for perspectives
+34888604 - 4 months ago, Inverted query part comprehension with non-empty left inversion forward results
+90ca9794 - 4 months ago, Serialized perspective now includes to context to create in
+b4a48bd2 - 4 months ago, Further work on inverted queries in the database
+a9ba47d9 - 4 months ago, Inverted queries in the database
+e81a409e - 5 months ago, Compiler now prohibits creating a context that is not bound if it is not a RootContext.
+8c720f84 - 5 months ago, Fixed omission in Dechacheable
+ed2b75fd - 5 months ago, Not every perspective now leads to synchronisation
+d7ea836a - 5 months ago, Work on testmodels
+05956217 - 5 months ago, Refactoring automatic compilation in CouchdbManagement
+a6a72c26 - 5 months ago, Decaching
+6e246354 - 5 months ago, Tightening the relation between cache and couchdb.
+3a91b010 - 5 months ago, Work on the RabbitMQ management api
+2dfdb61a - 5 months ago, If an entity cannot be found, remove its AVar from the cache.
+8f0a5287 - 5 months ago, The automatic data upgrade is now in operation. Package version bumped to 0.24.1
+28758559 - 5 months ago, A scaffold for executing data upgrades
+709621fe - 5 months ago, Tiny module idb-keyval
+3d3fa5a2 - 5 months ago, We now re-evalutate the state of roles and contexts from which we remove dangling references.
+6a970af1 - 5 months ago, Referential integrity and the clipboard.
+baeae387 - 5 months ago, Minimal models
+cbada01e - 5 months ago, In checkBinding we now look at the transitive closure over binding
+f61cba70 - 5 months ago, A minimal model text.
+1f2cd85d - 5 months ago, Uncache public resources before changing them
+39805cae - 5 months ago, Fixing getFile
+1de043bd - 6 months ago, Various improvements of model:CouchdbManagement
+996c3535 - 6 months ago, The test on whether inverted queries were compiled was too lax.
+a75761ec - 6 months ago, Missing case in query interpreter.
+d7f43ad1 - 6 months ago, Strip the storage scheme from identifiers when building credentials in state.
+380bbcc2 - 6 months ago, Fixed silly copy errors
+eb646032 - 6 months ago, Cancelling a user
+05c40372 - 6 months ago, Retrieve credentials over the role telescope.
+515ab496 - 6 months ago, Looking up an indexed role instance came too late for initSystem
+ead1a913 - 6 months ago, The serializationuser is NOT me!
+579e3c4a - 6 months ago, Re-creating instances; creating initial instances
+0c38ff46 - 6 months ago, The 'serializationuser'
+12836251 - 6 months ago, Refactored the way indexed resources are added to state on creation
+4040581b - 6 months ago, Many changes
+d4ff622f - 6 months ago, Introducing SocialMe
+0eac193d - 6 months ago, Fixed issues in 'fills' and 'filledBy'
+bc8dba9e - 6 months ago, Unsuccesful attempt to make the Purescript accept the query interpreter.
+1b16d8d2 - 6 months ago, The problem of indexed individuals for sync
+47e51f57 - 6 months ago, Admin can now only create contract when his credentials have been entered.
+795d420b - 6 months ago, Wrong role id for AMQP topic, fixed it.
+936e8582 - 6 months ago, Only replace a revision on en entity in cache if it is newer.
+ef766c88 - 6 months ago, Now, PerspectivesUsers are the roles we should send transactions to.
+cd5d533e - 6 months ago, DynamicPropertyGetter did not add dependencies on empty results.
+a4bbacad - 6 months ago, Fixed two errors in property compilation.
+c945c2c2 - 6 months ago, A new scheme for multiple installations, where each has its own queue.
+394817fc - 6 months ago, Missing cases for addTermOnRight
+abcf40bd - 6 months ago, Minor refactoring: name shadowing resolved.
+a731333b - 6 months ago, Fixed a test file wrt the previous change and deleted an obsolete test.
+7bee2712 - 6 months ago, Boundaries for Serialise Library.
+458c97c2 - 6 months ago, Boundaries for the Utilities Library.
+a460222f - 6 months ago, Boundary functions for the Sensors Library.
+0bb12c2b - 6 months ago, Boundary functions for the RabbitMQ Library.
+9e8490c2 - 6 months ago, Boundary functions for the Files Library
+2d028275 - 6 months ago, Boundary functions for the Parsing library.
+7f8721ca - 6 months ago, A better implementation of a dynamic property getter plus error boundaries around the Couchdb library functions
+b5fcd5de - 6 months ago, A function "bottomIdentifier" for the Utilities Library.
+1cf23309 - 6 months ago, UserName property now resolves to schemed identifier of PerspectivesUser that fills System$User.
+b4ce9aa5 - 6 months ago, We can now declare a calculated role to be functional.
+6642dca1 - 6 months ago, Fixed setting the system hour clock.
+4b00f7a0 - 6 months ago, The guard in array comprehension on composing inverted queries was wrong
+225030c6 - 6 months ago, Parsing the new ranges as return type of callExternal.
+46e783d9 - 6 months ago, System Clock; Date and Time range
+f2395c40 - 6 months ago, Prefix expansion for simple expressions.
+7962ac5d - 6 months ago, On adding or subtracting a Duration, we now take its denomination into account
+981a322b - 6 months ago, Durations and date-time values
+817a82d9 - 7 months ago, Effortless onboarding (I)
+8bf1c0eb - 7 months ago, The Perspectives utilities lib now generates symbols with CUID2
+72947769 - 7 months ago, The Node debug configuration is no longer troubled by certificates
+28cd2410 - 7 months ago, package now includes idb-keyval
+a5cd5c3c - 7 months ago, Version 2.24.0

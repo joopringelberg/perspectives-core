@@ -115,8 +115,12 @@ domain model://perspectives.domains#BrokerServices
             markdown <## Sign up to a service
                       You cannot yet connect to peers, but a service to do so is available below.
                       Select a row with a service (there is probably just one) by clicking it.
-                      Then, in the toolbar below, click the bolt icon. A menu will drow down.
+                      Then, in the toolbar below, click the bolt icon. A menu will drop down.
                       Click the "SignUp" item. 
+                      
+                      ***NOTE*** that by signing up, you will share your first- and last name 
+                      with the manager of the service. He or she will be able to contact you 
+                      through MyContexts.
 
                       A little later, an icon will appear in the top left part of your screen, 
                       indicating you can now connect with peers.
@@ -124,7 +128,7 @@ domain model://perspectives.domains#BrokerServices
               when (exists bs:MyBrokers >> PublicBrokers) and (not exists bs:MyBrokers >> Contracts)
             markdown <## You can connect to peers
                       This installation is subscribed to a Broker Service and is able to exchange information 
-                      automatically with peers you are in contact with.
+                      automatically with peers you are in contact with (including the manager of this service).
                      >
               when exists bs:MyBrokers >> Contracts
           row 
