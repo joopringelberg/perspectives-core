@@ -123,12 +123,14 @@ contextE = withPos do
                 aspects <>
                 enumeratedPublicDuplicates <>
                 rolesAndContexts))))
-    else pure $ singleton $ STATE $ StateE
-      { id: (ContextState (ContextType uname) Nothing)
-      , condition: Simple $ Value pos PBool "true"
-      , stateParts: Nil
-      , subStates: Nil
-      }
+    else inSubContext uname 
+      (getCurrentContext >>= \subContext ->
+        pure $ singleton $ STATE $ StateE
+          { id: (ContextState subContext Nothing)
+          , condition: Simple $ Value pos PBool "true"
+          , stateParts: Nil
+          , subStates: Nil
+          })
   -- | Notice: uname is unqualified.
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos, public: mpublicStore}
 
