@@ -28,11 +28,13 @@ where
 
 import Control.Monad.Trans.Class (lift)
 import Data.Array (filter, filterA, foldM, head, length, null, uncons)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Traversable (for_, traverse)
 import Foreign.Object (Object, keys, values)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Checking.Authorization (roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
@@ -47,7 +49,7 @@ import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Query.ExpressionCompiler (compileExpression, makeSequence)
-import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role)
+import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, adtContext2AdtRoleInContext, domain2contextType, domain2roleType, functional, mandatory, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Representation.ADT (ADT(..), DNF, allLeavesInADT, equalsOrGeneralises_, equalsOrSpecialises_)
 import Perspectives.Representation.Class.Identifiable (identifier_)
@@ -60,7 +62,8 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
-import Perspectives.Types.ObjectGetters (externalRole, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, generalisesRoleType_)
+import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..)) as Verbs
+import Perspectives.Types.ObjectGetters (externalRole, generalisesRoleType_, hasPerspectiveOnPropertyWithVerb, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
 import Prelude (bind, discard, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>), (>>=), (||))
 
 ------------------------------------------------------------------------------------
@@ -69,6 +72,7 @@ import Prelude (bind, discard, pure, show, unit, ($), (&&), (-), (<$>), (<*>), (
 type FD = PhaseThree QueryFunctionDescription
 
 -- The user RoleType is necessary for setting inverted queries.
+-- It is also used to check whether the executing user has a sufficient perspective.
 -- The domain should be a CDOM.
 -- | The expressions in the statements are compiled and inverted as well.
 compileStatement ::
@@ -133,11 +137,16 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
   -- and CreateContext. Hence,
   -- we declare the functions to be both functional and mandatory.
   -- All inverted queries that need be created are created in this function.
-  -- TODO: Controleer of de assignment operators wel corresponderen met de toegekende Verbs.
+  -- TODO: Controleer of de assignment operators wel toegestaan zijn gegeven de perspectieven van de subjects.
   describeAssignmentStatement :: Array RoleType -> Assignment -> PhaseThree QueryFunctionDescription
   describeAssignmentStatement subjects ass = case ass of
-      RemoveRole {roleExpression} -> do
-        rle <- ensureRole subjects roleExpression
+      RemoveRole {roleExpression, start, end} -> do
+        (rle :: QueryFunctionDescription) <- ensureRole subjects roleExpression
+        -- Check for each of the subjects whether they have a sufficient perspective on the range of the role expression.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange rle))
+          (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.Remove] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit))
         pure $ UQD currentcontextDomain QF.RemoveRole rle currentcontextDomain True True
       RemoveContext {roleExpression, start, end} -> do
         rle <- ensureRole subjects roleExpression
@@ -149,12 +158,22 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           true
           (allLeavesInADT $ unsafePartial domain2roleType $ range rle)
         if isContextRole
-          then pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
+          then do 
+            -- Check for each of the subjects whether they have a sufficient perspective on the range of the role expression.
+            for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange rle))
+              (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.Delete, Verbs.Remove] (Just start) (Just end)) >>= case _ of 
+                Left e -> throwError e
+                _ -> pure unit))
+            pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
           else throwError $ NotAContextRole start end
       CreateRole {roleIdentifier, contextExpression, localName, start, end} -> do
         mnameGetterDescription <- ensureStringValue localName
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         qualifiedRoleIdentifier <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte start end
+        -- Check for each of the subjects whether they have a sufficient perspective to create the qualifiedRoleIdentifier.
+        for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.Create] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit)
         -- Because we can use CreateRole in a binding in a letA, we return a meaningful range value.
         case mnameGetterDescription of
           Nothing -> pure $ UQD 
@@ -174,13 +193,19 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             True        
       CreateContext {contextTypeIdentifier, localName, roleTypeIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
-        mnameGetterDescription <- ensureStringValue localName
+        -- The optional name for the instance (it is an expression).
+        (mnameGetterDescription :: Maybe QueryFunctionDescription) <- ensureStringValue localName
+        -- The context type to create.
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
         case roleTypeIdentifier of
           Just r -> do
+            -- Create a new instance of qualifiedRoleIdentifier to fill with the new context instance.
             (qualifiedRoleIdentifier :: RoleType) <- qualifyWithRespectTo r cte start end
             case qualifiedRoleIdentifier of
               CR calculatedType -> do
+                -- The calculation consists of retrieving instances from the database.
+                -- NOTE. I do not know how to check the perspective, here. 
+                -- I wonder whether this case arises, ever!
                 isDBQRole <- lift2 $ isDatabaseQueryRole qualifiedRoleIdentifier
                 if isDBQRole
                   then case mnameGetterDescription of
@@ -200,18 +225,25 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                       True
                       True
                   else throwError $ CannotCreateCalculatedRole calculatedType start end
-              ENR enumeratedType -> case mnameGetterDescription of
-                Nothing -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType)) True True
-                Just nameGetterDescription -> pure $ BQD
-                  originDomain
-                  (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
-                  cte
-                  nameGetterDescription
-                  (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType))
-                  True
-                  True          
+              ENR enumeratedType -> do 
+                -- Check for each of the subjects whether they have a sufficient perspective to create a context in the qualifiedRoleIdentifier.
+                for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject enumeratedType [Verbs.CreateAndFill] (Just start) (Just end)) >>= case _ of 
+                    Left e -> throwError e
+                    _ -> pure unit)
+                case mnameGetterDescription of
+                  Nothing -> pure $ UQD originDomain (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier) cte (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType)) True True
+                  Just nameGetterDescription -> pure $ BQD
+                    originDomain
+                    (QF.CreateContext qualifiedContextTypeIdentifier qualifiedRoleIdentifier)
+                    cte
+                    nameGetterDescription
+                    (RDOM (adtContext2AdtRoleInContext (unsafePartial domain2contextType (range cte)) enumeratedType))
+                    True
+                    True          
           Nothing -> do 
           -- It is an error if qualifiedContextTypeIdentifier is not a specialisation of RootContext.
+          -- As there is no role to fill, the user cannot have a perspective on it. Hence we cannot check that perspective!
+          -- In other words, any user can create a RootContext. In practice RootContexts are only used for 'apps'.
             er <- lift $ lift $ externalRole qualifiedContextTypeIdentifier
             allowed <- lift $ lift ((ENR er) `generalisesRoleType_` (ENR $ EnumeratedRoleType rootContext))
             if allowed
@@ -224,10 +256,15 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         roleQfd <- ensureRole subjects roleExpression
         mnameGetterDescription <- ensureStringValue localName
         qualifiedContextTypeIdentifier <- qualifyContextType contextTypeIdentifier start end
+        -- Check for each of the subjects whether they have a sufficient perspective on the range of the role expression.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange roleQfd))
+          (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.Fill] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit))
         case mnameGetterDescription of
           Nothing -> pure $ UQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd originDomain True True
           Just nameGetterDescription -> pure $ BQD originDomain (QF.CreateContext_ qualifiedContextTypeIdentifier) roleQfd nameGetterDescription originDomain True True
-
+      -- NOTE: it is currently not possible to specify the move action.
       Move {roleExpression, contextExpression} -> do
         rle <- ensureRole subjects roleExpression
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression >>= \qfd -> case contextExpression of
@@ -248,6 +285,10 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
             Unknown -> throwError $ MaybeNotFunctional f.start f.end bindingExpression
             False -> throwError $ NotFunctional f.start f.end bindingExpression
           else pure unit
+        -- Check for each of the subjects whether they have a sufficient perspective to fill the qualifiedRoleIdentifier.
+        for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.Fill] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit)
         -- the possible fillers of binderType (qualifiedRoleIdentifier) should be less specific (=more general) than or equal to the type of the results of binderExpression (fillers).
         qualifies <- do
           (mfillerRestriction :: Maybe (DNF RoleInContext)) <- lift $ lift (getEnumeratedRole qualifiedRoleIdentifier >>= completeDeclaredFillerRestriction >>= traverse toDisjunctiveNormalForm_)
@@ -262,43 +303,70 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           then pure $ BQD originDomain (QF.Bind qualifiedRoleIdentifier) bindings cte originDomain True True
           else throwError $ RoleDoesNotBind f.start (ENR qualifiedRoleIdentifier) (unsafePartial $ domain2roleType (range bindings))
 
-      Bind_ {bindingExpression, binderExpression} -> do
+      Bind_ {bindingExpression, binderExpression, start, end} -> do
         -- bindingExpression should result in a functional role
         (bindings :: QueryFunctionDescription) <- ensureRole subjects  bindingExpression >>= ensureFunctional bindingExpression
         -- binderExpression should result in a functional role
         (binders :: QueryFunctionDescription) <- ensureRole subjects binderExpression >>= ensureFunctional binderExpression
+        -- Check for each of the subjects whether they have a sufficient perspective on the range of the binders expression.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange binders))
+          (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.Fill] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit))
         -- Now create a function description.
         pure $ BQD originDomain QF.Bind_ bindings binders originDomain True True
 
-      Unbind f@{bindingExpression, roleIdentifier} -> do
+      Unbind f@{bindingExpression, roleIdentifier, start, end} -> do
         (bindings :: QueryFunctionDescription) <- ensureRole subjects bindingExpression
         -- the type of the binder (indicated by roleIdentifier) should be an EnumeratedRoleType 
         -- (local name should resolve w.r.t. the binders of the bindings). 
         -- We try to resolve in the model and then filter candidates on whether they bind the bindings. 
         -- If they don't, the expression has no meaning.
-        (qualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
-        pure $ UQD originDomain (QF.Unbind qualifiedRoleIdentifier) bindings originDomain True True
+        (mqualifiedRoleIdentifier :: Maybe EnumeratedRoleType) <- qualifyBinderType roleIdentifier (unsafePartial $ domain2roleType $ range bindings) f.start f.end
+        -- Check for each of the subjects whether they have a sufficient perspective to remove the filler of the qualifiedRoleIdentifier.
+        case mqualifiedRoleIdentifier of 
+          Just qualifiedRoleIdentifier -> 
+            for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.RemoveFiller] (Just start) (Just end)) >>= case _ of 
+                Left e -> throwError e
+                _ -> pure unit)
+          Nothing -> pure unit
+        pure $ UQD originDomain (QF.Unbind mqualifiedRoleIdentifier) bindings originDomain True True
 
-      Unbind_ {bindingExpression, binderExpression} -> do
+      Unbind_ {bindingExpression, binderExpression, start, end} -> do
         -- bindingExpression should result in a functional role
         (bindings :: QueryFunctionDescription) <- ensureRole subjects  bindingExpression >>= ensureFunctional bindingExpression
         -- binderExpression should result in a functional role
         (binders :: QueryFunctionDescription) <- ensureRole subjects binderExpression >>= ensureFunctional binderExpression
+        -- Check for each of the subjects whether they have a sufficient perspective on the range of the binders expression.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange binders))
+          (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.RemoveFiller] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit))
         -- Now create a function description.
         pure $ BQD originDomain QF.Unbind_ bindings binders originDomain True True
 
-      DeleteRole f@{roleIdentifier, contextExpression} -> do
+      DeleteRole f@{roleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
         (qualifiedRoleIdentifier :: EnumeratedRoleType) <- qualifyAsEnumeratedTypeWithRespectTo roleIdentifier cte f.start f.end
+        -- Check for each of the subjects whether they have a sufficient perspective to Delete the qualifiedRoleIdentifier.
+        for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.Delete] (Just start) (Just end)) >>= case _ of 
+            Left e -> throwError e
+            _ -> pure unit)
         pure $ UQD originDomain (QF.DeleteRole qualifiedRoleIdentifier) cte originDomain True True
 
       DeleteContext f@{contextRoleIdentifier, contextExpression, start, end} -> do
         (cte :: QueryFunctionDescription) <- unsafePartial constructContextGetterDescription contextExpression
-        -- TODO: it must be a ContextRole
-        (qualifiedRoleIdentifier :: RoleType) <- qualifyWithRespectTo contextRoleIdentifier cte f.start f.end
-        kindOfRole <- (lift $ lift $ roleKindOfRoleType qualifiedRoleIdentifier)
+        (qualifiedRoleType :: RoleType) <- qualifyWithRespectTo contextRoleIdentifier cte f.start f.end
+        case qualifiedRoleType of 
+          ENR qualifiedRoleIdentifier -> 
+            -- Check for each of the subjects whether they have a sufficient perspective to Delete the qualifiedRoleIdentifier.
+            for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.Delete] (Just start) (Just end)) >>= case _ of 
+                Left e -> throwError e
+                _ -> pure unit)
+          _ -> pure unit
+        kindOfRole <- (lift $ lift $ roleKindOfRoleType qualifiedRoleType)
         if kindOfRole == ContextRole
-          then pure $ UQD originDomain (QF.DeleteContext qualifiedRoleIdentifier) cte originDomain True True
+          then pure $ UQD originDomain (QF.DeleteContext qualifiedRoleType) cte originDomain True True
           else throwError $ NotAContextRole start end
 
       DeleteProperty f@{propertyIdentifier, roleExpression, start, end} -> do
@@ -306,6 +374,12 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           Nothing -> pure $ SQD originDomain (QF.DataTypeGetter QF.IdentityF) originDomain True True
           Just e -> ensureRole subjects e
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
+        -- Check for each of the subjects whether they have a sufficient perspective to Delete the property.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange roleQfd))
+          -- I assume the object of the perspective has been compiled.
+          (\object -> (lift $ lift $ unsafePartial hasPerspectiveOnPropertyWithVerb subject object qualifiedProperty Verbs.DeleteProperty) >>= if _ 
+            then pure unit
+            else throwError (UnauthorizedForProperty "Auteur" subject (ENR object) (ENP qualifiedProperty) (Verbs.DeleteProperty) (Just start) (Just end))))
         pure $ UQD originDomain (QF.DeleteProperty qualifiedProperty) roleQfd originDomain True True
 
       PropertyAssignment f@{propertyIdentifier, operator, valueExpression, roleExpression, start, end} -> do
@@ -325,6 +399,16 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           Set _ -> pure $ QF.SetPropertyValue qualifiedProperty
           AddTo _ -> pure $ QF.AddPropertyValue qualifiedProperty
           DeleteFrom _ -> pure $ QF.RemovePropertyValue qualifiedProperty
+        verb <- case operator of
+          Set _ -> pure $ Verbs.SetPropertyValue
+          AddTo _ -> pure $ Verbs.AddPropertyValue
+          DeleteFrom _ -> pure $ Verbs.RemovePropertyValue
+        -- Check for each of the subjects whether they have a sufficient perspective to apply the operator the property.
+        for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange roleQfd))
+          -- I assume the object of the perspective has been compiled.
+          (\object -> (lift $ lift $ unsafePartial hasPerspectiveOnPropertyWithVerb subject object qualifiedProperty verb) >>= if _ 
+            then pure unit
+            else throwError (UnauthorizedForProperty "Auteur" subject (ENR object) (ENP qualifiedProperty) verb (Just start) (Just end))))
         case range valueQfd of
           (VDOM r _) | r == rangeOfProperty -> pure unit
           (VDOM r _) -> throwError $ WrongPropertyRange (startOf valueExpression) (endOf valueExpression) rangeOfProperty r

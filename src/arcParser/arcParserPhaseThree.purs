@@ -1466,7 +1466,7 @@ handleScreens screenEs = do
                 Just pspve@(Perspective{id:perspectiveId}) -> do
                   if perspectiveSupportsRoleVerbs pspve (maybe [] roleVerbList2Verbs roleVerbs)
                     then pure unit
-                    else throwError (UnauthorizedForRole "Auteur" subjectRoleType objectRoleType (maybe [] roleVerbList2Verbs roleVerbs))
+                    else throwError (UnauthorizedForRole "Auteur" subjectRoleType objectRoleType (maybe [] roleVerbList2Verbs roleVerbs) (Just start') (Just end'))
                   case propsOrView, propertyVerbs of
                     -- The modeller has provided no restrictions.
                     AST.AllProperties, Universal -> pure
@@ -1488,12 +1488,13 @@ handleScreens screenEs = do
                         , roleVerbs: maybe Nothing (Just <<< roleVerbList2Verbs) roleVerbs
                         , userRole: subjectRoleType
                         }
-            checkVerbsAndProps :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyVerb -> Perspective -> RoleType -> PhaseThree Unit
-            checkVerbsAndProps allProps requiredProps propertyVerbs perspective objectRoleType = for_ (expandPropSet allProps requiredProps)
-              \requiredProp -> for propertyVerbs \requiredVerb ->
-                if perspectiveSupportsPropertyForVerb perspective requiredProp requiredVerb
-                  then pure unit
-                  else throwError (UnauthorizedForProperty "Auteur" subjectRoleType objectRoleType requiredProp requiredVerb)
+              where 
+                checkVerbsAndProps :: Array PropertyType -> ExplicitSet PropertyType -> Array PropertyVerb -> Perspective -> RoleType -> PhaseThree Unit
+                checkVerbsAndProps allProps requiredProps propertyVerbs' perspective' objectRoleType = for_ (expandPropSet allProps requiredProps)
+                  \requiredProp -> for propertyVerbs' \requiredVerb ->
+                    if perspectiveSupportsPropertyForVerb perspective' requiredProp requiredVerb
+                      then pure unit
+                      else throwError (UnauthorizedForProperty "Auteur" subjectRoleType objectRoleType requiredProp requiredVerb (Just start') (Just end'))
 
 addUserRoleGraph :: PhaseThree Unit
 addUserRoleGraph = do

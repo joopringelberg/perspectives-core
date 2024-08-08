@@ -235,6 +235,13 @@ completeExpandedFillerRestriction :: EnumeratedRole -> MP (Maybe (ExpandedADT Ro
 completeExpandedFillerRestriction = completeDeclaredFillerRestriction >=> traverse expandUnexpandedLeaves
 
 -----------------------------------------------------------
+-- GETROLEADT
+-----------------------------------------------------------
+getRoleADT :: RoleType -> MP (ADT RoleInContext)
+getRoleADT (ENR enr) = getEnumeratedRole enr >>= roleADT
+getRoleADT (CR cr) = getCalculatedRole cr >>= roleADT 
+
+-----------------------------------------------------------
 -- EXPAND ROLETYPE
 -----------------------------------------------------------
 completeExpandedRoleType :: RoleType -> MP (ExpandedADT RoleInContext)

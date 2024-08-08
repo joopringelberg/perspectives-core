@@ -209,10 +209,12 @@ compileAssignment (BQD _ QF.Bind_ binding binder _ _ _) = do
 compileAssignment (UQD _ (QF.Unbind mroleType) bindings _ _ _) = do
   (bindingsGetter :: (ContextInstance ~~> RoleInstance)) <- context2role bindings
   case mroleType of
+    -- Just remove fillers conditionless.
     Nothing -> pure
       \contextId -> do
         binders <- lift (contextId ##= bindingsGetter >=> OG.allRoleBinders)
         for_ binders removeBinding
+    -- Only remove fillers from the filled roles of type `roleType`.
     Just roleType -> do
       EnumeratedRole role <- getEnumeratedRole roleType
       pure \contextId -> do

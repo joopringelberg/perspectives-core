@@ -32,6 +32,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, (##>>), (###>>))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Instances.ObjectGetters (roleType)
+import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Role (adtOfRole, getRole)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -55,24 +56,24 @@ roleHasPerspectiveOnPropertyWithVerb subject roleInstance property verb' = do
   (unsafePartial $ hasPerspectiveOnPropertyWithVerb subject roleType' property verb') >>=
     if _
       then pure $ Right true
-      else pure $ Left $ UnauthorizedForProperty "Auteur" subject (ENR roleType') (ENP property) verb'
+      else pure $ Left $ UnauthorizedForProperty "Auteur" subject (ENR roleType') (ENP property) verb' Nothing Nothing
 
 -- | True if the user role represented by the subject argument has a perspective
 -- | on the RoleType that includes an Action with the given Verb,
 -- | OR if the subject has the aspect "sys:RootContext$RootUser"
-roleHasPerspectiveOnRoleWithVerb :: RoleType -> EnumeratedRoleType -> Array RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
-roleHasPerspectiveOnRoleWithVerb subject roleType verbs = do
+roleHasPerspectiveOnRoleWithVerb :: RoleType -> EnumeratedRoleType -> Array RoleVerb -> Maybe ArcPosition -> Maybe ArcPosition -> MonadPerspectives (Either PerspectivesError Boolean)
+roleHasPerspectiveOnRoleWithVerb subject roleType verbs mstart mend = do
   hasPerspective <- unsafePartial (roleType ###>> hasPerspectiveOnRoleWithVerbs verbs subject)
   if hasPerspective
     then pure $ Right true
-    else pure $ Left $ UnauthorizedForRole "Auteur" subject (ENR roleType) verbs
+    else pure $ Left $ UnauthorizedForRole "Auteur" subject (ENR roleType) verbs mstart mend
 
 -- | This function differs from `roleHasPerspectiveOnRoleWithVerb` in that it uses an
 -- | `authorizedRole` (second parameter). This is the role that binds the external role that we scrutinize,
 -- | or it is the Calculated role that results in external roles. It is this contextrole (or calculated role)
 -- | that the subject is authorized for.
-roleHasPerspectiveOnExternalRoleWithVerbs :: RoleType -> Maybe RoleType -> Array RoleVerb -> MonadPerspectives (Either PerspectivesError Boolean)
-roleHasPerspectiveOnExternalRoleWithVerbs subject mroleType verbs = case mroleType of
+roleHasPerspectiveOnExternalRoleWithVerbs :: RoleType -> Maybe RoleType -> Array RoleVerb -> Maybe ArcPosition -> Maybe ArcPosition -> MonadPerspectives (Either PerspectivesError Boolean)
+roleHasPerspectiveOnExternalRoleWithVerbs subject mroleType verbs mstart mend = case mroleType of
   Nothing -> do
     liftEffect $ logPerspectivesError $ Custom "roleHasPerspectiveOnExternalRoleWithVerb: no authorizedRole provided to construct external role"
     pure $ Left $ Custom "roleHasPerspectiveOnExternalRoleWithVerb: no authorizedRole provided to construct external role"
@@ -80,7 +81,7 @@ roleHasPerspectiveOnExternalRoleWithVerbs subject mroleType verbs = case mroleTy
     (hasPerspectiveWithVerb subject rt) >>=
       if _
         then pure $ Right true
-        else pure $ Left $ UnauthorizedForRole "Auteur" subject rt verbs
+        else pure $ Left $ UnauthorizedForRole "Auteur" subject rt verbs mstart mend
     where
       hasPerspectiveWithVerb :: RoleType -> RoleType -> MonadPerspectives Boolean
       hasPerspectiveWithVerb subjectType authorizedRoleType = do

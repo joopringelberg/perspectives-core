@@ -96,12 +96,12 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
     -- The subject must be allowed to change the role: they must have a perspective on it that includes:
     --  * the verb CreateAndFill, in case a context role is created;
     --  * the verb Create, in case another role is created.
-    AddRoleInstancesToContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+    AddRoleInstancesToContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
       Left e -> handleError e
       -- Takes care of PERSISTENCE of both context and role.
       Right _ -> addRoleInstanceToContext contextInstance roleType (Tuple roleInstance (Just signedDelta))
     -- NOTE: the perspective should always include the Delete verb.
-    MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+    MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
       Left e -> handleError e
       Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
     -- As the external role and the context have been constructed before (and apparently have not thrown errors) we just add the delta to the external role
@@ -114,7 +114,7 @@ executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesT
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do
   log (show deltaType <> " of " <> show filled <> " (to) " <> show filler)
   roleType' <- lift (filled ##>> roleType)
-  (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill]) >>= case _ of
+  (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
     Left e -> handleError e
     Right _ -> case deltaType of
       SetFirstBinding -> void $ setFirstBinding filled (unsafePartial $ fromJust filler) (Just signedDelta)
@@ -241,7 +241,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
         else do
           -- Check if the author has a perspective on the role to be created that includes
           -- the verb Create.
-          (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill]) >>= case _ of
+          (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
             Left e -> handleError e
             Right _ -> constructAnotherRole_
     ConstructExternalRole -> do
@@ -252,22 +252,22 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       -- PERSISTENCE is handled here.
       lift (roleType ###>> hasAspect (EnumeratedRoleType rootContext)) >>= if _
         then void $ lookupOrCreateRoleInstance roleType Nothing constructExternalRole
-        else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill]) >>= case _ of
+        else (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
           Left e -> handleError e
           Right _ -> void $ lookupOrCreateRoleInstance roleType Nothing constructExternalRole
     RemoveRoleInstance -> do
-      (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove]) >>= case _ of
+      (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
         Right _ -> for_ (toNonEmptyArray roleInstances) scheduleRoleRemoval
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     RemoveExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove]) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
         Right _ -> for_ (ContextInstance <<< deconstructBuitenRol <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)

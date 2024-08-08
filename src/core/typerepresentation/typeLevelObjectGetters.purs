@@ -60,12 +60,12 @@ import Perspectives.Representation.Class.Context (contextADT, contextRole, roleI
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Representation.Class.PersistentType (DomeinFileId, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, expandUnexpandedLeaves, getRole, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleKindOfRoleType, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, expandUnexpandedLeaves, getRole, getRoleADT, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleKindOfRoleType, toDisjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
-import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, stateSpec2StateIdentifier)
+import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec, objectOfPerspective, perspectiveSupportsOneOfRoleVerbs, perspectiveSupportsProperty, perspectiveSupportsPropertyForVerb, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier(..), ViewType, propertytype2string, roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
@@ -517,7 +517,9 @@ equalsOrSpecialisesRoleInContext left right = do
 isPerspectiveOnADT :: Partial => Perspective -> ADT RoleInContext -> MP Boolean
 isPerspectiveOnADT p adt = (objectOfPerspective p) `equalsOrGeneralisesRoleInContext` adt
 
-
+isPerspectiveOnRoleType :: Partial => Perspective -> RoleType -> MP Boolean
+isPerspectiveOnRoleType p roleType = getRoleADT roleType >>= isPerspectiveOnADT p
+  
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS
 ----------------------------------------------------------------------------------------
@@ -663,12 +665,13 @@ findPerspective subjectType criterium = execStateT f Nothing
 -- | This function tests whether a user RoleType has a perspective on an object that carries the requested PropertyType.
 -- TODO. #10 hasPerspectiveOnPropertyWithVerb should check the PropertyVerbs.
 hasPerspectiveOnPropertyWithVerb :: Partial => RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives Boolean
-hasPerspectiveOnPropertyWithVerb subjectType roleType property verb = do
-  -- adt <- getEnumeratedRole roleType >>= roleADT
-  isJust <$> findPerspective
-    subjectType
-    -- The test is: is `property` included in the collection of properties of the perspective object?
-    (allProperties <<< map roleInContext2Role <<< objectOfPerspective >=> pure <<< isJust <<< elemIndex (ENP property))
+hasPerspectiveOnPropertyWithVerb subjectType roleType property verb =
+    isJust <$> findPerspective
+      subjectType
+      (\perspective -> do 
+        a <- pure $ perspectiveSupportsPropertyForVerb perspective (ENP property) verb
+        b <- perspective `isPerspectiveOnRoleType` (ENR roleType)
+        pure (a && b))
 
 -- perspectiveSupportsProperty
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
