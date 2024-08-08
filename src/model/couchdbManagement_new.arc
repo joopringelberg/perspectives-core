@@ -23,11 +23,12 @@ domain model://perspectives.domains#CouchdbManagement
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           couchdbapp <- create context CouchdbManagementApp
+          start <- create role StartContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
-          bind couchdbapp >> extern to StartContexts in sys:MySystem
-          Name = "Couchdb Management App" for couchdbapp >> extern
+          bind_ couchdbapp >> extern to start
+          Name = "Couchdb Management App" for start
 
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -66,7 +67,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- The username should be the PerspectivesSystem$User ID.
     user Manager = sys:SocialMe
       perspective on CouchdbServers
-        only (CreateAndFill, Remove, Delete)
+        only (CreateAndFill, Remove, Delete, Create, Fill)
         props (Name) verbs (Consult)
         props (Url, CouchdbServers$CouchdbPort, AdminUserName, AdminPassword, Name) verbs (SetPropertyValue)
 
@@ -77,6 +78,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- Manager needs this perspective for others to accept Admins created in state CouchdbServers$NoAdmin.
       perspective on CouchdbServers >> binding >> context >> CouchdbServer$Admin
         only (Create, Fill)
+        props (AuthorizedDomain, Password, SpecificUserName) verbs (SetPropertyValue)
       
       screen "Couchdb Server Administration"
         row
@@ -202,14 +204,14 @@ domain model://perspectives.domains#CouchdbManagement
       action CreateRepository
         create role Repositories
 
-      perspective on extern
-        props (ServerUrl, CouchdbPort) verbs (Consult)
+      perspective on External
+        props (ServerUrl, CouchdbPort, ServerUrl) verbs (Consult)
         props (Name) verbs (SetPropertyValue, Consult)
 
       perspective on Repositories
         all roleverbs
         props (Repositories$NameSpace, AdminEndorses, IsPublic, AdminLastName) verbs (Consult)
-        props (IsPublic) verbs (SetPropertyValue)
+        props (IsPublic, NameSpace_, HasDatabases) verbs (SetPropertyValue)
         in object state WithoutExternalDatabase
           props (AdminEndorses) verbs (SetPropertyValue)
         in object state CreateDatabases
@@ -220,6 +222,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Accounts
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
+        props (Password, AuthorizedDomain) verbs (SetPropertyValue)
       
       perspective on BespokeDatabases
         all roleverbs
@@ -316,6 +319,9 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on BespokeDatabases
         only (CreateAndFill, Remove)
         props (Description) verbs (Consult, SetPropertyValue)
+      
+      perspective on BespokeDatabases >> binding >> context >> Owner
+        only (Fill)
 
       action RequestDatabase
         letA
@@ -474,7 +480,7 @@ domain model://perspectives.domains#CouchdbManagement
 
     user CBAdmin = extern >> binder BespokeDatabases >> context >> Admin
       perspective on External
-        props (DatabaseLocation, Endorsed) verbs (Consult, SetPropertyValue)
+        props (DatabaseLocation, Endorsed, DatabaseName) verbs (Consult, SetPropertyValue)
         props (BaseUrl) verbs (Consult)
       perspective on Owner
         all roleverbs
@@ -522,6 +528,8 @@ domain model://perspectives.domains#CouchdbManagement
         only (Create, Fill, RemoveFiller, Remove)
         props (SpecificUserName, Password) verbs (SetPropertyValue)
         props (FirstName, LastName, Password, UserName) verbs (Consult)
+        props (AuthorizedDomain) verbs (SetPropertyValue)
+      perspective on Authors
         props (AuthorizedDomain) verbs (SetPropertyValue)
 
     -- This role requires credentials for the ServerUrl. It 'inherits' them from its filler.
@@ -598,6 +606,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Manifests
         only (Create, Fill, Delete, Remove)
         props (Description, LocalModelName) verbs (Consult)
+        props (DomeinFileName) verbs (SetPropertyValue)
         in object state NoLocalModelName
           props (LocalModelName) verbs (SetPropertyValue)
       
@@ -654,6 +663,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Manifests
         only (Create, Fill, Delete, Remove)
         props (Description, LocalModelName) verbs (Consult)
+        props (DomeinFileName) verbs (SetPropertyValue)
         in object state NoLocalModelName
           props (LocalModelName) verbs (SetPropertyValue)
       
@@ -781,8 +791,8 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on extern
         props (Description, IsLibrary, VersionToInstall, RecomputeVersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
-        only (Create, Fill, Remove, CreateAndFill)
-        props (Versions$Version, Description) verbs (Consult, SetPropertyValue)
+        only (Create, Fill, Remove, CreateAndFill, Delete)
+        props (Versions$Version, Description, Patch, Build) verbs (Consult, SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
         props (FirstName, LastName) verbs (Consult)
@@ -810,6 +820,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepubliceerd worden?
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
+      perspective on sys:MySystem >> ModelsInUse
+        only (Fill)
+        props (ModelToRemove) verbs (SetPropertyValue)
       perspective on Versions
         props (Versions$Version, Description, VersionedModelURI, VersionedModelManifest$External$DomeinFileName, Patch, Build) verbs (Consult)
         action StartUsing
@@ -931,9 +944,11 @@ domain model://perspectives.domains#CouchdbManagement
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
         props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch) verbs (SetPropertyValue)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload) verbs (SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
+      perspective on Manifest >> context >> Versions
+        props (IsRecommended) verbs (SetPropertyValue)
       perspective on Author
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
