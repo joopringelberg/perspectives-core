@@ -17,8 +17,11 @@ domain model://perspectives.domains#System
   -- has to be created in the PDR as well. We also add the public key of the end user.
   on entry
     do for sys:PerspectivesSystem$Installer
-      bind sys:MySystem >> extern to StartContexts in sys:MySystem
-      Name = "My System" for sys:MySystem >> extern
+      letA
+        start <- create role StartContexts in sys:MySystem
+      in
+        bind_ sys:MySystem >> extern to start
+        Name = "My System" for start
 
 
         -- NOTE that the following line only compiles correctly when
@@ -256,7 +259,7 @@ domain model://perspectives.domains#System
       perspective on SystemCaches
         defaults
       perspective on SocialEnvironment
-        only (CreateAndFill)
+        only (CreateAndFill, Fill)
 
       screen "Home"
         tab "System"
@@ -300,7 +303,8 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user Installer
       perspective on StartContexts
-        only (CreateAndFill, Remove)
+        only (Create, CreateAndFill, Remove, Fill)
+        props (Name) verbs (SetPropertyValue)
       perspective on IndexedContexts
         only (Create, Fill, Remove)
         props (IndexedContexts$Name) verbs (SetPropertyValue)
@@ -310,7 +314,7 @@ domain model://perspectives.domains#System
       perspective on BaseRepository
         only (CreateAndFill)
       perspective on SocialEnvironment
-        only (CreateAndFill)
+        only (CreateAndFill, Fill)
 
     context OutgoingInvitations (relational) filledBy Invitation
 
@@ -436,7 +440,7 @@ domain model://perspectives.domains#System
       property Message (String)
     user NotifiedUser
       perspective on Notifications
-        only (Remove)
+        only (Remove, Delete)
         props (Message) verbs (Consult)
         action DeleteNotifications
           delete role Notifications
