@@ -326,22 +326,25 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
           context <- lift2 $ enumeratedRoleContextType role
           pure $ SQD currentDomain (QF.RoleIndividual (RoleInstance ident)) (RDOM (UET (RoleInContext {context, role}))) True True
         _, _ -> case currentDomain of
-          (CDOM c) -> do
-            (rts :: Array RoleType) <- if isTypeUri ident
-              then if isExternalRole ident
-                then pure [ENR $ EnumeratedRoleType ident]
-                else lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
-              else if ident == "External"
-                then case c of
-                  (ST (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
-                  (UET (ContextType cid)) -> pure [ENR (EnumeratedRoleType (cid <> "$External"))]
-                  otherwise -> throwError $ Custom ("Cannot get the external role of a compound type: " <> show otherwise)
+          (CDOM c) -> if ident == "External"
+            then do 
+              (rts :: ADT RoleInContext) <- lift2 $ externalRoleOfADT c
+              pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM rts) True True
+            else do
+              (rts :: Array RoleType) <- if isTypeUri ident
+                then if isExternalRole ident
+                  then pure [ENR $ EnumeratedRoleType ident]
+                  else lift2 $ runArrayT $ lookForRoleTypeOfADT ident c
                 else lift2 $ runArrayT $ lookForUnqualifiedRoleTypeOfADT ident c
-            case uncons rts of
-              Nothing -> throwError $ ContextHasNoRole c ident pos (endOf $ Simple s)
-              Just {head, tail} -> if null tail
-                then unsafePartial $ makeRoleGetter currentDomain head
-                else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))
+              case uncons rts of
+                Nothing -> throwError $ ContextHasNoRole c ident pos (endOf $ Simple s)
+                Just {head, tail} -> if null tail
+                  then if isExternalRole ident
+                    then do 
+                      (rts' :: ADT RoleInContext) <- lift2 $ externalRoleOfADT c
+                      pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM rts') True True
+                    else unsafePartial $ makeRoleGetter currentDomain head
+                  else throwError (NotUniquelyIdentifying pos ident (roletype2string <$> rts))
           (RDOM r) -> do
             (pts :: Array PropertyType) <- if isTypeUri ident
               then  lift2 $ runArrayT $ lookForPropertyType ident (roleInContext2Role <$> r)

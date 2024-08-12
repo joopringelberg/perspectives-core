@@ -69,7 +69,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspective
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.Query.ExpressionCompiler (compileAndDistributeStep, compileAndSaveProperty, compileAndSaveRole, compileExpression, compileStep, qualifyLocalContextName, qualifyLocalEnumeratedRoleName, qualifyLocalRoleName)
 import Perspectives.Query.Kinked (completeInversions)
-import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd, functional)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, functional, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, toDisjunctiveNormalForm, transform)

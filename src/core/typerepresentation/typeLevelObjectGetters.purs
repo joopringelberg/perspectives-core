@@ -663,7 +663,6 @@ findPerspective subjectType criterium = execStateT f Nothing
 
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 -- | This function tests whether a user RoleType has a perspective on an object that carries the requested PropertyType.
--- TODO. #10 hasPerspectiveOnPropertyWithVerb should check the PropertyVerbs.
 hasPerspectiveOnPropertyWithVerb :: Partial => RoleType -> EnumeratedRoleType -> EnumeratedPropertyType -> PropertyVerb -> MonadPerspectives Boolean
 hasPerspectiveOnPropertyWithVerb subjectType roleType property verb =
     isJust <$> findPerspective

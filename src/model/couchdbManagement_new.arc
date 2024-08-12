@@ -625,6 +625,7 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Manifests" default
           row
             table Manifests
+              props (LocalModelName, Description) verbs (Consult)
         tab "Authors"
           row
             table Authors
