@@ -39,6 +39,8 @@ import Foreign (unsafeToForeign)
 import IDBKeyVal (idbGet, idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.CoreTypes (MonadPerspectives)
+import Perspectives.DataUpgrade.PatchModels (patchModels)
+import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, updateModel)
@@ -49,6 +51,7 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (createDatabase, databaseInfo, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources)
+import Perspectives.DataUpgrade.RecompileLocalModels (recompileLocalModels) 
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
@@ -59,7 +62,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 type PDRVersion = String
 
-runDataUpgrades :: MonadPerspectives Unit
+runDataUpgrades :: MonadPerspectives Unit 
 runDataUpgrades = do
   -- Get the current version
   mcurrentVersion <- liftAff $ idbGet "CurrentPDRVersion"
@@ -78,8 +81,10 @@ runDataUpgrades = do
   runUpgrade installedVersion "0.24.1" addFixingUpdates 
   runUpgrade installedVersion "0.24.2" indexedQueries 
   runUpgrade installedVersion "0.25.0" updateModels0250
-
-
+  runUpgrade installedVersion "0.25.2" 
+    (do 
+      patchModels PDR2501.replacements
+      void recompileLocalModels)
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------

@@ -11,9 +11,10 @@ domain model://joopringelberg.nl#TestQueries
         letA
           -- This is to add an entry to the Start Contexts in System.
           app <- create context TestQueries
+          start <- create role StartContexts in sys:MySystem
         in
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Test Queries" for app >> extern
+          bind_ app >> extern to start
+          Name = "Test Queries" for start
 
   on exit
     do for sys:PerspectivesSystem$Installer

@@ -24,9 +24,8 @@ module Main
 where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
-import Control.Monad.Except (runExceptT)
 import Control.Monad.Writer (runWriterT)
-import Data.Array (catMaybes, cons, foldM)
+import Data.Array (cons, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
@@ -34,7 +33,6 @@ import Data.Map (insert)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
 import Data.Nullable (Nullable, toMaybe, toNullable)
-import Data.Traversable (for)
 import Data.Tuple (Tuple(..), fst)
 import Effect (Effect)
 import Effect.Aff (Aff, Error, Fiber, Milliseconds(..), catchError, delay, error, forkAff, joinFiber, runAff, throwError, try)
@@ -46,7 +44,6 @@ import Effect.Now (now)
 import Foreign (Foreign)
 import Foreign.Object (fromFoldable, singleton)
 import IDBKeyVal (clear, idbSet)
-import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
 import Perspectives.Api (resumeApi, setupApi)
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
@@ -67,27 +64,27 @@ import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (DatabaseName, Keys(..), PouchdbUser, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, documentsInDatabase, getViewOnDatabase, includeDocs)
+import Perspectives.Persistence.API (DatabaseName, Keys(..), PouchdbUser, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, getViewOnDatabase)
 import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, invertedQueryDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
+import Perspectives.DataUpgrade.RecompileLocalModels as RECOMPILE
 import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), StateIdentifier)
 import Perspectives.ResourceIdentifiers (takeGuid)
-import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
+import Perspectives.RunMonadPerspectivesTransaction (doNotShareWithPeers, runEmbeddedIfNecessary, runEmbeddedTransaction, runMonadPerspectivesTransaction)
 import Perspectives.RunPerspectives (runPerspectivesWithState)
 import Perspectives.SetupCouchdb (createUserDatabases)
-import Perspectives.SetupUser (reSetupUser, setupInvertedQueryDatabase, setupUser)
+import Perspectives.SetupUser (reSetupUser, setupUser)
 import Perspectives.Sync.Channel (endChannelReplication)
 import Perspectives.Sync.Transaction (UninterpretedTransactionForPeer(..))
 import Perspectives.SystemClocks (forkedSystemClocks)
-import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (*>), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
-import Simple.JSON (read) as JSON
+import Prelude (Unit, bind, discard, pure, show, unit, void, ($), (+), (-), (<), (<$>), (<<<), (<>), (>), (>=>), (>>=))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Don't do anything. runPDR will actually start the core.
@@ -709,29 +706,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
           brokerService 
           indexedResourceToCreate
           missingResource
-        runPerspectivesWithState 
-          (do
-            addAllExternalFunctions
-            modelsDb <- modelsDatabaseName
-            {rows:allModels} <- documentsInDatabase modelsDb includeDocs
-            -- As doc is still uninterpreted, we can only rely on the rows.id member of the PouchdbAllDocs record. These, however, are DomeinFileIdentifiers.
-            -- We do not have a useful test on the form of such identifiers.
-            uninterpretedDomeinFiles <- for allModels \({id, doc}) -> case JSON.read <$> doc of
-              Just (Left errs) -> (logPerspectivesError (Custom ("Cannot interpret model document as UninterpretedDomeinFile: '" <> id <> "' " <> show errs))) *> pure Nothing
-              Nothing -> logPerspectivesError (Custom ("No document retrieved for model '" <> id <> "'.")) *> pure Nothing
-              Just (Right (df :: UninterpretedDomeinFile)) -> pure $ Just df
-            clearInvertedQueriesDatabase
-            r <- runMonadPerspectivesTransaction'
-              false
-              (ENR $ EnumeratedRoleType sysUser)
-              (runExceptT (executeInTopologicalOrder (catMaybes uninterpretedDomeinFiles) recompileModel))
-            case r of
-              Left errors -> logPerspectivesError (Custom ("recompileLocalModels: " <> show errors)) *> pure false
-              Right success -> do 
-                saveMarkedResources
-                pure success
-          ) 
-          state
+        runPerspectivesWithState RECOMPILE.recompileLocalModels state
   where
     handler :: Either Error Boolean -> Effect Unit
     handler (Left e) = do
@@ -740,13 +715,6 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
     handler (Right e) = do
       logPerspectivesError $ Custom $ "Basic models recompiled!"
       callback e
-
-    clearInvertedQueriesDatabase :: MonadPerspectives Unit
-    clearInvertedQueriesDatabase = do
-      db <- invertedQueryDatabaseName
-      deleteDatabase db
-      createDatabase db
-      setupInvertedQueryDatabase
 
 
 retrieveAllCredentials :: MonadPerspectives Unit 

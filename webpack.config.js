@@ -15,11 +15,19 @@ module.exports = function(env)
       filename: "perspectives-core.js",
       path: path.join(__dirname, "dist")
     },
+    resolve: {
+      extensions: ['.js']
+    },
     watch: false,
     mode: env.target,
     target: "webworker",
     module: {
-      rules: []
+      rules: [
+        {
+          test: /\.arc/,
+          type: 'asset/source'
+        }        
+      ]
     },
     plugins: [
       new webpack.DefinePlugin({

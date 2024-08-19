@@ -11,9 +11,10 @@ domain model://joopringelberg.nl#TestBindingen
         letA
           -- This is to add an entry to the Start Contexts in System.
           app <- create context TestBindingen
+          start <- create role StartContexts in sys:MySystem
         in
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Test Bindingen" for app >> extern
+          bind_ app >> extern to start
+          Name = "Test Bindingen" for start
 
   on exit
     do for sys:PerspectivesSystem$Installer
