@@ -11,9 +11,10 @@ domain model://joopringelberg.nl#Disconnect
         letA
           -- This is to add an entry to the Start Contexts in System.
           app <- create context Disconnect
+          start <- create role StartContexts in sys:MySystem
         in
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Disconnect from peers" for app >> extern
+          bind_ app >> extern to start
+          Name = "Disconnect from peers" for start
 
   on exit
     do for sys:PerspectivesSystem$Installer

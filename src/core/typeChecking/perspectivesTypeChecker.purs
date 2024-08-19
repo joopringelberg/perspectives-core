@@ -37,12 +37,13 @@ import Perspectives.Instances.ObjectGetters (completeRuntimeType)
 import Perspectives.Parsing.Messages (PerspectivesError(..), PF, fail)
 import Perspectives.Persistent (getPerspectContext)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (DNF, equalsOrSpecialises_)
+import Perspectives.Representation.ADT (equalsOrSpecialises_)
+import Perspectives.Representation.CNF (CNF)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextAspects, contextRole, externalRole, roleInContext, userRole, position, defaultPrototype)
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (ContextType, getEnumeratedRole, getPerspectType)
-import Perspectives.Representation.Class.Role (completeDeclaredFillerRestriction, kindOfRole, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (completeDeclaredFillerRestriction, kindOfRole, toConjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
@@ -148,8 +149,8 @@ checkContext c = do
 checkBinding :: EnumeratedRoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
   -- (mrestriction :: Maybe (ExpandedADT QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeExpandedFillerRestriction
-  (mrestriction :: Maybe (DNF QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeDeclaredFillerRestriction >>= traverse toDisjunctiveNormalForm_
-  (fillerType :: DNF QT.RoleInContext) <- completeRuntimeType filler >>= toDisjunctiveNormalForm_
+  (mrestriction :: Maybe (CNF QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeDeclaredFillerRestriction >>= traverse toConjunctiveNormalForm_
+  (fillerType :: CNF QT.RoleInContext) <- completeRuntimeType filler >>= toConjunctiveNormalForm_
   case mrestriction of 
     -- restriction -> fillerType
     Just restriction -> pure (restriction `equalsOrSpecialises_` fillerType)

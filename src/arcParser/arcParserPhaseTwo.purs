@@ -271,13 +271,13 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
           restrictions <- for attrs \(FilledByAttribute bnd context) -> do 
             ebnd <- expandBinding bnd
             pure $ ST $ RoleInContext {role: EnumeratedRoleType ebnd, context}
-          pure $ EnumeratedRole $ roleUnderConstruction {binding = Just $ PROD (ARR.fromFoldable restrictions)}
+          pure $ EnumeratedRole $ roleUnderConstruction {binding = Just $ SUM (ARR.fromFoldable restrictions)}
 
       Combination attrs -> do 
         restrictions <- for attrs \(FilledByAttribute bnd context) -> do 
           ebnd <- expandBinding bnd
           pure $ ST $ RoleInContext {role: EnumeratedRoleType ebnd, context}
-        pure $ EnumeratedRole $ roleUnderConstruction {binding = Just $ SUM (ARR.fromFoldable restrictions)}
+        pure $ EnumeratedRole $ roleUnderConstruction {binding = Just $ PROD (ARR.fromFoldable restrictions)}
       -- We assume the result of expandBinding refers to an EnumeratedRoleType. This need not be so;
       -- it will be repaired in PhaseThree.
       -- Note that `context` may not yet be fully qualified.
@@ -344,16 +344,6 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
     handleParts roleName e@(EnumeratedRole roleUnderConstruction@{}) (PublicUrl calc) = do 
       expandedCalc <- expandPrefix calc
       pure $ EnumeratedRole (roleUnderConstruction {publicUrl = Just $ S expandedCalc true})
-
-
-    -- We we add roleName as another disjunct of a sum type.
-    -- Notice that we treat roles as units here; not as collections of properties!
-    addToADT :: ADT RoleInContext -> RoleInContext -> ADT RoleInContext
-    addToADT adt roleInContext = case adt of
-      s@(UET _) ->  PROD [s, UET roleInContext]
-      SUM terms -> PROD $ cons (UET roleInContext) terms
-      p@(PROD _) -> PROD [p, UET roleInContext]
-      s@(ST _) -> PROD [s, UET roleInContext]
 
     -- Insert a Property type into a Role type.
     insertPropertyInto :: Property.Property -> EnumeratedRole -> EnumeratedRole

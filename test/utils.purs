@@ -26,7 +26,7 @@ developmentRepository_ :: String
 developmentRepository_ = "http://localhost:5984/repository"
 
 couchdbHost :: String
-couchdbHost = "http://127.0.0.1"
+couchdbHost = "https://localhost"
 
 couchdbPort :: Int
 couchdbPort = 5984
@@ -36,7 +36,7 @@ runP_ username = runPerspectives username "geheim" username username couchdbHost
 -- "http://joopringelberg.nl/cbd/repository"
 
 runP :: forall a. MonadPerspectives a -> Aff a
-runP = runP_ "joopdev"
+runP = runPerspectives "dev2" "geheim" "dev2" "dev21" couchdbHost couchdbPort
 
 runTestadmin :: forall a. MonadPerspectives a -> Aff a
 runTestadmin = runP_ "testadmin"

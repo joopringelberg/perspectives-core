@@ -9,8 +9,10 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Representation.ADT (ADT(..), DNF, ExpandedADT(..), equalsOrSpecialises, expand)
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialises, expand)
+import Perspectives.Representation.CNF (CNF)
+import Perspectives.Representation.ExpandedADT (ExpandedADT(..))
+import Perspectives.Utilities (class PrettyPrint, prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, test)
 import Test.Unit.Assert (assert)
@@ -55,7 +57,7 @@ theSuite = suite "Test.Perspectives.Representation.ADT.SpecialisesADT" do
     liftAff $ assert "not (ST 1 <= ST 2)" $ not (unwrap (equalsOrSpecialises <$> expandInIdentity (ST 1) <*> expandInIdentity (ST 2)))
 
 
-showDNF :: forall a. Show a => String -> DNF a -> MonadPerspectives Unit
+showDNF :: forall a. Show a => PrettyPrint a => String -> CNF a -> MonadPerspectives Unit
 showDNF comment adt = do 
   log comment
   log $ prettyPrint adt

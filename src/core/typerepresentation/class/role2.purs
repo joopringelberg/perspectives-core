@@ -40,11 +40,13 @@ import Perspectives.Identifiers (buitenRol)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.CNF (CNF, distribute, flattenProducts)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.Context (contextADT, roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
+import Perspectives.Representation.ExpandedADT (ExpandedADT(..))
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ThreeValuedLogic (bool2threeValued, pessimistic)
@@ -135,7 +137,7 @@ declaredFillerRestriction (EnumeratedRole r) = r.binding
 
 -- | The sum of the declared types of the aspects of the role, if any, expressed as an Abstract Data Type of role in context.
 declaredAspects :: EnumeratedRole -> MP (ADT RoleInContext)
-declaredAspects (EnumeratedRole r) = SUM <$> (for r.roleAspects (map declaredType <<< getEnumeratedRole <<< roleInContext2Role))
+declaredAspects (EnumeratedRole r) = PROD <$> (for r.roleAspects (map declaredType <<< getEnumeratedRole <<< roleInContext2Role))
 
 -- | The product of the declared filler restrictions of the declared aspects of the role, expressed as an Abstract Data Type of role in context.
 -- | Notice that the product may be empty!
@@ -160,18 +162,18 @@ completeDeclaredFillerRestriction role@(EnumeratedRole r) = do
 declaredTypeWithoutFiller :: EnumeratedRole -> MP (ADT RoleInContext)
 declaredTypeWithoutFiller role@(EnumeratedRole r) = do
   aspectTypes <- declaredAspects role
-  pure $ SUM [(declaredType role), aspectTypes]
+  pure $ PROD [(declaredType role), aspectTypes]
 
 -- | The sum of the declared aspect types, the complete declared filler restriction and the aspect types.
 completeDeclaredType :: EnumeratedRole -> MP (ADT RoleInContext)
 completeDeclaredType role@(EnumeratedRole r) = do
+  -- Will be a PROD.
   aspectTypes <- declaredAspects role
-  mfr <- completeDeclaredFillerRestriction role
-  case mfr, aspectTypes of 
-    Nothing, SUM [] -> pure $ declaredType role
-    Nothing, _ -> pure $ SUM [(declaredType role), aspectTypes]
-    Just fr, SUM [] -> pure $ SUM [(declaredType role), fr]
-    Just fr, _ -> pure $ SUM [(declaredType role), fr, aspectTypes]
+  case declaredFillerRestriction role, aspectTypes of 
+    Nothing, PROD [] -> pure $ declaredType role
+    Nothing, _ -> pure $ PROD [(declaredType role), aspectTypes]
+    Just fr, PROD [] -> pure $ PROD [(declaredType role), fr]
+    Just fr, _ -> pure $ PROD [(declaredType role), fr, aspectTypes]
 
 -----------------------------------------------------------
 -- TYPE EXPANSION
@@ -194,11 +196,11 @@ expandUnexpandedLeaves = expand $ unsafePartial
       -- is either ST or UET.
       case declaredType role of 
         ST ric -> case mexpandedFiller of 
-          Nothing -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
-          Just expandedFiller -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) (cons expandedFiller expandedAspects'))
+          Nothing -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) expandedAspects')
+          Just expandedFiller -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) (cons expandedFiller expandedAspects'))
         UET ric -> case mexpandedFiller of 
-          Nothing -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
-          Just expandedFiller -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) (cons expandedFiller expandedAspects'))
+          Nothing -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) expandedAspects')
+          Just expandedFiller -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) (cons expandedFiller expandedAspects'))
 
 -- | The recursive expansion of all aspects of the ADT. NOT INCLUDING FILLERS!
 expandAspects :: ADT RoleInContext -> MP (ExpandedADT RoleInContext)
@@ -214,8 +216,8 @@ expandAspects = expand $ unsafePartial
       -- we know by construction that the declared type of a role 
       -- is either ST or UET.
       case declaredType role of 
-        ST ric -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
-        UET ric -> pure $ ECT (EST ric) (ESUM $ nub $ cons (EST a) expandedAspects')
+        ST ric -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) expandedAspects')
+        UET ric -> pure $ ECT (EST ric) (EPROD $ nub $ cons (EST a) expandedAspects')
 
 typeToRole :: ExpandedADT RoleInContext -> MP (ExpandedADT EnumeratedRole)
 typeToRole = traverse (getEnumeratedRole <<< roleInContext2Role)
@@ -254,14 +256,15 @@ completeExpandedRoleType (CR cr) = getCalculatedRole cr >>=
 -- ADT RoleInContext TO DNF
 -- NOTICE: this function can be applied only when member `completeType` of EnumeratedRoleType has been constructed in Perspectives.Parsing.Arc.PhaseThree.
 -----------------------------------------------------------
-toDisjunctiveNormalForm_ :: ADT RoleInContext -> MP (DNF RoleInContext)
-toDisjunctiveNormalForm_ adt = case adt of 
+toConjunctiveNormalForm_ :: ADT RoleInContext -> MP (CNF RoleInContext)
+toConjunctiveNormalForm_ adt = case adt of 
   ST (RoleInContext{role}) -> getEnumeratedRole role >>= pure <<< _.completeType <<< unwrap
   -- In the disjunctive normal form we have no UET.
   -- We have a tree built from EST, ECT, ESUM and EPROD.
   UET (RoleInContext{role}) -> getEnumeratedRole role >>= pure <<< _.completeType <<< unwrap
-  SUM as -> for as toDisjunctiveNormalForm_ >>= pure <<< unsafePartial flattenSums
-  PROD as -> for as toDisjunctiveNormalForm_ >>= pure <<< unsafePartial distribute
+  SUM as -> for as toConjunctiveNormalForm_ >>= pure <<< unsafePartial distribute
+  PROD as -> for as toConjunctiveNormalForm_ >>= pure <<< unsafePartial flattenProducts
+
 
 -----------------------------------------------------------
 -- CONTEXTOFADT

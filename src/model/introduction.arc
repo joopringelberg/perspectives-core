@@ -17,11 +17,12 @@ domain model://perspectives.domains#Introduction
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context IntroductionApp
+          start <- create role StartContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Introduction App" for app >> extern
+          bind_ app >> extern to start
+          Name = "Introduction App" for start
   
   on exit
     do for sys:PerspectivesSystem$Installer

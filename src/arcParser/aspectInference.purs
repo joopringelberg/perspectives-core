@@ -106,7 +106,7 @@ inferFromAspectRoles = do
           (lift $ lift $ lift $ isMandatory_ head) >>= guard
           pure head
 
-    -- TODO: beslis of en hoe de binding restrictie geexpandeerd wordt. Nu laten we het bij de declared binding.
+    -- TODO: beslis of en hoe de binding restrictie geexpandeerd wordt. Nu laten we het bij de declared binding. Momenteel wordt inferBinding niet toegepast.
     -- The restriction on role fillers is the SUM of the restrictions of the aspects (including that modelled with the role itself)
     -- Assuming we've inferred bindings for all aspects _before_ we infer bindings for the role itself, we just have to deal 
     -- with the direct aspects.

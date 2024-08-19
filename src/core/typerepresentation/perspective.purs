@@ -169,6 +169,7 @@ perspectiveSupportsRoleVerbs (Perspective{roleVerbs}) verbs = null verbs || (isJ
   (\rvs -> hasAllVerbs verbs rvs)
   (MAP.values $ unwrap roleVerbs))
 
+-- | True iff there is at least one state in which the RoleVerb is supported.
 perspectiveSupportsOneOfRoleVerbs :: Perspective -> Array RoleVerb -> Boolean
 perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.findIndex
   (\rvs -> hasOneOfTheVerbs verbs rvs)

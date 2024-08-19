@@ -65,12 +65,13 @@ import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
 import Perspectives.Persistent (getPerspectRol)
 import Perspectives.PerspectivesState (addBinding, getVariableBindings, lookupVariableBinding)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), Range, RoleInContext, domain, domain2PropertyRange, domain2contextType, domain2roleType, range, roleInContext2Role)
-import Perspectives.Representation.ADT (ADT(..), DNF, equalsOrSpecialises_)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialises_)
+import Perspectives.Representation.CNF (CNF)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier(..), getEnumeratedRole, getPerspectType, getState)
 import Perspectives.Representation.Class.Property (calculation, functional, mandatory) as PC
 import Perspectives.Representation.Class.Property (getPropertyType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, toConjunctiveNormalForm_)
 import Perspectives.Representation.Class.Role (calculation) as RC
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
@@ -968,11 +969,11 @@ getDynamicPropertyGetterFromLocalName ln adt = do
 
 getFillerTypeRecursively :: ADT RoleInContext -> RoleInstance ~~> RoleInstance
 getFillerTypeRecursively adt r = do 
-  adtDnf <- lift $ lift $ (toDisjunctiveNormalForm_ adt)
+  adtDnf <- lift $ lift $ (toConjunctiveNormalForm_ adt)
   ArrayT $ (lift $ try $ getPerspectRol r) >>=
     handlePerspectRolError' "binding" [] (depthFirst adtDnf)
   where
-  depthFirst :: DNF RoleInContext -> PerspectRol -> AssumptionTracking (Array RoleInstance)
+  depthFirst :: CNF RoleInContext -> PerspectRol -> AssumptionTracking (Array RoleInstance)
   depthFirst adtDnf role = do
     tell $ ArrayWithoutDoubles [Filler $ rol_id role]
     case rol_binding role of
@@ -982,7 +983,7 @@ getFillerTypeRecursively adt r = do
           roleDnf <- lift (getEnumeratedRole (rol_pspType bRole) >>= pure <<< _.completeType <<< unwrap)
           -- adtDnf -> roleDnf
           -- e.g. adtDnf is an aspect of roleDnf or fills it.
-          if adtDnf `equalsOrSpecialises_` roleDnf
+          if roleDnf `equalsOrSpecialises_` adtDnf
             then pure [b]
             else depthFirst adtDnf bRole
 

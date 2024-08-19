@@ -33,9 +33,9 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (catMaybes, concat, findIndex, fold, intercalate, intersect, nub, null, singleton, uncons, union)
+import Data.Array (catMaybes, findIndex, fold, intercalate, intersect, nub, singleton, union)
 import Data.Eq.Generic (genericEq)
-import Data.Foldable (class Foldable, foldMap, foldl, foldlDefault, foldrDefault)
+import Data.Foldable (class Foldable, foldMap, foldlDefault, foldrDefault)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Monoid.Conj (Conj(..))
@@ -45,8 +45,10 @@ import Data.Set (fromFoldable, subset) as SET
 import Data.Traversable (class Traversable, sequenceDefault, traverse)
 import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.Representation.CNF (CNF, DPROD(..), DSUM(..), toConjunctiveNormalForm)
+import Perspectives.Representation.ExpandedADT (ExpandedADT(..), foldMapExpandedADT)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, bind, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<*>), (<<<), (<>), (>>=))
+import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<<<), (<>), (>>=))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 --------------------------------------------------------------------------------------------------
@@ -132,104 +134,6 @@ instance (ReadForeign a) => ReadForeign (ADT a) where
   readImpl f = map variantToGenericSum (readImpl f)
 
 --------------------------------------------------------------------------------------------------
----- EXPANDED ADT
---------------------------------------------------------------------------------------------------
-data ExpandedADT a = 
-  EST a 
-  -- The first (ExpandedADT a) functions as a label and is understood to be an ST value.
-  | ECT (ExpandedADT a) (ExpandedADT a)
-  | ESUM (Array (ExpandedADT a)) 
-  | EPROD (Array (ExpandedADT a)) 
-
-derive instance Generic (ExpandedADT a) _
-
-instance (Eq a) => Eq (ExpandedADT a) where
-  eq b1 b2 = genericEq b1 b2
-
-derive instance (Ord a) => Ord (ExpandedADT a)
-
-instance Functor ExpandedADT where
-  map f (EST a) = EST $ f a
-  map f (ECT label a) = ECT (map f label) (map f a)
-  map f (ESUM adts) = ESUM (map (map f) adts)
-  map f (EPROD adts) = EPROD (map (map f) adts)
-
--- The foldmap function of this Foldable instance folds over SUM and PROD in the same way.
--- For a function that does justice to the notion of `sum` and `product`, see foldMapADT.
-instance Foldable ExpandedADT where
-  foldMap f adt = case adt of 
-    EST a -> f a
-    ECT label a -> foldMap f a <> foldMap f a
-    EPROD as -> fold (foldMap f <$> as)
-    ESUM as -> fold (foldMap f <$> as)
-  foldr a = foldrDefault a
-  foldl a = foldlDefault a
-
-instance Traversable ExpandedADT where
-  traverse f adt = case adt of
-    EST a -> EST <$> f a
-    ECT label a -> ECT <$> traverse f label <*> traverse f a
-    EPROD as -> EPROD <$> (traverse (traverse f) as)
-    ESUM as -> ESUM <$> (traverse (traverse f) as)
-  sequence a = sequenceDefault a
-
-instance (Show a) => Show (ExpandedADT a) where
-  show (EST a) = "(" <> "EST" <> " " <> show a <> ")"
-  show (ECT label a) = "(" <> "ECT " <> show label <> " " <> show a <> ")"
-  show (ESUM adts) = "(" <> "ESUM" <> show adts <> ")"
-  show (EPROD adts) = "(" <> "EPROD" <> show adts <> ")"
-
-instance (Show a) => PrettyPrint (ExpandedADT a) where 
-  prettyPrint' t a@(EST _) = t <> show a
-  prettyPrint' t (ECT label a) = t <> "(ECT " <> show label <> "\n" <> prettyPrint' (t <> "  ") a <> ")"
-  prettyPrint' t (EPROD terms) = t <> "(EPROD [\n" <> (intercalate ",\n" $ prettyPrint' (t <> "  ") <$> terms) <> "\n" <> t <> "  ])"
-  prettyPrint' t (ESUM terms) = t <> "(ESUM [\n" <> (intercalate ",\n" $ prettyPrint' (t <> "  ") <$> terms) <> "\n" <> t <> "  ])"
-
--- | This function is like Foldable foldMap, but it folds with Conj over PROD and with Disj over SUM.
-foldMapExpandedADT :: forall a h. HeytingAlgebra h => (a -> h) -> ExpandedADT a -> h
-foldMapExpandedADT f adt = case adt of
-  EST a -> f a
-  ECT label a -> foldMapExpandedADT f a
-  EPROD as -> unwrap $ fold (Conj <<< foldMapExpandedADT f <$> as)
-  ESUM as -> unwrap $ fold (Disj <<< foldMapExpandedADT f <$> as)
-
--- The traverse function of the Traversable instance of ADT cannot change the structure of the
--- tree that describes a type. The function that traverses over the structure applies just to values 
--- contained in the structure.
--- `expand` is like traverse, but the function used to expand applies to the leaves of the tree, 
--- not just to the values contained in them. This makes it possible to 
---    * expand a leaf into a subtree (UET to CT);
---    * change one leaf type into another (UET to ST being the prime example)
-expand :: forall a m. Applicative m => Ord a => (ADT a -> m (ExpandedADT a)) -> ADT a -> m (ExpandedADT a)
-expand f adt = case adt of
-  a@(ST _) -> f a
-  a@(UET _) -> f a
-  PROD as -> EPROD <<< nub <$> (traverse (expand f) as)
-  SUM as -> ESUM <<< nub <$> (traverse (expand f) as)
-
--- | Like expand, but returns an ADT.
-transform :: forall a m. Applicative m => (ADT a -> m (ADT a)) -> ADT a -> m (ADT a)
-transform f adt = case adt of
-  a@(ST _) -> f a
-  a@(UET _) -> f a
-  PROD as -> PROD <$> (traverse (transform f) as)
-  SUM as -> SUM <$> (traverse (transform f) as)
-
--- | Like expand, but with the added possibility of reducing a node to Nothing.
--- | NOTE: the result is not an ExpandedADT; just ADT.
-expandAndReduce :: forall a m. Bind m => Applicative m => (ADT a -> m (Maybe (ADT a))) -> ADT a -> m (Maybe (ADT a))
-expandAndReduce f adt = case adt of
-  a@(ST _) -> f a
-  a@(UET _) -> f a
-  -- PROD as -> Just <<< PROD <<< catMaybes <$> (traverse (expandAndReduce f) as)
-  PROD as -> traverse (expandAndReduce f) as >>= \r -> case catMaybes r of 
-    [] -> pure Nothing
-    terms -> pure $ Just $ PROD terms
-  SUM as -> (traverse (expandAndReduce f) as) >>= \r -> case catMaybes r of
-    [] -> pure Nothing
-    terms -> pure $ Just $ SUM terms
-
---------------------------------------------------------------------------------------------------
 ---- HARRAY: AN ARRAY THAT HAS AN INSTANCE OF HEYTINGALGEBRA
 --------------------------------------------------------------------------------------------------
 data HArray a = HArray (Array a) | Everything
@@ -239,23 +143,27 @@ fromHArray (HArray a) = a
 
 -- This instance allows us to create Conj and Disj instances of HArray - both monoids.
 -- Those instances allow us to use foldMap to fold HAarray instances under either union or intersection.
--- We only need ff and tt to be able to implement mempty for the Monoid instances of Conj and Disj,
+-- We only need tt and ff to be able to implement mempty for the Monoid instances of Conj and Disj respectively,
 -- and conj and disj to implement append for the Semigroup instances of Conj and Disj.
 -- An HArray constructed with conj or disj will not have duplicates.
 instance (Ord a, Eq a) => HeytingAlgebra (HArray a) where
-  ff = HArray []
+  -- ff is used to implement mempty for the Disj Monoid.
+  ff = Everything
   -- It would be reasonable to have tt be Everything.
   -- However, we cannot handle that in practice. We never want Everything in our computation.
-  tt = Everything
+  -- tt is used to implement mempty for the Conj Monoid. 
+  tt = HArray []
   -- tt = HArray []
   conj l r = case l, r of
-    (HArray a), (HArray b) -> HArray (intersect (nub a) b)
-    (HArray a), Everything -> HArray $ nub a
-    Everything, (HArray b) -> HArray $ nub b
+    (HArray a), (HArray b) -> HArray (union (nub a) b)
+    (HArray a), Everything -> Everything
+    Everything, (HArray b) -> Everything
     Everything, Everything -> Everything
   disj l r = case l, r of
-    (HArray a), (HArray b) -> HArray (union (nub a) b)
-    _, _ -> Everything
+    (HArray a), (HArray b) -> HArray (intersect (nub a) b)
+    (HArray a), Everything -> HArray (nub a)
+    Everything, (HArray b) -> HArray (nub b)
+    Everything, Everything -> Everything
   not a = case a of 
     Everything -> HArray []
     _ -> Everything
@@ -305,73 +213,43 @@ allLeavesInExpandedADT :: forall a. Eq a => Ord a => ExpandedADT a -> Array a
 allLeavesInExpandedADT = foldMap singleton
 
 --------------------------------------------------------------------------------------------------
----- DISJUNCTIVE NORMAL FORM
+---- EXPANDING ADT
 --------------------------------------------------------------------------------------------------
-data DNF a = 
-  DST a 
-  | DSUM (Array (DNF a)) 
-  | DPROD (Array (DNF a)) 
+-- The traverse function of the Traversable instance of ADT cannot change the structure of the
+-- tree that describes a type. The function that traverses over the structure applies just to values 
+-- contained in the structure.
+-- `expand` is like traverse, but the function used to expand applies to the leaves of the tree, 
+-- not just to the values contained in them. This makes it possible to 
+--    * expand a leaf into a subtree (UET to CT);
+--    * change one leaf type into another (UET to ST being the prime example)
+expand :: forall a m. Applicative m => Ord a => (ADT a -> m (ExpandedADT a)) -> ADT a -> m (ExpandedADT a)
+expand f adt = case adt of
+  a@(ST _) -> f a
+  a@(UET _) -> f a
+  PROD as -> EPROD <<< nub <$> (traverse (expand f) as)
+  SUM as -> ESUM <<< nub <$> (traverse (expand f) as)
 
-derive instance Generic (DNF a) _
+-- | Like expand, but returns an ADT.
+transform :: forall a m. Applicative m => (ADT a -> m (ADT a)) -> ADT a -> m (ADT a)
+transform f adt = case adt of
+  a@(ST _) -> f a
+  a@(UET _) -> f a
+  PROD as -> PROD <$> (traverse (transform f) as)
+  SUM as -> SUM <$> (traverse (transform f) as)
 
-instance (Eq a) => Eq (DNF a) where
-  eq b1 b2 = genericEq b1 b2
-
-derive instance (Ord a) => Ord (DNF a)
-
-instance (Show a) => Show (DNF a) where
-  show (DST a) = "(" <> "DST" <> " " <> show a <> ")"
-  show (DSUM adts) = "(" <> "DSUM" <> show adts <> ")"
-  show (DPROD adts) = "(" <> "DPROD" <> show adts <> ")"
-
-instance (Show a) => PrettyPrint (DNF a) where 
-  prettyPrint' t a@(DST _) = t <> show a
-  prettyPrint' t (DPROD terms) = t <> "(DPROD [\n" <> (intercalate ",\n" $ prettyPrint' (t <> "  ") <$> terms) <> "\n" <> t <> "  ])"
-  prettyPrint' t (DSUM terms) = t <> "(DSUM [\n" <> (intercalate ",\n" $ prettyPrint' (t <> "  ") <$> terms) <> "\n" <> t <> "  ])"
-
-instance (WriteForeign a) => WriteForeign (DNF a) where
-  writeImpl f = writeImpl( genericSumToVariant f)
-
-instance (ReadForeign a) => ReadForeign (DNF a) where
-  readImpl f = map variantToGenericSum (readImpl f)
-
--- To be applied to an expanded tree only. In the expanded tree, UET will not occur.
-toDisjunctiveNormalForm :: forall a. Eq a => Ord a => ExpandedADT a -> DNF a
-toDisjunctiveNormalForm adt = case adt of 
-  EST a -> DSUM [(DPROD [DST a])]
-  -- In the disjunctive normal form we have no UET.
-  -- We have a tree built from EST, ECT, ESUM and EPROD.
-  ECT label a -> toDisjunctiveNormalForm a
-  ESUM as -> unsafePartial flattenSums $ map toDisjunctiveNormalForm as
-  EPROD as -> unsafePartial distribute (map toDisjunctiveNormalForm as)
-
--- the argument is the product of applying toDisjunctiveNormalForm to an array of ADT - so it must
--- be an array of SUM (PROD ST)
-flattenSums :: forall a. Eq a => Ord a => Partial => Array (DNF a) -> DNF a
-flattenSums sums = DSUM $ nub $ concat (sums <#>
-  (\a -> case a of 
-    DSUM ds -> ds))
-
--- Because of context we can safely assume that adts is an Array of (SUM [(PROD [ST])])
-distribute :: forall a. Eq a => Ord a => Partial => Array (DNF a) -> DNF a
-distribute adts = DSUM $ nub $ (matrixMultiply $ adts <#> (\sum -> case sum of
-  DSUM products -> products <#> (\product -> case product of 
-    DPROD ps -> Conjunct ps))) <#> \(Conjunct terms) -> DPROD terms
-
-matrixMultiply :: forall b. Ord b => Array (Array (Conjunct b)) -> Array (Conjunct b)
-matrixMultiply conjuncts = case uncons conjuncts of
-  Nothing -> []
-  Just {head, tail} -> if null tail
-    then head
-    else foldl multiply head tail
-  where
-  multiply :: Array (Conjunct b) -> Array (Conjunct b) -> Array (Conjunct b)
-  multiply cjs1 cjs2 = do
-    Conjunct cj1 <- cjs1
-    Conjunct cj2 <- cjs2
-    pure $ Conjunct $ nub $ cj1 <> cj2
-
-newtype Conjunct a = Conjunct (Array a)
+-- | Like expand, but with the added possibility of reducing a node to Nothing.
+-- | NOTE: the result is not an ExpandedADT; just ADT.
+expandAndReduce :: forall a m. Bind m => Applicative m => (ADT a -> m (Maybe (ADT a))) -> ADT a -> m (Maybe (ADT a))
+expandAndReduce f adt = case adt of
+  a@(ST _) -> f a
+  a@(UET _) -> f a
+  -- PROD as -> Just <<< PROD <<< catMaybes <$> (traverse (expandAndReduce f) as)
+  PROD as -> traverse (expandAndReduce f) as >>= \r -> case catMaybes r of 
+    [] -> pure Nothing
+    terms -> pure $ Just $ PROD terms
+  SUM as -> (traverse (expandAndReduce f) as) >>= \r -> case catMaybes r of
+    [] -> pure Nothing
+    terms -> pure $ Just $ SUM terms
 
 --------------------------------------------------------------------------------------------------
 ---- COMPARING ABSTRACT DATA TYPES
@@ -390,46 +268,32 @@ newtype Conjunct a = Conjunct (Array a)
 -- | See: Semantics of the Perspectives Language, chapter Another ordering of Role types for an explanation.
 equalsOrSpecialises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 equalsOrSpecialises adt1 adt2 = let
-  (adt1' :: DNF a) = toDisjunctiveNormalForm adt1
-  adt2' = toDisjunctiveNormalForm adt2
+  (adt1' :: CNF a) = toConjunctiveNormalForm adt1
+  adt2' = toConjunctiveNormalForm adt2
   in
   equalsOrSpecialises_ adt1' adt2'
 
 -- | left `equalsOrSpecialises_` right
--- | left -> right (logical implication) when the DNF is considered to be a propositional formula): 
--- | left >= right (superset) when considering the extension of instances of both.
--- | Intuitively when left is a 'smaller' formula than right (or when they are equal).
--- | Construct left as a specialisation of right by:
--- |    - adding a term to it (when right is a product)
--- |    - removing a term from it (when right is a sum).
--- | Consider role filling: <restriction on filled> `equalsOrSpecialises_` <filler>.
--- | Or: <restriction on filled> -> <filler>.
--- | This function computes whether every model (in terms of propositional logic) of the left term also satisfies the right term.
--- | That is, if the left term, taken as a proposition, implies the right term.
-equalsOrSpecialises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+-- | From the technical documentation:
+-- | * under `R specialises X` we take to understand `R => X`
+-- | * R => X iff
+-- | * For every disjunction x in the conjunctive formula of X, 
+-- | * there is a disjunction r in the conjunctive formula of R for which is it true that the terms of r are a subset of the terms of x.
+equalsOrSpecialises_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 equalsOrSpecialises_ = unsafePartial equalsOrSpecialises'
   where
-    -- Every product in the sum on the left must specialise the sum on the right.
-    equalsOrSpecialises' :: Partial => forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
-    equalsOrSpecialises' (DSUM productsOnLeft) sumOnRight@(DSUM _) = foldl (\allTrue leftProduct -> if allTrue then leftProduct `prodSpecialisesSum` sumOnRight else false) true productsOnLeft
-      where
-        -- The product on the left must specialise some product on the right.
-        prodSpecialisesSum :: forall b. Ord b => DNF b -> DNF b -> Boolean
-        prodSpecialisesSum productOnLeft@(DPROD _) (DSUM productsOnRight) = isJust $ findIndex (\productOnRight -> productOnLeft `prodSpecialisesProd` productOnRight) productsOnRight
-          where
-            -- the product on the left must have at least all elements of the product on the right.
-            prodSpecialisesProd :: forall c. Ord c => DNF c -> DNF c -> Boolean
-            prodSpecialisesProd (DPROD productOnLeft') (DPROD productOnRight) = productOnLeft' `superset` productOnRight
-              where
-                superset :: forall x. Ord x => Eq x => Array x -> Array x -> Boolean
-                superset super sub = (SET.fromFoldable sub) `SET.subset` (SET.fromFoldable super)
+    equalsOrSpecialises' :: CNF a -> CNF a -> Boolean
+    equalsOrSpecialises' (DPROD disjunctionsOnLeft) (DPROD disjunctionsOnRight) = unwrap
+      (fold
+        (disjunctionsOnRight <#> \(DSUM disjunctionOnRight) -> Conj $ isJust $ (flip findIndex) disjunctionsOnLeft
+          \(DSUM disjunctionOnLeft) -> ((SET.fromFoldable disjunctionOnLeft) `SET.subset` (SET.fromFoldable disjunctionOnRight))))
 
 -- | left `specialises` right
 -- | left -> right
 specialises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 specialises = flip generalises
 
-specialises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+specialises_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 specialises_ = flip generalises_
 
 -- | left `equalsOrGeneralises` right
@@ -437,7 +301,7 @@ specialises_ = flip generalises_
 equalsOrGeneralises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 equalsOrGeneralises = flip equalsOrSpecialises
 
-equalsOrGeneralises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+equalsOrGeneralises_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 equalsOrGeneralises_ = flip equalsOrSpecialises_
 
 -- | left `generalises` right
@@ -445,5 +309,5 @@ equalsOrGeneralises_ = flip equalsOrSpecialises_
 generalises :: forall a. Ord a => Eq a => ExpandedADT a -> ExpandedADT a -> Boolean
 generalises adt1 adt2 = adt1 /= adt2 && adt1 `equalsOrGeneralises` adt2
 
-generalises_ :: forall a. Ord a => Eq a => DNF a -> DNF a -> Boolean
+generalises_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 generalises_ dnf1 dnf2 = dnf1 /= dnf2 && dnf1 `equalsOrGeneralises_` dnf2

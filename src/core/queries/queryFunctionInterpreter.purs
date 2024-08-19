@@ -71,13 +71,14 @@ import Perspectives.PerspectivesState (addBinding, getVariableBindings, pushFram
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, addAsSupportingPaths, allPaths, appendPaths, applyValueFunction, composePaths, consOnMainPath, dependencyToValue, domain2Dependency, functionOnBooleans, functionOnStrings, singletonPath, snocOnMainPath, (#>>))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), RoleInContext, domain2PropertyRange, domain2roleType, range)
 import Perspectives.Query.UnsafeCompiler (lookup, mapDurationOperator, mapNumericOperator, orderFunction, performNumericOperation')
-import Perspectives.Representation.ADT (ADT(..), DNF, equalsOrSpecialises_)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialises_)
+import Perspectives.Representation.CNF (CNF)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty)
 import Perspectives.Representation.CalculatedRole (CalculatedRole)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole, getPerspectType)
 import Perspectives.Representation.Class.Property (calculation) as PC
 import Perspectives.Representation.Class.Property (getPropertyType)
-import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties, calculation, toConjunctiveNormalForm_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..), isDateOrTime, isPDuration)
@@ -608,20 +609,20 @@ pushAssumptionsForDependencyPath dp = for_ (allPaths dp)
 
 getFillerTypeRecursively :: ADT RoleInContext -> RoleInstance ~~> DependencyPath
 getFillerTypeRecursively adt r = do 
-  adtDnf <- lift $ lift $ toDisjunctiveNormalForm_ adt
+  adtCnf <- lift $ lift $ toConjunctiveNormalForm_ adt
   ArrayT $ (lift $ try $ getPerspectRol r) >>=
-    handlePerspectRolError' "getFillerTypeRecursively" [] (depthFirst adtDnf)
+    handlePerspectRolError' "getFillerTypeRecursively" [] (depthFirst adtCnf)
     where
-    depthFirst :: DNF RoleInContext -> PerspectRol -> AssumptionTracking (Array DependencyPath)
-    depthFirst adtDnf role =
+    depthFirst :: CNF RoleInContext -> PerspectRol -> AssumptionTracking (Array DependencyPath)
+    depthFirst adtCnf role =
         case rol_binding role of
           Nothing -> pure []
           Just b -> do
             bRole <- lift $ getPerspectRol b
-            roleDnf <- lift (getEnumeratedRole (rol_pspType bRole) >>= pure <<< _.completeType <<< unwrap)
-            if adtDnf `equalsOrSpecialises_` roleDnf
+            roleCnf <- lift (getEnumeratedRole (rol_pspType bRole) >>= pure <<< _.completeType <<< unwrap)
+            if roleCnf `equalsOrSpecialises_` adtCnf
               then pure [snocOnMainPath (singletonPath (R b)) (R $ rol_id role)]
-              else map (flip snocOnMainPath (R $ rol_id role)) <$> depthFirst adtDnf bRole
+              else map (flip snocOnMainPath (R $ rol_id role)) <$> depthFirst adtCnf bRole
 
 toBool :: List Dependency -> Boolean
 toBool (Cons (V _ (Value s)) _) = s == "true"

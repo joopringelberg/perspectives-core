@@ -37,7 +37,7 @@ domain model://joopringelberg.nl#TestModel
     context Roots filledBy Root
 
   case Test5
-    thing Role1 filledBy Filler1, Filler3
+    thing Role1 filledBy (Filler1, Filler3)
   
   case Test6
     thing Role1 filledBy Filler2

@@ -27,10 +27,10 @@ import Perspectives.Instances.Combinators (closure)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, modifyDF, withDomeinFile)
 import Perspectives.Query.QueryTypes (Domain(..), RoleInContext, domain2roleInContext, domain2roleType, range, replaceRange, roleInContext2Role)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
-import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrSpecialises_)
+import Perspectives.Representation.ADT (ADT, allLeavesInADT, equalsOrGeneralises_)
 import Perspectives.Representation.Class.Identifiable (identifier_)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (allLocalAliases, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (allLocalAliases, toConjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec)
@@ -101,11 +101,11 @@ contextualisePerspectives = do
     writePerspectiveOnAddedRole potentialObjects (EnumeratedRole{perspectives:aspectUserPerspectives}) =
       for_ aspectUserPerspectives \(p@(Perspective{object:aspectUserPerspectiveObject})) -> do
         -- Include fillers in the expansion.
-        aspectPerspectivesObjectDNF <- lift $ toDisjunctiveNormalForm_ (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
+        aspectPerspectivesObjectDNF <- lift $ toConjunctiveNormalForm_ (unsafePartial domain2roleInContext $ range aspectUserPerspectiveObject)
         found <- not <<< null <$> filterA (lift <<< (\(potentialObject :: EnumeratedRoleType) -> do 
           expandedPotentialObject <- getEnumeratedRole potentialObject >>= pure <<< _.completeType <<< unwrap 
           -- expandedAspectPerspectivesObject -> expandedPotentialObject
-          pure (aspectPerspectivesObjectDNF `equalsOrSpecialises_` expandedPotentialObject)
+          pure (aspectPerspectivesObjectDNF `equalsOrGeneralises_` expandedPotentialObject)
           )) potentialObjects
         if found
           then tell [p]
@@ -200,7 +200,7 @@ contextualisePerspectives = do
           (Perspective{actions:aspectActions, object:aspectObject, roleVerbs:aspectRoleVerbs, propertyVerbs:aspectPropertyVerbs}) = do
           -- is the object of the perspective a specialisation of the object of the aspect perspective?
           -- aspectObject -> object
-          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range aspectObject) `equalsOrSpecialisesRoleInContext` (unsafePartial domain2roleType $ range object))
+          isASpecialisation <- lift $ lift ((unsafePartial domain2roleType $ range object) `equalsOrSpecialisesRoleInContext` (unsafePartial domain2roleType $ range aspectObject))
           if isASpecialisation 
             then 
               pure $ Perspective r 

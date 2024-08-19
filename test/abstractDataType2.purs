@@ -17,8 +17,10 @@ import Data.Traversable (traverse)
 import Effect.Class.Console (log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Representation.ADT (ADT(..), DNF, ExpandedADT(..), HArray(..), collect, computeBoolean, computeCollection, expand, foldMapADT, toDisjunctiveNormalForm)
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Representation.ADT (ADT(..), HArray(..), collect, computeBoolean, computeCollection, expand, foldMapADT)
+import Perspectives.Representation.CNF (CNF, toConjunctiveNormalForm)
+import Perspectives.Representation.ExpandedADT (ExpandedADT(..))
+import Perspectives.Utilities (class PrettyPrint, prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, test)
 
@@ -43,7 +45,7 @@ theSuite :: Free TestF Unit
 theSuite = suite "Test.Perspectives.Representation.ADT" do
 
   test "Functor" $ runP do
-    result <- pure $ unwrap $ (toDisjunctiveNormalForm <$> expand (unsafePartial expandInIdentity)
+    result <- pure $ unwrap $ (toConjunctiveNormalForm <$> expand (unsafePartial expandInIdentity)
       (((*) 10) <$> (PROD [(SUM [PROD [ST 1, ST 2], PROD [ST 11, ST 12]]), SUM [PROD [ST 3, ST 4], PROD [ST 13, ST 14]]])))
     showDNF "map times 10:" $ result
     
@@ -142,7 +144,7 @@ showExpandedADT comment adt = do
   log $ prettyPrint adt
   log "\n"
 
-showDNF :: forall a. Show a => String -> DNF a -> MonadPerspectives Unit
+showDNF :: forall a. Show a => PrettyPrint a => String -> CNF a -> MonadPerspectives Unit
 showDNF comment adt = do 
   log comment
   log $ prettyPrint adt

@@ -233,8 +233,8 @@ completeRuntimeType rid = do
       mrestrictions <- completeDeclaredFillerRestriction role
       case mrestrictions of 
         Nothing -> pure crt
-        Just restrictions -> pure $ SUM [crt, restrictions]
-    Just b -> (\adt -> SUM[crt, adt]) <$> completeRuntimeType b
+        Just restrictions -> pure $ PROD [crt, restrictions]
+    Just b -> (\adt -> PROD[crt, adt]) <$> completeRuntimeType b
 
 allFillers :: RoleInstance -> MonadPerspectives (Array RoleInstance)
 allFillers rid = do 

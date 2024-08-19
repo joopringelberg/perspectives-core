@@ -20,11 +20,12 @@ domain model://perspectives.domains#BrokerServices
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context BrokerServices
+          start <- create role StartContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Broker Services App" for app >> extern
+          bind_ app >> extern to start
+          Name = "Broker Services App" for start
   
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -198,7 +199,7 @@ domain model://perspectives.domains#BrokerServices
       perspective on Accounts >> binding >> context >> Administrator
         only (Create, Fill)
       perspective on bs:MyBrokers >> PublicBrokers
-        only (CreateAndFill)
+        only (CreateAndFill, Fill)
       screen 
         row
           markdown <# Broker service
@@ -355,12 +356,13 @@ domain model://perspectives.domains#BrokerServices
 
       perspective on extern
         props (Url, Exchange, CurrentQueueName) verbs (Consult)
+        props (Registered, UseExpiresOn, GracePeriodExpiresOn, TerminatesOn) verbs (SetPropertyValue)
       perspective on AccountHolder
         all roleverbs
         props (AccountName, AccountPassword) verbs (Consult, SetPropertyValue)
       
       perspective on Queues
-        only (CreateAndFill)
+        only (Create, Fill)
         props (QueueName) verbs (SetPropertyValue, Consult)
 
       screen "Broker Contract"
@@ -386,7 +388,7 @@ domain model://perspectives.domains#BrokerServices
         props (AccountName, AccountPassword) verbs (Consult, SetPropertyValue)
       
       perspective on Queues
-        only (CreateAndFill)
+        only (Create, Fill)
         props (QueueName) verbs (Consult, SetPropertyValue)
       
       -- If this contract is due to self-signup, Administrator needs this perspective to know that this contract

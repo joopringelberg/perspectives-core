@@ -17,11 +17,12 @@ domain model://perspectives.domains#SimpleChat
           -- as they are the allowed binding of StartContexts.
           -- As a consequence, no context is created.
           app <- create context ChatApp
+          start <- create role StartContexts in sys:MySystem
         in
           -- Being a RootContext, too, Installer can fill a new instance
           -- of StartContexts with it.
-          bind app >> extern to StartContexts in sys:MySystem
-          Name = "Simple Chat App" for app >> extern
+          bind_ app >> extern to start
+          Name = "Simple Chat App" for start
   
   on exit
     do for sys:PerspectivesSystem$Installer
@@ -48,7 +49,7 @@ domain model://perspectives.domains#SimpleChat
     context IncomingChats = sys:SocialMe >> binding >> binder Partner >> context >> extern
     user Chatter = sys:SocialMe
       perspective on Chats
-        only (CreateAndFill, Remove)
+        only (CreateAndFill, Remove, Delete)
         props (Title) verbs (SetPropertyValue)
       perspective on IncomingChats
         props (Title) verbs (Consult)

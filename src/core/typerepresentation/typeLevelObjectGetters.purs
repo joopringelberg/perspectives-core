@@ -54,13 +54,14 @@ import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), DNF, allLeavesInADT, computeExpandedBoolean, equalsOrSpecialises_, generalises_)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, computeExpandedBoolean, equalsOrSpecialises_, generalises_)
 import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.CNF (CNF)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
 import Perspectives.Representation.Class.Context (contextAspects)
 import Perspectives.Representation.Class.Context (externalRole) as CTCLASS
 import Perspectives.Representation.Class.PersistentType (DomeinFileId, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType, getView, tryGetState)
-import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, calculation, expandUnexpandedLeaves, getRole, getRoleADT, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleKindOfRoleType, toDisjunctiveNormalForm_)
+import Perspectives.Representation.Class.Role (actionsOfRoleType, adtOfRole, allProperties, allRoleProperties, allRoles, allViews, bindingOfADT, calculation, expandUnexpandedLeaves, getRole, getRoleADT, perspectives, perspectivesOfRoleType, roleADT, roleADTOfRoleType, roleKindOfRoleType, toConjunctiveNormalForm_)
 import Perspectives.Representation.Context (Context)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
@@ -486,8 +487,8 @@ generalisesRoleType t1 t2 = ArrayT do
 generalisesRoleType_ :: RoleType -> (RoleType -> MonadPerspectives Boolean)
 generalisesRoleType_ t1 t2 = do 
   -- expand
-  (et1 :: DNF RoleInContext) <- (roleADTOfRoleType >=> toDisjunctiveNormalForm_) t1
-  (et2 :: DNF RoleInContext) <- (roleADTOfRoleType >=> toDisjunctiveNormalForm_) t2
+  (et1 :: CNF RoleInContext) <- (roleADTOfRoleType >=> toConjunctiveNormalForm_) t1
+  (et2 :: CNF RoleInContext) <- (roleADTOfRoleType >=> toConjunctiveNormalForm_) t2
   pure (et1 `generalises_` et2)
 
 -----------------------------------------------------------
@@ -502,8 +503,8 @@ equalsOrGeneralisesRoleInContext = flip equalsOrSpecialisesRoleInContext
 -- | Compares with `equalsOrSpecialises`.
 equalsOrSpecialisesRoleInContext :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
 equalsOrSpecialisesRoleInContext left right = do 
-  (left' :: DNF RoleInContext) <- toDisjunctiveNormalForm_ left
-  (right' :: DNF RoleInContext) <- toDisjunctiveNormalForm_ right
+  (left' :: CNF RoleInContext) <- toConjunctiveNormalForm_ left
+  (right' :: CNF RoleInContext) <- toConjunctiveNormalForm_ right
   pure (left' `equalsOrSpecialises_` right')
 
 -----------------------------------------------------------
@@ -519,6 +520,16 @@ isPerspectiveOnADT p adt = (objectOfPerspective p) `equalsOrGeneralisesRoleInCon
 
 isPerspectiveOnRoleType :: Partial => Perspective -> RoleType -> MP Boolean
 isPerspectiveOnRoleType p roleType = getRoleADT roleType >>= isPerspectiveOnADT p
+
+-- | From the object of the perspective, we derive an abstract type that characterises the restriction on the fillers of that object.
+-- | If that restriction specialises the roleType, it must be because it has it (the roleType) as (indirect) filler.
+-- | Such a perspective may provide access to some properties of the roleType.
+isPerspectiveOnRoleFilledWithRoleType :: Partial => Perspective -> RoleType -> MP Boolean
+isPerspectiveOnRoleFilledWithRoleType p roleType = do
+  mfillRestriction <- bindingOfADT (objectOfPerspective p)
+  case mfillRestriction of
+    Nothing -> pure false
+    Just fillRestriction -> getRoleADT roleType >>= equalsOrSpecialisesRoleInContext fillRestriction
   
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS TO FIND VIEWS AND ON VIEWS
@@ -670,7 +681,8 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verb =
       (\perspective -> do 
         a <- pure $ perspectiveSupportsPropertyForVerb perspective (ENP property) verb
         b <- perspective `isPerspectiveOnRoleType` (ENR roleType)
-        pure (a && b))
+        c <- perspective `isPerspectiveOnRoleFilledWithRoleType` (ENR roleType)
+        pure (a && (b || c)))
 
 -- perspectiveSupportsProperty
 rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
@@ -764,15 +776,15 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
   , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
   }
 
--- True, iff one of the types of the role instance is covered by the range of the QueryFunctionDescription.
+-- True, iff one of the types of the role instance is a specialisation of the range of the QueryFunctionDescription.
 -- The function is partial because it should only be used on a QueryFunctionDescription whose range
 -- represents a role type.
 isPerspectiveOnSelf :: Partial => QueryFunctionDescription -> (RoleType ~~~> Boolean)
 isPerspectiveOnSelf qfd = 
   some (\userRole' -> do 
-    dnf <- lift $ toDisjunctiveNormalForm_ (roleRange qfd)
-    (lift $ roleADTOfRoleType userRole') >>= lift <<< toDisjunctiveNormalForm_ >>=
-      (\userRoleDNF -> pure (dnf `equalsOrSpecialises_` userRoleDNF)))
+    dnf <- lift $ toConjunctiveNormalForm_ (roleRange qfd)
+    (lift $ roleADTOfRoleType userRole') >>= lift <<< toConjunctiveNormalForm_ >>=
+      (\userRoleDNF -> pure (userRoleDNF `equalsOrSpecialises_` dnf)))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS

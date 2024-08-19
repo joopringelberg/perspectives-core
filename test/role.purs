@@ -12,13 +12,15 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.ModelDependencies (perspectivesUsers, socialEnvironmentPersons, sysUser)
 import Perspectives.Query.QueryTypes (RoleInContext(..))
-import Perspectives.Representation.ADT (ADT(..), DNF(..), ExpandedADT(..), equalsOrSpecialises, equalsOrSpecialises_, specialises, toDisjunctiveNormalForm)
+import Perspectives.Representation.ADT (ADT(..), equalsOrSpecialises, equalsOrSpecialises_, specialises)
+import Perspectives.Representation.CNF (CNF, DPROD(..), DSUM(..), toConjunctiveNormalForm)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
-import Perspectives.Representation.Class.Role (allRoleProperties, completeDeclaredType, completeExpandedFillerRestriction, completeExpandedType, declaredAspects, declaredType)
+import Perspectives.Representation.Class.Role (allRoleProperties, completeDeclaredType, completeExpandedFillerRestriction, completeExpandedType, declaredAspects, declaredType, roleADTOfRoleType, typeToRole)
+import Perspectives.Representation.ExpandedADT (ExpandedADT(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile')
 import Perspectives.Types.ObjectGetters (equalsOrSpecialisesRoleInContext, generalisesRoleType_)
-import Perspectives.Utilities (prettyPrint)
+import Perspectives.Utilities (class PrettyPrint, prettyPrint)
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, test, testSkip)
 import Test.Unit.Assert (assert)
@@ -52,84 +54,90 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
         (UET (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" })))
     getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= declaredAspects >>=
       \dnf -> liftAff $ assert "declaredAspects" (eq dnf $
-        (SUM [
+        (PROD [
         (ST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
         ]))
     getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeDeclaredType >>=
       \dnf -> liftAff $ assert "completeDeclaredType" (eq dnf $
-        (SUM [
-            (UET (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" })),
-            (UET (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" })),
-            (SUM [
-              (ST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
-              ])
-            ]))
+        (PROD [
+          (UET (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" })),
+          (SUM [
+            (UET (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
+            ]),
+          (PROD [
+            (ST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
+            ])
+          ]))
     getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>=
       \dnf -> liftAff $ assert "completeExpandedType" (eq dnf $
-        (ESUM [
-            (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" }))
+         (EPROD [
+          (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" }))
+            (EPROD [
+              (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" })),
               (ESUM [
-                (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" })),
                 (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
-                  (ESUM [
+                  (EPROD [
                     (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" })),
-                    (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
-                      (ESUM [
-                        (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
-                        ]))
-                    ])),
-                (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
-                ])),
-            (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
-              (ESUM [
-                (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" })),
-                (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
-                  (ESUM [
-                    (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
+                    (ESUM [
+                      (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
+                      ])
                     ]))
-                ])),
-            (ESUM [
+                ]),
               (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
-              ])
+              ])),
+          (ESUM [
+            (ECT (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
+              (EPROD [
+                (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" })),
+                (ESUM [
+                  (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
+                  ])
+                ]))
+            ]),
+          (EPROD [
+            (EST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
             ])
+          ])
         )
-    getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>=
+    getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>=
       \dnf -> liftAff $ assert "completeExpandedType in DNF" (eq dnf
-        (DSUM [
-          DPROD [
-            (DST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" }))
+        (DPROD [
+          DSUM [
+            ( (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel$Test1", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1" }))
             ],
-          DPROD [
-            (DST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
+          DSUM [
+            ( (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1" }))
             ],
-          DPROD [
-            (DST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
+          DSUM [
+            ( (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2" }))
             ],
-          DPROD [
-            (DST (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
+          DSUM [
+            ( (RoleInContext { context: ContextType "model://joopringelberg.nl#TestModel", role: EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1" }))
             ]
           ]))
-    getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= allRoleProperties >>=
+    -- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "expanded type"
+    getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= allRoleProperties >>= 
+      -- \a -> log ("allRoleProperties " <> show a)
       \a -> liftAff $ assert "allRoleProperties" (eq a
         [ ENP (EnumeratedPropertyType "model://joopringelberg.nl#TestModel$Test1$Role1$Prop1")
         , ENP (EnumeratedPropertyType "model://joopringelberg.nl#TestModel$Filler1$Filler1Prop1")
         , ENP (EnumeratedPropertyType "model://joopringelberg.nl#TestModel$Filler2$Prop1")
         , ENP (EnumeratedPropertyType "model://joopringelberg.nl#TestModel$Aspect1$Prop1")]
         )
-    -- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "aspect1DNF"
-    -- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "role1DNF"
+    -- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "aspect1DNF"
+    -- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "role1DNF"
 
     do 
-      aspect1DNF <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm
-      role1DNF <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm
+      aspect1DNF <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm
+      role1DNF <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm
       -- showDNF "Aspect1" aspect1DNF
       -- showDNF "Role1" role1DNF
-      liftAff $ assert "aspect1 equalsOrSpecialises_ role1" (aspect1DNF `equalsOrSpecialises_` role1DNF)
+      liftAff $ assert "aspect1 equalsOrSpecialises_ role1" (role1DNF `equalsOrSpecialises_` aspect1DNF)
 
     do 
       aspect1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType
       role1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType
-      liftAff $ assert "aspect1 equalsOrSpecialises role11" (aspect1ExpandedADT `equalsOrSpecialises` role1ExpandedADT)
+      liftAff $ assert "aspect1 equalsOrSpecialises role11" (role1ExpandedADT `equalsOrSpecialises` aspect1ExpandedADT)
 
     do 
       role1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType
@@ -138,10 +146,10 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
     do 
       aspect1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType
       role1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= completeExpandedType
-      liftAff $ assert "aspect1 specialises role1" (aspect1ExpandedADT `specialises` role1ExpandedADT)
+      liftAff $ assert "aspect1 specialises role1" (role1ExpandedADT `specialises` aspect1ExpandedADT)
 
 
-    ((ENR $ EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") `generalisesRoleType_` (ENR $ EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1")
+    ((ENR $ EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") `generalisesRoleType_` (ENR $ EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1")
       ) >>= 
       \a -> liftAff $ assert "Aspect1 generalisesRoleType_ Role1" a
     
@@ -152,7 +160,7 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
     do 
       aspect1Declared <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= pure <<< declaredType
       role1Declared <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test1$Role1") >>= pure <<< declaredType
-      (aspect1Declared `equalsOrSpecialisesRoleInContext` role1Declared) >>= liftAff <<< assert "aspect1 specialises role1" 
+      (role1Declared `equalsOrSpecialisesRoleInContext` aspect1Declared) >>= liftAff <<< assert "aspect1 equalsOrSpecialisesRoleInContext role1" 
 
     do
       filler2ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2") >>= completeExpandedType
@@ -161,22 +169,22 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
         Nothing -> liftAff $ assert "Test1Role1 should have a filledBy clause!" false
         Just role1RestrictionExpandedADT -> do
           showExpandedADT "Filler1 expanded" role1RestrictionExpandedADT
-          showDNF "Filler1 DNF" (toDisjunctiveNormalForm role1RestrictionExpandedADT)
-          liftAff $ assert "Filler2 cannot fill Test1$Role1" (not (role1RestrictionExpandedADT `equalsOrSpecialises` filler2ExpandedADT))
+          showDNF "Filler1 DNF" (toConjunctiveNormalForm role1RestrictionExpandedADT)
+          liftAff $ assert "Filler2 cannot fill Test1$Role1" (not (filler2ExpandedADT `equalsOrSpecialises` role1RestrictionExpandedADT))
       
     do
       filler2ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler2") >>= completeExpandedType
       mrole1RestrictionExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test2$Role1") >>= completeExpandedFillerRestriction
       case mrole1RestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test2Role1 should have a filledBy clause!" false
-        Just role1RestrictionExpandedADT -> liftAff $ assert "Filler2 may fill Test2$Role1" (role1RestrictionExpandedADT `equalsOrSpecialises` filler2ExpandedADT)
+        Just role1RestrictionExpandedADT -> liftAff $ assert "Filler2 may fill Test2$Role1" (filler2ExpandedADT `equalsOrSpecialises` role1RestrictionExpandedADT)
       
     do
       filler1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1") >>= completeExpandedType
       mrole1RestrictionExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test2$Role1") >>= completeExpandedFillerRestriction
       case mrole1RestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test2Role1 should have a filledBy clause!" false
-        Just role1RestrictionExpandedADT -> liftAff $ assert "Filler1 may fill Test2$Role1" (role1RestrictionExpandedADT `equalsOrSpecialises` filler1ExpandedADT)
+        Just role1RestrictionExpandedADT -> liftAff $ assert "Filler1 may fill Test2$Role1" (filler1ExpandedADT `equalsOrSpecialises` role1RestrictionExpandedADT)
 
     do
       aspect1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Aspect1") >>= completeExpandedType
@@ -190,14 +198,14 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
       mrole2RestrictionExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test2$Role2") >>= completeExpandedFillerRestriction
       case mrole2RestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test2Role1 should have a filledBy clause!" false
-        Just role2RestrictionExpandedADT -> liftAff $ assert "Test1$Role`` may fill Test2$Role2" (role2RestrictionExpandedADT `equalsOrSpecialises` role1ExpandedADT )
+        Just role2RestrictionExpandedADT -> liftAff $ assert "Test1$Role may fill Test2$Role2" (role1ExpandedADT `equalsOrSpecialises` role2RestrictionExpandedADT)
 
     do
       test3ExternalExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test3$External") >>= completeExpandedType
       mtest4RootsRestrictionExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test4$Roots") >>= completeExpandedFillerRestriction
       case mtest4RootsRestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test2Role1 should have a filledBy clause!" false
-        Just test4RootsRestrictionExpandedADT -> liftAff $ assert "Test$External may fill Test4$Roots" (test4RootsRestrictionExpandedADT `equalsOrSpecialises` test3ExternalExpandedADT)
+        Just test4RootsRestrictionExpandedADT -> liftAff $ assert "Test$External may fill Test4$Roots" (test3ExternalExpandedADT `equalsOrSpecialises` test4RootsRestrictionExpandedADT)
 
     do
       filler3ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler3") >>= completeExpandedType
@@ -205,20 +213,20 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
       case mtest5Role1RestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test5Role1 should have a filledBy clause!" false
         Just test5Role1RestrictionExpandedADT -> do 
-          showDNF "Test5$Role1 restriction" (toDisjunctiveNormalForm test5Role1RestrictionExpandedADT)
+          showDNF "Test5$Role1 restriction" (toConjunctiveNormalForm test5Role1RestrictionExpandedADT)
           log "equalsOrSpecialises"
-          showDNF "filler3" (toDisjunctiveNormalForm filler3ExpandedADT)
-          liftAff $ assert "Filler3 may fill Test5$Role1" (test5Role1RestrictionExpandedADT `equalsOrSpecialises` filler3ExpandedADT)
+          showDNF "filler3" (toConjunctiveNormalForm filler3ExpandedADT)
+          liftAff $ assert "Filler3 may fill Test5$Role1" (filler3ExpandedADT `equalsOrSpecialises` test5Role1RestrictionExpandedADT)
 
     do
       filler1ExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Filler1") >>= completeExpandedType
-      showDNF "filler1" (toDisjunctiveNormalForm filler1ExpandedADT)
+      showDNF "filler1" (toConjunctiveNormalForm filler1ExpandedADT)
       mtest5Role1RestrictionExpandedADT <- getEnumeratedRole (EnumeratedRoleType "model://joopringelberg.nl#TestModel$Test5$Role1") >>= completeExpandedFillerRestriction
       case mtest5Role1RestrictionExpandedADT of 
         Nothing -> liftAff $ assert "Test5Role1 should have a filledBy clause!" false
         Just test5Role1RestrictionExpandedADT -> do 
-          showDNF "Test5$Role1 restriction" (toDisjunctiveNormalForm test5Role1RestrictionExpandedADT)
-          liftAff $ assert "Filler1 may fill Test5$Role1" (test5Role1RestrictionExpandedADT `equalsOrSpecialises` filler1ExpandedADT)
+          showDNF "Test5$Role1 restriction" (toConjunctiveNormalForm test5Role1RestrictionExpandedADT)
+          liftAff $ assert "Filler1 may fill Test5$Role1" (filler1ExpandedADT `equalsOrSpecialises` test5Role1RestrictionExpandedADT)
 
   testSkip "bindingOfADT" $ runP do
     loadModels "src/model" 
@@ -229,19 +237,20 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
       , "perspectivesSysteem"
       ] 
 
-    -- void $ bindingOfADT (SUM 
+    -- void $ bindingOfADT (PROD 
     --   [ (ST $ RoleInContext{role: EnumeratedRoleType sysUser, context: ContextType theSystem})
     --   , (ST $ RoleInContext{role: EnumeratedRoleType socialEnvironmentMe, context: ContextType socialEnvironment})])
     --     >>= (traverse (showADT ""))
     
     generalisesRoleType_ 
+      (ENR (EnumeratedRoleType socialEnvironmentPersons))
       (ENR (EnumeratedRoleType sysUser))
-      (ENR (EnumeratedRoleType socialEnvironmentPersons)) >>=
+       >>=
         (liftAff <<< assert "Me generalisesRoleType Persons")
   
     generalisesRoleType_ 
-      (ENR (EnumeratedRoleType socialEnvironmentPersons)) 
       (ENR (EnumeratedRoleType sysUser))
+      (ENR (EnumeratedRoleType socialEnvironmentPersons)) 
       >>=
         (liftAff <<< assert "not (Persons generalisesRoleType Me)") <<< not
 
@@ -297,16 +306,37 @@ theSuite = suite "Perspectives.Representation.Class.Role" do
     do
       getEnumeratedRole (EnumeratedRoleType sysUser) >>= pure <<< declaredType >>= showADT "declaredType User"
       getEnumeratedRole (EnumeratedRoleType sysUser) >>= completeExpandedType >>= showExpandedADT "completeExpandedType User"
-      getEnumeratedRole (EnumeratedRoleType sysUser) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF User"
+      getEnumeratedRole (EnumeratedRoleType sysUser) >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "DNF User"
 
       getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= pure <<< declaredType >>= showADT "declaredType perspectivesUsers"
       getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= completeExpandedType >>= showExpandedADT "completeExpandedType perspectivesUsers"
-      getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF perspectivesUsers"
+      getEnumeratedRole (EnumeratedRoleType perspectivesUsers) >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "DNF perspectivesUsers"
 
       getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= pure <<< declaredType >>= showADT "declaredType Persons"
       getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= completeExpandedType >>= showExpandedADT "completeExpandedType Persons"
-      getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= completeExpandedType >>= pure <<< toDisjunctiveNormalForm >>= showDNF "DNF Persons"
+      getEnumeratedRole (EnumeratedRoleType socialEnvironmentPersons) >>= completeExpandedType >>= pure <<< toConjunctiveNormalForm >>= showDNF "DNF Persons"
 
+  test "Type comparison" $ runP do
+    loadModels "src/model" 
+      [ "couchdb"
+      , "serialise"
+      , "sensor"
+      , "utilities"
+      , "perspectivesSysteem"
+      , "rabbitMQ"
+      , "BrokerServices"
+      ] 
+    
+    inviter <- pure (ENR (EnumeratedRoleType "model://perspectives.domains#System$Invitation$Inviter"))
+    administrator <- pure (ENR (EnumeratedRoleType "model://perspectives.domains#BrokerServices$BrokerContract$Administrator"))
+
+    -- roleADTOfRoleType inviter >>= showADT "roleADTOfRoleType inviter = "
+
+    -- roleADTOfRoleType administrator >>= showADT "roleADTOfRoleType administrator = " 
+
+    generalisesRoleType_ inviter administrator >>=
+        (liftAff <<< assert "Invitation$Inviter generalisesRoleType BrokerContract$Administrator")
+    
 
 
 showADT :: forall a. Show a => String -> ADT a -> MonadPerspectives Unit
@@ -321,7 +351,7 @@ showExpandedADT m adt = do
   log $ prettyPrint adt
   log "\n"
 
-showDNF :: forall a. Show a => String -> DNF a -> MonadPerspectives Unit
+showDNF :: forall a. Show a => PrettyPrint a => String -> CNF a -> MonadPerspectives Unit
 showDNF m dnf = do 
   log (m <> ": ")
   log $ prettyPrint dnf

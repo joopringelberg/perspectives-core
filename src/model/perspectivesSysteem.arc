@@ -558,7 +558,7 @@ domain model://perspectives.domains#System
       perspective on Inviter
         props (FirstName, LastName) verbs (Consult)
         in context state NoInviter
-          only (CreateAndFill)
+          only (CreateAndFill, Fill)
           props (FirstName, LastName) verbs (Consult)
       screen "Invitation"
         row 

@@ -72,8 +72,9 @@ import Perspectives.Query.Kinked (completeInversions)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, domain2roleInContext, domain2roleType, functional, mandatory, range, replaceContext, roleInContext2Role, sumOfDomains, traverseQfd)
 import Perspectives.Query.QueryTypes (RoleInContext(..)) as QT
 import Perspectives.Query.StatementCompiler (compileStatement)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, toDisjunctiveNormalForm, transform)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, transform)
 import Perspectives.Representation.Action (AutomaticAction(..), Action(..))
+import Perspectives.Representation.CNF (toConjunctiveNormalForm)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
@@ -1802,6 +1803,6 @@ computeCompleteEnumeratedTypes = do
 
     computeCompleteEnumeratedType :: EnumeratedRole -> PhaseThree EnumeratedRole
     computeCompleteEnumeratedType erole@(EnumeratedRole erec) = do
-      normalizedType <- lift $ lift (completeExpandedType erole >>= pure <<< toDisjunctiveNormalForm)
+      normalizedType <- lift $ lift (completeExpandedType erole >>= pure <<< toConjunctiveNormalForm)
       pure (EnumeratedRole erec {completeType = normalizedType})
 

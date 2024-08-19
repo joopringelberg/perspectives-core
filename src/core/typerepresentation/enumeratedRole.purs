@@ -36,8 +36,9 @@ import Perspectives.Data.EncodableMap (EncodableMap, empty, lookup, insert)
 import Perspectives.InvertedQuery (InvertedQuery(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Query.QueryTypes (Calculation, RoleInContext(..))
-import Perspectives.Representation.ADT (ADT, DNF(..))
+import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action)
+import Perspectives.Representation.CNF (CNF, DPROD(..), DSUM(..))
 import Perspectives.Representation.Class.Identifiable (class Identifiable)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (Perspective, StateSpec)
@@ -69,7 +70,7 @@ type EnumeratedRoleRecord =
   , propertyAliases :: OBJ.Object (EnumeratedPropertyType)
 
   , binding :: Maybe (ADT RoleInContext)
-  , completeType :: DNF RoleInContext
+  , completeType :: CNF RoleInContext
 
   , functional :: Boolean
   , mandatory :: Boolean
@@ -103,7 +104,7 @@ defaultEnumeratedRole qname dname kindOfRole context pos = EnumeratedRole
   , context: ContextType context
   -- This means: no restrictions. In order to prohibit a filler, the modeller should have specified "None"
   , binding: Nothing
-  , completeType: DST $ RoleInContext {context: ContextType context, role: EnumeratedRoleType qname}
+  , completeType: DPROD [DSUM [RoleInContext {context: ContextType context, role: EnumeratedRoleType qname}]]
 
   , views: []
 
