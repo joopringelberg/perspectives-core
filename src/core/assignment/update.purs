@@ -61,8 +61,8 @@ import Partial.Unsafe (unsafePartial)
 import Persistence.Attachment (class Attachment)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (aisInPropertyDelta, usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_context, rol_isMe, rol_pspType)
-import Perspectives.CoreTypes (class Persistent, InformedAssumption(..), MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
+import Perspectives.ContextAndRole (addRol_property, changeContext_me, changeContext_preferredUserRoleType, context_pspType, context_rolInContext, deleteRol_property, isDefaultContextDelta, modifyContext_rolInContext, popContext_state, popRol_state, pushContext_state, pushRol_state, removeRol_property, rol_context, rol_isMe, rol_pspType, setRol_property)
+import Perspectives.CoreTypes (class Persistent, InformedAssumption(..), MonadPerspectives, Updater, MonadPerspectivesTransaction, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DependencyTracking.Dependency (findContextStateRequests, findMeRequests, findPropertyRequests, findRoleRequests, findRoleStateRequests)
@@ -481,14 +481,47 @@ deleteProperty rids propertyName = case ARR.head rids of
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
 setProperty rids propertyName values = do
   rids' <- filterA hasDifferentValues rids
-  deleteProperty rids' propertyName
-  addProperty rids' propertyName (flip Tuple Nothing <$> values)
+  setProperty' rids'
   where
     hasDifferentValues :: RoleInstance -> MonadPerspectivesTransaction Boolean
     hasDifferentValues rid = do
       rtype <- lift $ roleType_ rid
       vals <- lift (rid ##= getPropertyFromTelescope propertyName)
       pure $ (not $ null (difference values vals)) || (not $ null (difference vals values))
+    setProperty' ::Array RoleInstance -> MonadPerspectivesTransaction Unit
+    setProperty' rids' = case ARR.head rids' of
+      Nothing -> pure unit
+      Just _ -> do
+        subject <- getSubject
+        for_ rids' \rid' -> do
+          mrid <- lift $ getPropertyBearingRoleInstance propertyName rid'
+          case mrid of
+            Nothing -> pure unit
+            Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
+                handlePerspectRolError
+                "deleteProperty"
+                \(pe@(PerspectRol{properties, pspType})) -> do
+                  users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
+                  -- Create a delta for all values.
+                  -- We must add the current values, otherwise a Transaction can only have a single 
+                  -- DeleteProperty delta.
+                  delta <- pure $ RolePropertyDelta
+                    { id : rid
+                    , roleType: pspType
+                    , property: replacementProperty
+                    , deltaType: SetProperty
+                    , values
+                    , subject
+                    }
+                  signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
+                  addDelta (DeltaInTransaction { users, delta: signedDelta})
+                  (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
+                  (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
+                  -- Apply all changes to the role and then save it:
+                  --  - change the property values in one go
+                  --  - remove all propertyDeltas for this property.
+                  lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const empty) propertyDeltas}) (setRol_property pe replacementProperty values))
+
 
 -----------------------------------------------------------
 -- SAVEFILE

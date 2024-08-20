@@ -46,7 +46,7 @@ import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty)
+import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty)
 import Perspectives.Authenticate (deserializeJWK, tryGetPublicKey, verifyDelta, verifyDelta')
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.ContextAndRole (defaultContextRecord, defaultRolRecord, getNextRolIndex, isDefaultContextDelta, rol_contextDelta)
@@ -138,6 +138,9 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
     DeleteProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
       Left e -> handleError e
       Right _ -> deleteProperty [id] property
+    SetProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.SetPropertyValue) >>= case _ of
+      Left e -> handleError e
+      Right _ -> setProperty [id] property values
     UploadFile -> do
       -- Do this only when we're executing the Delta for a public role. 
       -- As this is a RolePropertyDelta, it was created when a file was added to the role for a property with a File range. 
