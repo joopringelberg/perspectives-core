@@ -130,7 +130,12 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
       -- we need not check whether the model is known if we assume valid transactions:
       -- a role instance creation delta must have preceded the property delta.
       (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.AddPropertyValue) >>= case _ of
-        Left e -> handleError e
+        -- This is mainly for historical reasons: we used to set properties by first removing and then adding them.
+        -- This means that there are, in fact, in the Perspectives Universe property deltas with AddProperty that 
+        -- have been made with a perspective of SetPropertyValue.
+        Left e -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.SetPropertyValue) >>= case _ of
+          Left e1 -> handleError e1
+          Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
         Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
     RemoveProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.RemovePropertyValue) >>= case _ of
       Left e -> handleError e

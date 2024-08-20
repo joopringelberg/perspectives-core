@@ -217,7 +217,7 @@ domain model://perspectives.domains#CouchdbManagement
         in object state CreateDatabases
           props (IsPublic) verbs (SetPropertyValue)
         in object state NoNameSpace
-          props (Repositories$NameSpace) verbs (SetPropertyValue)
+          props (Repositories$NameSpace) verbs (SetPropertyValue, AddPropertyValue)
         
       perspective on Accounts
         all roleverbs
@@ -625,7 +625,6 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Manifests" default
           row
             table Manifests
-              props (LocalModelName, Description) verbs (Consult)
         tab "Authors"
           row
             table Authors
