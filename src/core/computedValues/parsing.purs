@@ -42,7 +42,7 @@ import Foreign.Object (Object, empty)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction, MonadPerspectives)
-import Perspectives.Couchdb (DeleteCouchdbDocument(..))
+import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocWithAttachmentInfo(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -116,10 +116,10 @@ type URL = String
 uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> StoredQueries -> MonadPerspectives Unit
 uploadToRepository_ splitName (DomeinFile df) invertedQueries = do 
   -- Get the attachment info
-  (mremoteDf :: Maybe DomeinFile) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
+  (mremoteDf :: Maybe DocWithAttachmentInfo) <- tryGetDocument_ splitName.repositoryUrl splitName.documentName
   attachments <- case mremoteDf of
     Nothing -> pure empty
-    Just (DomeinFile {_attachments}) -> case _attachments of
+    Just (DocWithAttachmentInfo {_attachments}) -> case _attachments of
       Nothing -> pure empty
       Just atts ->  traverseWithIndex
         (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment splitName.repositoryUrl splitName.documentName attName)

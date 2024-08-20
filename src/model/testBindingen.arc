@@ -52,7 +52,7 @@ domain model://joopringelberg.nl#TestBindingen
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on Tests
         all roleverbs
-        props (TestNaam, Explanation) verbs (Consult, SetPropertyValue)
+        props (TestNaam) verbs (Consult, SetPropertyValue)
         props (TestSucceeded) verbs (Consult)
       perspective on MarkDown
         all roleverbs
