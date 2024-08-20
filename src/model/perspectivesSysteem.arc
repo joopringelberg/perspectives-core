@@ -100,7 +100,7 @@ domain model://perspectives.domains#System
     user Initializer = sys:Me
       perspective on PerspectivesUsers
         only (Create)
-        props (Identifiable$PublicKey) verbs (SetPropertyValue)
+        props (Identifiable$PublicKey) verbs (SetPropertyValue, AddPropertyValue)
  
   -- MySocialEnvironment is the same on all of my devices.
     -- PDRDEPENDENCY
