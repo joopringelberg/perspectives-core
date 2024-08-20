@@ -520,7 +520,11 @@ setProperty rids propertyName values = do
                   -- Apply all changes to the role and then save it:
                   --  - change the property values in one go
                   --  - remove all propertyDeltas for this property.
-                  lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const empty) propertyDeltas}) (setRol_property pe replacementProperty values))
+                  lift $ cacheAndSave 
+                    rid 
+                    (over PerspectRol 
+                      (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const (fromFoldable (flip Tuple signedDelta <<< unwrap <$> values))) propertyDeltas}) 
+                      (setRol_property pe replacementProperty values))
 
 
 -----------------------------------------------------------
