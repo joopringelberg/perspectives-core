@@ -31,12 +31,13 @@ import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Trans.Class (lift)
 import Control.Plus ((<|>))
-import Data.Array (elemIndex, head)
+import Data.Array (elemIndex, foldM, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (catchError, try)
 import Effect.Class (liftEffect)
@@ -47,12 +48,12 @@ import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
 import Perspectives.ApiTypes (ContextSerialization(..), ContextsSerialisation(..), PropertySerialization(..), RecordWithCorrelationidentifier(..), Request(..), RequestRecord, Response(..), RolSerialization(..), mkApiEffect, showRequestRecord)
-import Perspectives.Assignment.Update (RoleProp(..), deleteProperty, getPropertyBearingRoleInstance, saveFile, setPreferredUserRoleType, setProperty)
+import Perspectives.Assignment.Update (RoleProp(..), addProperty, deleteProperty, getPropertyBearingRoleInstance, saveFile, setPreferredUserRoleType, setProperty)
 import Perspectives.Checking.PerspectivesTypeChecker (checkBinding)
 import Perspectives.CompileAssignment (compileAssignment)
 import Perspectives.CompileRoleAssignment (compileAssignmentFromRole)
-import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>))
-import Perspectives.DependencyTracking.Array.Trans (runArrayT)
+import Perspectives.CoreTypes (MP, MonadPerspectives, MonadPerspectivesTransaction, PropertyValueGetter, RoleGetter, liftToInstanceLevel, (##=), (##>), (##>>), (###=))
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DependencyTracking.Dependency (registerSupportedEffect, unregisterSupportedEffect)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -60,7 +61,7 @@ import Perspectives.Fuzzysort (matchIndexedContextNames)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, isTypeUri, typeUri2ModelUri_, typeUri2couchdbFilename)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getProperty, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Names (expandDefaultNamespaces, getMySystem)
@@ -77,7 +78,7 @@ import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfR
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType, RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid, resourceIdentifier2DocLocator)
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
@@ -86,8 +87,8 @@ import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
-import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, string2EnumeratedRoleType, string2RoleType)
-import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq)
+import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, rolesWithPerspectiveOnRoleAndProperty, string2EnumeratedRoleType, string2RoleType)
+import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq, (<*>))
 import Simple.JSON (read, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -295,6 +296,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter (map toRoleType_ <<< (binding >=> context >=> getMyType)) (RoleInstance subject) onlyOnce
         _ -> registerSupportedEffect corrId setter (map toRoleType_ <<< (context >=> getMyType)) (RoleInstance subject) onlyOnce
+    -- E.g. send in an External Role instance, get back the role instance in the context ultimately filled by the PerspectivesUser
+    -- that represents the current user.
+    -- If the role is a contextrole, we treat it as if we got its binding.
+    Api.GetMeInContext -> do
+      roleKind <- roleType_ (RoleInstance subject) >>= getEnumeratedRole >>= pure <<< kindOfRole
+      case roleKind of
+        ContextRole -> registerSupportedEffect corrId setter ((binding >=> context >=> getMe)) (RoleInstance subject) onlyOnce
+        _ -> registerSupportedEffect corrId setter ((context >=> getMe)) (RoleInstance subject) onlyOnce
     -- `subject` is a role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
@@ -306,6 +315,22 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.MatchContextName -> do 
       mysystem <- getMySystem
       registerSupportedEffect corrId setter (matchIndexedContextNames subject) (ContextInstance mysystem) onlyOnce
+    Api.GetChatParticipants -> do 
+      registerSupportedEffect 
+        corrId 
+        setter 
+        (\(chatRoleInstance :: RoleInstance) -> ArrayT $ lift do 
+          chatRoleType <- roleType_ chatRoleInstance
+          chatContextInstance <- chatRoleInstance ##>> context
+          contextType <- ((_.context <<< unwrap) <$> getEnumeratedRole chatRoleType)
+          userRoles <- contextType ###= (unsafePartial rolesWithPerspectiveOnRoleAndProperty (ENR chatRoleType) (ENP $ EnumeratedPropertyType predicate))
+          foldM
+            (\cumulator userRoleType -> (<>) <$> (chatContextInstance ##= getRoleInstances userRoleType) <*> pure cumulator)
+            []
+            userRoles
+        )
+        (RoleInstance subject)
+        onlyOnce
     Api.GetCouchdbUrl -> do
       url <- gets \s -> maybe "" identity s.couchdbUrl
       sendResponse (Result corrId [url]) setter
@@ -557,6 +582,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.SetProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
+        sendResponse (Result corrId ["ok"]) setter)
+      (\e -> sendResponse (Error corrId (show e)) setter)
+    Api.AddProperty -> catchError
+      (do
+        void $ runMonadPerspectivesTransaction authoringRole (addProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Tuple (Value object) Nothing)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype}

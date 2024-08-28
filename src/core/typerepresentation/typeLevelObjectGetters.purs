@@ -73,7 +73,7 @@ import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as TI
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerb)
 import Perspectives.Representation.View (propertyReferences)
 import Perspectives.Utilities (addUnique)
-import Prelude (Unit, append, bind, eq, flip, not, pure, show, unit, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||))
+import Prelude (Unit, append, bind, eq, flip, not, pure, show, unit, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (||), (<*>))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS ON ENUMERATEDROLETYPES
@@ -684,14 +684,14 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verb =
         c <- perspective `isPerspectiveOnRoleFilledWithRoleType` (ENR roleType)
         pure (a && (b || c)))
 
--- perspectiveSupportsProperty
-rolesWithPerspectiveOnProperty :: PropertyType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnProperty pt = COMB.filter userRole (propertyIsInPerspectiveOfUser pt)
+-- | All role types in a context type that have a perspective on a given role, with a perspective on the given property.
+rolesWithPerspectiveOnRoleAndProperty :: Partial => RoleType -> PropertyType -> ContextType ~~~> RoleType
+rolesWithPerspectiveOnRoleAndProperty subject pt = COMB.filter userRole (propertyIsInPerspectiveOfUser pt)
   where
     -- voor de user of één van zijn aspecten.
     propertyIsInPerspectiveOfUser :: PropertyType -> RoleType ~~~> Boolean
     propertyIsInPerspectiveOfUser property userRole' = lift $ isJust <$> findPerspective userRole'
-      (pure <<< (flip perspectiveSupportsProperty property))
+      (\perspective -> (&&) <$> (perspective `isPerspectiveOnRoleType` subject) <*> (pure $ perspectiveSupportsProperty perspective pt))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR PERSPECTIVES
