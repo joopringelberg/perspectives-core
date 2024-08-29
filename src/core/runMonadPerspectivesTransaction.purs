@@ -117,6 +117,7 @@ runMonadPerspectivesTransaction' share authoringRole a = (lift $ createTransacti
 -- | The first three are cleared out; from the last we remove the ExecuteDestructiveEffect and RoleUnbinding items.
 phase1 :: forall o. Boolean -> RoleType -> o -> MonadPerspectivesTransaction o
 phase1 share authoringRole r = do
+  log "Entering phase1."
   -- Run monotonic actions, after
   --  * adding all ContextRemovals to the untouchableContexts and
   --  * adding rolesToExit to the untouchableRoles.
@@ -220,6 +221,7 @@ phase1 share authoringRole r = do
 
 phase2 :: forall o. Boolean -> RoleType -> o -> MonadPerspectivesTransaction o
 phase2 share authoringRole r = do
+  log "Entering phase2."
   Transaction {invertedQueryResults, createdContexts, createdRoles, rolesToExit, scheduledAssignments, modelsToBeRemoved} <- AA.get
   (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
   AA.modify \t -> over Transaction (\tr -> tr {invertedQueryResults = []}) t
@@ -282,13 +284,13 @@ phase2 share authoringRole r = do
       -- we can simply reset it.
       -- We can also remove the untouchables; all resources listed in them have gone, now.
       AA.modify \t -> over Transaction (\tr -> tr {scheduledAssignments = [], untouchableContexts = [], untouchableRoles = []}) t
-      if not $ null modelsToBeRemoved
-        then log ("Will remove these models: " <> show modelsToBeRemoved)
-        else pure unit
-      lift $ void $ for modelsToBeRemoved tryRemoveEntiteit
       Transaction {postponedStateEvaluations, correlationIdentifiers} <- AA.get
       if null postponedStateEvaluations
         then do 
+          if not $ null modelsToBeRemoved
+            then log ("Will remove these models: " <> show modelsToBeRemoved)
+            else pure unit
+          lift $ void $ for modelsToBeRemoved tryRemoveEntiteit
           if not $ null correlationIdentifiers
             then do
               log "==========RUNNING EFFECTS============"

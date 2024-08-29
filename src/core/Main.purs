@@ -358,7 +358,9 @@ forkJustInTimeModelLoader modelToLoadAVar state = run
               (runEmbeddedIfNecessary
                 doNotShareWithPeers 
                 (ENR $ EnumeratedRoleType sysUser) 
-                (void $ addModelToLocalStore dfId isInitialLoad))
+                (do 
+                  log ("Will just-in-time load " <> show dfId)
+                  void $ addModelToLocalStore dfId isInitialLoad))
               state
             -- Report back to retrieveDomeinFile on the Aff level, i.e. when the embedded loading on the level of
             -- MonadPerspectives has been run.
