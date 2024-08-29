@@ -597,7 +597,7 @@ fillsOperator sourceOfFillerRoles sourceOfFilledRoles originRole = ArrayT do
 filledByCombinator :: (RoleInstance ~~> Filled) ->
   (Filler ~~> Value)
 filledByCombinator sourceOfFillerRoles filled = ArrayT do
-  (bools :: Array Boolean) <- runArrayT $ (sourceOfFillerRoles >=> filledBy (Filler_ filled) <<< Filled_) filled
+  (bools :: Array Boolean) <- runArrayT $ (sourceOfFillerRoles >=> \filler -> filledBy (Filler_ filler) (Filled_ filled)) filled
   -- If there are no bindingRoles, this function must return false.
   if null bools
     then pure [Value $ show false]
