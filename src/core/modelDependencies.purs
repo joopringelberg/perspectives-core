@@ -267,3 +267,15 @@ userWithCredentialsAuthorizedDomain = "model://perspectives.domains#System$WithC
 ------------------------------------------------------------------------------------
 bodiesWithAccountsModelName :: String
 bodiesWithAccountsModelName = "model://perspectives.domains#BodiesWithAccounts"
+
+------------------------------------------------------------------------------------
+-- SHAREDFILESERVICES
+------------------------------------------------------------------------------------
+mySharedFileServices :: String
+mySharedFileServices = "model://perspectives.domains#SharedFileServices$MySharedFileServices"
+
+actualSharedFileServer :: String
+actualSharedFileServer = "model://perspectives.domains#SharedFileServices$MySharedFileServices$ActualSharedFileServer"
+
+fileShareCredentials :: String
+fileShareCredentials = "model://perspectives.domains#SharedFileServices$MySharedFileServices$ActualSharedFileServer$FileShareCredentials"

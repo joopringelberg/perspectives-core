@@ -46,7 +46,7 @@ import Effect.Exception (error)
 import Foreign.Object (empty, lookup) as OBJ
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ContextAndRole (rol_binding, rol_context, rol_id, rol_pspType)
-import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, AssumptionTracking, liftToInstanceLevel, (###=), (##>>), (##>))
+import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), Assumption, AssumptionTracking, InformedAssumption(..), MP, MPQ, MonadPerspectives, MonadPerspectivesQuery, liftToInstanceLevel, (###=), (##>), (##>>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), firstOfSequence, runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionNArgs)
@@ -815,6 +815,9 @@ getterFromPropertyType (CP cp@(CalculatedPropertyType id)) = case lookupProperty
     void $ pure $ propertyGetterCacheInsert id (unsafeCoerce getter) functional mandatory
     pure (unsafeCoerce getter)
   Just g -> pure g
+
+getPropertyValues :: PropertyType -> (RoleInstance ~~> Value)
+getPropertyValues pt rid = (lift $ lift $ getterFromPropertyType pt) >>= \getter -> getter rid
 
 getHiddenFunction :: QueryFunctionDescription -> MP HiddenFunction
 getHiddenFunction = unsafeCoerce $ compileFunction

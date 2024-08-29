@@ -40,6 +40,7 @@ domain model://perspectives.domains#SharedFileServices
     property AccountName (String)
     property Password (String)
     property StorageType (String)
+    -- PDRDEPENDENCY
     property FileShareCredentials = "{\"accountName\": \"" + AccountName + "\", \"password\": \"" + Password + "\", \"storageType\": \"" + StorageType + "\", \"sharedStorageId\": \"" + Id + "\"}"
     
   -------------------------------------------------------------------------------
@@ -73,10 +74,7 @@ domain model://perspectives.domains#SharedFileServices
       perspective on DefaultFileServer
         only (Create)
         props (AccountName, Password, StorageType) verbs (SetPropertyValue)
-      
-      perspective on TheStartContext
-        props (Name) verbs (Consult)
-      
+            
       screen "Shared File Servers"
         row 
           form "Your own shared file service" MySharedFileService
@@ -88,9 +86,8 @@ domain model://perspectives.domains#SharedFileServices
     thing MySharedFileService 
       aspect sfs:SharedFileService
 
+    -- PDRDEPENDENCY
     thing ActualSharedFileServer (functional) = MySharedFileService orElse DefaultFileServer
 
     thing DefaultFileServer
       aspect sfs:SharedFileService
-
-    thing TheStartContext (functional) = filter sys:MySystem >> StartContexts with filledBy (sfs:MySharedFileServices >> extern)

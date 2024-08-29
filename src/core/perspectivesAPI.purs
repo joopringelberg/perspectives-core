@@ -63,14 +63,14 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
-import Perspectives.ModelDependencies (sysUser)
-import Perspectives.Names (expandDefaultNamespaces, getMySystem)
+import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, mySharedFileServices, sysUser)
+import Perspectives.Names (expandDefaultNamespaces, getMySystem, lookupIndexedContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol, saveMarkedResources)
 import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame)
-import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPublicUrl, getRoleFunction, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPropertyValues, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
@@ -78,7 +78,7 @@ import Perspectives.Representation.Class.Role (getRoleType, kindOfRole, rangeOfR
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
-import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType, propertytype2string, roletype2string, toRoleType_)
 import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid, resourceIdentifier2DocLocator)
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
@@ -88,7 +88,7 @@ import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, rolesWithPerspectiveOnRoleAndProperty, string2EnumeratedRoleType, string2RoleType)
-import Prelude (Unit, bind, discard, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=), eq, (<*>))
+import Prelude (Unit, bind, const, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
 import Simple.JSON (read, unsafeStringify)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -304,6 +304,19 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter ((binding >=> context >=> getMe)) (RoleInstance subject) onlyOnce
         _ -> registerSupportedEffect corrId setter ((context >=> getMe)) (RoleInstance subject) onlyOnce
+    Api.GetFileShareCredentials -> registerSupportedEffect 
+      corrId 
+      setter 
+      (const $ ArrayT $ lift do
+        -- Get the indexed context sfs:MySharedFileServices
+        -- Then get the role ActualSharedFileServer
+        -- Finally return the property FileShareCredentials
+        mservices <- lookupIndexedContext mySharedFileServices
+        case mservices of 
+          Nothing -> pure []
+          Just services -> services ##= (getRoleInstances (CR $ CalculatedRoleType actualSharedFileServer) >=> getPropertyValues (CP $ CalculatedPropertyType fileShareCredentials)))
+      (RoleInstance "")
+      onlyOnce
     -- `subject` is a role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
