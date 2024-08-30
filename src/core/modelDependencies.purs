@@ -15,7 +15,10 @@ perspectivesUsers :: String
 perspectivesUsers = "model://perspectives.domains#System$TheWorld$PerspectivesUsers" 
 
 identifiableLastName :: String
-identifiableLastName = "model://perspectives.domains#System$TheWorld$Identifiable$LastName" 
+identifiableLastName = "model://perspectives.domains#System$Identifiable$LastName" 
+
+identifiableFirstName :: String
+identifiableFirstName = "model://perspectives.domains#System$Identifiable$FirstName" 
 
 theWorld :: String
 theWorld = "model://perspectives.domains#System$TheWorld" 
@@ -275,7 +278,7 @@ mySharedFileServices :: String
 mySharedFileServices = "model://perspectives.domains#SharedFileServices$MySharedFileServices"
 
 actualSharedFileServer :: String
-actualSharedFileServer = "model://perspectives.domains#SharedFileServices$MySharedFileServices$ActualSharedFileServer"
+actualSharedFileServer = "model://perspectives.domains#SharedFileServices$SharedFileServices$ActualSharedFileServer"
 
 fileShareCredentials :: String
-fileShareCredentials = "model://perspectives.domains#SharedFileServices$MySharedFileServices$ActualSharedFileServer$FileShareCredentials"
+fileShareCredentials = "model://perspectives.domains#SharedFileServices$SharedFileService$FileShareCredentials"

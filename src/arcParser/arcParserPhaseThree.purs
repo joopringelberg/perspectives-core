@@ -55,7 +55,7 @@ import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegmen
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (MarkDownE(..), RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -86,11 +86,11 @@ import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(..), StateSpec(..), addProperty, createModificationSummary, expandPropSet, expandVerbs, isMutatingVerbSet, perspectiveMustBeSynchronized, perspectiveSupportsPropertyForVerb, perspectiveSupportsRoleVerbs, stateSpec2StateIdentifier)
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
+import Perspectives.Representation.ScreenDefinition (ChatDef(..), ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, optimistic, pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.UserGraph.Build (buildUserGraph)
 import Perspectives.Representation.Verbs (PropertyVerb, roleVerbList2Verbs)
 import Perspectives.Representation.View (View(..))
@@ -1388,6 +1388,7 @@ handleScreens screenEs = do
             screenElementDef (AST.TableElement tableE) = TableElementD <$> table tableE
             screenElementDef (AST.FormElement formE) = FormElementD <$> form formE
             screenElementDef (AST.MarkDownElement markdownE) = MarkDownElementD <$> markdown markdownE
+            screenElementDef (AST.ChatElement chatE) = ChatElementD <$> chat chatE
 
             functionalWidget :: ThreeValuedLogic
             functionalWidget = True
@@ -1425,11 +1426,29 @@ handleScreens screenEs = do
             markdown (MarkDownExpression {text, condition, context:ctxt, start:start', end:end'}) = do
               text' <- compileStep (CDOM $ ST ctxt) text
               -- The resulting QueryFunctionDescription should be functional.
-              if functional text' `eq` True
+              if functional text' `eq` True 
                 then do
                   condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
                   pure $ MarkDownExpressionDef {textQuery: text', condition: condition', text: Nothing}
                 else throwError (MarkDownExpressionMustBeFunctional start' end')
+            
+            chat :: ChatE -> PhaseThree ChatDef
+            chat (ChatE {chatRole, messagesProperty, mediaProperty, start:start', end:end'}) = do 
+              (chatRoleType :: RoleType) <- unsafePartial ARRP.head <$> collectRoles chatRole
+              qualifiedMessageProperty <- qualifyProperty chatRoleType messagesProperty
+              qualifiedMediaProperty <- qualifyProperty chatRoleType mediaProperty
+              pure $ ChatDef {chatRole: chatRoleType, chatInstance: Nothing, messageProperty: qualifiedMessageProperty, mediaProperty: qualifiedMediaProperty}
+
+              where 
+              qualifyProperty ::  RoleType -> String -> PhaseThree EnumeratedPropertyType
+              qualifyProperty chatRoleType prop = do 
+                candidates <- lift2 (chatRoleType ###= lookForUnqualifiedPropertyType_ messagesProperty )
+                case head candidates of
+                  Nothing -> throwError $ UnknownProperty start' prop (roletype2string chatRoleType)
+                  (Just t) | length candidates == 1 -> case t of
+                    ENP p -> pure p
+                    CP p -> throwError $ PropertyCannotBeCalculated prop start' end'
+                  otherwise -> throwError $ NotUniquelyIdentifying start' prop (map propertytype2string candidates)
 
 
             widgetCommonFields :: AST.WidgetCommonFields -> ThreeValuedLogic -> PhaseThree WidgetCommonFieldsDef

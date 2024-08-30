@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Identifiers (isTypeUri, typeUri2typeNameSpace)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -337,9 +337,17 @@ instance containsPrefixesTabE :: ScanSymbols TabE where
     scrEls' <- traverse scan scrEls
     pure $ TabE title isDefault scrEls'
 
+instance ScanSymbols ChatE where
+  scan (ChatE {chatRole, messagesProperty, mediaProperty, start, end}) = do
+    chatRole' <- scan chatRole
+    messagesProperty' <- f messagesProperty
+    mediaProperty' <- f mediaProperty
+    pure $ ChatE{ chatRole: chatRole', messagesProperty: messagesProperty', mediaProperty: mediaProperty', start, end}
+
 instance containsPrefixesScreenElement :: ScanSymbols ScreenElement where
   scan (RowElement r) = RowElement <$> scan r
   scan (ColumnElement r) = ColumnElement <$> scan r
   scan (TableElement r) = TableElement <$> scan r
   scan (FormElement r) = FormElement <$> scan r
   scan (MarkDownElement r) = MarkDownElement <$> scan r
+  scan (ChatElement r) = ChatElement <$> scan r

@@ -35,8 +35,8 @@ import Data.Array (elemIndex, foldM, head)
 import Data.Either (Either(..))
 import Data.List.Types (NonEmptyList)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
-import Data.Newtype (unwrap)
-import Data.Traversable (traverse)
+import Data.Newtype (class Newtype, unwrap)
+import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (catchError, try)
@@ -63,14 +63,14 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
-import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, mySharedFileServices, sysUser)
-import Perspectives.Names (expandDefaultNamespaces, getMySystem, lookupIndexedContext)
+import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, identifiableFirstName, identifiableLastName, mySharedFileServices, sysUser)
+import Perspectives.Names (expandDefaultNamespaces, getMySystem, getUserIdentifier, lookupIndexedContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol, saveMarkedResources)
 import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame)
-import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPropertyValues, getPublicUrl, getRoleFunction, getRoleInstances)
+import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPropertyFromTelescope, getPropertyValues, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
 import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
@@ -88,8 +88,8 @@ import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, rolesWithPerspectiveOnRoleAndProperty, string2EnumeratedRoleType, string2RoleType)
-import Prelude (Unit, bind, const, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
-import Simple.JSON (read, unsafeStringify)
+import Prelude (Unit, bind, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Simple.JSON (read, unsafeStringify, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -304,19 +304,22 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
       case roleKind of
         ContextRole -> registerSupportedEffect corrId setter ((binding >=> context >=> getMe)) (RoleInstance subject) onlyOnce
         _ -> registerSupportedEffect corrId setter ((context >=> getMe)) (RoleInstance subject) onlyOnce
-    Api.GetFileShareCredentials -> registerSupportedEffect 
-      corrId 
-      setter 
-      (const $ ArrayT $ lift do
-        -- Get the indexed context sfs:MySharedFileServices
-        -- Then get the role ActualSharedFileServer
-        -- Finally return the property FileShareCredentials
-        mservices <- lookupIndexedContext mySharedFileServices
-        case mservices of 
-          Nothing -> pure []
-          Just services -> services ##= (getRoleInstances (CR $ CalculatedRoleType actualSharedFileServer) >=> getPropertyValues (CP $ CalculatedPropertyType fileShareCredentials)))
-      (RoleInstance "")
-      onlyOnce
+    Api.GetFileShareCredentials ->  do 
+      me <- getUserIdentifier
+      registerSupportedEffect 
+        corrId 
+        setter 
+        (\_ -> ArrayT $ lift do
+          -- Get the indexed context sfs:MySharedFileServices
+          -- Then get the role ActualSharedFileServer
+          -- Finally return the property FileShareCredentials
+          mservices <- lookupIndexedContext mySharedFileServices
+          case mservices of 
+            Nothing -> pure []
+            Just services -> services ##= (getRoleInstances (CR $ CalculatedRoleType actualSharedFileServer) >=> getPropertyValues (CP $ CalculatedPropertyType fileShareCredentials)))
+        -- Notice that the argument plays no role in the computation, but it has to be provided.
+        (RoleInstance me)
+        onlyOnce
     -- `subject` is a role instance. Returns all RoleTypes that sys:Me
     -- ultimately fills an instance of in the corresponding context instance.
     Api.GetAllMyRoleTypes -> do
@@ -328,22 +331,26 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.MatchContextName -> do 
       mysystem <- getMySystem
       registerSupportedEffect corrId setter (matchIndexedContextNames subject) (ContextInstance mysystem) onlyOnce
-    Api.GetChatParticipants -> do 
-      registerSupportedEffect 
-        corrId 
-        setter 
-        (\(chatRoleInstance :: RoleInstance) -> ArrayT $ lift do 
-          chatRoleType <- roleType_ chatRoleInstance
-          chatContextInstance <- chatRoleInstance ##>> context
-          contextType <- ((_.context <<< unwrap) <$> getEnumeratedRole chatRoleType)
-          userRoles <- contextType ###= (unsafePartial rolesWithPerspectiveOnRoleAndProperty (ENR chatRoleType) (ENP $ EnumeratedPropertyType predicate))
-          foldM
-            (\cumulator userRoleType -> (<>) <$> (chatContextInstance ##= getRoleInstances userRoleType) <*> pure cumulator)
-            []
-            userRoles
-        )
-        (RoleInstance subject)
-        onlyOnce
+    Api.GetChatParticipants -> registerSupportedEffect 
+      corrId 
+      setter 
+      (\(chatRoleInstance :: RoleInstance) -> ArrayT $ lift do 
+        chatRoleType <- roleType_ chatRoleInstance
+        chatContextInstance <- chatRoleInstance ##>> context
+        contextType <- ((_.context <<< unwrap) <$> getEnumeratedRole chatRoleType)
+        userRoleTypes <- contextType ###= (unsafePartial rolesWithPerspectiveOnRoleAndProperty (ENR chatRoleType) (ENP $ EnumeratedPropertyType predicate))
+        userRoles <- foldM
+          (\cumulator userRoleType -> (<>) <$> (chatContextInstance ##= getRoleInstances userRoleType) <*> pure cumulator)
+          []
+          userRoleTypes
+        -- {roleInstance, firstname, lastname, avatar [OPTIONAL]}
+        for userRoles \roleInstance -> do
+          firstname <- roleInstance ##> getPropertyFromTelescope (EnumeratedPropertyType identifiableFirstName)
+          lastname <- roleInstance ##> getPropertyFromTelescope (EnumeratedPropertyType identifiableLastName)
+          pure $ ChatParticipant (writeJSON ({firstname, lastname, roleInstance, avatar: Nothing} :: ChatParticipantFields))
+      )
+      (RoleInstance subject)
+      onlyOnce
     Api.GetCouchdbUrl -> do
       url <- gets \s -> maybe "" identity s.couchdbUrl
       sendResponse (Result corrId [url]) setter
@@ -776,3 +783,7 @@ type QueryUnsubscriber e = Effect Unit
 -- | Apply an ApiEffect to a Response, in effect sending it through the API to the caller.
 sendResponse :: Response -> Api.ApiEffect -> MonadPerspectives Unit
 sendResponse r ae = liftEffect $ ae r
+
+newtype ChatParticipant = ChatParticipant String
+derive instance Newtype ChatParticipant _
+type ChatParticipantFields = {roleInstance :: RoleInstance, firstname :: Maybe Value, lastname :: Maybe Value, avatar :: Maybe String} -- avatar will be a PSharedFile.

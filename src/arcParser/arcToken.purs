@@ -229,6 +229,9 @@ perspectDef = LanguageDef
                   , "markdown"
                   , "when"
                   , "table"
+                  , "chat"
+                  , "messages"
+                  , "media"
 
                   ]
                 , caseSensitive:   true

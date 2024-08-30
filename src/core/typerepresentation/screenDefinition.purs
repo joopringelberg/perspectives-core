@@ -32,8 +32,9 @@ import Foreign (F, Foreign, ForeignError(..), fail)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.InstanceIdentifiers (RoleInstance)
 import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
-import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
 import Perspectives.Representation.Verbs (RoleVerb)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
@@ -65,6 +66,7 @@ data ScreenElementDef =
   | TableElementD TableDef
   | FormElementD FormDef
   | MarkDownElementD MarkDownDef
+  | ChatElementD  ChatDef
 
 newtype RowDef = RowDef (Array ScreenElementDef)
 newtype ColumnDef = ColumnDef (Array ScreenElementDef)
@@ -74,6 +76,8 @@ data MarkDownDef =
   MarkDownConstantDef {text :: String, condition :: Maybe QueryFunctionDescription} |
   MarkDownPerspectiveDef { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType} |
   MarkDownExpressionDef {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String}
+newtype ChatDef = ChatDef (ChatDefFields (chatRole :: RoleType))
+type ChatDefFields f = { chatInstance :: Maybe RoleInstance, messageProperty :: EnumeratedPropertyType, mediaProperty :: EnumeratedPropertyType | f}
 -----------------------------------------------------------
 -- WIDGETS
 -----------------------------------------------------------
@@ -112,6 +116,7 @@ derive instance genericTableDef' :: Generic TableDef' _
 derive instance genericFormDef :: Generic FormDef _
 derive instance genericFormDef' :: Generic FormDef' _
 derive instance Generic MarkDownDef _
+derive instance Generic ChatDef _
 
 -----------------------------------------------------------
 -- SHOW INSTANCES
@@ -124,6 +129,7 @@ instance showColumnDef :: Show ColumnDef where show x = genericShow x
 instance showTableDef :: Show TableDef where show = genericShow
 instance showFormDef :: Show FormDef where show = genericShow
 instance Show MarkDownDef where show = genericShow
+instance Show ChatDef where show = genericShow
 
 -----------------------------------------------------------
 -- EQ INSTANCES
@@ -136,6 +142,7 @@ instance eqColumnDef :: Eq ColumnDef where eq a b = genericEq a b
 instance eqTableDef :: Eq TableDef where eq = genericEq
 instance eqFormDef :: Eq FormDef where eq = genericEq
 instance Eq MarkDownDef where eq = genericEq
+instance Eq ChatDef where eq = genericEq
 
 -----------------------------------------------------------
 -- WRITEFOREIGN INSTANCES
@@ -150,6 +157,7 @@ instance writeForeignScreenElementDef :: WriteForeign ScreenElementDef where
   writeImpl (TableElementD t) = write { elementType: "TableElementD", element: t}
   writeImpl (FormElementD f) = write { elementType: "FormElementD", element: f}
   writeImpl (MarkDownElementD f) = write { elementType: "MarkDownElementD", element: f}
+  writeImpl (ChatElementD c) = write { elementType: "ChatElementD", element: c}
 
 instance writeForeignTabDef :: WriteForeign TabDef where
   writeImpl (TabDef widgetCommonFields) = write widgetCommonFields
@@ -166,6 +174,8 @@ instance WriteForeign MarkDownDef where
   writeImpl (MarkDownConstantDef f) = write { tag: "MarkDownConstantDef", element: f}
   writeImpl (MarkDownPerspectiveDef f) = write { tag: "MarkDownPerspectiveDef", element: f}
   writeImpl (MarkDownExpressionDef f) = write { tag: "MarkDownExpressionDef", element: f}
+instance WriteForeign ChatDef where
+  writeImpl (ChatDef fields) = write {tag: "ChatDef", fields: fields {chatRole = roletype2string fields.chatRole}}
 
 instance WriteForeign ScreenKey where
   writeImpl (ScreenKey ct rt) = writeImpl {ct, rt}
@@ -189,6 +199,7 @@ instance ReadForeign ScreenElementDef where
           "MarkDownConstantDef" -> MarkDownElementD <<< MarkDownConstantDef <$> ((read' subElement) :: F {text :: String, condition :: Maybe QueryFunctionDescription})
           "MarkDownPerspectiveDef" -> MarkDownElementD <<< MarkDownPerspectiveDef <$> ((read' subElement) :: F { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType})
           "MarkDownExpressionDef" -> MarkDownElementD <<< MarkDownExpressionDef <$> ((read' subElement) :: F {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String})
+      "ChatElementD" -> ChatElementD <$> ((read' element) :: F ChatDef)
 
 instance ReadForeign ScreenKey where
   readImpl f = do 
@@ -223,6 +234,13 @@ instance ReadForeign FormDef where
       "FormDef" -> pure $ FormDef fields
       _ -> fail (TypeMismatch "FormDef" tag)
 
+instance ReadForeign ChatDef where
+  readImpl f = do
+    ({tag, fields} :: { tag :: String, fields :: ChatDefFields (chatRole :: String)}) <- read' f
+    case tag of 
+      "ChatDef" -> pure $ ChatDef fields {chatRole = ENR $ EnumeratedRoleType fields.chatRole} -- TODO: we weten niet of het een enumerated role is!
+      _ -> fail (TypeMismatch "ChatDef" tag)
+  
 derive newtype instance ReadForeign TabDef
 
 -------------------------------------------------------------------------------

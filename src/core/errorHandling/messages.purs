@@ -111,6 +111,7 @@ data PerspectivesError
     | ExpressionsShouldBeFunctional Boolean Boolean ArcPosition
     | NoMonths ArcPosition
     | NotARootContext ArcPosition ArcPosition ContextType
+    | PropertyCannotBeCalculated String ArcPosition ArcPosition
 
     | UnauthorizedForProperty String RoleType RoleType PropertyType PropertyVerb (Maybe ArcPosition) (Maybe ArcPosition)
     | UnauthorizedForRole String RoleType RoleType (Array RoleVerb) (Maybe ArcPosition) (Maybe ArcPosition)
@@ -213,6 +214,7 @@ instance showPerspectivesError :: Show PerspectivesError where
       showCardinality b = if b then "functional" else "relational"
   show (NoMonths pos) = "(NoMonths) It is not allowed to subtract months from or add to a date. Try days or weeks instead."
   show (NotARootContext start end qualifiedContextTypeIdentifier) = "(NotARootContext) " <> (unwrap qualifiedContextTypeIdentifier) <> " is not a RootContext but you try to create it without filling a role with it. Consider using 'create_ context <ContextType> bound to <roleExpression>' between " <> show start <> " and " <> show end <> "."
+  show (PropertyCannotBeCalculated prop start end) = "(PropertyCannotBeCalculated) This property cannot be calculated " <> showPosition start end
   show (UnauthorizedForProperty author userRole role property verb start end) = "(UnauthorizedForProperty) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes " <> show verb <> " for property " <> show property <> maybeShowPosition start end
   show (UnauthorizedForRole author userRole role verbs mstart mend) = "(UnauthorizedForRole) User " <> author <> " in role " <> show userRole <> " has no perspective on role " <> show role <> " that includes at least one of " <> show verbs <> maybeShowPosition mstart mend
   show (UnauthorizedForContext author userRole contextType) = "(UnauthorizedForContext) User " <> author <> " in role " <> show userRole <> " has no perspective on context " <> show contextType

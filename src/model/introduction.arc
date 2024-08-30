@@ -44,7 +44,7 @@ domain model://perspectives.domains#Introduction
       aspect sys:RootContext$External
 
     context Introductions (relational) filledBy Introduction
-    context IncomingIntroductions = sys:SocialMe >> binder Introducee >> context >> extern
+    context IncomingIntroductions = sys:SocialMe >> binding >> binder sys:SocialEnvironment$Persons >> binder Introducee >> context >> extern
     user Manager = sys:Me
       perspective on Introductions
         only (CreateAndFill, Remove)
@@ -67,16 +67,56 @@ domain model://perspectives.domains#Introduction
     user Guest = sys:SocialMe
       perspective on Introducer
         only (Create, Fill)
+
     user Introducer filledBy sys:TheWorld$PerspectivesUsers
+      perspective on extern
+        props (Title) verbs (Consult, SetPropertyValue)
+        action StartConversation
+          create role Conversation
+      perspective on Introducer
+        props (FirstName) verbs (Consult)
       perspective on Introducee
         only (Create, Fill, Remove, CreateAndFill)
         props (FirstName, LastName) verbs (Consult)
+      perspective on Conversation
+        only (Create, Remove)
+        props (Messages, Media) verbs (AddPropertyValue, Consult)
+      screen
+        row
+          column 
+            row 
+              form External
+            row 
+              table Introducee
+          column 
+            chat Conversation
+              messages Messages
+              media Media
 
     user Introducee (relational) filledBy sys:TheWorld$PerspectivesUsers
       perspective on extern
         props (Title) verbs (Consult)
+        action StartConversation
+          create role Conversation
       perspective on Introducer
         props (FirstName, LastName) verbs (Consult)
       perspective on Introducee
         props (FirstName, LastName) verbs (Consult)
+      perspective on Conversation
+        only (Create, Remove)
+        props (Messages, Media) verbs (AddPropertyValue, Consult)
+      screen
+        row
+          column 
+            row 
+              form External
+            row 
+              form Introducer
+          column 
+            chat Conversation
+              messages Messages
+              media Media
       
+    thing Conversation
+      property Messages (relational, String)
+      property Media (relational, String)

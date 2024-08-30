@@ -378,6 +378,7 @@ data ScreenElement =
   | TableElement TableE
   | FormElement FormE
   | MarkDownElement MarkDownE
+  | ChatElement ChatE
 
 --------------------------------------------------------------------------------
 ---- TAB, ROW, COLUMN
@@ -418,6 +419,17 @@ data MarkDownE =
   MarkDownConstant {text :: Step, condition :: Maybe Step, context :: ContextType, start :: ArcPosition, end :: ArcPosition} |
   MarkDownPerspective {widgetFields :: WidgetCommonFields, condition :: Maybe String, start :: ArcPosition, end :: ArcPosition} |
   MarkDownExpression {text :: Step, condition :: Maybe Step, context :: ContextType, start :: ArcPosition, end :: ArcPosition} 
+
+--------------------------------------------------------------------------------
+---- CHAT
+--------------------------------------------------------------------------------
+newtype ChatE = ChatE 
+  { chatRole :: RoleIdentification
+  , messagesProperty :: String
+  , mediaProperty :: String
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
 
 --------------------------------------------------------------------------------
 ---- INSTANCES
@@ -526,3 +538,7 @@ instance showForm :: Show FormE where show = genericShow
 
 derive instance Generic MarkDownE _
 instance Show MarkDownE where show = genericShow
+
+derive instance Generic ChatE _
+instance Show ChatE where show = genericShow
+derive instance Newtype ChatE _

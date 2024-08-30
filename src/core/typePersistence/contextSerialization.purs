@@ -25,13 +25,13 @@ module Perspectives.TypePersistence.ContextSerialisation where
 
 import Prelude
 
-import Control.Monad.Trans.Class (lift) 
+import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, elemIndex, filter, head, length, null, filterA)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (for, traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, MPQ, (###=))
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, MPQ, (###=), (##>))
 import Perspectives.Data.EncodableMap (lookup)
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -40,11 +40,11 @@ import Perspectives.Identifiers (typeUri2ModelUri_)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Perspectives.Query.UnsafeCompiler (compileFunction)
+import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances)
 import Perspectives.Representation.Class.Role (perspectivesOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.Perspective (Perspective(..), StateSpec(..))
-import Perspectives.Representation.ScreenDefinition (ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..), WidgetCommonFieldsDef)
+import Perspectives.Representation.ScreenDefinition (ChatDef(..), ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..), WidgetCommonFieldsDef)
 import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType(..))
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUserFromId, perspectivesForContextAndUser', serialisePerspective)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
@@ -110,6 +110,7 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
   contextualiseScreenElementDef (TableElementD e) = map TableElementD <$> contextualiseTableDef e
   contextualiseScreenElementDef (FormElementD e) = map FormElementD <$> contextualiseFormDef e
   contextualiseScreenElementDef (MarkDownElementD e) = map MarkDownElementD <$> contextualiseMarkDownDef e
+  contextualiseScreenElementDef (ChatElementD c) = map ChatElementD <$> contextualiseChatDef c 
 
   contextualiseRowDef :: RowDef -> MPQ (Maybe RowDef)
   contextualiseRowDef (RowDef elements) = do
@@ -139,6 +140,11 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
         Just widgetFields' -> pure $ Just $ MarkDownPerspectiveDef {widgetFields: widgetFields', conditionProperty}
         Nothing -> pure Nothing
     _ -> pure $ Just md
+
+  contextualiseChatDef :: ChatDef -> MPQ (Maybe ChatDef)
+  contextualiseChatDef (ChatDef r@{chatRole}) = do 
+    chatRoleInstance <- (lift $ lift  (contextInstance ##> getRoleInstances chatRole)) 
+    pure $ Just $ ChatDef r {chatInstance = chatRoleInstance}
   
   contextualiseWidgetCommonFields :: WidgetCommonFieldsDef -> MPQ (Maybe WidgetCommonFieldsDef)
   contextualiseWidgetCommonFields wc@{perspectiveId, propertyVerbs, roleVerbs, userRole} = do
@@ -273,6 +279,7 @@ instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef wh
   addPerspectives (TableElementD re) user ctxt = TableElementD <$> addPerspectives re user ctxt
   addPerspectives (FormElementD re) user ctxt = FormElementD <$> addPerspectives re user ctxt
   addPerspectives (MarkDownElementD re) user ctxt = MarkDownElementD <$> addPerspectives re user ctxt
+  addPerspectives (ChatElementD re) user ctxt = ChatElementD <$> addPerspectives re user ctxt
 
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
   addPerspectives (TabDef r) user ctxt = do
@@ -315,6 +322,11 @@ instance AddPerspectives MarkDownDef where
       widgetFields
       ctxt
     pure $ MarkDownPerspectiveDef {widgetFields: widgetFields {perspective = Just perspective}, conditionProperty}
+  
+instance AddPerspectives ChatDef where
+  addPerspectives (ChatDef r@ {chatRole}) user ctxt = do 
+    chatRoleInstance <- (lift (ctxt ##> getRoleInstances chatRole)) 
+    pure $ ChatDef r {chatInstance = chatRoleInstance}
 
 traverseScreenElement :: RoleInstance -> ContextInstance -> ScreenElementDef -> AssumptionTracking (Maybe ScreenElementDef)
 traverseScreenElement user ctxt a = case a of 

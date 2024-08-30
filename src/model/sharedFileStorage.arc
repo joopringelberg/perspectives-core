@@ -42,7 +42,7 @@ domain model://perspectives.domains#SharedFileServices
     property StorageType (String)
     -- PDRDEPENDENCY
     property FileShareCredentials = "{\"accountName\": \"" + AccountName + "\", \"password\": \"" + Password + "\", \"storageType\": \"" + StorageType + "\", \"sharedStorageId\": \"" + Id + "\"}"
-    
+
   -------------------------------------------------------------------------------
   ---- SHARED FILE SERVICES
   -------------------------------------------------------------------------------

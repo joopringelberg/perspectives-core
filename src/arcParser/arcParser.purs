@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -1391,6 +1391,7 @@ screenElementE = withPos do
     "table" -> reserved "table" *> (TableElement <$> tableE)
     "form" -> reserved "form" *> (FormElement <$> formE)
     "markdown" -> reserved "markdown" *> (MarkDownElement <$> markdownE)
+    "chat" -> reserved "chat" *> (ChatElement <$> chatE)
     -- NOTE: extend message when a new widget is added.
     _ -> fail "Only `row`, `column`, `table` and `form` are allowed here. "
 
@@ -1463,3 +1464,16 @@ markdownE = do
       sameOrOutdented'
       end <- getPosition
       pure $ MarkDownExpression {text, condition, context, start, end}
+
+chatE :: IP ChatE
+chatE = do
+  -- We cannot know, at this point, whether the role is Calculated or Enumerated.
+  -- Like with the filledBy clause, we assume Enumerated and repair that later.
+  ctxt <- getCurrentContext
+  start <- getPosition
+  roleName <- arcIdentifier
+  chatRole <- pure (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ roleName) start)
+  messagesProperty <- reserved "messages" *> arcIdentifier
+  mediaProperty <- reserved "media" *> arcIdentifier
+  end <- getPosition
+  pure $ ChatE { chatRole, messagesProperty, mediaProperty, start, end}
