@@ -60,14 +60,16 @@ import Perspectives.PerspectivesState (getPerspectivesUser)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, consOnMainPath, singletonPath)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
+import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
+import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..), createTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (enumeratedRolePropertyTypes_, perspectivesClosure_, propertiesInPerspective)
+import Perspectives.Types.ObjectGetters (perspectivesClosure_, propertiesInPerspective)
 import Prelude (Unit, bind, discard, join, pure, show, unit, void, ($), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Simple.JSON (unsafeStringify, write)
 
@@ -193,7 +195,7 @@ getPropertyValues pt dep = do
   computePathToFillerWithProperty :: Partial => DependencyPath ~~> DependencyPath
   computePathToFillerWithProperty path@{head} = ArrayT case head of 
     R rid -> do 
-      localProps <- lift $ (roleType_ >=> enumeratedRolePropertyTypes_) rid
+      localProps <- lift $ (roleType_ >=> allLocallyRepresentedProperties <<< ST) rid
       if isJust $ elemIndex pt localProps
         -- The type of the role instance support the property. Return the path
         then pure [path]
