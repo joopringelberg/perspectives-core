@@ -88,7 +88,7 @@ import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, rolesWithPerspectiveOnRoleAndProperty, string2EnumeratedRoleType, string2RoleType)
-import Prelude (Unit, bind, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<*>), (<<<), (<>), (==), (>=>), (>>=))
+import Prelude (Unit, bind, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Simple.JSON (read, unsafeStringify, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -334,19 +334,21 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.GetChatParticipants -> registerSupportedEffect 
       corrId 
       setter 
-      (\(chatRoleInstance :: RoleInstance) -> ArrayT $ lift do 
-        chatRoleType <- roleType_ chatRoleInstance
-        chatContextInstance <- chatRoleInstance ##>> context
-        contextType <- ((_.context <<< unwrap) <$> getEnumeratedRole chatRoleType)
-        userRoleTypes <- contextType ###= (unsafePartial rolesWithPerspectiveOnRoleAndProperty (ENR chatRoleType) (ENP $ EnumeratedPropertyType predicate))
+      (\(chatRoleInstance :: RoleInstance) -> ArrayT do 
+        chatRoleType <- lift $ roleType_ chatRoleInstance
+        chatContextInstance <- runArrayT $ context chatRoleInstance
+        contextType <- ((_.context <<< unwrap) <$> (lift $ getEnumeratedRole chatRoleType))
+        userRoleTypes <- lift $ contextType ###= (unsafePartial rolesWithPerspectiveOnRoleAndProperty (ENR chatRoleType) (ENP $ EnumeratedPropertyType predicate))
         userRoles <- foldM
-          (\cumulator userRoleType -> (<>) <$> (chatContextInstance ##= getRoleInstances userRoleType) <*> pure cumulator)
+          (\cumulator userRoleType -> do
+            is <- runArrayT (getRoleInstances userRoleType (unsafePartial fromJust $ head chatContextInstance))
+            pure ( cumulator <> is))
           []
           userRoleTypes
         -- {roleInstance, firstname, lastname, avatar [OPTIONAL]}
         for userRoles \roleInstance -> do
-          firstname <- roleInstance ##> getPropertyFromTelescope (EnumeratedPropertyType identifiableFirstName)
-          lastname <- roleInstance ##> getPropertyFromTelescope (EnumeratedPropertyType identifiableLastName)
+          firstname <- head <$> (runArrayT $ getPropertyFromTelescope (EnumeratedPropertyType identifiableFirstName) roleInstance)
+          lastname <- head <$> (runArrayT $ getPropertyFromTelescope (EnumeratedPropertyType identifiableLastName) roleInstance)
           pure $ ChatParticipant (writeJSON ({firstname, lastname, roleInstance, avatar: Nothing} :: ChatParticipantFields))
       )
       (RoleInstance subject)
@@ -499,6 +501,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             Right ids -> lift $ sendResponse (Result corrId (unwrap <$> ids)) setter
     -- {request: "RemoveRol", subject: rolID, predicate: rolName, object: contextType, authoringRole: myroletype}
     -- The context type given in object must be described in a locally installed model.
+    -- the predicate is the type of the role to be removed. It is the 'authorizedRole'
     Api.RemoveRol -> do
       if (isExternalRole subject)
         then do
