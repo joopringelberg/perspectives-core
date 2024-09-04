@@ -61,7 +61,7 @@ import Perspectives.Assignment.SerialiseAsDeltas (serialisedAsDeltasFor)
 import Perspectives.Assignment.Update (cacheAndSave, deleteProperty, getSubject)
 import Perspectives.Authenticate (signDelta)
 import Perspectives.CollectAffectedContexts (addDeltasForPerspectiveObjects, usersWithPerspectiveOnRoleBinding, usersWithPerspectiveOnRoleBinding', usersWithPerspectiveOnRoleInstance)
-import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
+import Perspectives.ContextAndRole (changeContext_me, context_buitenRol, context_pspType, modifyContext_rolInContext, rol_binding, rol_context, rol_isMe, rol_pspType)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, Updater, MonadPerspectives, (###=), (##=), (##>), (##>>))
 import Perspectives.Deltas (addCorrelationIdentifiersToTransactie, addDelta)
 import Perspectives.DependencyTracking.Dependency (findBindingRequests, findFilledRoleRequests, findMeRequests, findResourceDependencies, findRoleRequests)
@@ -71,13 +71,14 @@ import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (allRoleBinders, context, contextType, contextType_, getRoleOnClipboard, getUnlinkedRoleInstances, isMe, roleType_)
 import Perspectives.ModelDependencies (cardClipBoard)
-import Perspectives.Names (getMySystem)
+import Perspectives.Names (findIndexedContextName, findIndexedRoleName, getMySystem, removeIndexedContext, removeIndexedRole)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, tryGetPerspectContext, tryGetPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getMyType, getRoleInstances)
-import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getEnumeratedRole)
+import Perspectives.Representation.Class.Context (userRole)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), getContext, getEnumeratedRole)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType, RoleKind(..), RoleType(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType, RoleKind(..), RoleType(..), externalRoleType)
 import Perspectives.ResourceIdentifiers (isInPublicScheme)
 import Perspectives.RoleAssignment (filledNoLongerPointsTo, filledPointsTo, fillerNoLongerPointsTo, fillerPointsTo, lookForAlternativeMe, roleIsMe, roleIsNotMe)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
@@ -153,6 +154,23 @@ scheduleContextRemoval authorizedRole id =
         unlinkedRoleTypes <- lift (contextType ###= allUnlinkedRoles)
         unlinkedInstances <- lift $ concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
         allRoleInstances <- pure $ (cons br $ unlinkedInstances <> (concat $ values rolInContext))
+
+        subject <- getSubject
+        signedDelta <- signDelta $ writeJSON $ stripResourceSchemes $ UniverseRoleDelta 
+          { id
+          , contextType: context_pspType ctxt
+          , roleType: over ContextType buitenRol (context_pspType ctxt)
+          , authorizedRole
+          -- Note that in this case, the authorizedRole is NOT the type of the roleInstances.
+          , roleInstances: SNEA.singleton $ context_buitenRol ctxt
+          , deltaType: RemoveExternalRoleInstance
+          , subject
+          }
+        userRoleTypes <- lift (getContext (context_pspType ctxt) >>= pure <<< userRole)
+        (users :: Array RoleInstance) <- lift (concat <$> (traverse (\(userRole :: RoleType) -> id ##= getRoleInstances userRole) userRoleTypes ))
+        -- Remove the own user
+        addDelta $ DeltaInTransaction {users, delta: signedDelta}
+
         clipboard <- lift getRoleOnClipboard
         case clipboard of 
           Just roleOnClipboard -> if isJust $ elemIndex roleOnClipboard allRoleInstances
@@ -163,7 +181,7 @@ scheduleContextRemoval authorizedRole id =
           _ -> pure unit
         modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
           { scheduledAssignments = scheduledAssignments `union` [(ContextRemoval id authorizedRole)]
-          , rolesToExit = nub $ rolesToExit <> allRoleInstances})
+          , rolesToExit = nub $ rolesToExit <> allRoleInstances}) 
 
 -- Only called when the external role is also 'bound' in a DBQ role.
 removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTransaction Unit
@@ -182,10 +200,13 @@ removeContextInstance id authorizedRole = do
   (try $ getPerspectContext id) >>=
     handlePerspectContextError "removeContextInstance"
     \(ctxt@(PerspectContext{pspType:contextType, rolInContext, buitenRol})) -> do
-      do
         unlinkedRoleTypes <- contextType ###= allUnlinkedRoles
         unlinkedInstances <- concat <$> (for unlinkedRoleTypes \rt -> id ##= getUnlinkedRoleInstances rt)
         for_ (unlinkedInstances <> (concat $ values rolInContext)) removeEntiteit
+        -- Clean up the indexed role administration in state.
+        findIndexedContextName id >>= case _ of 
+          Just indexedName -> removeIndexedContext indexedName
+          Nothing -> pure unit
         void $ removeEntiteit buitenRol
         removeEntiteit id
 
@@ -225,6 +246,10 @@ removeRoleInstance roleId = (try $ (getPerspectRol roleId)) >>= handlePerspectRo
     removeRoleInstanceFromContext role
     -- PERSISTENCE (severe the binding links of the incoming FILLS relation).
     severeBindingLinks role
+    -- Clean up the indexed role administration in state.
+    findIndexedRoleName roleId >>= case _ of 
+      Just indexedName -> removeIndexedRole indexedName
+      Nothing -> pure unit
     -- PERSISTENCE (finally remove the role instance from cache and database).
     removeEntiteit roleId
 

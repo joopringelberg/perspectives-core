@@ -24,16 +24,17 @@ module Perspectives.Names
 
 where
 
-import Control.Monad.AvarMonadAsk (gets)
+import Control.Monad.AvarMonadAsk (gets, modify)
+import Data.Array (head)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, fromFoldable, lookup) as OBJ
+import Foreign.Object (Object, delete, filter, fromFoldable, keys, lookup) as OBJ
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Identifiers (deconstructLocalNameFromCurie, deconstructPrefix, isTypeUri)
 import Perspectives.ModelDependencies (sysMe)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Prelude (append, bind, flip, pure, ($), (<<<), (<>), (>>=))
+import Prelude (Unit, append, bind, eq, flip, pure, ($), (<<<), (<>), (>>=))
 
 -----------------------------------------------------------
 -- EXPAND DEFAULT NAMESPACES
@@ -98,6 +99,25 @@ lookupIndexedRole iname = gets _.indexedRoles >>= pure <<< OBJ.lookup iname
 -- | Look up a fully qualified indexed name, e.g. maps "sys:Me" to "def:#<GUID>$User".
 lookupIndexedContext :: String -> MonadPerspectives (Maybe ContextInstance)
 lookupIndexedContext iname = gets _.indexedContexts >>= pure <<< OBJ.lookup iname
+
+-----------------------------------------------------------
+-- REVERSE LOOKUP RESOURCES IN INDEXED NAMES
+-----------------------------------------------------------
+-- | If the role instance is in fact an indexed resource, returns the identifier (key) under which it is stored in state.
+findIndexedRoleName :: RoleInstance -> MonadPerspectives (Maybe String)
+findIndexedRoleName rid = gets _.indexedRoles >>= pure <<< head <<< OBJ.keys <<< OBJ.filter (eq rid)
+
+findIndexedContextName :: ContextInstance -> MonadPerspectives (Maybe String)
+findIndexedContextName cid = gets _.indexedContexts >>= pure <<< head <<< OBJ.keys <<< OBJ.filter (eq cid)
+
+-----------------------------------------------------------
+-- REMOVE INDEXED NAMES
+-----------------------------------------------------------
+removeIndexedRole :: String -> MonadPerspectives Unit
+removeIndexedRole s = modify \r -> r {indexedRoles = OBJ.delete s r.indexedRoles}
+
+removeIndexedContext :: String -> MonadPerspectives Unit
+removeIndexedContext s = modify \r -> r {indexedContexts = OBJ.delete s r.indexedContexts}
 
 -----------------------------------------------------------
 -- SYSTEM AND USER
