@@ -40,7 +40,9 @@ import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeIm
 
 data RoleVerb =
     Remove            -- Remove a single instance
+  | RemoveContext     -- Remove a contextrole instance together with its context.
   | Delete            -- Remove all instances
+  | DeleteContext     -- Delete all contextrole instances together with their contexts.
   | Create            -- Create an instance
   | CreateAndFill     -- CreateAndFill <RoleType> with <roleExpr>
   | Fill              -- <functionalRoleExpr> with <functionalRoleExpr>

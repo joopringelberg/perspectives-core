@@ -1204,7 +1204,9 @@ roleVerb = do
   case v of
     "RemoveFiller" -> pure RemoveFiller
     "Remove" -> pure Remove
+    "RemoveContext" -> pure RemoveContext
     "Delete" -> pure Delete
+    "DeleteContext" -> pure DeleteContext
     "CreateAndFill" -> pure CreateAndFill
     "Create" -> pure Create
     "Fill" -> pure Fill

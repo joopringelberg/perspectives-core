@@ -271,11 +271,11 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove] Nothing Nothing) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.DeleteContext, Verbs.RemoveContext] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         Right _ -> for_ (toArray roleInstances) (flip removeContextIfUnbound authorizedRole)
     RemoveExternalRoleInstance -> do
-      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.Delete, Verbs.Remove] Nothing Nothing) >>= case _ of
+      (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.DeleteContext, Verbs.RemoveContext] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
         Right _ -> for_ (ContextInstance <<< deconstructBuitenRol <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)

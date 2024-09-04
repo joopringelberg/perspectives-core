@@ -162,7 +162,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
           then do 
             -- Check for each of the subjects whether they have a sufficient perspective on the range of the role expression.
             for_ subjects (\subject -> for_ (roleInContext2Role <$> (allLeavesInADT $ unsafePartial roleRange rle))
-              (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.Delete, Verbs.Remove] (Just start) (Just end)) >>= case _ of 
+              (\object -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject object [Verbs.DeleteContext, Verbs.RemoveContext] (Just start) (Just end)) >>= case _ of 
                 Left e -> throwError e
                 _ -> pure unit))
             pure $ UQD currentcontextDomain QF.RemoveContext rle currentcontextDomain True True
@@ -361,7 +361,7 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         case qualifiedRoleType of 
           ENR qualifiedRoleIdentifier -> 
             -- Check for each of the subjects whether they have a sufficient perspective to Delete the qualifiedRoleIdentifier.
-            for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.Delete] (Just start) (Just end)) >>= case _ of 
+            for_ subjects (\subject -> (lift $ lift $ roleHasPerspectiveOnRoleWithVerb subject qualifiedRoleIdentifier [Verbs.DeleteContext] (Just start) (Just end)) >>= case _ of 
                 Left e -> throwError e
                 _ -> pure unit)
           _ -> pure unit

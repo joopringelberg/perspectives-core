@@ -177,7 +177,7 @@ perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.
 
 perspectiveMustBeSynchronized :: Perspective -> Boolean
 perspectiveMustBeSynchronized p@(Perspective {roleVerbs, propertyVerbs}) = 
-  perspectiveSupportsOneOfRoleVerbs p [Remove, Delete] ||
+  perspectiveSupportsOneOfRoleVerbs p [Remove, Delete, RemoveContext, DeleteContext] ||
   perspectiveSupportsPropertyVerb p Consult
 
 -----------------------------------------------------------
@@ -241,7 +241,7 @@ newtype PropertyInRole = PropertyInRole { role :: EnumeratedRoleType, property :
 -- | PARTIAL: can only be used after object of Perspective has been compiled in PhaseThree.
 createModificationSummary :: Partial => Perspective -> ModificationSummary
 createModificationSummary p@(Perspective{roleVerbs, propertyVerbs}) =
-  { modifiesRoleInstancesOf: if perspectiveSupportsOneOfRoleVerbs p [Remove, Delete, Create, CreateAndFill]
+  { modifiesRoleInstancesOf: if perspectiveSupportsOneOfRoleVerbs p [Remove, RemoveContext, Delete, DeleteContext, Create, CreateAndFill]
     then commonLeavesInADT $ objectOfPerspective p
     else []
   , modifiesRoleBindingOf: if perspectiveSupportsOneOfRoleVerbs p [CreateAndFill, Fill, Unbind, RemoveFiller]
