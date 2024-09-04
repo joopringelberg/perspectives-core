@@ -206,7 +206,7 @@ getPropertyValues pt dep = do
             -- We cannot find the filler that supports this property.
             Nothing -> pure []
             -- Contintue with the filler and add a step to the path.
-            Just b -> runArrayT $ computePathToFillerWithProperty (consOnMainPath (R b) dep)
+            Just b -> runArrayT $ computePathToFillerWithProperty (consOnMainPath (R b) path)
 
 serialiseDependencies :: Array RoleInstance -> NonEmptyList Dependency -> MonadPerspectivesTransaction Unit
 serialiseDependencies users deps = void $ runStateT (serialiseDependencies_ users deps) []
@@ -251,9 +251,9 @@ serialiseDependency users mpreviousDependency currentDependency = do
   where
     -- | Returns true iff the binding of the first argument equals the second argument.
     addBindingDelta :: RoleInstance -> RoleInstance -> MonadPerspectivesTransaction Boolean
-    addBindingDelta roleId1 roleId2 = (liftToMPT $ try $ getPerspectRol roleId1) >>= handlePerspectRolError' "addBindingDelta" false
+    addBindingDelta roleId1 roleId2 = (liftToMPT $ try $ getPerspectRol roleId2) >>= handlePerspectRolError' "addBindingDelta" false
       \(PerspectRol{binding, bindingDelta}) -> case binding of
-        Just b -> if b == roleId2
+        Just b -> if b == roleId1
           then traverse_ (\bd -> addDelta $ DeltaInTransaction {users, delta: bd}) bindingDelta *> pure true
           else pure false
         Nothing -> pure false
