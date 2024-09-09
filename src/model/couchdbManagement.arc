@@ -67,7 +67,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- The username should be the PerspectivesSystem$User ID.
     user Manager = sys:SocialMe
       perspective on CouchdbServers
-        only (CreateAndFill, Remove, Delete, Create, Fill)
+        only (CreateAndFill, RemoveContext, DeleteContext, Create, Fill)
         props (Name) verbs (Consult)
         props (Url, CouchdbServers$CouchdbPort, AdminUserName, AdminPassword, Name) verbs (SetPropertyValue)
 
@@ -84,7 +84,7 @@ domain model://perspectives.domains#CouchdbManagement
         row
           table CouchdbServers
             -- No restriction on properties, but the Create and CreateAndFill verbs are omitted.
-            only (Remove)
+            only (RemoveContext)
 
       
     -- A new CouchdbServers instance comes complete with a CouchdbServer$Admin role
@@ -317,7 +317,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (Repositories$NameSpace) verbs (Consult)
       
       perspective on BespokeDatabases
-        only (CreateAndFill, Remove)
+        only (CreateAndFill, RemoveContext)
         props (Description) verbs (Consult, SetPropertyValue)
       
       perspective on BespokeDatabases >> binding >> context >> Owner
@@ -604,7 +604,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
-        only (Create, Fill, Delete, Remove)
+        only (Create, Fill, Delete, RemoveContext, DeleteContext)
         props (Description, LocalModelName) verbs (Consult)
         props (DomeinFileName) verbs (SetPropertyValue)
         in object state NoLocalModelName
@@ -661,7 +661,7 @@ domain model://perspectives.domains#CouchdbManagement
         props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
 
       perspective on Manifests
-        only (Create, Fill, Delete, Remove)
+        only (Create, Fill, Delete, RemoveContext)
         props (Description, LocalModelName) verbs (Consult)
         props (DomeinFileName) verbs (SetPropertyValue)
         in object state NoLocalModelName
@@ -791,7 +791,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on extern
         props (Description, IsLibrary, VersionToInstall, RecomputeVersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Versions
-        only (Create, Fill, Remove, CreateAndFill, Delete)
+        only (Create, Fill, RemoveContext, CreateAndFill, Delete, DeleteContext)
         props (Versions$Version, Description, Patch, Build) verbs (Consult, SetPropertyValue)
       perspective on Versions >> binding >> context >> Author
         only (Fill, Create)
@@ -808,7 +808,7 @@ domain model://perspectives.domains#CouchdbManagement
             form "This Manifest" External
           row
             table "Available Versions" Versions
-              only (Remove)
+              only (RemoveContext)
         tab "Authors"
           row
             table "Authors" Author

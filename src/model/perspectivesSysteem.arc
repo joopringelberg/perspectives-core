@@ -303,13 +303,13 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user Installer
       perspective on StartContexts
-        only (Create, CreateAndFill, Remove, Fill)
+        only (Create, CreateAndFill, Remove, RemoveContext, Fill)
         props (Name) verbs (SetPropertyValue)
       perspective on IndexedContexts
-        only (Create, Fill, Remove)
+        only (Create, Fill, Remove, RemoveContext)
         props (IndexedContexts$Name) verbs (SetPropertyValue)
       perspective on IndexedRoles
-        only (Create, Fill, Remove)
+        only (Create, Fill, Remove, RemoveContext)
         props (IndexedRoles$Name) verbs (SetPropertyValue)
       perspective on BaseRepository
         only (CreateAndFill)
@@ -440,7 +440,7 @@ domain model://perspectives.domains#System
       property Message (String)
     user NotifiedUser
       perspective on Notifications
-        only (Remove, Delete)
+        only (Remove, Delete, RemoveContext, DeleteContext)
         props (Message) verbs (Consult)
         action DeleteNotifications
           delete role Notifications
@@ -549,7 +549,7 @@ domain model://perspectives.domains#System
             props (CompleteMessage) verbs (Consult)
 
     -- Without the filter, the Inviter will count as Guest and its bot will fire for the Inviter, too.
-    user Guest = filter sys:SocialMe with not fills (currentcontext >> Inviter)
+    user Guest = (filter sys:SocialMe >> binding with not fills (currentcontext >> Inviter))
       perspective on extern
         props (InviterLastName, Message) verbs (Consult)
       perspective on Invitee

@@ -32,7 +32,7 @@ domain model://joopringelberg.nl#Disconnect
     state NoManager = not exists Manager
       on entry 
         do for Initializer
-          bind sys:SocialMe to Manager
+          bind sys:SocialMe >> binding to Manager
 
     user Initializer = sys:Me
       perspective on Manager

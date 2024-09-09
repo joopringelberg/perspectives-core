@@ -61,7 +61,7 @@ domain model://perspectives.domains#Introduction
     state NoIntroducer = not exists Introducer
       on entry
         do for Guest
-          bind sys:SocialMe to Introducer
+          bind sys:SocialMe >> binding to Introducer
     external
       property Title (String)
     user Guest = sys:SocialMe

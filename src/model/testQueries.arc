@@ -88,7 +88,7 @@ domain model://joopringelberg.nl#TestQueries
     state NoManager = not exists Manager
       on entry 
         do for Initializer
-          bind sys:SocialMe to Manager
+          bind sys:SocialMe >> binding to Manager
 
     -- This state has been seen to become active after creating TheEmbeddedContext.
     state State1 = exists TheEmbeddedContext
@@ -204,7 +204,7 @@ domain model://joopringelberg.nl#TestQueries
       aspect tq:TQAspect$EC
       on entry
         do for Initializer
-          bind sys:SocialMe to EmbeddedUser in binding >> context
+          bind sys:SocialMe >> binding to EmbeddedUser in binding >> context
       -- This state has been seen to become active after creating it and its filler.
       -- This state has been seen to become active after filling it.
       -- This state has been seen to become inactive after removing the filler.

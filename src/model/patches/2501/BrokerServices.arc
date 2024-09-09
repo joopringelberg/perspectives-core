@@ -88,7 +88,7 @@ domain model://perspectives.domains#BrokerServices
             letA
               accountsinstance <- create context BrokerContract bound to Accounts in origin >> binding >> context
             in
-              bind sys:SocialMe to AccountHolder in accountsinstance >> binding >> context
+              bind sys:SocialMe >> binding to AccountHolder in accountsinstance >> binding >> context
               bind accountsinstance >> context >> Administrator to Administrator in accountsinstance >> binding >> context
           action EndContract
             letA
@@ -143,7 +143,7 @@ domain model://perspectives.domains#BrokerServices
     state NoAdministrator = not exists Administrator
       on entry
         do for BrokerService$Guest
-          bind sys:SocialMe to Administrator
+          bind sys:SocialMe >> binding to Administrator
           PublicUrl = extern >> binder ManagedBrokers >> StorageLocation for extern
     external
       property Name (mandatory, String)

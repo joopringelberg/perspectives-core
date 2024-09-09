@@ -73,7 +73,7 @@ domain model://perspectives.domains#SharedFileServices
       
       perspective on DefaultFileServer
         only (Create)
-        props (AccountName, Password, StorageType) verbs (SetPropertyValue)
+        props (AccountName, Password, StorageType, Disabled) verbs (SetPropertyValue)
             
       screen "Shared File Servers"
         row 
@@ -87,7 +87,8 @@ domain model://perspectives.domains#SharedFileServices
       aspect sfs:SharedFileService
 
     -- PDRDEPENDENCY
-    thing ActualSharedFileServer (functional) = MySharedFileService orElse DefaultFileServer
+    thing ActualSharedFileServer (functional) = MySharedFileService orElse (filter DefaultFileServer with not Disabled)
 
     thing DefaultFileServer
       aspect sfs:SharedFileService
+      property Disabled (Boolean)

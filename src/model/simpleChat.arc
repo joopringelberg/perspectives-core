@@ -67,7 +67,7 @@ domain model://perspectives.domains#SimpleChat
           only (Create, Fill)
       on entry
         do for Creator
-          bind sys:SocialMe to Initiator
+          bind sys:SocialMe >> binding to Initiator
     external
       property Title (String)
 
