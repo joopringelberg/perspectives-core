@@ -177,7 +177,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (RoleHasNoBinding pos rtype) = "(RoleHasNoBinding) The role '" <> show rtype <> "' has no binding. If it is a Sum-type, one of its members may have no binding " <> show pos
   show (RoleCannotHaveBinding start end roletype) = "(RoleCannotHaveBinding) External Roles cannot have a binding. " <> roletype <> ", from " <> show start <> " to " <> show end
   show (IncompatibleDomainsForJunction dom1 dom2) = "(IncompatibleDomainsForJunction) These two domains cannot be joined in a disjunction of conjunction: '" <> show dom1 <> "', '" <> show dom2 <> "'."
-  show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "', at: " <> show pos
+  show (RoleDoesNotBind pos rtype adt) = "(RoleDoesNotBind) The role '" <> show rtype <> "' does not bind roles of type '" <> show adt <> "' (it may have an aspect that is stricter than its own filler restricion!), at: " <> show pos
   show (LocalRoleDoesNotBind start end lname adt) = "(LocalRoleDoesNotBind) The roles that name '" <> lname <> "' (from " <> show start <> " to " <> show end <> ") can be matched to, do not bind '" <> show adt <> "'."
   show (IncompatibleComposition pos left right) = "(IncompatibleComposition) The result of the left operand (" <> show left <> ") and the argument of the right operand (" <> show right <> ") are incompatible."
   show (IncompatibleDomains pos1 pos2) = "(IncompatibleDomains) The result of the expression at " <> show pos1 <> " and " <> show pos2 <> " have incompatible domains (both must be contexts, roles or values)."
