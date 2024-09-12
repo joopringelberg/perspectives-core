@@ -208,6 +208,7 @@ getPropertyValues pt dep = do
             -- Contintue with the filler and add a step to the path.
             Just b -> runArrayT $ computePathToFillerWithProperty (consOnMainPath (R b) path)
 
+-- | Adds deltas to the current transaction for the given users and for the dependencies in the List of Dependency-s.
 serialiseDependencies :: Array RoleInstance -> NonEmptyList Dependency -> MonadPerspectivesTransaction Unit
 serialiseDependencies users deps = void $ runStateT (serialiseDependencies_ users deps) []
 

@@ -24,11 +24,15 @@
 
 module Perspectives.Extern.Utilities where
 
+import Affjax (Response, printError, request)
+import Affjax.RequestBody as RequestBody
+import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.AvarMonadAsk (gets)
-import Control.Monad.Error.Class (try)
+import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (head, singleton)
 import Data.Either (Either(..))
+import Data.HTTP.Method (Method(..))
 import Data.Int (floor)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (unwrap)
@@ -39,6 +43,8 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
+import Effect.Exception (error)
 import Effect.Random (randomRange)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
 import Perspectives.Authenticate (getMyPublicKey)
@@ -63,8 +69,8 @@ import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.ResourceIdentifiers (createCuid)
-import Prelude (class Show, bind, discard, pure, show, void, ($), (<<<), (<>), (>=>), (>>=))
-import Simple.JSON (writeJSON)
+import Prelude (class Show, bind, discard, pure, show, void, ($), (<<<), (<>), (>=>), (>>=), (*>))
+import Simple.JSON (readJSON, writeJSON)
 import Text.Parsing.Parser (ParseError)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -217,6 +223,36 @@ createInvitation_ messageA transactionA confirmationA _ = try
     _, _, _ -> pure [])
   >>= handleExternalFunctionError "model://perspectives.domains#Utilities$CreateInvitation"
 
+getSharedFileServerKey :: Array String -> RoleInstance -> MonadPerspectivesQuery String
+getSharedFileServerKey keyArray _ = try
+  (ArrayT $ case head keyArray of
+    Just sharedFileServerKey -> do
+        rq <- pure 
+          { method: Left POST
+          , url: "__MYCONTEXTS__ppsfs/getsharedfileserverkey"
+          , headers: []
+          , content: Just $ RequestBody.string $ writeJSON ({sharedfileserverkey: sharedFileServerKey } :: { sharedfileserverkey :: String})
+          , responseFormat: ResponseFormat.string
+          , timeout: Nothing
+          , password: Nothing
+          , username: Nothing
+          , withCredentials: false
+          }
+        res <- liftAff $ request rq
+        case res of 
+          Left e -> do 
+            log $ printError e
+            pure []
+          Right (response :: Response String) -> case (readJSON response.body) of
+            Left e -> throwError $ error ("model://perspectives.domains#Utilities$GetSharedFileServerKey: " <> show e)
+            Right (r :: {error :: Maybe Int, message :: Maybe String, newKey :: Maybe String}) -> case r.error, r.message, r.newKey of
+              Just error_, Just message_, _ -> log message_ *> pure []
+              Nothing, Nothing, Just newKey_ -> pure [newKey_]
+              _, _, _ -> pure []
+    Nothing -> pure []
+    )
+  >>= handleExternalFunctionError "model://perspectives.domains#Utilities$GetSharedFileServerKey"
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -234,4 +270,5 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$EvalExpression" {func: unsafeCoerce evalExpression_, nArgs: 1, isFunctional: Unknown}
   , Tuple "model://perspectives.domains#Utilities$SystemParameter" {func: unsafeCoerce systemParameter_, nArgs: 1, isFunctional: True}
   , Tuple "model://perspectives.domains#Utilities$CreateInvitation" {func: unsafeCoerce createInvitation_, nArgs: 3, isFunctional: True}
+  , Tuple "model://perspectives.domains#Utilities$GetSharedFileServerKey" {func: unsafeCoerce getSharedFileServerKey, nArgs: 1, isFunctional: True}
   ]

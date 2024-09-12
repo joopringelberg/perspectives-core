@@ -89,7 +89,7 @@ compileState stateId = do
     (notifyOnExit' :: Map RoleType (Updater ContextInstance)) <- traverseWithIndex
       (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnExit)
-    (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean, isSelfPerspective :: Boolean }) <- traverseWithIndex
+    (perspectivesOnEntry' :: Map RoleType { properties :: Array PropertyType, selfOnly :: Boolean, peerOnly :: Boolean, isSelfPerspective :: Boolean }) <- traverseWithIndex
       (\subject (ContextPerspective r) -> pure r)
       (unwrap perspectivesOnEntry)
 

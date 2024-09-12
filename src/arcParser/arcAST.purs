@@ -199,6 +199,7 @@ data StateQualifiedPart =
   AC ActionE |
   CA ContextActionE |
   SO SelfOnly |
+  PO PeerOnly |
   N NotificationE |
   AE AutomaticEffectE |
   SUBSTATE StateE
@@ -262,6 +263,18 @@ newtype ContextActionE = ContextActionE
 --------------------------------------------------------------------------------
 -- Ends up in Perspective, identified by subject and object.
 newtype SelfOnly = SelfOnly
+  { subject :: RoleIdentification
+  , object :: RoleIdentification
+  , state :: StateSpecification
+  , start :: ArcPosition
+  , end :: ArcPosition
+  }
+
+--------------------------------------------------------------------------------
+---- PEERONLY
+--------------------------------------------------------------------------------
+-- Ends up in Perspective, identified by subject and object.
+newtype PeerOnly = PeerOnly
   { subject :: RoleIdentification
   , object :: RoleIdentification
   , state :: StateSpecification
@@ -488,6 +501,9 @@ derive instance newtypePropertyVerbE :: Newtype PropertyVerbE _
 
 derive instance genericSelfOnly :: Generic SelfOnly _
 instance showSelfOnly :: Show SelfOnly where show = genericShow
+
+derive instance Generic PeerOnly _
+instance Show PeerOnly where show = genericShow
 
 derive instance genericPropertyE :: Generic PropertyE _
 instance showPropertyE :: Show PropertyE where show = genericShow

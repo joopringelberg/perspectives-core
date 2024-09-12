@@ -761,9 +761,10 @@ actionStates (Perspective {actions}) = stateSpec2StateIdentifier <$> (fromFoldab
 isAspectOfPerspective :: Partial => Perspective -> Perspective -> MP Boolean
 isAspectOfPerspective perspectiveAspect perspective = (objectOfPerspective perspective) `equalsOrSpecialisesRoleInContext` (objectOfPerspective perspectiveAspect)
 
--- | `perspectiveAspect addedToPersective perspective` integreert perspectiveAspect in perspective.
+-- | `perspectiveAspect `addPerspectiveTo` perspective` integreert perspectiveAspect in perspective.
 -- | roleVerbs, propertyVerbs and actions of perspectiveAspect are added to those of perspective.
 -- | If perspectiveAspect.selfOnly == true, perspective.selfOnly will be made true as well.
+-- | The same holds for peerOnly.
 -- | The values of isEnumerated must be equal.
 addPerspectiveTo :: Perspective -> Perspective -> Perspective
 addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Perspective perspective
@@ -774,6 +775,7 @@ addPerspectiveTo (Perspective perspectiveAspect) (Perspective perspective) = Per
   -- Note that two Action maps with duplicate keys will lose actions when added to each other.
   , actions = EncodableMap $ Map.unionWith OBJ.union (unwrap perspectiveAspect.actions) (unwrap perspective.actions)
   , selfOnly = perspectiveAspect.selfOnly || perspective.selfOnly
+  , peerOnly = perspectiveAspect.peerOnly || perspective.peerOnly
   }
 
 -- True, iff one of the types of the role instance is a specialisation of the range of the QueryFunctionDescription.

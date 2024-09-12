@@ -59,9 +59,11 @@ domain model://perspectives.domains#SharedFileServices
         letA
           defaultserver <- create role DefaultFileServer
         in
-          AccountName = "joop.ringelberg@gmail.com" for defaultserver
-          Password = "wAteengroteho15p..." for defaultserver
-          StorageType = "mega" for defaultserver
+          -- For the ppstorage type (perspectives-sharedfilestorage) we have no need for the AccountName. 
+          -- Also, we overload `Password` with the unique personal SharedFileServerKey that allows limited uploading of files.
+          AccountName = "ignored" for defaultserver
+          Password = sys:SocialMe >> SharedFileServerKey for defaultserver
+          StorageType = "ppstorage" for defaultserver
     
     user Manager = sys:Me
       perspective on MySharedFileService 

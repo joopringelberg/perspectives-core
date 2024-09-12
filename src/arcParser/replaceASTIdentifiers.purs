@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Perspectives.Identifiers (endsWithSegments)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PropertyVerbE(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PeerOnly(..), PropertyVerbE(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 
 type OriginalId = String
@@ -30,6 +30,7 @@ instance ReplaceIdentifiers StateQualifiedPart where
   replaceIdentifier original addendum (AC r) = AC $ replaceIdentifier original addendum r
   replaceIdentifier original addendum (CA r) = CA $ replaceIdentifier original addendum r
   replaceIdentifier original addendum (SO r) = SO $ replaceIdentifier original addendum r
+  replaceIdentifier original addendum (PO r) = PO $ replaceIdentifier original addendum r
   replaceIdentifier original addendum (N r) = N $ replaceIdentifier original addendum r
   replaceIdentifier original addendum (AE r) = AE $ replaceIdentifier original addendum r
   replaceIdentifier original addendum (SUBSTATE r) = SUBSTATE $ replaceIdentifier original addendum r
@@ -81,6 +82,11 @@ instance ReplaceIdentifiers ContextActionE where
 
 instance ReplaceIdentifiers SelfOnly where
   replaceIdentifier original addendum (SelfOnly r@{subject, state}) = SelfOnly $ r
+    { subject = replaceIdentifier original addendum subject
+    , state = replaceIdentifier original addendum state}
+
+instance ReplaceIdentifiers PeerOnly where
+  replaceIdentifier original addendum (PeerOnly r@{subject, state}) = PeerOnly $ r
     { subject = replaceIdentifier original addendum subject
     , state = replaceIdentifier original addendum state}
 

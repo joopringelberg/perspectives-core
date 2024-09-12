@@ -124,12 +124,26 @@ domain model://perspectives.domains#System
     -- We also make sure that each Persons instance we know about has access to all our System$User identities, so he/she can synchronize to us.
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy (PerspectivesUsers, NonPerspectivesUsers)
+      -- The unique key provided to each new participant in the Perspectives Trusted Network by one of his peers.
+      -- It can be used to store a limited number of media files in the perspectives sharedfile storage.
+      -- PDRDEPENDENCY (actually, a MyContexts dependency)
+      property SharedFileServerKey (String)
+      state NoKey = not exists SharedFileServerKey and exists sys:Me >> SharedFileServerKey
+        on entry
+          do for SystemUser
+            SharedFileServerKey = callExternal util:GetSharedFileServerKey( sys:Me >> SharedFileServerKey ) returns String
       perspective on Me
         props (Cancelled, LastName, FirstName, PublicKey) verbs (Consult)
+      perspective on Persons
+        props (SharedFileServerKey) verbs (Consult)
+        -- Only the peer himself is allowed to see his key (and of course the SystemUser that creates it for him).
+        peeronly
+
     user Me filledBy PerspectivesUsers
       aspect sys:RoleWithId
       indexed sys:SocialMe
       property MyIdentity (File)
+
     user SystemUser = sys:Me
       perspective on Me
         only (Create, Fill)
@@ -145,7 +159,7 @@ domain model://perspectives.domains#System
           Cancelled = true
       perspective on Persons
         only (Create, Fill)
-        props (FirstName, LastName) verbs (SetPropertyValue, Consult)
+        props (FirstName, LastName, SharedFileServerKey) verbs (SetPropertyValue, Consult)
       -- Use this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
       -- that previously was filled by a NonPerspectivesUsers instance.
       perspective on sys:TheWorld >> PerspectivesUsers

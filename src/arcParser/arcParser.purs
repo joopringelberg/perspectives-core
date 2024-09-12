@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PeerOnly(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -833,6 +833,7 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     "selfonly", _ -> singleton <<< SO <$> selfOnly
+    "peeronly", _ -> singleton <<< PO <$> peerOnly
     _, _ -> case first of
       "" -> do
         thisWord <- stringUntilNewline
@@ -1225,6 +1226,21 @@ selfOnly = do
       end <- getPosition
       sameOrOutdented'
       pure $ SelfOnly {subject: s, object: o, state, start, end}
+    Nothing, Nothing -> fail "User role and object of perspective must be given, "
+    Nothing, (Just _) -> fail "User role must be given, "
+    (Just _), Nothing -> fail "Object of perspective must be given, "
+
+peerOnly :: IP PeerOnly
+peerOnly = do
+  reserved "peeronly"
+  -- | subject and object must be present.
+  {subject, object, state} <- getArcParserState
+  case subject, object of
+    Just s, Just o -> do
+      start <- getPosition
+      end <- getPosition
+      sameOrOutdented'
+      pure $ PeerOnly {subject: s, object: o, state, start, end}
     Nothing, Nothing -> fail "User role and object of perspective must be given, "
     Nothing, (Just _) -> fail "User role must be given, "
     (Just _), Nothing -> fail "Object of perspective must be given, "

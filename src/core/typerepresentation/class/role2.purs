@@ -35,7 +35,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Exception (error)
 import Foreign.Object (Object, toArrayWithKey)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, MP)
+import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
@@ -367,6 +367,10 @@ rangeOfCalculatedRole cr = calculation cr >>= roleCalculationRange
 displayNameOfRoleType :: RoleType -> MonadPerspectives String
 displayNameOfRoleType (ENR e) = getEnumeratedRole e >>= pure <<< displayName
 displayNameOfRoleType (CR e) = getCalculatedRole e >>= pure <<< displayName
+
+calculationOfRoleType :: RoleType -> MonadPerspectives QueryFunctionDescription
+calculationOfRoleType (ENR e) = getEnumeratedRole e >>= calculation
+calculationOfRoleType (CR e) = getCalculatedRole e >>= calculation
 
 -----------------------------------------------------------
 -- FUNCTIONS ON CALCULATEDROLETYPE

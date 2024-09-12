@@ -64,6 +64,7 @@ newtype InvertedQuery = InvertedQuery
   , states :: Array StateIdentifier
   , statesPerProperty :: EncodableMap PropertyType (Array StateIdentifier)
   , selfOnly :: Boolean
+  , peerOnly :: Boolean
 }
 
 derive instance genericInvertedQuery :: Generic InvertedQuery _
