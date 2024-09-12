@@ -426,7 +426,9 @@ removeProperty rids propertyName values = case ARR.head rids of
             -- Apply all changes to the role and then save it:
             --  - change the property values in one go
             --  - remove all propertyDeltas.
-            lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (filterKeys (\key -> isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe replacementProperty values))
+            -- filterKeys: Filter out those key/value pairs of a map for which a predicate on the key fails to hold. So: if predicate holds, the key-value pair is added to the result. 
+            -- This translates here to: if the key is one of the values to remove, the predicate should fail!
+            lift $ cacheAndSave rid (over PerspectRol (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (filterKeys (\key -> not $ isJust $ elemIndex (Value key) values)) propertyDeltas}) (removeRol_property pe replacementProperty values))
 
 -- | Delete all property values from the role for the EnumeratedPropertyType.
 -- | If there are no values for the property on the role instance, this is a no-op.
