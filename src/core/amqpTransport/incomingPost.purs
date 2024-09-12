@@ -42,7 +42,7 @@ import Perspectives.AMQP.Stomp (StructuredMessage, acknowledge, createStompClien
 import Perspectives.Assignment.Update (setProperty)
 import Perspectives.CoreTypes (BrokerService, MonadPerspectives, MonadPerspectivesQuery, (##>))
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (context, externalRole, getFilledRoles, getProperty)
+import Perspectives.Instances.ObjectGetters (binding, context, externalRole, getFilledRoles, getProperty)
 import Perspectives.ModelDependencies (accountHolder, accountHolderName, accountHolderPassword, accountHolderQueueName, brokerContract, brokerEndpoint, brokerServiceExchange, connectedToAMQPBroker, indexedSocialMe, sysUser)
 import Perspectives.Names (getMySystem, lookupIndexedRole)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
@@ -124,17 +124,17 @@ incomingPost = do
 
 -- | Construct the BrokerService from the database, if possible, and set it in PerspectivesState.
 retrieveBrokerService :: MonadPerspectives Unit
-retrieveBrokerService = lookupIndexedRole indexedSocialMe >>= (\u -> (unsafePartial fromJust u) ##> constructBrokerServiceForUser) >>= setBrokerService
+retrieveBrokerService = lookupIndexedRole indexedSocialMe >>= (\u -> (unsafePartial fromJust u) ##> binding >=> constructBrokerServiceForUser) >>= setBrokerService
 
 
 -- | Construct a BrokerService object for a particular user by querying the database.
 constructBrokerServiceForUser :: RoleInstance -> MonadPerspectivesQuery BrokerService
-constructBrokerServiceForUser socialMe = do
+constructBrokerServiceForUser perspectivesUserInstance = do
   -- LET OP: gaat misschien fout als model:BrokerServices nog niet beschikbaar is.
   accountHolder <- getFilledRoles
     (ContextType brokerContract)
     (EnumeratedRoleType accountHolder)
-    socialMe
+    perspectivesUserInstance
   (Value login) <- getProperty (EnumeratedPropertyType accountHolderName) accountHolder
   (Value passcode) <- getProperty (EnumeratedPropertyType accountHolderPassword) accountHolder
   
