@@ -41,6 +41,7 @@ import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalO
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataUpgrade.PatchModels (patchModels)
 import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
+import Perspectives.DataUpgrade.PatchModels.PDR2503 as PDR2503
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, updateModel)
@@ -84,6 +85,10 @@ runDataUpgrades = do
   runUpgrade installedVersion "0.25.2" 
     (do 
       patchModels PDR2501.replacements
+      void recompileLocalModels)
+  runUpgrade installedVersion "0.25.3" 
+    (do 
+      patchModels PDR2503.replacements
       void recompileLocalModels)
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
