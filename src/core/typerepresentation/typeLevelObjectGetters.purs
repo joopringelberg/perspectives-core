@@ -54,7 +54,7 @@ import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (modelDatabaseName)
 import Perspectives.Persistent.PublicStore (PublicStore)
 import Perspectives.Query.QueryTypes (Calculation, QueryFunctionDescription, RoleInContext(..), domain2roleType, queryFunction, range, roleInContext2Role, roleRange, secondOperand)
-import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, computeExpandedBoolean, equalsOrSpecialises_, generalises_)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT, computeExpandedBoolean, equalsOrSpecialises_, equals_, generalises_)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CNF (CNF)
 import Perspectives.Representation.Class.Context (contextADT, contextRole, roleInContext, userRole) as ContextClass
@@ -492,7 +492,7 @@ generalisesRoleType_ t1 t2 = do
   pure (et1 `generalises_` et2)
 
 -----------------------------------------------------------
----- EQUALSORGENERALISES, EQUALSORSPECIALISES FOR ROLE IN CONTEXT
+---- EQUALS, EQUALSORGENERALISES, EQUALSORSPECIALISES FOR ROLE IN CONTEXT
 -----------------------------------------------------------
 -- | Compares with `equalsOrGeneralises`.
 -- | right -> left (logical implication)
@@ -506,6 +506,12 @@ equalsOrSpecialisesRoleInContext left right = do
   (left' :: CNF RoleInContext) <- toConjunctiveNormalForm_ left
   (right' :: CNF RoleInContext) <- toConjunctiveNormalForm_ right
   pure (left' `equalsOrSpecialises_` right')
+
+equals :: ADT RoleInContext -> ADT RoleInContext -> MP Boolean
+equals left right = do 
+  (left' :: CNF RoleInContext) <- toConjunctiveNormalForm_ left
+  (right' :: CNF RoleInContext) <- toConjunctiveNormalForm_ right
+  pure (left' `equals_` right')
 
 -----------------------------------------------------------
 ---- ISPERSPECTIVEONADT

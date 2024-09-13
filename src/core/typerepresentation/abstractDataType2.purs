@@ -48,7 +48,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.CNF (CNF, DPROD(..), DSUM(..), toConjunctiveNormalForm)
 import Perspectives.Representation.ExpandedADT (ExpandedADT(..), foldMapExpandedADT)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<<<), (<>), (>>=))
+import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<<<), (<>), (>>=), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
 
 --------------------------------------------------------------------------------------------------
@@ -287,6 +287,15 @@ equalsOrSpecialises_ = unsafePartial equalsOrSpecialises'
       (fold
         (disjunctionsOnRight <#> \(DSUM disjunctionOnRight) -> Conj $ isJust $ (flip findIndex) disjunctionsOnLeft
           \(DSUM disjunctionOnLeft) -> ((SET.fromFoldable disjunctionOnLeft) `SET.subset` (SET.fromFoldable disjunctionOnRight))))
+
+equals_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
+equals_ = unsafePartial equals'
+  where
+    equals' :: CNF a -> CNF a -> Boolean
+    equals' (DPROD disjunctionsOnLeft) (DPROD disjunctionsOnRight) = unwrap
+      (fold
+        (disjunctionsOnRight <#> \(DSUM disjunctionOnRight) -> Conj $ isJust $ (flip findIndex) disjunctionsOnLeft
+          \(DSUM disjunctionOnLeft) -> ((SET.fromFoldable disjunctionOnLeft) == (SET.fromFoldable disjunctionOnRight))))
 
 -- | left `specialises` right
 -- | left -> right

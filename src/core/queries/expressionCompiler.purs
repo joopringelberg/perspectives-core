@@ -75,7 +75,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), bool2
 import Perspectives.Representation.ThreeValuedLogic (and, or) as THREE
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), roletype2string)
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..)) as RTI
-import Perspectives.Types.ObjectGetters (allTypesInContextADT, allTypesInRoleADT, enumeratedRoleContextType, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
+import Perspectives.Types.ObjectGetters (allTypesInContextADT, allTypesInRoleADT, enumeratedRoleContextType, equals, isUnlinked_, lookForPropertyType, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT, qualifyContextInDomain, qualifyEnumeratedRoleInDomain, qualifyRoleInDomain)
 import Prelude (bind, discard, eq, map, pure, show, unit, void, ($), (&&), (-), (<$>), (<*>), (<<<), (<>), (==), (>>=), (||))
 
 ------------------------------------------------------------------------------------
@@ -759,11 +759,16 @@ compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =
     comparison :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> FunctionName -> PhaseThree QueryFunctionDescription
     comparison pos left' right' functionName = do
       -- Both ranges must be equal, both sides must be functional.
-      if ((range left') `eq` (range right'))
+      ((range left') `equalDomains` (range right')) >>= if _
         then if (pessimistic $ functional left') && (pessimistic $ functional right')
           then pure $ BQD currentDomain (QF.BinaryCombinator functionName) left' right' (VDOM PBool Nothing) (isFunctionalFunction functionName) True
           else throwError $ ExpressionsShouldBeFunctional (pessimistic $ functional left') (pessimistic $ functional right') pos
         else throwError $ TypesCannotBeCompared pos (range left') (range right')
+      where 
+        equalDomains :: Domain -> Domain -> PhaseThree Boolean
+        -- special case for RDOM
+        equalDomains (RDOM r1) (RDOM r2) = lift $ lift $ equals r1 r2
+        equalDomains d1 d2 = pure $ eq d1 d2
 
     binOp :: ArcPosition -> QueryFunctionDescription -> QueryFunctionDescription -> Array Range -> FunctionName -> PhaseThree QueryFunctionDescription
     binOp pos left' right' allowedRangeConstructors functionName = if (pessimistic $ functional left') && (pessimistic $ functional right')
