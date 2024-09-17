@@ -227,6 +227,9 @@ myBrokers = "model://perspectives.domains#BrokerServices$MyBrokers"
 brokerServiceAccounts :: String
 brokerServiceAccounts = "model://perspectives.domains#BrokerServices$BrokerService$Accounts"
 
+brokerServiceContractInUse :: String
+brokerServiceContractInUse = "model://perspectives.domains#BrokerServices$BrokerServices$ContractInUse"
+
 brokerEndpoint :: String
 brokerEndpoint = "model://perspectives.domains#BrokerServices$BrokerContract$External$Url"
 

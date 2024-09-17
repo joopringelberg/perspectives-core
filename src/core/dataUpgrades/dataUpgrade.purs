@@ -90,6 +90,7 @@ runDataUpgrades = do
     (do 
       patchModels PDR2503.replacements
       void recompileLocalModels)
+  runUpgrade installedVersion "0.25.4" updateModels0254
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------
@@ -150,5 +151,14 @@ updateModels0250 = runMonadPerspectivesTransaction'
   do
     updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BodiesWithAccounts@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#CouchdbManagement@2.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")
+
+updateModels0254 :: MonadPerspectives Unit
+updateModels0254 = runMonadPerspectivesTransaction'
+  false
+  (ENR $ EnumeratedRoleType sysUser)
+  do
+    updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#CouchdbManagement@2.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")

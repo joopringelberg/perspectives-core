@@ -44,7 +44,7 @@ domain model://joopringelberg.nl#TestActionPerspectives
           create role ToBeRemoved
       perspective on ContextToBeRemoved
         -- Outcomment the next line to demonstrate the compiler check on ScrapContext an CreateContext
-        only (Remove, CreateAndFill, Fill, Delete)
+        only (Remove, CreateAndFill, Fill, DeleteContext)
         action ScrapContext
           remove role origin
       action CreateContext

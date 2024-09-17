@@ -128,7 +128,7 @@ domain model://perspectives.domains#System
       -- It can be used to store a limited number of media files in the perspectives sharedfile storage.
       -- PDRDEPENDENCY (actually, a MyContexts dependency)
       property SharedFileServerKey (String)
-      state NoKey = not exists SharedFileServerKey and exists sys:Me >> SharedFileServerKey
+      state NoKey = (not exists SharedFileServerKey) and (exists sys:Me >> SharedFileServerKey)
         on entry
           do for SystemUser
             SharedFileServerKey = callExternal util:GetSharedFileServerKey( sys:Me >> SharedFileServerKey ) returns String
@@ -137,7 +137,7 @@ domain model://perspectives.domains#System
       perspective on Persons
         props (SharedFileServerKey) verbs (Consult)
         -- Only the peer himself is allowed to see his key (and of course the SystemUser that creates it for him).
-        peeronly
+        selfonly
 
     user Me filledBy PerspectivesUsers
       aspect sys:RoleWithId
@@ -239,7 +239,7 @@ domain model://perspectives.domains#System
       perspective on StartContexts
         props (Name) verbs (Consult)
       perspective on Contacts
-        props (FirstName, LastName) verbs (Consult)
+        props (FirstName, LastName) verbs (Consult, SetPropertyValue)
       perspective on OutgoingInvitations
         only (CreateAndFill, Remove)
         props (InviterLastName) verbs (Consult)
@@ -249,9 +249,17 @@ domain model://perspectives.domains#System
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
       perspective on ModelsInUse
-        only (Remove, Create, CreateAndFill)
+        only (Remove, Create, CreateAndFill, Fill, RemoveFiller)
         props (ModelName, Description, Version, Patch, Build) verbs (Consult)
-        props (InstalledPatch, InstalledBuild, UpdateOnBuild) verbs (SetPropertyValue)
+        props (InstalledPatch, InstalledBuild, UpdateOnBuild, DetachedFiller) verbs (SetPropertyValue)
+        in object state Filled
+          action Detach
+            DetachedFiller = binding >> callExternal util:RoleIdentifier() returns String
+            unbind_ origin >> binding from origin
+        in object state UnFilled
+          action Reattach
+            bind_ (roleinstance (sys:VersionedModelManifest$External) DetachedFiller) to origin
+
       perspective on ModelsToUpdate
         props (ModelName, Description, Version) verbs (Consult)
         in object state InstallUpdate
@@ -348,6 +356,7 @@ domain model://perspectives.domains#System
       -- PDRDEPENDENCY
       property InstalledBuild (Number)
       property UpdateOnBuild (Boolean)
+      property DetachedFiller (String)
       state InstallBuild = UpdateOnBuild and InstalledBuild < Build
         on entry
           notify User
@@ -363,6 +372,9 @@ domain model://perspectives.domains#System
           do for User
             callEffect cdb:UpdateModel( ModelToRemove, false )
             InstalledPatch = Patch
+      state Filled = exists binding
+      state UnFilled = (not exists binding) and exists DetachedFiller
+          
       on exit
         -- notify User
         --   "Model {ModelToRemove} has been removed completely."

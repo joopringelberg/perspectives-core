@@ -62,10 +62,14 @@ domain model://perspectives.domains#BrokerServices
             create_ context BrokerService bound to origin
     
     context PublicBrokers (relational) filledBy BrokerService
-      state NoContract = not exists context >> filter PublicBrokers >> binding >> context >> Accounts >> binding >> context >> AccountHolder with filledBy sys:SocialMe -- gaat fout; origin kan wel.
+      state NoContract = not exists (filter binding >> context >> Accounts with binding >> context >> AccountHolder >> binding == sys:SocialMe >> binding)
     
     -- A contract for the BrokerService I use.
-    context Contracts = sys:SocialMe >> binder AccountHolder >> context >> extern
+    context Contracts = sys:SocialMe >> binding >> binder AccountHolder >> context >> extern
+
+    -- PDRDEPENDENCY
+    -- Arbitrarily take the first registerd (=active) contract to be the one that is in use.
+    context ContractInUse (functional) = filter Contracts with Registered >>= first
 
     user Manager = sys:Me
       perspective on ManagedBrokers
@@ -73,6 +77,8 @@ domain model://perspectives.domains#BrokerServices
         props (Name) verbs (Consult)
         props (StorageLocation) verbs (Consult, SetPropertyValue)
       perspective on Contracts
+        view BrokerContract$External$ForAccountHolder verbs (Consult)
+      perspective on ContractInUse
         view BrokerContract$External$ForAccountHolder verbs (Consult)
       perspective on PublicBrokers
         only (Create, Fill, Remove)
@@ -101,6 +107,8 @@ domain model://perspectives.domains#BrokerServices
         tab "My Contracts"
           row
             table "My Contracts" Contracts
+          row 
+            form "Contract in use" ContractInUse
         tab "Brokers" default
           row 
             table ManagedBrokers
@@ -279,6 +287,17 @@ domain model://perspectives.domains#BrokerServices
         on entry
           notify AccountHolder
             "Your lease of the BrokerService has ended. Within {Service >> GracePeriod} days, you will no longer be able to receive information from peers."
+      
+    state Terminated = callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> TerminatesOn or extern >> ContractTerminated
+      on entry
+        do for BrokerContract$Administrator
+          callEffect rabbit:DeleteAMQPaccount(
+            extern >> ManagementEndpoint,
+            Administrator >> AdminUserName,
+            Administrator >> AdminPassword,
+            AccountHolder >> AccountName)
+          delete context bound to Queues
+          Registered = false for extern
 
     -- TODO: On exiting a BrokerContract, we want to undo the subscription with RabbitMQ.
     -- on exit
@@ -301,6 +320,8 @@ domain model://perspectives.domains#BrokerServices
       property UseExpiresOn (DateTime)
       property GracePeriodExpiresOn (DateTime)
       property TerminatesOn (DateTime)
+
+      property ContractTerminated (Boolean)
 
       view ForAccountHolder (Name, UseExpiresOn)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
@@ -356,7 +377,7 @@ domain model://perspectives.domains#BrokerServices
 
       perspective on extern
         props (Url, Exchange, CurrentQueueName) verbs (Consult)
-        props (Registered, UseExpiresOn, GracePeriodExpiresOn, TerminatesOn) verbs (SetPropertyValue)
+        props (Registered, UseExpiresOn, GracePeriodExpiresOn, TerminatesOn, ContractTerminated) verbs (SetPropertyValue)
       perspective on AccountHolder
         all roleverbs
         props (AccountName, AccountPassword) verbs (Consult, SetPropertyValue)
@@ -383,18 +404,22 @@ domain model://perspectives.domains#BrokerServices
     user Administrator filledBy bs:BrokerService$Administrator
       aspect sys:Invitation$Inviter
 
+      perspective on Administrator
+        props (AdminUserName, AdminPassword) verbs (Consult)
+
       perspective on AccountHolder
         all roleverbs
         props (AccountName, AccountPassword) verbs (Consult, SetPropertyValue)
       
       perspective on Queues
-        only (Create, Fill)
+        only (Create, Fill, DeleteContext)
         props (QueueName) verbs (Consult, SetPropertyValue)
       
       -- If this contract is due to self-signup, Administrator needs this perspective to know that this contract
       -- fills an Accounts role in the service
       perspective on extern
-        props (Name) verbs (Consult)
+        props (Name, ContractTerminated, ManagementEndpoint, TerminatesOn) verbs (Consult)
+        props (Registered) verbs (SetPropertyValue)
 
       screen "Create Broker Contract"
         row 
