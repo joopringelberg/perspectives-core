@@ -102,6 +102,8 @@ instance containsPrefixesUnaryStep :: ScanSymbols UnaryStep where
   scan (Fills pos s) = Fills pos <$> scan s
   scan (Available pos s) = Available pos <$> scan s
   scan (DurationOperator pos op s) = DurationOperator pos op <$> scan s
+  scan (ContextIndividual pos tp s) = ContextIndividual pos <$> f tp <*> scan s
+  scan (RoleIndividual pos tp s) = RoleIndividual pos <$> f tp <*> scan s
 
 instance containsPrefixesLetStep :: ScanSymbols LetStep where
   scan (LetStep r@{bindings, assignments}) = do

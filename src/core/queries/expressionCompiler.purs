@@ -63,9 +63,9 @@ import Perspectives.Query.QueryTypes (Range) as QT
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getEnumeratedProperty, getEnumeratedRole, typeExists)
+import Perspectives.Representation.Class.PersistentType (DomeinFileId(..), StateIdentifier(..), getCalculatedProperty, getCalculatedRole, getContext, getEnumeratedProperty, getEnumeratedRole, typeExists)
 import Perspectives.Representation.Class.Property (propertyTypeIsFunctional, propertyTypeIsMandatory, range) as PROP
-import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
+import Perspectives.Representation.Class.Role (adtIsFunctional, bindingOfADT, contextOfADT, contextOfRepresentation, externalRoleOfADT, getRoleADTFromString, getRoleType, roleADT, roleTypeIsFunctional, roleTypeIsMandatory)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
@@ -86,6 +86,7 @@ type FD = PhaseThree QueryFunctionDescription
 ------------------------------------------------------------------------------------
 ------ COMPILING EXPRESSIONS
 -- Compiles a Step and qualifies any returns clauses in it.
+-- Assume that the model being compiled is available.
 ------------------------------------------------------------------------------------
 compileExpression :: Domain -> Step -> FD
 compileExpression domain stp = compileStep domain stp >>= traverseQfd (qualifyReturnsClause (startOf stp))
@@ -608,6 +609,30 @@ compileUnaryStep currentDomain st@(DurationOperator start duration s) = do
   case range descriptionOfs of
     VDOM PNumber _ -> pure $ replaceRange descriptionOfs (VDOM (PDuration durationRange) Nothing)
     otherwise -> throwError $ IncompatibleQueryArgument start currentDomain (Unary st)
+
+compileUnaryStep currentDomain st@(ContextIndividual pos qualifiedIdentifier s) = do
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    VDOM PString _ -> do 
+      -- Check whether tye type exists.
+      mqualifiedContext <- lift $ lift $ try (getContext $ ContextType qualifiedIdentifier)
+      case mqualifiedContext of
+        Left _ -> throwError $ UnknownContext pos qualifiedIdentifier
+        Right _ -> pure $ UQD currentDomain (QF.UnaryCombinator ContextIndividualF) descriptionOfs (CDOM $ UET $ ContextType qualifiedIdentifier) True True
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+
+compileUnaryStep currentDomain st@(RoleIndividual pos qualifiedIdentifier s) = do
+  descriptionOfs <- compileStep currentDomain s
+  case range descriptionOfs of
+    VDOM PString _ -> do 
+      -- Check whether tye type exists.
+      mqualifiedRole <- lift $ lift $ try $ getEnumeratedRole $ EnumeratedRoleType qualifiedIdentifier
+      case mqualifiedRole of 
+        Left _ -> throwError $ UnknownRole pos qualifiedIdentifier
+        Right _ -> do 
+          role <- lift $ lift $ getEnumeratedRole (EnumeratedRoleType qualifiedIdentifier)
+          pure $ UQD currentDomain (QF.UnaryCombinator RoleIndividualF) descriptionOfs (RDOM $ UET $ RoleInContext {role: EnumeratedRoleType qualifiedIdentifier, context: contextOfRepresentation role}) True True
+    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =

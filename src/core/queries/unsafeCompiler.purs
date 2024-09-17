@@ -414,6 +414,10 @@ compileFunction (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) = do
   f1' <- compileFunction f1
   pure (unsafeCoerce $ available_ f1')
 
+compileFunction (UQD _ (UnaryCombinator ContextIndividualF) contextExpr _ _ _) = compileFunction contextExpr
+
+compileFunction (UQD _ (UnaryCombinator RoleIndividualF) contextExpr _ _ _) = compileFunction contextExpr
+
 compileFunction (UQD _ (UnaryCombinator NotF) f1 _ _ _) = do
   (f1' :: String ~~> Value) <- unsafeCoerce (compileFunction f1)
   pure (unsafeCoerce $ not f1')

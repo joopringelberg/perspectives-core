@@ -205,6 +205,8 @@ perspectDef = LanguageDef
                   , "publicrole"
                   , "publiccontext"
                   , "isInState"
+                  , "contextinstance"
+                  , "roleinstance"
 
                   -- Functions in expressions
                   , "specialisesRoleType"

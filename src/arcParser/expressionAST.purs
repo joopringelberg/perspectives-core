@@ -77,6 +77,9 @@ data UnaryStep =
   | Fills ArcPosition Step
   | Available ArcPosition Step
   | DurationOperator ArcPosition Operator Step
+  | ContextIndividual ArcPosition String Step
+  | RoleIndividual ArcPosition String Step
+
 
 newtype BinaryStep = BinaryStep {start :: ArcPosition, end :: ArcPosition, operator :: Operator, left :: Step, right :: Step, parenthesised :: Boolean}
 
@@ -194,6 +197,8 @@ instance prettyPrintUnaryStep :: PrettyPrint UnaryStep where
   prettyPrint' t (Fills _ s) = "Fills " <> prettyPrint' t s
   prettyPrint' t (Available _ s) = "Available " <> prettyPrint' t s
   prettyPrint' t (DurationOperator _ op s) = show op <> " " <> prettyPrint' t s
+  prettyPrint' t (ContextIndividual _ tp s) = "contextindividual (" <> tp <> ") " <> prettyPrint' t s
+  prettyPrint' t (RoleIndividual _ tp s) = "roleindividual (" <> tp <> ") " <> prettyPrint' t s
 
 derive instance genericPureLetStep :: Generic PureLetStep _
 instance showPureLetStep :: Show PureLetStep where show = genericShow

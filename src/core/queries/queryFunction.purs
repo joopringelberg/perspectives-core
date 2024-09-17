@@ -77,6 +77,8 @@ data FunctionName =
   | MinimumF
   | MaximumF
   | AvailableF
+  | ContextIndividualF
+  | RoleIndividualF
 
   | TypeOfContextF
   | RoleTypesF
@@ -121,6 +123,8 @@ instance eqFunctionName :: Eq FunctionName where
   eq MinimumF MinimumF = true
   eq MaximumF MaximumF = true
   eq AvailableF AvailableF = true
+  eq ContextIndividualF ContextIndividualF = true
+  eq RoleIndividualF RoleIndividualF = true
 
   eq TypeOfContextF TypeOfContextF = true
   eq RoleTypesF RoleTypesF = true
@@ -170,6 +174,8 @@ instance showFunctionName :: Show FunctionName where
     show MinimumF = "minimum"
     show MaximumF = "maximum"
     show AvailableF = "available"
+    show RoleIndividualF = "roleindividualf"
+    show ContextIndividualF = "contextindividualf"
     show TypeOfContextF = "TypeOfContextF"
     show RoleTypesF = "RoleTypesF"
     show SpecialisesRoleTypeF = "SpecialisesRoleTypeF"
@@ -218,12 +224,14 @@ instance readForeignFunctionName :: ReadForeign FunctionName where
       "minimum" -> pure MinimumF
       "maximum" -> pure MaximumF
       "available" -> pure AvailableF
+      "roleindividualf" -> pure RoleIndividualF
+      "contextindividualf" -> pure ContextIndividualF
       "TypeOfContextF" -> pure TypeOfContextF
       "RoleTypesF" -> pure RoleTypesF
       "SpecialisesRoleTypeF" -> pure SpecialisesRoleTypeF
       "IsInStateF" -> pure IsInStateF
       "first" -> pure FirstF
-      f -> throwError $ singleton (ForeignError $ "readForeign FunctionName: Unknown FunctionName: " <> f)
+      f' -> throwError $ singleton (ForeignError $ "readForeign FunctionName: Unknown FunctionName: " <> f')
 
 isFunctionalFunction :: FunctionName -> ThreeValuedLogic
 isFunctionalFunction fn = case fn of
@@ -262,6 +270,8 @@ isFunctionalFunction fn = case fn of
   MinimumF -> True
   MaximumF -> True
   AvailableF -> True
+  RoleIndividualF -> True
+  ContextIndividualF -> True
   TypeOfContextF -> True
   RoleTypesF -> False
   SpecialisesRoleTypeF -> True
@@ -306,6 +316,8 @@ isMandatoryFunction fn = case fn of
   MinimumF -> True
   MaximumF -> True
   AvailableF -> True
+  ContextIndividualF -> False
+  RoleIndividualF -> False
   TypeOfContextF -> True
   RoleTypesF -> True
   SpecialisesRoleTypeF -> True

@@ -38,7 +38,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), Operator(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP(..))
-import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, regexFlags', reserved, pubParser)
+import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, pubParser, regexFlags', reserved)
 import Perspectives.Parsing.Arc.IndentParser (IP, entireBlock, getPosition)
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
@@ -288,7 +288,7 @@ parseJSDate = try do
   pure $ unsafePerformEffect $ parse s
 
 isUnaryKeyword :: String -> Boolean
-isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "filledBy", "fills", "available"]
+isUnaryKeyword kw = isJust $ elemIndex kw ["not", "exists", "filledBy", "fills", "available", "roleinstance", "contextinstance"]
 
 unaryStep :: IP Step
 unaryStep = do
@@ -299,6 +299,8 @@ unaryStep = do
     "filledBy" -> Unary <$> (FilledBy <$> getPosition <*> (reserved "filledBy" *> (defer \_ -> step)))
     "fills" -> Unary <$> (Fills <$> getPosition <*> (reserved "fills" *> (defer \_ -> step)))
     "available" -> Unary <$> (Available <$> getPosition <*> (reserved "available" *> (defer \_ -> step)))
+    "contextinstance" -> Unary <$> (ContextIndividual <$> getPosition <*> (reserved "contextinstance" *> token.parens arcIdentifier) <*> (defer \_ -> step))
+    "roleinstance" -> Unary <$> (RoleIndividual <$> getPosition <*> (reserved "roleinstance" *> token.parens arcIdentifier) <*> (defer \_ -> step))
     s -> fail ("Expected not, exists, filledBy, fills or available, but found: '" <> s <> "'. ")
 
 operator :: Partial => IP Operator
@@ -444,6 +446,8 @@ startOf stp = case stp of
     startOfUnary (Fills p _) = p
     startOfUnary (Available p _) = p
     startOfUnary (DurationOperator p _ _) = p
+    startOfUnary (ContextIndividual p _ _) = p
+    startOfUnary (RoleIndividual p _ _) = p
 
 
 endOf :: Step -> ArcPosition
@@ -456,8 +460,8 @@ endOf stp = case stp of
 
   where
     endOfSimple (ArcIdentifier (ArcPosition{line, column}) id) = ArcPosition{line, column: column + length id}
-    endOfSimple (RoleTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 6 + length id}
-    endOfSimple (ContextTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 9 + length id}
+    endOfSimple (RoleTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 11 + length id}
+    endOfSimple (ContextTypeIndividual (ArcPosition{line, column}) id) = ArcPosition{line, column: column + 14 + length id}
     endOfSimple (Value (ArcPosition{line, column}) _ v) = ArcPosition({line, column: column + length v + 1})
     endOfSimple (PublicRole (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
     endOfSimple (PublicContext (ArcPosition{line, column}) url) =  ArcPosition({line, column: column + length url + 1})
@@ -488,6 +492,8 @@ endOf stp = case stp of
     endOfUnary (Fills (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (Available (ArcPosition{line, column}) step') = endOf step'
     endOfUnary (DurationOperator _ _ step') = endOf step'
+    endOfUnary (ContextIndividual _ _ step') = endOf step'
+    endOfUnary (RoleIndividual _ _ step') = endOf step'
 
     col_ :: ArcPosition -> Int
     col_ (ArcPosition{column}) = column

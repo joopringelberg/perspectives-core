@@ -144,6 +144,16 @@ interpretUQD (UQD _ (UnaryCombinator AvailableF) f1 _ _ _) a = ArrayT do
   result <- lift $ available' (toString <$> r)
   pure $ [consOnMainPath (V "AvailableF" (Value $ show result)) a]
 
+interpretUQD (UQD _ (UnaryCombinator ContextIndividualF) contextExpr _ _ _) a = ArrayT do
+  (paths :: Array DependencyPath) <- runArrayT $ interpret contextExpr a
+  pure (paths <#> \r@{head} -> unsafePartial $ case head of 
+    (V _ (Value cid)) -> consOnMainPath (C (ContextInstance cid)) r)
+
+interpretUQD (UQD _ (UnaryCombinator RoleIndividualF) roleExpr _ _ _) a = ArrayT do
+  (paths :: Array DependencyPath) <- runArrayT $ interpret roleExpr a
+  pure (paths <#> \r@{head} -> unsafePartial $ case head of 
+    (V _ (Value rid)) -> consOnMainPath (R (RoleInstance rid)) r)
+
 interpretUQD (UQD _ (UnaryCombinator NotF) f1 _ _ _) a = ArrayT do
   (r :: Array DependencyPath) <- runArrayT $ interpret f1 a
   -- The DescriptionCompiler ensures that we have only Value type heads.
