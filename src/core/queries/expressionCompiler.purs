@@ -357,7 +357,7 @@ compileSimpleStep currentDomain s@(ArcIdentifier pos ident) = do
               Just {head:pt, tail} -> if null tail
                 then makePropertyGetter currentDomain pt
                 else throwError $ NotUniquelyIdentifying pos ident (show <$> pts)
-          otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+          otherwise -> throwError $ DomainTypeRequired "context or role" currentDomain pos (endOf (Simple s))
 
 compileSimpleStep currentDomain (PublicRole pos ident) = do
   rType <- lift2 $ roleType_ (RoleInstance ident)
@@ -390,7 +390,7 @@ compileSimpleStep currentDomain s@(Filler pos membeddingContext) = do
                 Nothing -> throwError $ UnknownContext pos context
                 (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.DataTypeGetterWithParameter FillerF (unwrap qn)) (RDOM $ replaceContext adtOfBinding qn) True False
                 _ -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames)
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
   case currentDomain of
@@ -421,20 +421,20 @@ compileSimpleStep currentDomain s@(Filled pos binderName membeddingContext) = do
               Nothing -> throwError $ UnknownContext pos context
               (Just qn) | length qnames == 1 -> pure $ SQD currentDomain (QF.FilledF qBinderType (ContextType context)) (RDOM $ replaceContext adtOfBinder qn) False False
               otherwise -> throwError $ NotUniquelyIdentifying pos context (map unwrap qnames) 
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(Context pos) = do
   case currentDomain of
     (RDOM (r :: ADT RoleInContext)) -> do
       (typeOfContext :: ADT ContextType) <- pure $ contextOfADT r
       pure $ SQD currentDomain (QF.DataTypeGetter ContextF) (CDOM typeOfContext) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(TypeOfContext pos) = do
   case currentDomain of
     (CDOM (r :: ADT ContextType)) -> do
       pure $ SQD currentDomain (QF.TypeGetter TypeOfContextF) ContextKind True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "context" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(RoleTypeIndividual pos typeName) = do
   nameSpace <- getsDF _.id
@@ -456,7 +456,7 @@ compileSimpleStep currentDomain s@(RoleTypes pos) = do
   case currentDomain of
     ContextKind -> do
       pure $ SQD currentDomain (QF.TypeGetter RoleTypesF) RoleKind True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "context type" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
   case currentDomain of
@@ -473,7 +473,7 @@ compileSimpleStep currentDomain s@(SpecialisesRoleType pos roleName) = do
             (Just qn) | length qnames == 1 -> pure qn
             otherwise -> throwError $ NotUniquelyIdentifying pos roleName (map unwrap qnames)
       pure $ SQD currentDomain (QF.DataTypeGetterWithParameter SpecialisesRoleTypeF (unwrap qRoleName)) (VDOM PBool Nothing) (isFunctionalFunction SpecialisesRoleTypeF) False
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role type" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(IsInState pos stateName) = do
   -- If the domain is a SUM, the stateName must belong to at least one of the members.
@@ -490,7 +490,7 @@ compileSimpleStep currentDomain s@(IsInState pos stateName) = do
     CDOM adt -> do 
       (allContexts :: Array ContextType) <- lift $ lift (adt ###= allTypesInContextADT)
       f (unwrap <$> allContexts)
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role or context" currentDomain pos (endOf $ Simple s)
   pure $ SQD currentDomain (QF.DataTypeGetterWithParameter IsInStateF (unwrap qualifiedStateName)) (VDOM PBool Nothing) (isFunctionalFunction IsInStateF) False
 
   where
@@ -517,7 +517,7 @@ compileSimpleStep currentDomain s@(IsInState pos stateName) = do
 compileSimpleStep currentDomain s@(RegEx pos (reg :: RegExP)) = do
   case currentDomain of
     VDOM PString _ -> pure $ SQD currentDomain (QF.RegExMatch reg) (VDOM PBool Nothing) True False
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "string" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain (TypeTimeOnlyContext pos ctype) = pure $
   SQD currentDomain (QF.TypeTimeOnlyContextF ctype) (CDOM (UET $ ContextType ctype)) True True
@@ -534,13 +534,13 @@ compileSimpleStep currentDomain s@(Extern pos) = do
     (CDOM c) -> do
       (rts :: ADT RoleInContext) <- lift2 $ externalRoleOfADT c
       pure $ SQD currentDomain (QF.DataTypeGetter ExternalRoleF) (RDOM rts) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "context" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain s@(IndexedName pos) = do
   case currentDomain of
     (CDOM c) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedContextName) (VDOM PString Nothing) True False
     (RDOM r) -> pure $ SQD currentDomain (QF.DataTypeGetter IndexedRoleName) (VDOM PString Nothing) True False
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Simple s)
+    otherwise -> throwError $ DomainTypeRequired "role or context" currentDomain pos (endOf $ Simple s)
 
 compileSimpleStep currentDomain (Identity _) = do
   isFunctional <- case currentDomain of
@@ -571,7 +571,7 @@ compileUnaryStep currentDomain (LogicalNot pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     VDOM PBool _ -> pure $ UQD currentDomain (QF.UnaryCombinator NotF) descriptionOfs (VDOM PBool Nothing) (functional descriptionOfs) (mandatory descriptionOfs)
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain s
+    otherwise -> throwError $ NotABoolean pos
 
 compileUnaryStep currentDomain st@(Exists pos s) = do
   descriptionOfs <- compileStep currentDomain s
@@ -581,18 +581,18 @@ compileUnaryStep currentDomain st@(FilledBy pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator FilledByF) descriptionOfs (VDOM PBool Nothing) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> throwError $ NotARoleDomain (range descriptionOfs) pos (endOf s)
 
 compileUnaryStep currentDomain st@(Fills pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
     RDOM _ -> pure $ UQD currentDomain (QF.UnaryCombinator FillsF) descriptionOfs (VDOM PBool Nothing) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> throwError $ NotARoleDomain (range descriptionOfs) pos (endOf s)
 
 compileUnaryStep currentDomain st@(Available pos s) = do
   descriptionOfs <- compileStep currentDomain s
   case range descriptionOfs of
-    VDOM _ _ -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    VDOM _ _ -> throwError $ ValueExpressionNotAllowed (range descriptionOfs) pos (endOf s)
     otherwise -> pure $ UQD currentDomain (QF.UnaryCombinator AvailableF) descriptionOfs (VDOM PBool Nothing) True True
 
 compileUnaryStep currentDomain st@(DurationOperator start duration s) = do
@@ -608,7 +608,7 @@ compileUnaryStep currentDomain st@(DurationOperator start duration s) = do
     Millisecond _ -> pure MilliSecond_
   case range descriptionOfs of
     VDOM PNumber _ -> pure $ replaceRange descriptionOfs (VDOM (PDuration durationRange) Nothing)
-    otherwise -> throwError $ IncompatibleQueryArgument start currentDomain (Unary st)
+    otherwise -> throwError $ DomainTypeRequired "number" (range descriptionOfs) start (endOf s)
 
 compileUnaryStep currentDomain st@(ContextIndividual pos qualifiedIdentifier s) = do
   descriptionOfs <- compileStep currentDomain s
@@ -619,7 +619,7 @@ compileUnaryStep currentDomain st@(ContextIndividual pos qualifiedIdentifier s) 
       case mqualifiedContext of
         Left _ -> throwError $ UnknownContext pos qualifiedIdentifier
         Right _ -> pure $ UQD currentDomain (QF.UnaryCombinator ContextIndividualF) descriptionOfs (CDOM $ UET $ ContextType qualifiedIdentifier) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> throwError $ DomainTypeRequired "role" currentDomain pos (endOf s)
 
 compileUnaryStep currentDomain st@(RoleIndividual pos qualifiedIdentifier s) = do
   descriptionOfs <- compileStep currentDomain s
@@ -632,7 +632,7 @@ compileUnaryStep currentDomain st@(RoleIndividual pos qualifiedIdentifier s) = d
         Right _ -> do 
           role <- lift $ lift $ getEnumeratedRole (EnumeratedRoleType qualifiedIdentifier)
           pure $ UQD currentDomain (QF.UnaryCombinator RoleIndividualF) descriptionOfs (RDOM $ UET $ RoleInContext {role: EnumeratedRoleType qualifiedIdentifier, context: contextOfRepresentation role}) True True
-    otherwise -> throwError $ IncompatibleQueryArgument pos currentDomain (Unary st)
+    otherwise -> throwError $ DomainTypeRequired "string" (range descriptionOfs) pos (endOf s)
 
 compileBinaryStep :: Domain -> BinaryStep -> FD
 compileBinaryStep currentDomain s@(BinaryStep{operator, left, right}) =

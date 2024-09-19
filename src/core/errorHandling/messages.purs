@@ -35,7 +35,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Parsing.Arc.Expression.AST (PureLetStep(..), Step)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement.AST (LetStep(..))
-import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, Range, RoleInContext)
+import Perspectives.Query.QueryTypes (Domain, QueryFunctionDescription, RoleInContext, Range)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Range (Range) as RAN
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType, CalculatedRoleType, ContextType, DomeinFileId, EnumeratedRoleType, PropertyType, RoleKind, RoleType, StateIdentifier, roletype2string)
@@ -94,7 +94,9 @@ data PerspectivesError
     | CannotModifyCalculatedProperty String ArcPosition ArcPosition
     | NotAContextDomain QueryFunctionDescription Domain ArcPosition ArcPosition
     | NotARoleDomain Domain ArcPosition ArcPosition
+    | ValueExpressionNotAllowed Domain ArcPosition ArcPosition
     | NotAStringDomain QueryFunctionDescription ArcPosition ArcPosition
+    | DomainTypeRequired String Range ArcPosition ArcPosition
     | NotAContextRole ArcPosition ArcPosition
     | NotFunctional ArcPosition ArcPosition Step
     | MaybeNotFunctional ArcPosition ArcPosition Step
@@ -193,7 +195,9 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (CannotCreateCalculatedProperty pt start end) = "(CannotCreateCalculatedProperty) Can not change the value of a property that is calculated, between: " <> show start <> " and: " <> show end
   show (CannotModifyCalculatedProperty props start end) = "(CannotModifyCalculatedProperty) Can not change the value these calculated properties (" <> props <> "), between: " <> show start <> " and: " <> show end
   show (NotARoleDomain dom start end) = "(NotARoleDomain) This expression should have a role type: " <> show dom <> ", between " <> show start <> " and " <> show end
+  show (ValueExpressionNotAllowed dom start end) = "(ValueExpressionNotAllowed) This expression has type: " <> show dom <> " but a Value is not allowed here " <> showPosition start end
   show (NotAStringDomain qfd start end) = "(NotAStringDomain) This expression should have a string type: " <> show qfd <> ", between " <> show start <> " and " <> show end
+  show (DomainTypeRequired domains dom start end) = "(DomainTypeRequired) This expression should result in a " <> domains <> ", but instead is a " <> show dom <> showPosition start end
   show (NotAContextRole start end) = "(NotAContextRole) All role types in this expression should be context roles (binding the external role of a context), between " <> show start <> " and " <> show end
   show (NotAContextDomain qfd dom start end) = "(NotAContextDomain) This expression:\n" <> prettyPrint qfd <> "\nshould return a context type, but has instead: " <> show dom <> ", between " <> show start <> " and " <> show end
   show (NotFunctional start end qfd) = "(NotFunctional) This expression is not a single value, between " <> show start <> " and " <> show end
