@@ -46,7 +46,7 @@ import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, isContextDomain, makeComposition, mandatory, queryFunction, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2context, context2role, getDynamicPropertyGetter, getPublicUrl)
-import Perspectives.Representation.ADT (allLeavesInADT)
+import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
 import Perspectives.Representation.Class.Identifiable (displayName, identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
@@ -202,6 +202,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
         DataTypeGetterWithParameter FilledByF _ -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
         DataTypeGetter FillerF -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
         DataTypeGetterWithParameter FillerF _ -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM (roleInContext2Context <$> unsafePartial roleRange qfd)) True True)
+        FilledF _ ctxt -> pure $ makeComposition qfd (SQD (range qfd) (DataTypeGetter ContextF) (CDOM $ UET ctxt) True True)
         RolGetter _ -> pure query
       Nothing -> if isContextDomain (domain qfd)
         then pure $ SQD (domain qfd) (DataTypeGetter IdentityF) (domain qfd) True True
