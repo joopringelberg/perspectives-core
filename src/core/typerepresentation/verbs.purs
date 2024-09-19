@@ -148,7 +148,7 @@ roleVerbList2Verbs (Excluding excluded) = difference allVerbs excluded
 roleVerbList2Verbs (Including v) = v
 
 allVerbs :: Array RoleVerb
-allVerbs = [Remove, Delete, Create, CreateAndFill, Fill, Unbind, RemoveFiller, Move]
+allVerbs = [Remove, Delete, Create, CreateAndFill, Fill, Unbind, RemoveFiller, Move, RemoveContext, DeleteContext]
 
 hasOneOfTheVerbs :: Array RoleVerb -> RoleVerbList -> Boolean
 hasOneOfTheVerbs vs All = true
