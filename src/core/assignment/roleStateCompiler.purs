@@ -87,9 +87,9 @@ compileState stateId = do
       (\subject notification -> compileNotification notification subject)
       (unwrap notifyOnExit)
     (perspectivesOnEntry' :: Map RoleType CompiledStateDependentPerspective) <- traverseWithIndex
-      (\subject (RolePerspective{currentContextCalculation, properties, selfOnly, peerOnly, isSelfPerspective}) -> do 
+      (\subject (RolePerspective{currentContextCalculation, properties, selfOnly, authorOnly, isSelfPerspective}) -> do 
         contextGetter <- role2context currentContextCalculation
-        pure {contextGetter, properties, selfOnly, peerOnly, isSelfPerspective})
+        pure {contextGetter, properties, selfOnly, authorOnly, isSelfPerspective})
       (unwrap perspectivesOnEntry)
 
     -- We postpone compiling substates until they're asked for.

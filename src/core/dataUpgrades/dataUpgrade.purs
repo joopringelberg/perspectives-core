@@ -42,6 +42,8 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataUpgrade.PatchModels (patchModels)
 import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
 import Perspectives.DataUpgrade.PatchModels.PDR2503 as PDR2503
+import Perspectives.DataUpgrade.PatchModels.PDR2505 as PDR2505
+import Perspectives.DataUpgrade.RecompileLocalModels (recompileLocalModels)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Extern.Couchdb (modelsDatabaseName, updateModel)
@@ -52,7 +54,6 @@ import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (createDatabase, databaseInfo, documentsInDatabase, includeDocs)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, saveEntiteit_, saveMarkedResources)
-import Perspectives.DataUpgrade.RecompileLocalModels (recompileLocalModels) 
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
@@ -91,6 +92,10 @@ runDataUpgrades = do
       patchModels PDR2503.replacements
       void recompileLocalModels)
   runUpgrade installedVersion "0.25.4" updateModels0254
+  runUpgrade installedVersion "0.25.5" 
+    (do 
+      patchModels PDR2505.replacements
+      void recompileLocalModels)
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------

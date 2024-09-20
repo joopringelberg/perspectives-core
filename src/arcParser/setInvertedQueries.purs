@@ -50,13 +50,13 @@ setInvertedQueries ::
   Boolean ->
   Boolean -> 
   WithModificationSummary Unit
-setInvertedQueries users statesPerProperty roleStates qfd selfOnly peerOnly = do
+setInvertedQueries users statesPerProperty roleStates qfd selfOnly authorOnly = do
   -- log ("setInvertedQueries:" <> "\n users =" <> show users <> "\n states = " <> show roleStates <> "\n statesPerProperty = " <> showTree statesPerProperty <> "\n qfd = " <> show qfd)
   (zqs :: (Array QueryWithAKink)) <- lift $ invert qfd
 
   if null users
     -- This is a state query. The property access is part of the inversion.
-    then for_ zqs \qwk -> storeInvertedQuery qwk users roleStates statesPerProperty selfOnly peerOnly
+    then for_ zqs \qwk -> storeInvertedQuery qwk users roleStates statesPerProperty selfOnly authorOnly
     -- This is a perspective query. Access to properties is not included in the inverted query; it is just the perspective object.
-    else for_ zqs \qwk@(ZQ backward forward) -> storeInvertedQuery qwk users roleStates statesPerProperty selfOnly peerOnly
+    else for_ zqs \qwk@(ZQ backward forward) -> storeInvertedQuery qwk users roleStates statesPerProperty selfOnly authorOnly
       

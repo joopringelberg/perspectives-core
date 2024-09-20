@@ -60,14 +60,14 @@ data StateDependentPerspective =
   ContextPerspective
     { properties :: Array PropertyType
     , selfOnly :: Boolean
-    , peerOnly :: Boolean
+    , authorOnly :: Boolean
     , isSelfPerspective :: Boolean
   } |
   RolePerspective
     { currentContextCalculation :: QueryFunctionDescription
     , properties :: Array PropertyType
     , selfOnly :: Boolean
-    , peerOnly :: Boolean
+    , authorOnly :: Boolean
     , isSelfPerspective :: Boolean
     }
 
@@ -82,34 +82,34 @@ type StateDependentPerspective_ =
   , currentContextCalculation :: Maybe QueryFunctionDescription
   , properties :: Array PropertyType
   , selfOnly :: Boolean
-  , peerOnly :: Boolean
+  , authorOnly :: Boolean
   , isSelfPerspective :: Boolean
   }
 instance WriteForeign StateDependentPerspective where
-  writeImpl (ContextPerspective {properties, selfOnly, peerOnly, isSelfPerspective}) = writeImpl 
+  writeImpl (ContextPerspective {properties, selfOnly, authorOnly, isSelfPerspective}) = writeImpl 
     ({ constructor: "ContextPerspective"
     , currentContextCalculation: Nothing
     , properties
     , selfOnly
-    , peerOnly
+    , authorOnly
     , isSelfPerspective
     } :: StateDependentPerspective_)
-  writeImpl (RolePerspective {properties, selfOnly, peerOnly, isSelfPerspective, currentContextCalculation}) = writeImpl 
+  writeImpl (RolePerspective {properties, selfOnly, authorOnly, isSelfPerspective, currentContextCalculation}) = writeImpl 
     { constructor: "RolePerspective"
     , currentContextCalculation: Just currentContextCalculation
     , properties
     , selfOnly
-    , peerOnly
+    , authorOnly
     , isSelfPerspective
     }
 
 instance ReadForeign StateDependentPerspective where
   readImpl f = do
-    {constructor, properties, currentContextCalculation, selfOnly, peerOnly, isSelfPerspective} :: StateDependentPerspective_ <- read' f
+    {constructor, properties, currentContextCalculation, selfOnly, authorOnly, isSelfPerspective} :: StateDependentPerspective_ <- read' f
     unsafePartial case constructor of
-      "ContextPerspective" -> pure $ ContextPerspective {properties, selfOnly, peerOnly, isSelfPerspective}
+      "ContextPerspective" -> pure $ ContextPerspective {properties, selfOnly, authorOnly, isSelfPerspective}
       "RolePerspective" -> 
-        pure $ RolePerspective {properties, selfOnly, peerOnly, isSelfPerspective, currentContextCalculation: unsafePartial fromJust currentContextCalculation}
+        pure $ RolePerspective {properties, selfOnly, authorOnly, isSelfPerspective, currentContextCalculation: unsafePartial fromJust currentContextCalculation}
 
 constructState :: StateIdentifier -> Calculation -> StateFulObject -> Array StateIdentifier -> State
 constructState id condition stateFulObject subStates = State

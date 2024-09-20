@@ -56,7 +56,7 @@ storeInvertedQuery ::
   Boolean ->
   Boolean -> 
   WithModificationSummary Unit
-storeInvertedQuery qwk users roleStates statesPerProperty selfOnly peerOnly = storeInvertedQuery' qwk users roleStates statesPerProperty selfOnly peerOnly Nothing
+storeInvertedQuery qwk users roleStates statesPerProperty selfOnly authorOnly = storeInvertedQuery' qwk users roleStates statesPerProperty selfOnly authorOnly Nothing
 
 
 -- | Modifies the DomeinFile in PhaseTwoState.
@@ -69,7 +69,7 @@ storeInvertedQuery' ::
   Boolean -> 
   Maybe QueryFunctionDescription ->
   WithModificationSummary Unit
-storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty selfOnly peerOnly mfilter = do
+storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty selfOnly authorOnly mfilter = do
   -- What is confusing about what follows is that it just seems to handle the first step of an inverted query.
   -- What about the steps that follow?
   -- Reflect that we have generated *separate inverted queries* for all these steps, each 'kinking' the original query
@@ -96,7 +96,7 @@ storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty
           roleStates
           statesPerProperty 
           selfOnly 
-          peerOnly
+          authorOnly
           Nothing
         -- prepend the filter to the source. Store {first source step} << filter criterium.
         storeInvertedQuery' 
@@ -105,7 +105,7 @@ storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty
           (roleStates `union` (concat $ fromFoldable $ Map.values statesPerProperty)) 
           statesPerProperty
           selfOnly
-          peerOnly
+          authorOnly
           (Just filter)
         -- unsafePartial $ setPathForStep 
         --   source
@@ -115,9 +115,9 @@ storeInvertedQuery' qwk@(ZQ backward forward) users roleStates statesPerProperty
         --   statesPerProperty 
         --   selfOnly 
         --   (Just filter)
-      _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly peerOnly mfilter
-    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly peerOnly mfilter
-    (Just b@(MQD _ _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly peerOnly mfilter
+      _ -> unsafePartial $ setPathForStep qfd1 qwk users roleStates statesPerProperty selfOnly authorOnly mfilter
+    (Just b@(SQD _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly authorOnly mfilter
+    (Just b@(MQD _ _ _ _ _ _)) -> unsafePartial $ setPathForStep b qwk users roleStates statesPerProperty selfOnly authorOnly mfilter
     otherwise -> lift $ throwError (Custom $ "impossible case in setInvertedQueries:\n" <> prettyPrint otherwise)
 
 -- | The function is partial, because we just handle the SQD and MQD cases.
@@ -134,7 +134,7 @@ setPathForStep :: Partial =>
   Boolean ->
   Maybe QueryFunctionDescription ->
   WithModificationSummary Unit
-setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly peerOnly mfilter = do
+setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProperty selfOnly authorOnly mfilter = do
   model <- getsDF _.id
   {modifiesRoleInstancesOf, modifiesRoleBindingOf, modifiesPropertiesOf} <- ask
   case qf of
@@ -155,14 +155,14 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
               , forwardsCompiled: Nothing
               , users
               -- Default value. Should be computed per case.
-              , modifies: false
+              , modifies: false 
               , statesPerProperty: EncodableMap statesPerProperty
               -- The inverted query is the inversion of the computation of the Perspective object. This object should be available
               -- to the user in all states that the perspective is valid in. These states are not listed explicitly in the Perspective,
               -- but can be computed from the union of the StateSpecs of the roleVerbs, propertyVerbs and actions.
               , states
               , selfOnly
-              , peerOnly
+              , authorOnly
               })
             , model}
         CP _ -> pure unit
@@ -215,7 +215,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 , statesPerProperty: EncodableMap statesPerProperty
                 , states
                 , selfOnly
-                , peerOnly}) 
+                , authorOnly}) 
             , model }
 
     -- FILLER STEP
@@ -262,11 +262,11 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                     -- pas states aan als een stap is weggehaald. D.w.z. Verwijder de states van het oorspronkelijke domein van backwards, voeg als state toe de ground state van het nieuwe domein van backwards.
                     , states
                     , selfOnly
-                    , peerOnly}) 
+                    , authorOnly}) 
           , model }
           
     -- Treat the variant with a context restriction in exactly the same way as without that restriction.
-    QF.DataTypeGetterWithParameter QF.FillerF _ -> setPathForStep (SQD dom (QF.DataTypeGetter QF.FillerF) ran fun man) qWithAK users states statesPerProperty selfOnly peerOnly mfilter
+    QF.DataTypeGetterWithParameter QF.FillerF _ -> setPathForStep (SQD dom (QF.DataTypeGetter QF.FillerF) ran fun man) qWithAK users states statesPerProperty selfOnly authorOnly mfilter
 
     QF.RolGetter roleType -> case roleType of
       ENR role -> let
@@ -303,7 +303,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 , statesPerProperty: EncodableMap statesPerProperty
                 , states
                 , selfOnly
-                , peerOnly
+                , authorOnly
                 })
               , model}
       CR _ -> lift $ throwError $ Custom "Implement the handling of Calculated Roles in setPathForStep."
@@ -329,7 +329,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                   , statesPerProperty: EncodableMap statesPerProperty
                   , states
                   , selfOnly
-                  , peerOnly
+                  , authorOnly
                   })
         , model}
 
@@ -380,7 +380,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
                 , statesPerProperty: EncodableMap statesPerProperty
                 , states
                 , selfOnly
-                , peerOnly
+                , authorOnly
                 })
               , model}
 
@@ -390,7 +390,7 @@ setPathForStep qfd@(SQD dom qf ran fun man) qWithAK users states statesPerProper
 
     _ -> lift $ throwError $ Custom "setPathForStep: there should be no other cases. This is a system programming error."
 
-setPathForStep (MQD _ qf _ _ _ _) qWithAK users states statesPerProperty selfOnly peerOnly mfilter = 
+setPathForStep (MQD _ qf _ _ _ _) qWithAK users states statesPerProperty selfOnly authorOnly mfilter = 
   case qf of
     -- ExternalCoreRoleGetter is the inversion of a role individual step, such as sys:Me,
     -- and there are no other query steps that invert to it.

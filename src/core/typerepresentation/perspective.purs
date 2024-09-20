@@ -41,7 +41,7 @@ import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, allPropertyVerbs, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, bind, flip, pure, ($), (&&), (<#>), (<$>), (<>), (>), (||))
+import Prelude (class Eq, class Ord, class Show, bind, flip, not, pure, ($), (&&), (<#>), (<$>), (<>), (>), (||))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
 
 -----------------------------------------------------------
@@ -72,7 +72,7 @@ type PerspectiveRecord =
   -- The object of this perspective must be a user role; however, the perspective may be that of another user role.
   -- The net result is that if the object is a multi-user role, any changes falling within the perspective 
   -- are _only ever shared with the instance on whom the changes are made_.
-  , peerOnly :: Boolean
+  , authorOnly :: Boolean
   , isSelfPerspective :: Boolean
   , automaticStates :: Array StateIdentifier
   }
@@ -181,7 +181,7 @@ perspectiveSupportsOneOfRoleVerbs (Perspective{roleVerbs}) verbs = isJust $ LST.
   (MAP.values $ unwrap roleVerbs)
 
 perspectiveMustBeSynchronized :: Perspective -> Boolean
-perspectiveMustBeSynchronized p@(Perspective {roleVerbs, propertyVerbs}) = 
+perspectiveMustBeSynchronized p@(Perspective {roleVerbs, propertyVerbs, authorOnly}) = not authorOnly &&
   perspectiveSupportsOneOfRoleVerbs p [Remove, Delete, RemoveContext, DeleteContext] ||
   perspectiveSupportsPropertyVerb p Consult
 

@@ -833,7 +833,7 @@ perspectivePart = do
     "perspective", "on" -> perspectiveOn
     "perspective", "of" -> perspectiveOf
     "selfonly", _ -> singleton <<< SO <$> selfOnly
-    "peeronly", _ -> singleton <<< PO <$> peerOnly
+    "authoronly", _ -> singleton <<< PO <$> authorOnly
     _, _ -> case first of
       "" -> do
         thisWord <- stringUntilNewline
@@ -1230,9 +1230,9 @@ selfOnly = do
     Nothing, (Just _) -> fail "User role must be given, "
     (Just _), Nothing -> fail "Object of perspective must be given, "
 
-peerOnly :: IP PeerOnly
-peerOnly = do
-  reserved "peeronly"
+authorOnly :: IP PeerOnly
+authorOnly = do
+  reserved "authoronly"
   -- | subject and object must be present.
   {subject, object, state} <- getArcParserState
   case subject, object of

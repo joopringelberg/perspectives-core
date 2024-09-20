@@ -986,8 +986,12 @@ handlePostponedStateQualifiedParts = do
         -- | Modifies the DomeinFile in PhaseTwoState.
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd = for_ qualifiedUsers
-          (modifyPerspective objectQfd object start
-            (\(Perspective pr) -> Perspective pr {selfOnly = true}))
+          -- If this is not a selfPerspective, generate an error.
+          \qualifiedUser -> do 
+            isSelfPerspective <- lift $ lift (qualifiedUser ###>> (unsafePartial isPerspectiveOnSelf objectQfd))
+            if isSelfPerspective
+              then modifyPerspective objectQfd object start (\(Perspective pr) -> Perspective pr {selfOnly = true}) qualifiedUser
+              else throwError $ NotASelfPerspective start end
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.PO (AST.PeerOnly{subject, object, state, start, end})) = do
@@ -996,17 +1000,17 @@ handlePostponedStateQualifiedParts = do
       qualifiedUsers <- collectRoles subject
       -- ... to their perspective on this object...
       objectQfd <- roleIdentificationToQueryFunctionDescription object start
-      -- ... the selfOnly member to true.
+      -- ... the authorOnly member to true.
       modifyAllSubjectPerspectives qualifiedUsers objectQfd
-      -- Modify the selfOnly value of StateDependentPerspectives in states.
+      -- Modify the authorOnly value of StateDependentPerspectives in states.
       -- We cannot modify states of Calculated Roles, as these do not exist.
       states <- stateSpec2States state >>= statesExist start end >>= LIST.filterM isEnumeratedRoleState <<< LIST.fromFoldable
       for_ states
         (modifyStateDependentPerspectives
           state
           (case _ of
-            ContextPerspective r -> ContextPerspective r {peerOnly = true}
-            RolePerspective r -> RolePerspective  r {peerOnly = true})
+            ContextPerspective r -> ContextPerspective r {authorOnly = true}
+            RolePerspective r -> RolePerspective  r {authorOnly = true})
           qualifiedUsers
           objectQfd
           start
@@ -1018,7 +1022,7 @@ handlePostponedStateQualifiedParts = do
         modifyAllSubjectPerspectives :: Array RoleType -> QueryFunctionDescription -> PhaseThree Unit
         modifyAllSubjectPerspectives qualifiedUsers objectQfd = for_ qualifiedUsers
           (modifyPerspective objectQfd object start
-            (\(Perspective pr) -> Perspective pr {peerOnly = true}))
+            (\(Perspective pr) -> Perspective pr {authorOnly = true}))
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.CA (AST.ContextActionE{id, subject, object:currentContext, state, effect, start, end})) = do
@@ -1138,14 +1142,14 @@ handlePostponedStateQualifiedParts = do
                 AST.ContextState _ _ -> modifier $ ContextPerspective
                   { properties: []
                   , selfOnly: false
-                  , peerOnly: false
+                  , authorOnly: false
                   , isSelfPerspective
                   }
                 otherwise -> modifier $ RolePerspective
                   { currentContextCalculation
                   , properties: []
                   , selfOnly: false
-                  , peerOnly: false
+                  , authorOnly: false
                   , isSelfPerspective
                   }
               perspectivesOnEntry
@@ -1181,7 +1185,7 @@ handlePostponedStateQualifiedParts = do
                 , propertyVerbs: EM.empty
                 , actions: EM.empty
                 , selfOnly: false
-                , peerOnly: false
+                , authorOnly: false
                 , isSelfPerspective
                 , automaticStates: []
                 }
@@ -1209,7 +1213,7 @@ handlePostponedStateQualifiedParts = do
                 , propertyVerbs: EM.empty
                 , actions: EM.empty
                 , selfOnly: false
-                , peerOnly: false
+                , authorOnly: false
                 , isSelfPerspective
                 , automaticStates: []
                 }
@@ -1588,17 +1592,17 @@ invertPerspectiveObjects = do
         perspectivesInEnumeratedRole (EnumeratedRole{id, perspectives}) = for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (ENR id))
 
         perspectivesInCalculatedRole :: CalculatedRole -> PhaseThree Unit
-        perspectivesInCalculatedRole (CalculatedRole{id, perspectives, kindOfRole}) = if kindOfRole == Public
+        perspectivesInCalculatedRole (CalculatedRole{id, perspectives, kindOfRole}) = if kindOfRole == Public 
           then pure unit 
           else for_ (filter perspectiveMustBeSynchronized perspectives) (addInvertedQueriesForPerspectiveObject (CR id))
 
         addInvertedQueriesForPerspectiveObject :: RoleType -> Perspective -> PhaseThree Unit
-        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly, peerOnly}) = do
+        addInvertedQueriesForPerspectiveObject roleType p@(Perspective {object, propertyVerbs, selfOnly, authorOnly}) = do
           -- Sets the inverted queries directly in the EnumeratedRoles and Properties in the
           -- DomeinFile we keep in PhaseTwoState.
           sPerProp <- lift2 $ statesPerProperty p
           runReaderT
-            (setInvertedQueries [roleType] sPerProp ((roleStates p) `union` (automaticStates p) `union` (actionStates p) `union` (stateSpec2StateIdentifier <$> (fromFoldable $ EM.keys propertyVerbs))) object selfOnly peerOnly)
+            (setInvertedQueries [roleType] sPerProp ((roleStates p) `union` (automaticStates p) `union` (actionStates p) `union` (stateSpec2StateIdentifier <$> (fromFoldable $ EM.keys propertyVerbs))) object selfOnly authorOnly)
             (unsafePartial createModificationSummary p)
 
         explicitSet2RelevantProperties :: ExplicitSet PropertyType -> RelevantProperties

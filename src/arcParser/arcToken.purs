@@ -152,6 +152,7 @@ perspectDef = LanguageDef
                   , "defaults"
                   , "default"
                   , "selfonly"
+                  , "authoronly"
 
                   -- States
                   , "in"
