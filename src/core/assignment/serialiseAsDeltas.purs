@@ -34,13 +34,13 @@ import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Reader (runReaderT)
 import Control.Monad.State (StateT, gets, runStateT)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (cons) as ARR
+import Data.Array (cons, head) as ARR
 import Data.Array (elemIndex, nub)
 import Data.Array.NonEmpty (NonEmptyArray, singleton) as NA
 import Data.Array.NonEmpty (toArray)
 import Data.Foldable (for_, traverse_)
 import Data.List.NonEmpty (NonEmptyList, foldM, head)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Newtype (unwrap)
 import Effect.Aff.AVar (new)
 import Effect.Class.Console (log)
@@ -172,9 +172,8 @@ serialiseRoleInstancesAndProperties cid users object properties selfOnly isPersp
             R r -> pure [r]
           serialiseDependencies oneUserOnly dependencies
           for_ properties'
-            \pt -> for_ (_.head <$> rinstances)
-              \(dep ::Dependency) -> do
-                (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
+            \pt -> do 
+                (vals :: Array DependencyPath) <- liftToMPT ((singletonPath (R $ unsafePartial fromJust $ ARR.head oneUserOnly)) ##= getPropertyValues pt)
                 for_ (join (allPaths <$> vals)) (serialiseDependencies oneUserOnly)
     else do
       for_ (join (allPaths <$> rinstances)) (serialiseDependencies (toArray users))
