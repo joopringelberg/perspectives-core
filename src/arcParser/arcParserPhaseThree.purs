@@ -54,13 +54,14 @@ import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutoma
 import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.InvertedQuery.Storable (StoredQueries)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), PeerOnly(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), AuthorOnly(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
 import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
 import Perspectives.Parsing.Arc.Expression (endOf, startOf)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..), VarBinding)
+import Perspectives.Parsing.Arc.PhaseThree.CheckPerspectivesModifiers (checkPerspectiveModifiers)
 import Perspectives.Parsing.Arc.PhaseThree.PerspectiveContextualisation (addAspectsToExternalRoles, contextualisePerspectives)
 import Perspectives.Parsing.Arc.PhaseThree.SetInvertedQueries (setInvertedQueries)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, getsDF, lift2, modifyDF, runPhaseTwo_', throwError, withDomeinFile, withFrame)
@@ -140,6 +141,7 @@ phaseThree_ df@{id, referredModels} postponedParts screens = do
       -- Now all perspectives are available.
       -- Check whether actions are allowed given perspectives.
       handleScreens screens
+      checkPerspectiveModifiers
       invertPerspectiveObjects
       -- combinePerspectives
       addUserRoleGraph
@@ -994,7 +996,7 @@ handlePostponedStateQualifiedParts = do
               else throwError $ NotASelfPerspective start end
 
     -- | Modifies the DomeinFile in PhaseTwoState.
-    handlePart (AST.PO (AST.PeerOnly{subject, object, state, start, end})) = do
+    handlePart (AST.PO (AST.AuthorOnly{subject, object, state, start, end})) = do
       currentDomain <- pure (CDOM $ UET $ stateSpec2ContextType state)
       -- Set, for all these users...
       qualifiedUsers <- collectRoles subject

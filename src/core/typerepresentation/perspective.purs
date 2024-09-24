@@ -68,7 +68,7 @@ type PerspectiveRecord =
   -- selfonly is just for a user's perspective on his own role. So the object of this perspective
   -- must be a user role and the perspective _is of_ that user role, too.
   , selfOnly :: Boolean
-  -- peeronly means: the perspective is just for the peer himself. 
+  -- AuthorOnly means: the perspective is just for the peer himself. 
   -- The object of this perspective must be a user role; however, the perspective may be that of another user role.
   -- The net result is that if the object is a multi-user role, any changes falling within the perspective 
   -- are _only ever shared with the instance on whom the changes are made_.

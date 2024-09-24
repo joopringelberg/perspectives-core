@@ -28,7 +28,7 @@ import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Identifiers (isTypeUri, typeUri2typeNameSpace)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), PeerOnly(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), AuthorOnly(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
@@ -215,11 +215,11 @@ instance containsPrefixesStateQualifiedPart :: ScanSymbols StateQualifiedPart wh
     object' <- scan object
     state' <- scan state
     pure (SO (SelfOnly r {subject = subject', object = object', state = state'}))
-  scan (PO (PeerOnly r@{subject, object, state})) = do
+  scan (PO (AuthorOnly r@{subject, object, state})) = do
     subject' <- scan subject
     object' <- scan object
     state' <- scan state
-    pure (PO (PeerOnly r {subject = subject', object = object', state = state'}))
+    pure (PO (AuthorOnly r {subject = subject', object = object', state = state'}))
   scan (N (NotificationE r@{user, transition, message, object})) = do
     user' <- scan user
     transition' <- scan transition

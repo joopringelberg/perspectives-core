@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PeerOnly(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), AuthorOnly(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -1236,7 +1236,7 @@ selfOnly = do
     Nothing, (Just _) -> fail "User role must be given, "
     (Just _), Nothing -> fail "Object of perspective must be given, "
 
-authorOnly :: IP PeerOnly
+authorOnly :: IP AuthorOnly
 authorOnly = do
   reserved "authoronly"
   -- | subject and object must be present.
@@ -1246,7 +1246,7 @@ authorOnly = do
       start <- getPosition
       end <- getPosition
       sameOrOutdented'
-      pure $ PeerOnly {subject: s, object: o, state, start, end}
+      pure $ AuthorOnly {subject: s, object: o, state, start, end}
     Nothing, Nothing -> fail "User role and object of perspective must be given, "
     Nothing, (Just _) -> fail "User role must be given, "
     (Just _), Nothing -> fail "Object of perspective must be given, "

@@ -690,14 +690,14 @@ hasPerspectiveOnPropertyWithVerb subjectType roleType property verb =
         c <- perspective `isPerspectiveOnRoleFilledWithRoleType` (ENR roleType)
         pure (a && (b || c)))
 
--- | All role types in a context type that have a perspective on a given role, with a perspective on the given property.
+-- | All role types in a context type that have a perspective on a given object role, with a perspective on the given property.
 rolesWithPerspectiveOnRoleAndProperty :: Partial => RoleType -> PropertyType -> ContextType ~~~> RoleType
-rolesWithPerspectiveOnRoleAndProperty subject pt = COMB.filter userRole (propertyIsInPerspectiveOfUser pt)
+rolesWithPerspectiveOnRoleAndProperty object pt = COMB.filter userRole (propertyIsInPerspectiveOfUser pt)
   where
     -- voor de user of één van zijn aspecten.
     propertyIsInPerspectiveOfUser :: PropertyType -> RoleType ~~~> Boolean
     propertyIsInPerspectiveOfUser property userRole' = lift $ isJust <$> findPerspective userRole'
-      (\perspective -> (&&) <$> (perspective `isPerspectiveOnRoleType` subject) <*> (pure $ perspectiveSupportsProperty perspective pt))
+      (\perspective -> (&&) <$> (perspective `isPerspectiveOnRoleType` object) <*> (pure $ perspectiveSupportsProperty perspective pt))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR PERSPECTIVES

@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import Perspectives.Identifiers (endsWithSegments)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), PeerOnly(..), PropertyVerbE(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ContextActionE(..), NotificationE(..), AuthorOnly(..), PropertyVerbE(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 
 type OriginalId = String
@@ -85,8 +85,8 @@ instance ReplaceIdentifiers SelfOnly where
     { subject = replaceIdentifier original addendum subject
     , state = replaceIdentifier original addendum state}
 
-instance ReplaceIdentifiers PeerOnly where
-  replaceIdentifier original addendum (PeerOnly r@{subject, state}) = PeerOnly $ r
+instance ReplaceIdentifiers AuthorOnly where
+  replaceIdentifier original addendum (AuthorOnly r@{subject, state}) = AuthorOnly $ r
     { subject = replaceIdentifier original addendum subject
     , state = replaceIdentifier original addendum state}
 

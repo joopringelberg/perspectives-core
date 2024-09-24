@@ -37,11 +37,12 @@ import Foreign.Object (Object, toArrayWithKey)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MP, MonadPerspectives)
 import Perspectives.Identifiers (buitenRol)
+import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), RoleInContext(..), domain2roleInContext, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.QueryTypes (functional, mandatory) as QT
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CNF (CNF, distribute, flattenProducts)
-import Perspectives.Representation.CalculatedRole (CalculatedRole)
+import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Context (contextADT, roles)
 import Perspectives.Representation.Class.Identifiable (class Identifiable, identifier, identifier_)
 import Perspectives.Representation.Class.PersistentType (class PersistentType, ContextType, getCalculatedRole, getContext, getEnumeratedRole, getPerspectType)
@@ -70,6 +71,7 @@ class (Show r, Identifiable r i, PersistentType r i) <= RoleClass r i | r -> i, 
   perspectives :: r -> Array Perspective
   contextActions :: r -> Map StateSpec (Object Action)
   displayName :: r -> String
+  pos :: r -> ArcPosition
   
 -----------------------------------------------------------
 -- CALCULATED ROLE INSTANCE
@@ -90,6 +92,7 @@ instance calculatedRoleRoleClass :: RoleClass CalculatedRole CalculatedRoleType 
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
   displayName r = (unwrap r).displayName
+  pos r = (unwrap r).pos
 
 -----------------------------------------------------------
 -- ENUMERATED ROLE INSTANCE
@@ -119,6 +122,7 @@ instance enumeratedRoleRoleClass :: RoleClass EnumeratedRole EnumeratedRoleType 
   perspectives r = (unwrap r).perspectives
   contextActions r = unwrap (unwrap r).actions
   displayName r = (unwrap r).displayName
+  pos r = (unwrap r).pos
 
 -----------------------------------------------------------
 -- VARIOUS DECLARED TYPES OF ENUMERATEDROLE
@@ -294,6 +298,21 @@ contextOfRole :: Role -> ADT ContextType
 contextOfRole (E e) = context e
 contextOfRole (C c) = context c
 
+perspectivesOfRole :: Role -> Array Perspective
+perspectivesOfRole (E e) = perspectives e
+perspectivesOfRole (C e) = perspectives e
+
+roleIsFunctional :: Role -> MonadPerspectives Boolean
+roleIsFunctional (E e) = functional e
+roleIsFunctional (C e) = functional e
+
+identifierOfRole :: Role -> String
+identifierOfRole (E e) = identifier_ e
+identifierOfRole (C e) = identifier_ e
+
+posOfRole :: Role -> ArcPosition
+posOfRole (E e) = pos e
+posOfRole (C e) = pos e
 -----------------------------------------------------------
 -- FUNCTIONS ON ROLETYPE
 -----------------------------------------------------------
