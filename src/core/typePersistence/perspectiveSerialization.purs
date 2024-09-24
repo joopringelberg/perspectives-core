@@ -419,6 +419,7 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContex
             { values: unwrap <$> vals
             , propertyVerbs: show <$> intersect restrictingVerbs (unsafePartial fromJust $ lookup (propertytype2string propertyType) localVerbsPerProperty)}
       kind <- lift $ lift (roleType_ roleId >>= roleKindOfRoleType <<< ENR)
+      filler <- lift $ lift $ binding_ roleId
       publicUrl <-  case kind of 
         -- Only report a result for ContextRole kinds. 
         ContextRole -> (do
@@ -442,6 +443,7 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContex
         , actions: nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
         , objectStateBasedProperties
         , publicUrl
+        , filler
       }
 
 -- | The verbs in this type contain both those based on context- and subject state,

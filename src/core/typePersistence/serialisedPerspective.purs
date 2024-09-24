@@ -30,7 +30,7 @@ module Perspectives.TypePersistence.PerspectiveSerialisation.Data where
 import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
 import Foreign.Object (Object)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleKind)
 
 type SerialisedPerspective' =
@@ -114,6 +114,7 @@ type RoleInstanceWithProperties =
   -- The url of this roleInstance if there is a public perspective on it.
   -- If it is a ContextRole, the url of its filler.
   , publicUrl :: Maybe String
+  , filler :: Maybe RoleInstance
   }
 
 type ValuesWithVerbs =
