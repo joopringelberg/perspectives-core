@@ -483,17 +483,17 @@ setFirstBinding filled filler msignedDelta = (lift $ try $ getPerspectRol filled
                 (writeJSON $ stripResourceSchemes $ delta)
               Just signedDelta -> pure signedDelta
 
-            -- SYNCHRONISATION
-            handleNewPeer filled
-            addDelta (DeltaInTransaction { users, delta: signedDelta })
-            -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
-
             -- PERSISTENCE
+            -- Save the SignedDelta as the bindingDelta in the role. Re-fetch filled as it has been changed!
             (modifiedFilled :: PerspectRol) <- lift $ getPerspectRol filled
             lift $ cacheAndSave filled (over PerspectRol (\rl -> rl {bindingDelta = Just signedDelta}) modifiedFilled)
 
+            -- SYNCHRONISATION
             -- Only now can we compute the deltas that must be sent to other users in case the filled role is a 
             -- perspective object. The bindingdelta we've just added is a vital part of that.
+            handleNewPeer filled
+            addDelta (DeltaInTransaction { users, delta: signedDelta })
+
             void $ addDeltasForPerspectiveObjects filled
 
             pure users

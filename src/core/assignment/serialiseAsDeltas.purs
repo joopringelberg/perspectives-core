@@ -53,7 +53,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError, handlePerspectRolError')
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.ObjectGetters (binding_, roleType_)
-import Perspectives.ModelDependencies (idProperty, sysUser)
+import Perspectives.ModelDependencies (perspectivesUsersPublicKey, sysUser)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
 import Perspectives.PerspectivesState (getPerspectivesUser)
@@ -157,7 +157,10 @@ serialiseRoleInstancesAndProperties ::
 serialiseRoleInstancesAndProperties cid users object properties selfOnly isPerspectiveOnSelf = do
   -- We know that object has a role range.
   properties' <- if isPerspectiveOnSelf
-    then pure $ ARR.cons (ENP $ EnumeratedPropertyType idProperty) properties
+    -- To ensure that the receiving user of a self-perspective actually receives the full role telescope, we add
+    -- the following property. In terms of communication it will be neutral as the receiver obviously has access to his own 
+    -- PublicKey.
+    then pure $ ARR.cons (ENP $ EnumeratedPropertyType perspectivesUsersPublicKey) properties
     else pure properties
   -- All instances of this RoleType (object) the user may see in this context.
   -- In general, these may be instances of several role types, as the perspective object is expressed as a query.

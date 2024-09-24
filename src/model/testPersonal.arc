@@ -73,8 +73,7 @@ domain model://joopringelberg.nl#TestPersonal
       property Report (String)
       perspective on Client
         selfonly
-        -- Without FirstName, Client will not receive his filler...
-        props (FirstName, Report) verbs (Consult)
+        props (Report) verbs (Consult)
       -- This perspective allows Client to create a ClientCases instance for an incoming CLientCase.
       -- Because it is authorOnly, it will never be used for synchronisation.
       perspective on extern >> binder ClientCases
@@ -99,8 +98,7 @@ domain model://joopringelberg.nl#TestPersonal
       property Report (selfonly, String)
       
       perspective on Client
-        -- Without FirstName, Client will not receive his filler...
-        props (FirstName, Report) verbs (Consult)
+        props (Report) verbs (Consult)
       -- This perspective allows Client to create a ClientCases instance for an incoming CLientCase.
       -- Because it is authorOnly, it will never be used for synchronisation.
       perspective on extern >> binder GroupSessions
