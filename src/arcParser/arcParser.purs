@@ -646,7 +646,7 @@ propertyE = do
     -- the opening parenthesis functions as the recognizer: when found, the rest of the stream **must** start on
     -- a valid property attribute specification.
     propertyAttributes :: IP (List PropertyPart)
-    propertyAttributes = token.parens (((mandatory <|> relational <|> (Ran <$> propertyRange)) <?> "mandatory, relational or a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
+    propertyAttributes = token.parens (((mandatory <|> relational <|> selfonly <|> authoronly <|> (Ran <$> propertyRange)) <?> "(optionally) mandatory, then optionally relational, then optionally either selfonly or authoronly, then (required) a range (Boolean, Number, String, DateTime, Email), ") `sepBy` token.symbol ",")
         where
           mandatory :: IP PropertyPart
           mandatory = (reserved "mandatory" *> (pure (MandatoryAttribute' true)))
@@ -654,6 +654,12 @@ propertyE = do
           -- | Properties are by default functional.
           relational :: IP PropertyPart
           relational = (reserved "relational" *> (pure (FunctionalAttribute' false)))
+
+          selfonly :: IP PropertyPart
+          selfonly = (reserved "selfonly" *> (pure SelfonlyAttribute))
+
+          authoronly :: IP PropertyPart
+          authoronly = (reserved "authoronly" *> (pure AuthoronlyAttribute))
 
     propertyFacets :: Range -> IP (List PropertyFacet)
     propertyFacets r = nestedBlock propertyFacet

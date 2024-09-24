@@ -51,9 +51,10 @@ import Perspectives.ModelDependencies (privateChannel)
 import Perspectives.Persistence.API (createDatabase)
 import Perspectives.Persistence.State (getCouchdbBaseURL, withCouchdbUrl)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
+import Perspectives.Representation.Class.Property (propertyTypeIsAuthorOnly)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value, externalRole)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..))
 import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..))
 import Perspectives.Sync.Channel (addPartnerToChannel, createChannel, setChannelReplication)
 import Perspectives.Types.ObjectGetters (propertyIsInPerspectiveOf, roleIsInPerspectiveOf)
@@ -108,6 +109,7 @@ lift2Coll = lift
 
 -- TODO. This function is not used as it has been replaced in serialiseFor with delta serialisation.
 -- NOTICE that it accesses the PerspectContext member rolInContext directly. It will miss unlinked role instances!
+-- NOTICE that selfonly properties are not implemented!
 serialiseAsJsonFor_:: RoleType -> ContextInstance -> Collecting Unit
 serialiseAsJsonFor_ userType cid = do
   (PerspectContext{pspType, rolInContext}) <- lift2Coll $ getPerspectContext cid
@@ -154,7 +156,8 @@ serialiseAsJsonFor_ userType cid = do
     serialisePropertiesFor propertyTypeId values = do
       -- For each set of Property Values, add a RolePropertyDelta if the user may see it.
       propAllowed <- lift (userType ###>> propertyIsInPerspectiveOf (EnumeratedPropertyType propertyTypeId))
-      if propAllowed then tell (OBJ.singleton propertyTypeId (unwrap <$> values)) else pure unit
+      isAuthorOnly <- lift $ propertyTypeIsAuthorOnly (ENP $ EnumeratedPropertyType propertyTypeId)
+      if propAllowed && not isAuthorOnly then tell (OBJ.singleton propertyTypeId (unwrap <$> values)) else pure unit
 
 -- | This function expects an instance of type sys:Invitation, creates a channel and binds it to the Invitation
 -- | in the role PrivateChannel.

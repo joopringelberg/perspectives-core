@@ -187,17 +187,19 @@ enteringState contextId stateId = do
   me <- lift getPerspectivesUser
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, isSelfPerspective} -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {properties, selfOnly, authorOnly, isSelfPerspective} -> do
       userInstances <- lift (contextId ##= COMB.filter (getRoleInstances allowedUser) ((COMB.not' (filledBy (Filler_ $ perspectivesUser2RoleInstance me))) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
-        Just u' -> serialiseRoleInstancesAndProperties
-          contextId
-          u'
-          objectQfd
-          properties
-          selfOnly
-          isSelfPerspective
+        Just u' -> if authorOnly
+          then pure unit
+          else serialiseRoleInstancesAndProperties
+            contextId
+            u'
+            objectQfd
+            properties
+            selfOnly
+            isSelfPerspective
 
   -- Recur.
   subStates <- lift $ subStates_ stateId

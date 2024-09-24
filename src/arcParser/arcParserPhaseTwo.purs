@@ -507,6 +507,12 @@ traverseEnumeratedPropertyE (PropertyE {id, range, propertyParts, propertyFacets
     -- MANDATORYATTRIBUTE
     handleParts (EnumeratedProperty propertyUnderConstruction) (MandatoryAttribute' bool) = pure (EnumeratedProperty $ propertyUnderConstruction {mandatory = bool})
 
+    -- SELFONLYATTRIBUTE
+    handleParts (EnumeratedProperty propertyUnderConstruction) SelfonlyAttribute = pure (EnumeratedProperty $ propertyUnderConstruction {selfonly = true})
+
+    -- AUTHORONLYATTRIBUTE
+    handleParts (EnumeratedProperty propertyUnderConstruction) AuthoronlyAttribute = pure (EnumeratedProperty $ propertyUnderConstruction {selfonly = true})
+
 -- | Traverse a PropertyE that results in an CalculatedProperty.
 traverseCalculatedPropertyE :: PropertyE -> Namespace -> PhaseTwo Property.Property
 traverseCalculatedPropertyE (PropertyE {id, range, propertyParts, pos}) ns = do

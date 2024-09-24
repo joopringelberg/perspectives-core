@@ -40,8 +40,8 @@ import IDBKeyVal (idbGet, idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataUpgrade.PatchModels (patchModels)
-import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
-import Perspectives.DataUpgrade.PatchModels.PDR2503 as PDR2503
+-- import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
+-- import Perspectives.DataUpgrade.PatchModels.PDR2503 as PDR2503
 import Perspectives.DataUpgrade.PatchModels.PDR2505 as PDR2505
 import Perspectives.DataUpgrade.RecompileLocalModels (recompileLocalModels)
 import Perspectives.DomeinFile (DomeinFile(..))
@@ -77,25 +77,32 @@ runDataUpgrades = do
       pure "0.24"
 
   ----------------------------------------------------------------------------------------
-  ------- PDR VERSION 0.24.1
-  ------- In this version, we add views for automatic referential integrity fixing.
+  -- NOTE ON PATCHING.
+  -- A 'patch' actually is a complete model source text, with some modifications.
+  -- As the PDR that executes upgrades is always the most recent version, it expects the latest syntax.
+  -- Comment out any older patches!
+  -- NOTE ON UPDATING MODELS
+  -- Similar reasoning holds for updating models. The latest (recommended) version is fetched and installed
+  -- locally. This obviously has to happen only once for a model.
   ----------------------------------------------------------------------------------------
   runUpgrade installedVersion "0.24.1" addFixingUpdates 
   runUpgrade installedVersion "0.24.2" indexedQueries 
   runUpgrade installedVersion "0.25.0" updateModels0250
-  runUpgrade installedVersion "0.25.2" 
-    (do 
-      patchModels PDR2501.replacements
-      void recompileLocalModels)
-  runUpgrade installedVersion "0.25.3" 
-    (do 
-      patchModels PDR2503.replacements
-      void recompileLocalModels)
+  -- runUpgrade installedVersion "0.25.2" 
+  --   (do 
+  --     patchModels PDR2501.replacements
+  --     void recompileLocalModels)
+  -- runUpgrade installedVersion "0.25.3" 
+  --   (do 
+  --     patchModels PDR2503.replacements
+  --     void recompileLocalModels)
   runUpgrade installedVersion "0.25.4" updateModels0254
   runUpgrade installedVersion "0.25.5" 
     (do 
       patchModels PDR2505.replacements
       void recompileLocalModels)
+  runUpgrade installedVersion "0.25.6" 
+    (void recompileLocalModels)
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------

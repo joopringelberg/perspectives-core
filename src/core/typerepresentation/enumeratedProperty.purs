@@ -51,6 +51,8 @@ type EnumeratedPropertyRecord =
   , range :: Range
   , functional :: Boolean
   , mandatory :: Boolean
+  , selfonly :: Boolean
+  , authoronly :: Boolean
 
   , pos :: ArcPosition
 
@@ -69,6 +71,8 @@ defaultEnumeratedProperty id dn role range pos = EnumeratedProperty
   , range: range
   , functional: true
   , mandatory: false
+  , selfonly: false
+  , authoronly: false
   , pos: pos
   , onPropertyDelta: empty
   , constrainingFacets: []

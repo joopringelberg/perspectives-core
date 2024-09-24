@@ -195,20 +195,22 @@ enteringRoleState roleId stateId = do
   State {object} <- lift $ getState stateId
   case object of
     Nothing -> pure unit
-    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, isSelfPerspective} -> do
+    Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, authorOnly, isSelfPerspective} -> do
       currentcontext <- lift $ (roleId ##>> contextGetter)
       userInstances <- lift (currentcontext ##= COMB.filter (getRoleInstances allowedUser) (COMB.not' (filledBy (Filler_ $ perspectivesUser2RoleInstance me)) <<< Filled_))
       case fromArray userInstances of
         Nothing -> pure unit
         -- As the user gets a new perspective, he should have the corresonding resources. Hence we serialise them as Deltas and 
         -- add these to the transaction.
-        Just u' -> serialiseRoleInstancesAndProperties
-          currentcontext
-          u'
-          objectQfd
-          properties
-          selfOnly
-          isSelfPerspective
+        Just u' -> if authorOnly
+          then pure unit
+          else serialiseRoleInstancesAndProperties
+            currentcontext
+            u'
+            objectQfd
+            properties
+            selfOnly
+            isSelfPerspective
 
   -- Recur.
   subStates <- lift $ subStates_ stateId

@@ -52,6 +52,8 @@ class (Identifiable r i) <= PropertyClass r i | r -> i, i -> r where
   range :: r -> MonadPerspectives Range
   mandatory :: r -> MonadPerspectives Boolean
   functional :: r -> MonadPerspectives Boolean
+  selfonly :: r -> MonadPerspectives Boolean
+  authoronly :: r -> MonadPerspectives Boolean
   isCalculated :: r -> MonadPerspectives Boolean
   calculation :: r -> MonadPerspectives QueryFunctionDescription
   constrainingFacets :: r -> Array PropertyFacet
@@ -70,6 +72,8 @@ instance calculatedPropertyPropertyClass :: PropertyClass CalculatedProperty Cal
   -- Hoe bepaal je of een Calculated property functional is? En wat betekent het?
   -- Betekenis: je weet of er één of meerdere waarden zijn. Dat kan nuttig zijn als je een GUI opbouwt.
   functional r = pure true
+  authoronly r = pure false
+  selfonly r = pure false
   isCalculated _ = pure true
   calculation r = case (unwrap r).calculation of
     Q calc -> pure calc
@@ -81,6 +85,8 @@ instance enumeratedPropertyPropertyClass :: PropertyClass EnumeratedProperty Enu
   range r = pure (unwrap r).range
   functional r = pure (unwrap r).functional
   mandatory r = pure (unwrap r).mandatory
+  selfonly r = pure (unwrap r).selfonly
+  authoronly r = pure (unwrap r).authoronly
   isCalculated _ = pure false
   calculation r = do
     context <- enumeratedRoleContextType (role r)
@@ -116,6 +122,16 @@ propertyTypeIsMandatory :: PropertyType -> MonadPerspectives Boolean
 propertyTypeIsMandatory = getProperty >=> (case _ of
   E r -> mandatory r
   C r -> mandatory r)
+
+propertyTypeIsSelfOnly :: PropertyType -> MonadPerspectives Boolean
+propertyTypeIsSelfOnly = getProperty >=> (case _ of
+  E r -> selfonly r
+  C r -> selfonly r)
+
+propertyTypeIsAuthorOnly :: PropertyType -> MonadPerspectives Boolean
+propertyTypeIsAuthorOnly = getProperty >=> (case _ of
+  E r -> authoronly r
+  C r -> authoronly r)
 
 propertyTypeIsCalculated :: PropertyType -> MonadPerspectives Boolean
 propertyTypeIsCalculated = getProperty >=> (case _ of

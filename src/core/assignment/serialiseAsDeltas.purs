@@ -62,6 +62,7 @@ import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPa
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Property (getProperty, getCalculation) as PClass
+import Perspectives.Representation.Class.Property (propertyTypeIsAuthorOnly, propertyTypeIsSelfOnly)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.Perspective (Perspective(..))
@@ -136,9 +137,11 @@ serialisePerspectiveForUser ::
   RoleType ->
   Perspective ->
   MonadPerspectivesTransaction Unit
-serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, propertyVerbs, selfOnly, isSelfPerspective}) = do
-  (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
-  serialiseRoleInstancesAndProperties cid users object (nub visiblePropertyTypes) selfOnly isSelfPerspective
+serialisePerspectiveForUser cid users userRoleType p@(Perspective{object, propertyVerbs, selfOnly, authorOnly, isSelfPerspective}) = if authorOnly
+  then pure unit 
+  else do
+    (visiblePropertyTypes :: Array PropertyType) <- liftToMPT $ propertiesInPerspective p
+    serialiseRoleInstancesAndProperties cid users object (nub visiblePropertyTypes) selfOnly isSelfPerspective
 
 -- | MODEL DEPENDENCY IN THIS FUNCTION. The correct operation of this function depends on
 -- | model:System. The role model:System$PerspectivesSystem$User should have a property with
@@ -178,18 +181,27 @@ serialiseRoleInstancesAndProperties cid users object properties selfOnly isPersp
     else do
       for_ (join (allPaths <$> rinstances)) (serialiseDependencies (toArray users))
       for_ properties'
-        \pt -> for_ (_.head <$> rinstances)
-          \(dep :: Dependency) -> do
-            (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
-            for_ (join (allPaths <$> vals)) (serialiseDependencies (toArray users))
+        \pt -> do
+          isSelfOnlyProperty <- lift $ propertyTypeIsSelfOnly pt
+          for_ (_.head <$> rinstances)
+            \(dep :: Dependency) -> do
+              (vals :: Array DependencyPath) <- liftToMPT ((singletonPath dep) ##= getPropertyValues pt)
+              if isSelfOnlyProperty
+                then for_ (join (allPaths <$> vals)) 
+                  (serialiseDependencies (unsafePartial case dep of 
+                    R oneUserOnly -> [oneUserOnly]))
+                else for_ (join (allPaths <$> vals)) (serialiseDependencies (toArray users))
 
 getPropertyValues :: PropertyType -> DependencyPath ~~> DependencyPath
-getPropertyValues pt dep = do
-  calc <- lift $ lift $ (PClass.getProperty >=> PClass.getCalculation) pt
-  -- Calculate the DependencyPath that leads to the filler whose type supports the property. Start from that.
-  -- This is to accomodate overloaded fillers.
-  pathToRoleWithProperty <- unsafePartial computePathToFillerWithProperty dep
-  interpret calc pathToRoleWithProperty
+getPropertyValues pt dep = (lift $ lift $ propertyTypeIsAuthorOnly pt) >>= if _ 
+  then ArrayT $ pure []
+  else do
+    calc <- lift $ lift $ (PClass.getProperty >=> PClass.getCalculation) pt
+    -- Calculate the DependencyPath that leads to the filler whose type supports the property. Start from that.
+    -- This is to accomodate overloaded fillers.
+    pathToRoleWithProperty <- unsafePartial computePathToFillerWithProperty dep
+    interpret calc pathToRoleWithProperty
+
   where
   computePathToFillerWithProperty :: Partial => DependencyPath ~~> DependencyPath
   computePathToFillerWithProperty path@{head} = ArrayT case head of 

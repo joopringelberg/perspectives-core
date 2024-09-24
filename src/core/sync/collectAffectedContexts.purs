@@ -59,6 +59,7 @@ import Perspectives.Query.QueryTypes (RoleInContext(..), isRoleDomain, range)
 import Perspectives.Query.UnsafeCompiler (getHiddenFunction, getRoleInstances)
 import Perspectives.Representation.ADT (allLeavesInADT)
 import Perspectives.Representation.Class.PersistentType (StateIdentifier, tryGetState)
+import Perspectives.Representation.Class.Property (propertyTypeIsAuthorOnly, propertyTypeIsSelfOnly)
 import Perspectives.Representation.Class.Role (bindingOfRole, calculationOfRoleType)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.State (StateFulObject(..))
@@ -470,6 +471,7 @@ addDeltasForPerspectiveObjects filled = do
       -- If iq has the selfOnly modifier, we must apply another algorithm to the roleInstance and the roleInstance.
       -- In that case, the filled role itself is also the user role instance (selfOnly can only be applied to self-perspectives).
       -- Consequently, the filled role is the only user that should be informed of the deltas in the calculation of the properties.
+      -- Notice that authorOnly queries are not inverted. They cannot turn up here.
       if isForSelfOnly iq
         then do
           ctxt <- lift (context' filled)
@@ -597,50 +599,60 @@ runForwardsComputation roleInstance (InvertedQuery{description, forwardsCompiled
 -- of the case above where there was no forwards query.
 -- Do this only for inverted queries that result in a role domain.
 computeProperties :: Array (DependencyPath) -> EncodableMap PropertyType (Array StateIdentifier) -> (Array ContextWithUsers) -> MonadPerspectivesTransaction Unit
-computeProperties rinstances statesPerProperty cwus = forWithIndex_ (unwrap statesPerProperty)
-  (\prop propStates -> for_ propStates
-    -- For each state that provides a perspective on the property,
-    \stateIdentifier -> (lift $ tryGetState stateIdentifier) >>= case _ of
-      -- If we deal with a roleInstance of a type for which no state has been defined,
-      -- we should carry on as if the state condition was satisfied.
-      Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
-      Just (State.State{stateFulObject}) ->
-        -- if the stateful object...
-        case stateFulObject of
-          -- ... is the current context, then if it is in that state,
-          Cnt _ -> for_ cwus
-            \(Tuple cid users) -> (lift $ contextIsInState stateIdentifier cid) >>= if _
-              -- then run the interpreter on the property computation and the head of the dependency paths
-              -- and create deltas for all users
-              then for_ (_.head <$> rinstances)
-                \(dep :: Dependency) -> do
-                  (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                  for_ (join (allPaths <$> vals)) (serialiseDependencies users)
-              else pure unit
-          -- ... is the subject role, collect each user that is that state,
-          Srole _ -> for_ cwus
-            \(Tuple _ users) -> lift (filterA (roleIsInState stateIdentifier) users) >>=
-              \sanctionedUsers ->
-                -- run the interpreter on the property computation and the head of the dependency paths
-                -- and create deltas for all collected users
-                for_ (_.head <$> rinstances)
-                  \(dep :: Dependency) -> do
-                    (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                    for_ (join (allPaths <$> vals)) (serialiseDependencies sanctionedUsers)
-          -- ... is the object role, then for all paths that end in a role that is in that state,
-          Orole _ -> (filterA
-            (\{head} -> case head of
-              R rid -> lift (roleIsInState stateIdentifier rid)
-              otherwise -> throwError (error ("computeProperties (states per property) hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
-            rinstances)
-              >>= pure <<< map _.head
-              -- run the interpreter on the property computation and the head of the dependency path
-              -- and create deltas for all users
-              >>= traverse_
-                \(dep :: Dependency) -> do
-                  (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
-                  for_ (join (allPaths <$> vals)) (serialiseDependencies (join $ snd <$> cwus))
-  )
+computeProperties rinstances statesPerProperty cwus = forWithIndex_ (unwrap statesPerProperty) g
+  where 
+  g :: PropertyType -> Array StateIdentifier -> MonadPerspectivesTransaction Unit
+  g prop propStates = do 
+    isAuthorOnly <- lift (propertyTypeIsAuthorOnly prop)
+    isSelfOnly <- lift (propertyTypeIsSelfOnly prop)
+    if isAuthorOnly
+      then pure unit
+      else for_ propStates
+        -- For each state that provides a perspective on the property,
+        \stateIdentifier -> (lift $ tryGetState stateIdentifier) >>= case _ of
+          -- If we deal with a roleInstance of a type for which no state has been defined,
+          -- we should carry on as if the state condition was satisfied.
+          Nothing -> for_ (join (allPaths <$> rinstances)) (serialiseDependencies (join $ snd <$> cwus))
+          Just (State.State{stateFulObject}) ->
+            -- if the stateful object...
+            case stateFulObject of
+              -- ... is the current context, then if it is in that state,
+              Cnt _ -> for_ cwus
+                \(Tuple cid users) -> (lift $ contextIsInState stateIdentifier cid) >>= if _
+                  -- then run the interpreter on the property computation and the head of the dependency paths
+                  -- and create deltas for all users
+                  then for_ (_.head <$> rinstances) (f users isSelfOnly)
+                  else pure unit
+              -- ... is the subject role, collect each user that is that state,
+              Srole _ -> for_ cwus
+                \(Tuple _ users) -> lift (filterA (roleIsInState stateIdentifier) users) >>=
+                  \sanctionedUsers ->
+                    -- run the interpreter on the property computation and the head of the dependency paths
+                    -- and create deltas for all collected users
+                    for_ (_.head <$> rinstances) (f sanctionedUsers isSelfOnly)
+              -- ... is the object role, then for all paths that end in a role that is in that state,
+              Orole _ -> (filterA
+                (\{head} -> case head of
+                  R rid -> lift (roleIsInState stateIdentifier rid)
+                  otherwise -> throwError (error ("computeProperties (states per property) hits on a QueryInterpreter result that is not a role: " <> show otherwise)))
+                rinstances)
+                  >>= pure <<< map _.head
+                  -- run the interpreter on the property computation and the head of the dependency path
+                  -- and create deltas for all users
+                  >>= traverse_ (f (join $ snd <$> cwus) isSelfOnly)
+
+    where
+      f :: Array RoleInstance -> Boolean -> Dependency -> MonadPerspectivesTransaction Unit
+      f  users isSelfOnly dep = if isSelfOnly 
+        then case dep of
+          R user -> do 
+            (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
+            for_ (join (allPaths <$> vals)) (serialiseDependencies [user])
+          _ -> pure unit
+        else do
+          (vals :: Array DependencyPath) <- lift ((singletonPath dep) ##= getPropertyValues prop)
+          for_ (join (allPaths <$> vals)) (serialiseDependencies users)
+    
 
 -- | Add deltas for all the users to the current transaction, from the given assumption.
 createDeltasFromAssumption :: Array RoleInstance -> InformedAssumption -> MonadPerspectivesTransaction Unit
@@ -747,20 +759,22 @@ aisInPropertyDelta
   property                  -- the name of the property taken from the assignment statement
   replacementProperty       -- the actual name of the property on the role instance that bears it
   propertyBearingType                 -- the type of the role instance that actually bears the property.
-  = do
-  typeOfInstanceOnpath <- lift $ roleType_ instanceOnPath
-  (allKeys :: Array RunTimeInvertedQueryKey) <- lift $ runtimeIndexForPropertyQueries 
-    typeOfInstanceOnpath 
-    propertyBearingType 
-    property 
-    replacementProperty
-  allCalculations <- lift $ getPropertyQueries compileBoth allKeys
-  -- `handleBackwardQuery` will actually not return any users since we have no property queries for properties in a perspective and a perspective itself is always on a role.
-  -- However, there may be state queries that must be re-evaluated. We conveniently capture both role- and context state queries through handleBackwardQuery
-  for_ allCalculations (handleBackwardQuery propertyBearingInstance)
-  -- The property might fall in a perspective. Compute the users and add deltas to the transaction.
-  users <- addDeltasForPropertyChange propertyBearingInstance property replacementProperty
-  pure (nub users)
+  = (lift $ propertyTypeIsAuthorOnly $ ENP replacementProperty) >>= if _ 
+    then pure []
+    else do
+      typeOfInstanceOnpath <- lift $ roleType_ instanceOnPath
+      (allKeys :: Array RunTimeInvertedQueryKey) <- lift $ runtimeIndexForPropertyQueries 
+        typeOfInstanceOnpath 
+        propertyBearingType 
+        property 
+        replacementProperty
+      allCalculations <- lift $ getPropertyQueries compileBoth allKeys
+      -- `handleBackwardQuery` will actually not return any users since we have no property queries for properties in a perspective and a perspective itself is always on a role.
+      -- However, there may be state queries that must be re-evaluated. We conveniently capture both role- and context state queries through handleBackwardQuery
+      for_ allCalculations (handleBackwardQuery propertyBearingInstance)
+      -- The property might fall in a perspective. Compute the users and add deltas to the transaction.
+      users <- addDeltasForPropertyChange propertyBearingInstance property replacementProperty
+      pure (nub users)
 
 -- | If the role instance or any of the roles it fills is the object of a perspective, add deltas to the transaction for the user(s) of that perspective
 -- | so that they will receive deltas that inform them about the property change.
@@ -771,6 +785,7 @@ aisInPropertyDelta
 -- | of the role instance.
 addDeltasForPropertyChange :: RoleInstance -> EnumeratedPropertyType -> EnumeratedPropertyType -> MonadPerspectivesTransaction (Array RoleInstance)
 addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = do
+  isSelfOnlyProperty <- lift (propertyTypeIsSelfOnly $ ENP replacementProperty)
   allFilleds <- lift $ cons roleWithPropertyValue <$> getRecursivelyAllFilledRoles roleWithPropertyValue
   -- It is as if all these filled roles now have a (changed) value for this property.
   nub <<< concat <$> for allFilleds \roleWithPropertyValue' -> do
@@ -795,7 +810,7 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
       if null cwus'
         -- For a selfOnly query, this should not happen.
         then pure []
-        else if isForSelfOnly iq
+        else if isForSelfOnly iq || isSelfOnlyProperty
           -- If iq has the selfOnly modifier, the perspective object equals the user role that has the perspective.
           -- Only compute the property for that role instance!
           then do 
