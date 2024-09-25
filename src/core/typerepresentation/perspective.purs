@@ -38,10 +38,10 @@ import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..), range)
 import Perspectives.Representation.ADT (ADT, commonLeavesInADT)
 import Perspectives.Representation.Action (Action)
-import Perspectives.Representation.ExplicitSet (ExplicitSet(..), isElementOf, overlapsPSet)
+import Perspectives.Representation.ExplicitSet (ExplicitSet(..), intersectionPset, isElementOf, overlapsPSet)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, EnumeratedRoleType, PropertyType(..), RoleType, StateIdentifier)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), RoleVerbList, allPropertyVerbs, hasAllVerbs, hasOneOfTheVerbs, hasVerb)
-import Prelude (class Eq, class Ord, class Show, bind, flip, not, pure, ($), (&&), (<#>), (<$>), (<>), (>), (||))
+import Prelude (class Eq, class Ord, class Show, bind, flip, not, pure, ($), (&&), (<#>), (<$>), (<>), (>), (||), (/=))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
 
 -----------------------------------------------------------
@@ -160,6 +160,16 @@ perspectiveSupportsPropertyVerb (Perspective {propertyVerbs}) propertyVerb = fin
     find pvs = isJust $ LST.findIndex
       (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
         (\(PropertyVerbs _ pverbs) -> isElementOf propertyVerb pverbs)
+        pva)
+      pvs
+
+perspectiveSupportsPropertyWithOneofVerbs :: Perspective -> PropertyType -> ExplicitSet PropertyVerb -> Boolean
+perspectiveSupportsPropertyWithOneofVerbs (Perspective {propertyVerbs}) property pVerbAlternatives = find $ MAP.values $ unwrap propertyVerbs
+  where
+    find :: List (Array PropertyVerbs) -> Boolean
+    find pvs = isJust $ LST.findIndex
+      (\(pva :: Array PropertyVerbs) -> isJust $ findIndex
+        (\(PropertyVerbs pset pverbs) -> Empty /= (intersectionPset [pVerbAlternatives, pverbs]) && isElementOf property pset)
         pva)
       pvs
 

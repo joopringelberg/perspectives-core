@@ -24,7 +24,7 @@ module Perspectives.Representation.ExplicitSet where
 
 import Prelude
 
-import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, uncons)
+import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, null, uncons)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), isJust)
 import Data.Set (subset, fromFoldable)
@@ -92,7 +92,12 @@ intersectionOfArrays x = case uncons x of
 intersectionPset :: forall a. Eq a => Array (ExplicitSet a) -> ExplicitSet a
 intersectionPset terms = if isJust (elemIndex Empty terms)
   then Empty
-  else PSet (intersectionOfArrays (unsafePartial elements <$> (delete Universal terms)))
+  else let 
+      i = (intersectionOfArrays (unsafePartial elements <$> (delete Universal terms)))
+    in
+      if null i 
+        then Empty
+        else PSet i  
 
 isElementOf :: forall a. Eq a => a -> ExplicitSet a -> Boolean
 isElementOf a Empty = false

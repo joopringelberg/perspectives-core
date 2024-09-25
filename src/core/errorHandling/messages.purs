@@ -123,6 +123,8 @@ data PerspectivesError
     | MissingPerspective
     | UserHasNoPerspective RoleType RoleType ArcPosition ArcPosition
     | PerspectiveCannotBeAuthorOnly String ArcPosition EnumeratedRoleType ArcPosition EnumeratedPropertyType
+    | SelfOnlyNeedsTwoRoles String ArcPosition EnumeratedPropertyType
+    | SelfOnlyShouldBeAuthorOnly String ArcPosition EnumeratedPropertyType
     | StateDoesNotExist StateIdentifier ArcPosition ArcPosition
 
     | RolErrorBoundary String String
@@ -229,8 +231,12 @@ instance showPerspectivesError :: Show PerspectivesError where
 
   show MissingPerspective = "(MissingPerspective) This should be inside a perspective expression."
   show (UserHasNoPerspective subject object start end) = "(UserHasNoPerspective) User " <> roletype2string subject <> " has no perspective on " <> roletype2string object <> " (between " <> show start <> " and " <> show end <> ")."
-  show (PerspectiveCannotBeAuthorOnly userRoleName userRoleStart (EnumeratedRoleType objectRole) objectRoleStart (EnumeratedPropertyType prop)) = "(PerspectiveCannotBeAuthorOnly) The perspective of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") on property '" <> prop <> "' of object '" <> objectRole <> "' (starting on " <> show objectRoleStart <> "), \
+  show (PerspectiveCannotBeAuthorOnly userRoleName userRoleStart (EnumeratedRoleType objectRole) objectRoleStart (EnumeratedPropertyType prop)) = "(PerspectiveCannotBeAuthorOnly) `authoronly` on the perspective of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") on property '" <> prop <> "' of object '" <> objectRole <> "' (starting on " <> show objectRoleStart <> "), \
     \ is without meaning because this is the only userrole with a perspective on it and the userrole is functional"
+  show (SelfOnlyNeedsTwoRoles userRoleName userRoleStart (EnumeratedPropertyType prop)) = "(SelfOnlyNeedsTwoRoles) `selfonly` on property '" <> prop <> "' of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") \
+    \ is meaningless because this users' perspective is the only perspective on it (consider `authoronly` instead)."
+  show (SelfOnlyShouldBeAuthorOnly userRoleName userRoleStart (EnumeratedPropertyType prop)) = "(SelfOnlyShouldBeAuthorOnly) `selfonly` on property '" <> prop <> "' of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") \
+    \ is meaningless because either '" <> userRoleName <> "' is functional or there is no other user role that can change the property. In both cases `authoronly` is more appropriate."
   show (StateDoesNotExist stateId start end) = "(StateDoesNotExist) The state '" <> show stateId <> "' is not modelled (between " <> show start <> " and " <> show end <> ")."
 
   show (RolErrorBoundary boundaryName err) = "(RolErrorBoundary) ErrorBoundary in '" <> boundaryName <> "' for PerspectRol (" <> err <> ")"
