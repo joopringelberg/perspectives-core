@@ -39,18 +39,19 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (Role(..), identifierOfRole, kindOfRole, perspectivesOfRole, pos, posOfRole, roleIsFunctional)
+import Perspectives.Representation.EnumeratedProperty (EnumeratedProperty(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Perspective (Perspective(..), perspectiveSupportsPropertyWithOneofVerbs)
-import Perspectives.Representation.TypeIdentifiers (EnumeratedPropertyType, PropertyType(..), RoleKind(..), RoleType(..))
+import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (PropertyVerb(..))
 import Perspectives.Types.ObjectGetters (propertiesInPerspective)
 
 checkPerspectiveModifiers :: PhaseThree Unit
 checkPerspectiveModifiers = do 
   {enumeratedProperties} <- lift $ State.gets _.dfr
-  for_ enumeratedProperties (checkAuthorOnly <<< identifier)
-  for_ enumeratedProperties (checkSelfOnly <<< identifier)
+  for_ enumeratedProperties checkAuthorOnly
+  for_ enumeratedProperties checkSelfOnly
 
 findRolesWithProperty :: PropertyType -> PhaseThree (Array EnumeratedRole)
 findRolesWithProperty pt = do
@@ -77,45 +78,48 @@ findPerspectivesOnProperty prop = do
               then tell [{userRole, objectRole, perspective}]
               else pure unit))
 
-checkAuthorOnly :: EnumeratedPropertyType -> PhaseThree Unit
-checkAuthorOnly prop = do 
-  perspectivesAndRoles <- findPerspectivesOnProperty (ENP prop)
-  case head perspectivesAndRoles of 
-    (Just {userRole, objectRole, perspective}) -> if ((length perspectivesAndRoles) == 1)
-      then do 
-        isFunctional <- lift $ lift $ roleIsFunctional userRole
-        if isFunctional
-          then throwError [PerspectiveCannotBeAuthorOnly (identifierOfRole userRole) (posOfRole userRole) (identifier objectRole) (pos objectRole) prop]
-          else pure unit
-      else pure unit
-    -- Give a warning here?
-    Nothing -> pure unit
+checkAuthorOnly :: EnumeratedProperty -> PhaseThree Unit
+checkAuthorOnly (EnumeratedProperty{id:prop, authoronly}) = if authoronly
+  then do 
+    perspectivesAndRoles <- findPerspectivesOnProperty (ENP prop)
+    case head perspectivesAndRoles of 
+      (Just {userRole, objectRole, perspective}) -> if ((length perspectivesAndRoles) == 1)
+        then do 
+          isFunctional <- lift $ lift $ roleIsFunctional userRole
+          if isFunctional
+            then throwError [PerspectiveCannotBeAuthorOnly (identifierOfRole userRole) (posOfRole userRole) (identifier objectRole) (pos objectRole) prop]
+            else pure unit
+        else pure unit
+      -- Give a warning here?
+      Nothing -> pure unit
+  else pure unit
 
-  pure unit
 userRolesInModel :: PhaseThree (Array Role)
 userRolesInModel = do 
   {enumeratedRoles, calculatedRoles} <- lift $ State.gets _.dfr
   pure $ (E <$> filter (eq UserRole <<< kindOfRole) (values enumeratedRoles)) <> 
     (C <$> (filter (eq UserRole <<< kindOfRole) (values calculatedRoles)))
 
-checkSelfOnly  :: EnumeratedPropertyType -> PhaseThree Unit
-checkSelfOnly prop = do
-  perspectivesAndRoles <- findPerspectivesOnProperty (ENP prop)
-  perspectivesThatWrite <- pure $ filter 
-    (\{perspective} -> perspectiveSupportsPropertyWithOneofVerbs perspective (ENP prop) (PSet [SetPropertyValue, AddPropertyValue, RemovePropertyValue]))
-    perspectivesAndRoles 
-  if ((length perspectivesAndRoles) == 1)
-    then unsafePartial case head perspectivesAndRoles of
-      (Just {userRole, objectRole, perspective}) -> throwError [SelfOnlyNeedsTwoRoles (identifierOfRole userRole) (posOfRole userRole) prop]
-    else void $ for_ perspectivesAndRoles (\{userRole, objectRole, perspective} -> 
-      if (unwrap perspective).isSelfPerspective
-        then do 
-          isFunctional <- lift $ lift $ roleIsFunctional userRole
-          isWritingPerspective <- pure $ perspectiveSupportsPropertyWithOneofVerbs perspective (ENP prop) (PSet [SetPropertyValue, AddPropertyValue, RemovePropertyValue])
-          anotherPerspectiveWrites <- if isWritingPerspective
-            then pure $ length perspectivesThatWrite > 1
-            else pure $ length perspectivesThatWrite > 0
-          if isFunctional || not anotherPerspectiveWrites
-            then throwError $ [SelfOnlyShouldBeAuthorOnly (identifierOfRole userRole) (posOfRole userRole) prop]
-            else pure unit
-        else pure unit)
+checkSelfOnly  :: EnumeratedProperty -> PhaseThree Unit
+checkSelfOnly (EnumeratedProperty{id:prop, selfonly}) = if selfonly
+  then do
+    perspectivesAndRoles <- findPerspectivesOnProperty (ENP prop)
+    perspectivesThatWrite <- pure $ filter 
+      (\{perspective} -> perspectiveSupportsPropertyWithOneofVerbs perspective (ENP prop) (PSet [SetPropertyValue, AddPropertyValue, RemovePropertyValue]))
+      perspectivesAndRoles 
+    if ((length perspectivesAndRoles) == 1)
+      then unsafePartial case head perspectivesAndRoles of
+        (Just {userRole, objectRole, perspective}) -> throwError [SelfOnlyNeedsTwoRoles (identifierOfRole userRole) (posOfRole userRole) prop]
+      else void $ for_ perspectivesAndRoles (\{userRole, objectRole, perspective} -> 
+        if (unwrap perspective).isSelfPerspective
+          then do 
+            isFunctional <- lift $ lift $ roleIsFunctional userRole
+            isWritingPerspective <- pure $ perspectiveSupportsPropertyWithOneofVerbs perspective (ENP prop) (PSet [SetPropertyValue, AddPropertyValue, RemovePropertyValue])
+            anotherPerspectiveWrites <- if isWritingPerspective
+              then pure $ length perspectivesThatWrite > 1
+              else pure $ length perspectivesThatWrite > 0
+            if isFunctional || not anotherPerspectiveWrites
+              then throwError $ [SelfOnlyShouldBeAuthorOnly (identifierOfRole userRole) (posOfRole userRole) prop]
+              else pure unit
+          else pure unit)
+  else pure unit

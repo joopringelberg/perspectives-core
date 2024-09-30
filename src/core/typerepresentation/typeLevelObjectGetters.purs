@@ -792,7 +792,7 @@ isPerspectiveOnSelf qfd =
   some (\userRole' -> do 
     dnf <- lift $ toConjunctiveNormalForm_ (roleRange qfd)
     (lift $ roleADTOfRoleType userRole') >>= lift <<< toConjunctiveNormalForm_ >>=
-      (\userRoleDNF -> pure (userRoleDNF `equalsOrSpecialises_` dnf)))
+      (\userRoleDNF -> pure (userRoleDNF `equals_` dnf)))
 
 ----------------------------------------------------------------------------------------
 ------- FUNCTIONS FOR ACTIONS

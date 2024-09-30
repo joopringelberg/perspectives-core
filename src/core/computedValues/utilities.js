@@ -7,3 +7,5 @@ exports.formatDateTimeImpl = function( epoch, locale, options)
 }
 
 exports.pdrVersion = (typeof __PDRVersion__ == 'undefined') ? "" : __PDRVersion__;
+exports.mycontextsUrl = __MYCONTEXTS__;
+

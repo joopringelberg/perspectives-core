@@ -214,6 +214,7 @@ systemParameter_ parArray _ = try
   >>= handleExternalFunctionError "model://perspectives.domains#Utilities$SystemParameter"
 
 foreign import pdrVersion :: String
+foreign import mycontextsUrl :: String
 
 -- | Given a serialised transaction and the string representation of a ConfirmationCode, creates a serialised Invitation
 createInvitation_ :: Array String -> Array String -> Array String -> RoleInstance -> MonadPerspectivesQuery String
@@ -229,7 +230,7 @@ getSharedFileServerKey keyArray _ = try
     Just sharedFileServerKey -> do
         rq <- pure 
           { method: Left POST
-          , url: "__MYCONTEXTS__ppsfs/getsharedfileserverkey"
+          , url: mycontextsUrl <> "ppsfs/getsharedfileserverkey"
           , headers: []
           , content: Just $ RequestBody.string $ writeJSON ({sharedfileserverkey: sharedFileServerKey } :: { sharedfileserverkey :: String})
           , responseFormat: ResponseFormat.string

@@ -231,8 +231,8 @@ instance showPerspectivesError :: Show PerspectivesError where
 
   show MissingPerspective = "(MissingPerspective) This should be inside a perspective expression."
   show (UserHasNoPerspective subject object start end) = "(UserHasNoPerspective) User " <> roletype2string subject <> " has no perspective on " <> roletype2string object <> " (between " <> show start <> " and " <> show end <> ")."
-  show (PerspectiveCannotBeAuthorOnly userRoleName userRoleStart (EnumeratedRoleType objectRole) objectRoleStart (EnumeratedPropertyType prop)) = "(PerspectiveCannotBeAuthorOnly) `authoronly` on the perspective of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") on property '" <> prop <> "' of object '" <> objectRole <> "' (starting on " <> show objectRoleStart <> "), \
-    \ is without meaning because this is the only userrole with a perspective on it and the userrole is functional"
+  show (PerspectiveCannotBeAuthorOnly userRoleName userRoleStart (EnumeratedRoleType objectRole) objectRoleStart (EnumeratedPropertyType prop)) = "(PerspectiveCannotBeAuthorOnly) `authoronly` on property '" <> prop <> "' of object '" <> objectRole <> "' (starting on " <> show objectRoleStart <> "), \
+    \ is without meaning because user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") is the only userrole with a perspective on it and the userrole is functional"
   show (SelfOnlyNeedsTwoRoles userRoleName userRoleStart (EnumeratedPropertyType prop)) = "(SelfOnlyNeedsTwoRoles) `selfonly` on property '" <> prop <> "' of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") \
     \ is meaningless because this users' perspective is the only perspective on it (consider `authoronly` instead)."
   show (SelfOnlyShouldBeAuthorOnly userRoleName userRoleStart (EnumeratedPropertyType prop)) = "(SelfOnlyShouldBeAuthorOnly) `selfonly` on property '" <> prop <> "' of user '" <> userRoleName <> "' (from " <> show userRoleStart <> ") \

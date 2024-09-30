@@ -33,7 +33,7 @@
 
 module Perspectives.Representation.ADT where
 
-import Data.Array (catMaybes, findIndex, fold, intercalate, intersect, nub, singleton, union)
+import Data.Array (catMaybes, findIndex, fold, intercalate, intersect, length, nub, singleton, union)
 import Data.Eq.Generic (genericEq)
 import Data.Foldable (class Foldable, foldMap, foldlDefault, foldrDefault)
 import Data.Generic.Rep (class Generic)
@@ -292,7 +292,7 @@ equals_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 equals_ = unsafePartial equals'
   where
     equals' :: CNF a -> CNF a -> Boolean
-    equals' (DPROD disjunctionsOnLeft) (DPROD disjunctionsOnRight) = unwrap
+    equals' (DPROD disjunctionsOnLeft) (DPROD disjunctionsOnRight) = length disjunctionsOnLeft == length disjunctionsOnRight && unwrap
       (fold
         (disjunctionsOnRight <#> \(DSUM disjunctionOnRight) -> Conj $ isJust $ (flip findIndex) disjunctionsOnLeft
           \(DSUM disjunctionOnLeft) -> ((SET.fromFoldable disjunctionOnLeft) == (SET.fromFoldable disjunctionOnRight))))
