@@ -82,9 +82,9 @@ step_ parenthesised = do
           , operator:opOfRight
           , right: rightOfRight
           , end: endOfRight
-          , parenthesised: protected})) -> 
+          , parenthesised: rightParenthesised})) -> 
             if
-              not protected &&
+              not rightParenthesised &&
               ((operatorPrecedence op) > (operatorPrecedence opOfRight))
 
             -- Regrouping: the parse tree (a op1 (b op2 c)) becomes ((a op1 b) op2 c).
@@ -122,7 +122,7 @@ step_ parenthesised = do
     leftSide = do
       keyword <- option "" (lookAhead reservedIdentifier)
       case keyword of
-        "filter" -> reserved "filter" *> step
+        "filter" -> reserved "filter" *> step_ parenthesised
         "letE" -> pureLetStep
         "callExternal" -> computationStep
         u | isUnaryKeyword u -> unaryStep
