@@ -32,7 +32,7 @@ module.exports = function(env)
     plugins: [
       new webpack.DefinePlugin({
         __PDRVersion__: JSON.stringify(require("./package.json").version),
-        __MYCONTEXTS__: "https://mycontexts.com/"
+        __MYCONTEXTS__: '"https://mycontexts.com/"'
       })        
       ],
     externals: {
