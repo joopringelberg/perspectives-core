@@ -259,9 +259,6 @@ type PouchdbAllDocs =
 -- | Creates the document in the database.
 -- | Returns the new revision.
 -- | Authentication ensured.
--- | The semantics of this operation depends critically on using generic encode.
--- | This allows us to control the value of the _id member of the json representation independently of 
--- | that of the ContextRecord or the RolRecord.
 addDocument :: forall d f. Attachment d => WriteForeign d => Revision d => DatabaseName -> d -> DocumentName -> MonadPouchdb f Revision_
 addDocument dbName doc docName = withDatabase dbName
   \db -> do
