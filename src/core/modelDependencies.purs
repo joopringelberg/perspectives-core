@@ -277,6 +277,9 @@ bodiesWithAccountsModelName = "model://perspectives.domains#BodiesWithAccounts"
 ------------------------------------------------------------------------------------
 -- SHAREDFILESERVICES
 ------------------------------------------------------------------------------------
+sharedFileServices :: String
+sharedFileServices = "model://perspectives.domains#SharedFileServices"
+
 mySharedFileServices :: String
 mySharedFileServices = "model://perspectives.domains#SharedFileServices$MySharedFileServices"
 

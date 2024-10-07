@@ -63,7 +63,7 @@ import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
-import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, identifiableFirstName, identifiableLastName, mySharedFileServices, sysUser)
+import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, identifiableFirstName, identifiableLastName, mySharedFileServices, sharedFileServices, sysUser)
 import Perspectives.Names (expandDefaultNamespaces, getMySystem, getUserIdentifier, lookupIndexedContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment, toFile)
@@ -310,6 +310,8 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         corrId 
         setter 
         (\_ -> ArrayT $ lift do
+          -- Ensure model://perspectives.domains#SharedFileServices is available.
+          void $ retrieveDomeinFile (DomeinFileId sharedFileServices)
           -- Get the indexed context sfs:MySharedFileServices
           -- Then get the role ActualSharedFileServer
           -- Finally return the property FileShareCredentials
@@ -604,7 +606,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             sendResponse (Result corrId [(show ok)]) setter
     Api.SetProperty -> catchError
       (do
-        void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Value object)])
+        void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) Nothing [(Value object)])
         sendResponse (Result corrId ["ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     Api.AddProperty -> catchError
@@ -615,7 +617,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype}
     Api.DeleteProperty -> catchError
       (do
-        void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate))
+        void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) Nothing) 
         sendResponse (Result corrId ["Ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: "SaveFile"
