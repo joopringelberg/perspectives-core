@@ -96,11 +96,6 @@ domain model://perspectives.domains#BrokerServices
             in
               bind sys:SocialMe >> binding to AccountHolder in accountsinstance >> binding >> context
               bind accountsinstance >> context >> Administrator to Administrator in accountsinstance >> binding >> context
-          action EndContract
-            letA
-              mycontract <- filter binding >> context >> Accounts with binding >> context >> AccountHolder filledBy sys:SocialMe
-            in
-              remove context mycontract
 
       
       screen "Managing Broker Services and contracts"
@@ -117,7 +112,7 @@ domain model://perspectives.domains#BrokerServices
             markdown <## Get connected
                       MyContexts is most useful when you connect to other people. 
                       This installation has not yet a means to connect to others. 
-                      Move to the [[link:pub:https://perspectives.domains/cw_or3rqch6p8/#k0bal5u2vg$External|Perspectives Broker Service]] 
+                      Move to the [[link:pub:https://perspectives.domains/cw_j4qovsczpm/#gobbccbstw$External|Perspectives Broker Service]] 
                       page to get online. You will read further instructions there.
                      >
               when not (exists bs:MyBrokers >> PublicBrokers)
@@ -180,13 +175,13 @@ domain model://perspectives.domains#BrokerServices
 
       state WithCredentials = (exists AdminUserName) and (exists AdminPassword)
         perspective on Accounts
-          only (CreateAndFill, Remove)
+          only (CreateAndFill, Remove, RemoveContext)
           props(LastNameOfAccountHolder) verbs (Consult)
       perspective on Administrator
         props (FirstName, LastName) verbs (Consult)
         props (AdminUserName, AdminPassword) verbs (SetPropertyValue)
       perspective on extern
-        props (Name, Url, ManagementEndpoint, SelfRegisterEndpoint, Exchange, ServiceDescription) verbs (Consult, SetPropertyValue)
+        props (Name, Url, ManagementEndpoint, SelfRegisterEndpoint, Exchange, ServiceDescription, TerminationPeriod, GracePeriod, ContractPeriod) verbs (Consult, SetPropertyValue)
         props (PublicUrl) verbs (Consult)
 
     user Guest = sys:Me
@@ -197,9 +192,9 @@ domain model://perspectives.domains#BrokerServices
 
     public Visitor at (extern >> PublicUrl) = sys:Me
       perspective on extern
-        props (Name, SelfRegisterEndpoint, PublicUrl, Url, Exchange, ServiceDescription) verbs (Consult)
+        props (Name, SelfRegisterEndpoint, PublicUrl, Url, Exchange, ServiceDescription, ContractPeriod, GracePeriod, TerminationPeriod) verbs (Consult)
       perspective on Administrator
-        props (FirstName, LastName) verbs (Consult)
+        props (FirstName, LastName, HasKey) verbs (Consult)
       perspective on Accounts
         only (Create, Fill, CreateAndFill)
       perspective on Accounts >> binding >> context >> AccountHolder
@@ -257,7 +252,7 @@ domain model://perspectives.domains#BrokerServices
         do for BrokerContract$Administrator
           -- This is the role that the Invitee/AccountHolder will fill with himself if she accepts the BrokerContract.
           create role AccountHolder
-    state CanRegister = ((exists AccountHolder) and exists Administrator) and exists extern >> SelfRegisterEndpoint
+    state CanRegister = (not exists Queues) and (exists AccountHolder) and (exists Administrator) and exists extern >> SelfRegisterEndpoint
       on entry
         do for AccountHolder
           letA 
@@ -274,21 +269,14 @@ domain model://perspectives.domains#BrokerServices
               queueid) returns Boolean for External
     state Active = extern >> Registered
       on entry
-        do for AccountHolder
-          letA 
-            now <- callExternal sensor:ReadSensor("clock", "now") returns DateTime
-          in 
-            UseExpiresOn = (now + Service >> ContractPeriod) for External
-            GracePeriodExpiresOn = (extern >> UseExpiresOn + Service >> GracePeriod) for External
-            TerminatesOn = (extern >> GracePeriodExpiresOn + Service >> TerminationPeriod) for External
         notify AccountHolder
           "You now have an account at the BrokerService { extern >> Name }"
-      state ExpiresSoon = callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> UseExpiresOn
+      state ExpiresSoon = (extern >> Registered) and callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> UseExpiresOn
         on entry
           notify AccountHolder
             "Your lease of the BrokerService has ended. Within {Service >> GracePeriod} days, you will no longer be able to receive information from peers."
       
-    state Terminated = callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> TerminatesOn or extern >> ContractTerminated
+    state Terminated = (extern >> Registered) and callExternal sensor:ReadSensor("clock", "now") returns DateTime > extern >> TerminatesOn or extern >> ContractTerminated
       on entry
         do for BrokerContract$Administrator
           callEffect rabbit:DeleteAMQPaccount(
@@ -325,6 +313,15 @@ domain model://perspectives.domains#BrokerServices
 
       view ForAccountHolder (Name, UseExpiresOn)
       view Account (FirstNameOfAccountHolder, LastNameOfAccountHolder)
+
+      on entry
+        do for AccountHolder
+          letA 
+            now <- callExternal sensor:ReadSensor("clock", "now") returns DateTime
+          in 
+            UseExpiresOn = (now + context >> Service >> ContractPeriod)
+            GracePeriodExpiresOn = (UseExpiresOn + context >> Service >> GracePeriod)
+            TerminatesOn = (GracePeriodExpiresOn + context >> Service >> TerminationPeriod)
     
     -- PDRDEPENDENCY
     user AccountHolder filledBy sys:TheWorld$PerspectivesUsers
@@ -389,7 +386,7 @@ domain model://perspectives.domains#BrokerServices
       screen "Broker Contract"
         column
           row
-            form "BrokerService" External
+            form "Contract" External
           row
             form "Administrator" Administrator
           row
