@@ -93,6 +93,20 @@ domain model://perspectives.domains#System
     -- PDRDEPENDENCY
     user PerspectivesUsers (relational)
       aspect sys:Identifiable
+      -- The unique key provided to each new participant in the Perspectives Trusted Network by one of his peers.
+      -- It can be used to store a limited number of media files in the perspectives sharedfile storage.
+      -- PDRDEPENDENCY (actually, a MyContexts dependency)
+      property SharedFileServerKey (selfonly, String)
+      state NoKey = (not HasKey) and (exists sys:SocialMe >> SharedFileServerKey)
+        on entry
+          do for Initializer
+            SharedFileServerKey = callExternal util:GetSharedFileServerKey( sys:SocialMe >> SharedFileServerKey ) returns String
+            HasKey = true
+      property HasKey (Boolean)
+
+      perspective on PerspectivesUsers
+        props (SharedFileServerKey, HasKey) verbs (Consult)
+    
     user NonPerspectivesUsers (relational)
       aspect sys:Identifiable
 
@@ -100,7 +114,7 @@ domain model://perspectives.domains#System
     user Initializer = sys:Me
       perspective on PerspectivesUsers
         only (Create)
-        props (Identifiable$PublicKey) verbs (SetPropertyValue, AddPropertyValue)
+        props (Identifiable$PublicKey, SharedFileServerKey, HasKey) verbs (SetPropertyValue, AddPropertyValue)
  
   -- MySocialEnvironment is the same on all of my devices.
     -- PDRDEPENDENCY
@@ -124,20 +138,8 @@ domain model://perspectives.domains#System
     -- We also make sure that each Persons instance we know about has access to all our System$User identities, so he/she can synchronize to us.
     -- PDRDEPENDENCY
     user Persons (relational, unlinked) filledBy (PerspectivesUsers, NonPerspectivesUsers)
-      -- The unique key provided to each new participant in the Perspectives Trusted Network by one of his peers.
-      -- It can be used to store a limited number of media files in the perspectives sharedfile storage.
-      -- PDRDEPENDENCY (actually, a MyContexts dependency)
-      property SharedFileServerKey (String)
-      state NoKey = (not exists SharedFileServerKey) and (exists sys:Me >> SharedFileServerKey)
-        on entry
-          do for SystemUser
-            SharedFileServerKey = callExternal util:GetSharedFileServerKey( sys:Me >> SharedFileServerKey ) returns String
       perspective on Me
         props (Cancelled, LastName, FirstName, PublicKey) verbs (Consult)
-      perspective on Persons
-        props (SharedFileServerKey) verbs (Consult)
-        -- Only the peer himself is allowed to see his key (and of course the SystemUser that creates it for him).
-        selfonly
 
     user Me filledBy PerspectivesUsers
       aspect sys:RoleWithId
@@ -159,7 +161,7 @@ domain model://perspectives.domains#System
           Cancelled = true
       perspective on Persons
         only (Create, Fill)
-        props (FirstName, LastName, SharedFileServerKey) verbs (SetPropertyValue, Consult)
+        props (FirstName, LastName) verbs (SetPropertyValue, Consult)
       -- Use this perspective to select a PerspectivesUsers instance to replace the filler of an instance of Persons
       -- that previously was filled by a NonPerspectivesUsers instance.
       perspective on sys:TheWorld >> PerspectivesUsers
@@ -211,11 +213,11 @@ domain model://perspectives.domains#System
     -- If User is not filled with Persons, we can never fill a role that requires Persons with User. That may be inconvenient.
     -- OF WE MOETEN ME VULLEN MET PERSONS.
     -- TODO. WHAT ABOUT SOCIALENVIRONMENT$ME?
-    user User (mandatory) filledBy Persons
+    user User (mandatory) filledBy PerspectivesUsers
       aspect sys:ContextWithNotification$NotifiedUser
       -- This will happen on importing SocialEnvironment and Me from another installation.
       -- If we import a peer's data, we will get a User instance that is already filled.
-      state FillWithPerson = (not exists binding) and exists sys:MySocialEnvironment >> Me
+      state FillWithPerspectivesUser = (not exists binding) and exists sys:MySocialEnvironment >> Me
         on entry
           do for User
             -- User has a sufficient perspective on itself to do this.
@@ -234,7 +236,7 @@ domain model://perspectives.domains#System
       view VolledigeNaam (FirstName, LastName)
       perspective on User
         only (Create, Fill)
-        props (LastName, FirstName) verbs (SetPropertyValue)
+        props (LastName, FirstName, PublicKey) verbs (SetPropertyValue)
         props (Channel) verbs (Consult)
       perspective on StartContexts
         props (Name) verbs (Consult)
@@ -543,7 +545,7 @@ domain model://perspectives.domains#System
 
     user Inviter (mandatory) filledBy sys:TheWorld$PerspectivesUsers
       perspective on Invitee
-        props (FirstName, LastName) verbs (Consult)
+        props (FirstName, LastName, HasKey) verbs (Consult)
       perspective on External
         props (Message, ConfirmationCode, SerialisedInvitation) verbs (SetPropertyValue, Consult)
         props (CompleteMessage) verbs (Consult)
@@ -564,7 +566,7 @@ domain model://perspectives.domains#System
 
     user Invitee (mandatory) filledBy Guest
       perspective on Inviter
-        props (FirstName, LastName) verbs (Consult)
+        props (FirstName, LastName, HasKey) verbs (Consult)
       perspective on extern
         props (InviterLastName, CompleteMessage, ConfirmationCode) verbs (Consult)
       screen "Invitation"
