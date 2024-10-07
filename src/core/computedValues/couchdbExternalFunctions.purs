@@ -374,6 +374,14 @@ createInitialInstances unversionedModelname versionedModelName patch build versi
               , Tuple DEP.installedBuild [build]])
           , binding: unwrap <$> versionedModelManifest})
 
+-- | Creates instances in a transaction where the authoring role is PerspectivesSystem$User (the 'subject' of the delta: the role that must have the right perspective), of:
+-- |    * PerspectivesSystem
+-- |    * PerspectivesSystem$User
+-- |    * TheWorld
+-- |    * PerspectivesUsers (with author TheWorld$Initializer) for the new user and for authoring role "serializationuser", where
+-- |      - the new user gets a PublicKey
+-- |      - the serializationuser gets a LastName ("serializationuser").
+-- |    * BaseRepository, filled with the Perspectives Repository.
 initSystem :: MonadPerspectivesTransaction Unit
 initSystem = do
   lift $ saveMarkedResources

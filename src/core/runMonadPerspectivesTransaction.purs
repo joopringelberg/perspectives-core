@@ -71,6 +71,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- | Runs an update function (a function in MonadPerspectivesTransaction that produces deltas),
 -- | runs actions as long as they are triggered, sends deltas to other participants and re-runs active queries
 -- | Create a Transaction with the role in TheWorld that fills SocialEnvironment$Me (which in turn fills PerspectivesSystem$User).
+-- | The authoringRole winds up as 'subject' in deltas.
 runMonadPerspectivesTransaction :: forall o.
   RoleType ->
   MonadPerspectivesTransaction o
@@ -140,7 +141,7 @@ phase1 share authoringRole r = do
       oldFrame <- lift pushFrame
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
-      catchError (void $ for states (enteringState ctxt))
+      catchError (void $ runSharing share authoringRole (for states (enteringState ctxt)))
         \e -> logPerspectivesError $ Custom ("Cannot enter context state for " <> show ctxt <>  ", because " <> show e)
       lift $ restoreFrame oldFrame
   -- Enter the rootState of roles that are created.
@@ -151,7 +152,7 @@ phase1 share authoringRole r = do
       oldFrame <- lift pushFrame
       lift $ addBinding "currentcontext" [unwrap ctxt]
       -- Error boundary.
-      catchError (void $ for states (enteringRoleState rid))
+      catchError (void $ runSharing share authoringRole (for states (enteringRoleState rid)))
         \e -> logPerspectivesError $ Custom ("Cannot enter role state, because " <> show e)
       lift $ restoreFrame oldFrame
   -- Exit the rootState of roles that are scheduled to be removed, unless we did so before.
@@ -159,29 +160,33 @@ phase1 share authoringRole r = do
   if not $ null rolesThatHaveNotExited
     then log ("Roles that have not exited: " <> show rolesThatHaveNotExited)
     else pure unit
-  void $ for rolesThatHaveNotExited
-    \rid -> do
-      ctxt <- lift (rid ##>> context)
-      states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
-      if null states
-        then pure unit
-        else do
-          oldFrame <- lift pushFrame
-          lift $ addBinding "currentcontext" [unwrap ctxt]
-          stateEvaluationAndQueryUpdatesForRole rid
-          -- Error boundary.
-          catchError (void $ for states (exitingRoleState rid))
-            \e -> do 
-              logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
-              lift $ restoreFrame oldFrame
-              throwError e
-          lift $ restoreFrame oldFrame
+  if null rolesThatHaveNotExited
+    then pure unit
+    else void $ runSharing share authoringRole (for rolesThatHaveNotExited
+      \rid -> do
+        ctxt <- lift (rid ##>> context)
+        states <- lift (rid ##= roleType >=> liftToInstanceLevel roleRootStates)
+        if null states
+          then pure unit
+          else do
+            oldFrame <- lift pushFrame
+            lift $ addBinding "currentcontext" [unwrap ctxt]
+            stateEvaluationAndQueryUpdatesForRole rid
+            -- Error boundary.
+            catchError (void $ for states (exitingRoleState rid))
+              \e -> do 
+                logPerspectivesError $ Custom ("Cannot exit role state for " <> show rid <> ", because " <> show e)
+                lift $ restoreFrame oldFrame
+                throwError e
+            lift $ restoreFrame oldFrame)
   -- Exit the rootState of contexts that scheduled to be removed, unless we did so before.
   contextsThatHaveNotExited <- lift $ filterA (\sa -> case sa of
       ContextRemoval ctxt _ -> ctxt ##>> exists' getActiveStates
       _ -> pure false)
     scheduledAssignments
-  void $ for contextsThatHaveNotExited (unsafePartial exitContext)
+  if null contextsThatHaveNotExited
+    then pure unit
+    else void $ runSharing share authoringRole (for contextsThatHaveNotExited (unsafePartial exitContext))
     -- First append the collected rolesToExit and ContextRemovals to the untouchableRoles and untouchableContexts
     -- to preserve the invariant.
   AA.modify (\t -> over Transaction (\tr -> tr
@@ -228,7 +233,9 @@ phase2 share authoringRole r = do
   if not null stateEvaluations
     then log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
     else pure unit
-  evaluateStates stateEvaluations
+  if null stateEvaluations
+    then pure unit
+    else runSharing share authoringRole (evaluateStates stateEvaluations)
   -- Is there a reason to run phase1 again?
   -- Only if there are new createdContexts, createdRoles, rolesToExit, 
   -- or new scheduledAssignments that are a ContextRemoval, a RoleUnbinding or a ExecuteDestructiveEffect.
@@ -307,7 +314,9 @@ phase2 share authoringRole r = do
             else pure r
         else do 
           log $ "Re-evaluating state evaluations that depend on a removed resource: " <> (show postponedStateEvaluations)
-          evaluateStates postponedStateEvaluations
+          if null postponedStateEvaluations
+            then pure unit
+            else (runSharing share authoringRole (evaluateStates postponedStateEvaluations))
           AA.modify \t -> over Transaction (\tr -> tr {postponedStateEvaluations = [], modelsToBeRemoved = []}) t
           phase2 share authoringRole r
 
@@ -318,6 +327,19 @@ phase2 share authoringRole r = do
     criterium (ExecuteDestructiveEffect _ _ _) = true
     criterium _ = false
 
+-- | Actions performed on behalf of the own user in the course of state transitions will result in deltas that
+-- | must be synchronised with peers, even when the transaction in which this happens is received from a peer
+-- | and thus is non-sharing.
+runSharing :: forall o. Boolean -> RoleType -> MonadPerspectivesTransaction o -> MonadPerspectivesTransaction o
+runSharing share authoringRole t = if share
+  -- We already share, just execute the action.
+  then t
+  -- Run from within a non-sharing transaction. Run an embedded, sharing transaction.
+  else do
+    log "run from nonsharing transaction."
+    r <- lift $ runEmbeddedTransaction shareWithPeers authoringRole t
+    log "returning to nonsharing transaction."
+    pure r
 
 -- Add to each context or role instance the user role type and the RootState type.
 computeStateEvaluations :: InvertedQueryResult -> MonadPerspectives (Array StateEvaluation)
@@ -365,6 +387,7 @@ isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
 exitContext (ContextRemoval ctxt authorizedRole) = do
+  -- Adds a RemoveExternalRoleInstance to the current transaction.
   stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
   states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
   if null states

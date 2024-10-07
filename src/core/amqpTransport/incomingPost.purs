@@ -104,7 +104,7 @@ incomingPost = do
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do
       mySystem <- getMySystem
-      void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType sysUser) (setProperty [RoleInstance $ buitenRol mySystem] (EnumeratedPropertyType connectedToAMQPBroker) [Value $ show c])
+      void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType sysUser) (setProperty [RoleInstance $ buitenRol mySystem] (EnumeratedPropertyType connectedToAMQPBroker) Nothing [Value $ show c])
       pure unit
 
     -- | Send all transactions that have accumulated in the post database while we had no connection to the Broker.
