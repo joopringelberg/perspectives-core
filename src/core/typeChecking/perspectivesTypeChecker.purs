@@ -128,24 +128,6 @@ checkContext c = do
 -- | The allowed filler of the given role type to be filled (including those of its Aspects!) must be equal to or more general than the type of the proposed filler.
 -- | The type of the proposed filler may not be equal to the given role type (we disallow a role filling itself).
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
--- checkBinding :: RoleType -> RoleInstance -> MP Boolean
--- checkBinding filledType filler = do
---   -- If the model is not available locally, try to get it from the repository.
---   (fillerType :: EnumeratedRoleType) <- roleType_ filler
---   fillerContextType <- (context' >=> contextType_) filler
---   if filledType == ENR fillerType
---     then pure false
---     else do
---       fillerADT <- pure $ ST $ QT.RoleInContext {context: fillerContextType, role: fillerType}
---       -- The filledType has restrictions on the fillers that it allows.
---       -- These restrictions can be modeled with the filledType itself, but
---       -- the restrictions of all of its Aspects count as well.
---       (filledTypeAllowedFiller :: ADT QT.RoleInContext) <- bindingOfRole filledType
---       -- Take the transitive closure over binding.
---       fillers' <- transitiveBindingOfADT fillerADT
---       filleds' <- transitiveBindingOfADT filledTypeAllowedFiller
---       filleds' `equalsOrGeneralisesRoleInContext` fillers'
-
 checkBinding :: EnumeratedRoleType -> RoleInstance -> MP Boolean
 checkBinding filledType filler = do
   -- (mrestriction :: Maybe (ExpandedADT QT.RoleInContext)) <- getEnumeratedRole filledType >>= completeExpandedFillerRestriction
@@ -153,5 +135,5 @@ checkBinding filledType filler = do
   (fillerType :: CNF QT.RoleInContext) <- completeRuntimeType filler >>= toConjunctiveNormalForm_
   case mrestriction of 
     -- restriction -> fillerType
-    Just restriction -> pure (restriction `equalsOrSpecialises_` fillerType)
+    Just restriction -> pure (fillerType `equalsOrSpecialises_` restriction)
     Nothing -> pure true

@@ -279,6 +279,10 @@ equalsOrSpecialises adt1 adt2 = let
 -- | * R => X iff
 -- | * For every disjunction x in the conjunctive formula of X, 
 -- | * there is a disjunction r in the conjunctive formula of R for which is it true that the terms of r are a subset of the terms of x.
+-- |
+-- | In terms of left and right (substitute left for R and right for X):
+-- | * For every disjunction r in the conjunctive formula of right, 
+-- | * there is a disjunction l in the conjunctive formula of left for which is it true that the terms of l are a subset of the terms of r.
 equalsOrSpecialises_ :: forall a. Ord a => Eq a => CNF a -> CNF a -> Boolean
 equalsOrSpecialises_ = unsafePartial equalsOrSpecialises'
   where
