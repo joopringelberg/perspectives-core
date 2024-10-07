@@ -65,7 +65,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- in order to create databases and members.
     -- Becoming a Couchdb Server Admin should be managed outside Perspectives.
     -- The username should be the PerspectivesSystem$User ID.
-    user Manager = sys:SocialMe
+    user Manager = sys:SocialMe >> binding
       perspective on CouchdbServers
         only (CreateAndFill, RemoveContext, DeleteContext, Create, Fill)
         props (Name) verbs (Consult)
@@ -95,6 +95,7 @@ domain model://perspectives.domains#CouchdbManagement
       property CouchdbPort (mandatory, String)
         pattern = "^\\d{1,5}$" "A port number written as a string, consisting of up to 5 digits, maximally 65535."
       -- The Password and UserName of Manager (and therefore CouchdbServer$Admin) for Url.
+      -- TODO: Deze properties zouden authorOnly moeten zijn!
       property AdminPassword (mandatory, String)
       property AdminUserName (mandatory, String)
 
@@ -103,7 +104,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- These credentials are only effective in the current session. 
       -- They are added (persistently) to CouchdbServer$Admin as soon as that role is filled. From then on,
       -- this installation can authenticate with the server at Url.
-      state AddCredentials = ((exists Url) and exists AdminPassword) and exists AdminUserName
+      state AddCredentials = ((exists Url) and exists AdminPassword) and (exists AdminUserName) and not exists binding
         on entry
           do for Manager
             callEffect cdb:AddCredentials( Url, AdminUserName, AdminPassword )
@@ -156,16 +157,24 @@ domain model://perspectives.domains#CouchdbManagement
       -- This covers the case we get a CouchdbServer that we did not create ourselves.
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
-      state AddReceivedServer = not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin
+      state AddReceivedServer = (not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin) and exists (filter context >> Admin with filledBy sys:SocialMe >> binding)
         perspective of Admin 
           perspective on extern >> binder CouchdbServers
+            -- selfonly
             only (Create, Fill)
+            props (Url, CouchdbServers$CouchdbPort) verbs (Consult, SetPropertyValue)
         perspective of Accounts
           perspective on extern >> binder CouchdbServers
+            -- selfonly
             only (Create, Fill)
         on entry
           do for Admin
-            bind origin to CouchdbServers in cm:MyCouchdbApp
+            letA
+              server <- create role CouchdbServers in cm:MyCouchdbApp
+            in 
+              bind_ origin to server
+              Url = ServerUrl for server
+              CouchdbPort = CouchdbPort for server
           do for Accounts
             bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Admin
@@ -190,12 +199,13 @@ domain model://perspectives.domains#CouchdbManagement
     -- This role requires credentials for the ServerUrl, because it updates CouchdbServer and creates and updates Repositories and Accounts.
     -- It requires write access to cw_servers_and_repositories.
     -- TODO Hernoem dit naar ServerAdmin.
-    user Admin (relational) filledBy CouchdbManagementApp$Manager 
+    user Admin filledBy CouchdbManagementApp$Manager 
       -- As acc:Body$Admin, has full perspective on Accounts.
       -- These properties come from sys:WithCredentials
       -- WithCredentials$UserName - CALCULATED, either the SpecificUserName or the ID of the PerspectivesSystem$User.
       -- The next two properties are set on creating the admin (state CouchdbServerApp$CouchdbServers$NoAdmin)
       -- WithCredentials$SpecificUserName
+      -- TODO: deze properties zouden authorOnly moeten zijn!
       -- WithCredentials$Password
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Admin
@@ -247,7 +257,7 @@ domain model://perspectives.domains#CouchdbManagement
               props (ServerUrl, Name) verbs (Consult)
               --props (Name) verbs (SetPropertyValue)
           row
-            table "Admins" Admin
+            form "Admins" Admin
         tab "Repositories" default
           row 
             table Repositories
@@ -266,7 +276,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- WithCredentials$AuthorizedDomain
       aspect acc:Body$Accounts
       aspect sys:ContextWithNotification$NotifiedUser
-      state Filled = exists binding
+      state Filled = (exists binding) and not exists Password
         on entry
           do for Admin
             letA
@@ -337,7 +347,7 @@ domain model://perspectives.domains#CouchdbManagement
           row
             form External
           row
-            table "Admins" Admin
+            form "Admins" Admin
           row
             table Accounts
         tab "Repositories" default
@@ -382,7 +392,7 @@ domain model://perspectives.domains#CouchdbManagement
         pattern = "^[a-z]([a-z]|[0-9]|[\\._$+-])*$" "Only lowercase characters (a-z), digits (0-9), and any of the characters ., _, $, + and - are allowed. Must begin with a letter."
       property HasDatabases (Boolean)
 
-      state CreateRepository = exists Repositories$NameSpace
+      state CreateRepository = (exists Repositories$NameSpace) and not exists NameSpace_
         on entry
           do for Admin
             letA
@@ -392,7 +402,7 @@ domain model://perspectives.domains#CouchdbManagement
               -- Copy the namespace to the Repository, but replace dots with underscores.
               NameSpace_ = reponame for origin >> binding
 
-      state CreateDatabases = (exists NameSpace_) and AdminEndorses and exists context >> Admin >> Password
+      state CreateDatabases = (not HasDatabases) and (exists NameSpace_) and AdminEndorses and exists context >> Admin >> Password
         on entry
           do for Admin
             letA
@@ -410,18 +420,17 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
               HasDatabases = true
-        on exit
-          do for Admin
-            letA
-              baseurl <- context >> extern >> ServerUrl
-              readmodels <- "models_" + NameSpace_
-              readinstances <- "cw_" + NameSpace_
-            in 
-              -- models
-              callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
-              -- instances
-              callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
-              HasDatabases = false
+      on exit
+        do for Admin
+          letA
+            baseurl <- context >> extern >> ServerUrl
+            readmodels <- "models_" + NameSpace_
+            readinstances <- "cw_" + NameSpace_
+          in 
+            -- models
+            callEffect cdb:DeleteCouchdbDatabase( baseurl, readmodels )
+            -- instances
+            callEffect cdb:DeleteCouchdbDatabase( baseurl, readinstances )
 
       -- THIS STATE WILL NOT BE REVISITED WHEN ALL MANIFESTS ARE REMOVED,
       -- because the role instance state is re-evaluated BEFORE the instance is actually thrown away.
@@ -431,12 +440,12 @@ domain model://perspectives.domains#CouchdbManagement
 
       state NoNameSpace = not exists Repositories$NameSpace
 
-        -- Ad Admin may exist already if the Repository is created by Accounts.
-        -- state NoAdmin = AdminEndorses and not exists binding >> context >> Repository$Admin
-        --   on entry
-        --     do for Admin
-        --       -- create role Admin in binding >> context
-        --       bind context >> Admin to Admin in binding >> context
+      -- Ad Admin may exist already if the Repository is created by Accounts.
+      state NoAdmin = AdminEndorses and not exists binding >> context >> Repository$Admin
+        on entry
+          do for Admin
+            -- create role Admin in binding >> context
+            bind context >> Admin to Admin in binding >> context
 
     context BespokeDatabases (relational) filledBy BespokeDatabase
     context MyBespokeDatabases = filter BespokeDatabases with binding >> context >> Owner filledBy sys:Me
@@ -453,17 +462,17 @@ domain model://perspectives.domains#CouchdbManagement
       property OwnerName = context >> Owner >> LastName
       property Description (String)
       property Public (Boolean)
-      state CreateDb = Endorsed and exists context >> Owner
+      state CreateDb = Endorsed and (exists context >> Owner) and not exists DatabaseName
         on entry
           do for CBAdmin
             DatabaseName = "cw_" + callExternal util:GenSym() returns String + "/" 
             callEffect cdb:CreateCouchdbDatabase( BaseUrl, DatabaseName )
             DatabaseLocation = BaseUrl + DatabaseName
             callEffect cdb:MakeAdminOfDb( BaseUrl, DatabaseName, context >> Owner >> UserName )
-        state Publish = Public
-          on entry
-            do for CBAdmin
-              callEffect cdb:MakeDatabasePublic( BaseUrl, DatabaseName )
+      state Publish = (exists DatabaseName) and Public
+        on entry
+          do for CBAdmin
+            callEffect cdb:MakeDatabasePublic( BaseUrl, DatabaseName )
         -- on exit
         --   do for CBAdmin
         --     callEffect cdb:MakeDatabasePrivate( BaseUrl, DatabaseName )
@@ -477,6 +486,8 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on External
         props (Public, Description) verbs (Consult, SetPropertyValue)
         props (DatabaseLocation) verbs (Consult)
+      perspective on Owner
+        props (LastName) verbs (Consult)
 
     user CBAdmin = extern >> binder BespokeDatabases >> context >> Admin
       perspective on External
@@ -550,7 +561,7 @@ domain model://perspectives.domains#CouchdbManagement
       action CreateManifest
         create role Manifests
 
-      state IsFilled = (exists binding) and context >> extern >> RepoHasDatabases
+      state IsFilled = (exists binding) and (not exists AuthorizedDomain) and context >> extern >> RepoHasDatabases
         on entry
           do for ServerAdmin
             -- Only the CouchdbServer$Admin has a Create and Fill perspective on
@@ -636,7 +647,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- (and that role actually requires write access to models_RepositoryUrl), this is a convenient place to arrange that.
     user Authors (relational) filledBy CouchdbServer$Accounts
       aspect acc:Body$Accounts
-      state Filled = exists binding
+      state Filled = (exists binding) and not exists AuthorizedDomain
         on entry
           do for ServerAdmin
             letA
@@ -858,7 +869,7 @@ domain model://perspectives.domains#CouchdbManagement
       aspect sys:ModelManifest$Versions
       -- Version
       -- VersionedLocalModelName
-      state ReadyToMake = (exists Versions$Version) and not exists binding
+      state ReadyToMake = (exists Versions$Version) and (not exists binding) and not exists Patch
         on entry
           do for Author
             letA
@@ -906,6 +917,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- The readable date and time of the last upload.
       property LastUpload = callExternal util:FormatDateTime( LastChangeDT, "nl-NL", "{\"dateStyle\": \"short\", \"timeStyle\": \"short\"}" ) returns String
       property MustUpload (Boolean)
+      -- This must be writerOnly.
+      -- The property will have no value in a new installation, effectively preventing upload on receiving a new Version
+      property AutoUpload (Boolean)
 
       on exit
         do for Author
@@ -923,7 +937,7 @@ domain model://perspectives.domains#CouchdbManagement
               -- Set the version to download.
               VersionToInstall = Version for binder Versions >> context >> extern
       
-      state ProcessArc = (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT) or not exists LastChangeDT)
+      state ProcessArc = AutoUpload and (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT) or not exists LastChangeDT)
         on entry
           do for Author
             ArcFeedback = callExternal p:ParseAndCompileArc( ModelURI, ArcSource ) returns String
@@ -944,7 +958,7 @@ domain model://perspectives.domains#CouchdbManagement
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
         props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload) verbs (SetPropertyValue)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload) verbs (SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Manifest >> context >> Versions
