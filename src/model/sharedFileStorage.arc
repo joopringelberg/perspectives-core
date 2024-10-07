@@ -62,7 +62,7 @@ domain model://perspectives.domains#SharedFileServices
           -- For the ppstorage type (perspectives-sharedfilestorage) we have no need for the AccountName. 
           -- Also, we overload `Password` with the unique personal SharedFileServerKey that allows limited uploading of files.
           AccountName = "ignored" for defaultserver
-          Password = sys:SocialMe >> SharedFileServerKey for defaultserver
+          Password = sys:SocialMe >> binding >> SharedFileServerKey for defaultserver
           StorageType = "ppstorage" for defaultserver
     
     user Manager = sys:Me
@@ -82,8 +82,6 @@ domain model://perspectives.domains#SharedFileServices
           form "Your own shared file service" MySharedFileService
         row
           form "The actual shared file service in use" ActualSharedFileServer
-        row 
-          form TheStartContext
 
     thing MySharedFileService 
       aspect sfs:SharedFileService

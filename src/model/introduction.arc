@@ -44,7 +44,7 @@ domain model://perspectives.domains#Introduction
       aspect sys:RootContext$External
 
     context Introductions (relational) filledBy Introduction
-    context IncomingIntroductions = sys:SocialMe >> binding >> binder sys:SocialEnvironment$Persons >> binder Introducee >> context >> extern
+    context IncomingIntroductions = sys:SocialMe >> binding >> binder Introducee >> context >> extern
     user Manager = sys:Me
       perspective on Introductions
         only (CreateAndFill, Remove)
@@ -112,6 +112,8 @@ domain model://perspectives.domains#Introduction
               form External
             row 
               form Introducer
+            row 
+              table Introducee
           column 
             chat Conversation
               messages Messages
