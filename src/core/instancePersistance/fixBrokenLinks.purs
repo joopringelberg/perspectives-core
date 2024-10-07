@@ -168,7 +168,7 @@ fixRoleReferences roleId = do
         then do 
           s <- getMySystem
           runEmbeddedIfNecessary doNotShareWithPeers (ENR $ EnumeratedRoleType sysUser)
-            (deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard))
+            (deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard) Nothing)
         else pure unit
 
 -- This version only changes the administration in the filler; the full version in Perspectives.RoleAssignment changes both sides.

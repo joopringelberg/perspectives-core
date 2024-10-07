@@ -184,7 +184,7 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           lift $ lift $ withRoleInsertionPoint (setFirstBinding roleInstance expandedBinding Nothing)
       case properties of
         (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-          lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+          lift $ lift $ setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) Nothing (Value <$> values)
       tell users
 
 -- | Construct a Role instance for an existing Context instance.
@@ -232,7 +232,7 @@ createAndAddRoleInstance_ roleType@(EnumeratedRoleType rtype) contextId (RolSeri
     -- Then add the properties
     case properties of
       (PropertySerialization props) -> forWithIndex_ props \propertyTypeId values ->
-        setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+        setProperty [roleInstance] (EnumeratedPropertyType propertyTypeId) Nothing (Value <$> values)
     pure roleInstance
 
 scheduleIndexedResourceCreation :: IndexedResource -> MonadPerspectivesTransaction Unit

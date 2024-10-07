@@ -85,10 +85,10 @@ forkedSystemClocks state = do
           systemHour' <- string2Time systemHour
           -- if the hour of the currentTime is not equal to the systemHour', set the currentTime to the hour of the currentTime.
           if (hour currentTime) `notEq` (hour systemHour')
-            then setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemHour) 
+            then setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemHour)  Nothing
               [Value $ time2String (wholeHour (hour currentTime))]
             else pure unit
-        Nothing -> setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemHour) [Value $ time2String (wholeHour $ hour currentTime)]
+        Nothing -> setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemHour) Nothing [Value $ time2String (wholeHour $ hour currentTime)]
       -- read the current date.
       currentDate <- liftEffect $ nowDate
       case msystemDate of 
@@ -96,10 +96,10 @@ forkedSystemClocks state = do
           systemDate' <- unsafePartial fromJust <$> string2Date systemDate
           -- Compare the date component of PerspectivesSystem$CurrentDate with the current date. If it is less, set CurrentDate.
           if systemDate' < currentDate
-            then setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemDate)
+            then setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemDate) Nothing
               [Value $ date2String currentDate]
             else pure unit
-        Nothing -> setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemDate) [Value $ date2String currentDate]
+        Nothing -> setProperty [RoleInstance $ buitenRol system] (EnumeratedPropertyType currentSystemDate) Nothing [Value $ date2String currentDate]
       
       pure unit
 

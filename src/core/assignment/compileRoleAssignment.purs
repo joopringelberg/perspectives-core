@@ -167,7 +167,7 @@ compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = d
         Nothing -> pure unit
         Just role -> try (lift $ getPerspectRol role) >>=
           handlePerspectRolError "compileAssignmentFromRole, Move"
-            (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType))
+            (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles (moveRoleInstanceToAnotherContext context c pspType Nothing))
 
     else pure \roleId -> do
       ctxt <- lift (roleId ##> contextGetter)
@@ -179,7 +179,7 @@ compileAssignmentFromRole (BQD _ QF.Move roleToMove contextToMoveTo _ _ mry) = d
             Nothing -> pure unit
             Just role -> try (lift $ getPerspectRol role) >>=
               handlePerspectRolError "compileAssignmentFromRole, Move"
-                (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles  (moveRoleInstanceToAnotherContext context c pspType))
+                (\((PerspectRol{context, pspType}) :: PerspectRol) -> for roles  (moveRoleInstanceToAnotherContext context c pspType Nothing))
 
 compileAssignmentFromRole (BQD _ (QF.Bind qualifiedRoleIdentifier) bindings contextToBindIn _ _ _) = do
   (contextGetter :: (RoleInstance ~~> ContextInstance)) <- role2context contextToBindIn
@@ -238,7 +238,7 @@ compileAssignmentFromRole (UQD _ (QF.DeleteProperty qualifiedProperty) roleQfd _
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift (roleId ##= roleGetter)
-    deleteProperty roles qualifiedProperty
+    deleteProperty roles qualifiedProperty Nothing
 
 compileAssignmentFromRole (BQD _ (QF.RemovePropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
@@ -246,7 +246,7 @@ compileAssignmentFromRole (BQD _ (QF.RemovePropertyValue qualifiedProperty) valu
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift (roleId ##= roleGetter)
     (values :: Array Value) <- lift (roleId ##= valueGetter)
-    removeProperty roles qualifiedProperty values
+    removeProperty roles qualifiedProperty Nothing values
 
 compileAssignmentFromRole (BQD _ (QF.AddPropertyValue qualifiedProperty) valueQfd roleQfd _ _ _) = do
   (roleGetter :: (RoleInstance ~~> RoleInstance)) <- role2role roleQfd
@@ -262,7 +262,7 @@ compileAssignmentFromRole (BQD _ (QF.SetPropertyValue qualifiedProperty) valueQf
   pure \roleId -> do
     (roles :: Array RoleInstance) <- lift (roleId ##= roleGetter)
     (values :: Array Value) <- lift (roleId ##= valueGetter)
-    setProperty roles qualifiedProperty values
+    setProperty roles qualifiedProperty Nothing values
 
 compileAssignmentFromRole (MQD _ (QF.CreateFileF mimeType qualifiedProperty) args _ _ _) = do
   -- args = [filenameQfd, contentQfd, roleQfd]
@@ -277,10 +277,10 @@ compileAssignmentFromRole (MQD _ (QF.CreateFileF mimeType qualifiedProperty) arg
       -- Notice that the content is a string. It is eventually passed on to toFile as a Foreign value and 
       -- then passed on to the File constructor. This constructor accepts Strings just as well as ArrayBuffers.
       Just roleInstance, Just content, Just (Value fileName) -> do 
-        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
+        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign content) mimeType
       Just roleInstance, Nothing, Just (Value fileName) -> do 
-        setProperty roles qualifiedProperty [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
+        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign "") mimeType
       Nothing, _, Just (Value fileName) -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
       _, _, _ -> throwError (error $ "some of the arguments to create file are missing.")

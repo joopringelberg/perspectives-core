@@ -110,7 +110,7 @@ constructEmptyContext contextInstanceId ctype localName externeProperties author
       forWithIndex_ props \propertyTypeId values ->
         -- PERSISTENCE of the role instance.
         -- CURRENTUSER: there can be no change to the current user.
-        setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) (Value <$> values)
+        setProperty [externalRole] (EnumeratedPropertyType propertyTypeId) Nothing (Value <$> values)
       -- If there were no props, we have to save the external role now.
       if isEmpty props then lift $ void $ saveEntiteit externalRole else pure unit
   pure contextInstance

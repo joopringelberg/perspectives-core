@@ -55,8 +55,8 @@ import Simple.JSON (class ReadForeign, class WriteForeign)
 -----------------------------------------------------------
 -- | The subject is the user role with the perspective that should include the right verbs to allow the delta
 -- | and with an object that corresponds to the resource being modified by the delta.
--- | This is often taken from the transacton in which modifications are made. It is the member 'authoringRole'
--- | (not to be confused with member 'author', who must be an instance of sys:PerspectivesSystem$User).
+-- | This is often taken from the transacton in which modifications are made. It is the member 'authoringRole' of Transaction, provided when executing a transaction with runMonadPerspectivesTransaction
+-- | (not to be confused with member 'author', who must be an instance of sys:PerspectivesSystem$User). THIS REMARK MAY BE OBSOLETE!
 type DeltaRecord f = {subject :: RoleType | f}
 
 -----------------------------------------------------------

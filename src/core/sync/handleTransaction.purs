@@ -103,7 +103,7 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
     -- NOTE: the perspective should always include the Delete verb.
     MoveRoleInstancesToAnotherContext -> (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Create, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
       Left e -> handleError e
-      Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType roleInstance
+      Right _ -> moveRoleInstanceToAnotherContext contextInstance (unsafePartial $ fromJust destinationContext) roleType (Just signedDelta) roleInstance 
     -- As the external role and the context have been constructed before (and apparently have not thrown errors) we just add the delta to the external role
     -- iff it is not present!
     AddExternalRole -> lift (getPerspectRol roleInstance >>= \rol@(PerspectRol r) -> if isDefaultContextDelta (rol_contextDelta rol)
@@ -139,13 +139,13 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
         Right _ -> addProperty [id] property (flip Tuple (Just signedDelta) <$> values)
     RemoveProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.RemovePropertyValue) >>= case _ of
       Left e -> handleError e
-      Right _ -> removeProperty [id] property values
+      Right _ -> removeProperty [id] property (Just signedDelta) values
     DeleteProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.DeleteProperty) >>= case _ of
       Left e -> handleError e
-      Right _ -> deleteProperty [id] property
+      Right _ -> deleteProperty [id] property (Just signedDelta)
     SetProperty -> (lift $ roleHasPerspectiveOnPropertyWithVerb subject id property Verbs.SetPropertyValue) >>= case _ of
       Left e -> handleError e
-      Right _ -> setProperty [id] property values
+      Right _ -> setProperty [id] property (Just signedDelta) values
     UploadFile -> do
       -- Do this only when we're executing the Delta for a public role. 
       -- As this is a RolePropertyDelta, it was created when a file was added to the role for a property with a File range. 

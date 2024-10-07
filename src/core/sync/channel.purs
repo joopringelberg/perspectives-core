@@ -130,13 +130,13 @@ getYouFromChannel = do
 
 setAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setAddress host port rl = do
-  setProperty rl (EnumeratedPropertyType addressHost) [Value host]
-  setProperty rl (EnumeratedPropertyType addressPort) [Value (show port)]
+  setProperty rl (EnumeratedPropertyType addressHost) Nothing [Value host]
+  setProperty rl (EnumeratedPropertyType addressPort) Nothing [Value (show port)]
 
 setRelayAddress :: Host -> Port -> Array RoleInstance -> MPT Unit
 setRelayAddress host port rl = do
-  setProperty rl (EnumeratedPropertyType addressRelayHost) [Value host]
-  setProperty rl (EnumeratedPropertyType addressRelayPort) [Value (show port)]
+  setProperty rl (EnumeratedPropertyType addressRelayHost) Nothing [Value host]
+  setProperty rl (EnumeratedPropertyType addressRelayPort) Nothing [Value (show port)]
 
 -- | Regardless whether I am the Initiator or the ConnectedPartner, set my host and port value.
 setMyAddress :: Host -> Port -> ContextInstance -> MonadPerspectivesTransaction Unit

@@ -130,7 +130,7 @@ scheduleRoleRemoval id = do
             Just r -> if r == id
               then do 
                 s <- lift $ getMySystem
-                deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard)
+                deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard) Nothing
               else pure unit
 
 -- | Schedules all roles in the context, including its external role, for removal.
@@ -176,7 +176,7 @@ scheduleContextRemoval authorizedRole id =
           Just roleOnClipboard -> if isJust $ elemIndex roleOnClipboard allRoleInstances
             then do 
               s <- lift $ getMySystem
-              deleteProperty [RoleInstance (buitenRol s)] (EnumeratedPropertyType cardClipBoard)
+              deleteProperty [RoleInstance (buitenRol s)] (EnumeratedPropertyType cardClipBoard) Nothing
             else pure unit
           _ -> pure unit
         modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
@@ -213,6 +213,7 @@ removeContextInstance id authorizedRole = do
 -- | STATE EVALUATION
 -- | QUERY UPDATES
 -- | SYNCHRONISATION
+-- | Adds a RemoveExternalRoleInstance delta to the transaction.
 stateEvaluationAndQueryUpdatesForContext :: ContextInstance -> Maybe RoleType -> MonadPerspectivesTransaction Unit
 stateEvaluationAndQueryUpdatesForContext id authorizedRole = do
   (lift $ try $ getPerspectContext id) >>=
@@ -288,6 +289,7 @@ handleRoleOnContextRemoval roleId = (lift $ try $ (getPerspectRol roleId)) >>= h
 -- | is affected when the role instance is removed.
 -- | STATE EVALUATION and computing peers with a perspective on the instance.
 -- | NO SYNCHRONIZATION: of the removal itself; this must be handled in the environment of the calling functions.
+-- | Furthermore, adds no deltas to the transaction.
 statesAndPeersForRoleInstanceToRemove :: PerspectRol -> MonadPerspectivesTransaction (Array RoleInstance)
 statesAndPeersForRoleInstanceToRemove (PerspectRol{id:roleId, context, pspType:roleType, binding, filledRoles}) = do
   -- The last boolean argument prevents usersWithPerspectiveOnRoleInstance from adding Deltas to the transaction

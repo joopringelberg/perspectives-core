@@ -250,8 +250,8 @@ removeRoleInstancesFromContext contextId rolName rolInstances = (lift $ try $ ge
 -- | QUERY UPDATES
 -- | CURRENTUSER for contextId and one of rolInstances.
 -- TODO. De enige manier om deze functie aan te passen lijkt een nieuwe ContextDelta te maken en mee te nemen in de ContextDelta met MoveRoleInstancesToAnotherContext. Aan de ontvangende kant moet die nieuwe ContextDelta dan in de verplaatste rol worden gezet op de plek van 'contextDelta'.
-moveRoleInstanceToAnotherContext :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> (Updater RoleInstance)
-moveRoleInstanceToAnotherContext _ _ _ _ = pure unit
+moveRoleInstanceToAnotherContext :: ContextInstance -> ContextInstance -> EnumeratedRoleType -> Maybe SignedDelta -> (Updater RoleInstance)
+moveRoleInstanceToAnotherContext _ _ _ _ _ = pure unit
 -- moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstance = pure unit
 -- moveRoleInstanceToAnotherContext originContextId destinationContextId rolName rolInstances = do
 --   roles <- traverse (lift <<< lift <<< getPerspectRol) rolInstances
@@ -397,8 +397,8 @@ setDeltasForProperty propertyName modifier allDeltas = case lookup (unwrap prope
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
-removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
-removeProperty rids propertyName values = case ARR.head rids of
+removeProperty :: Array RoleInstance -> EnumeratedPropertyType -> Maybe SignedDelta -> (Updater (Array Value))
+removeProperty rids propertyName mdelta values = case ARR.head rids of
   Nothing -> pure unit
   Just _ -> do
     subject <- getSubject
@@ -411,15 +411,16 @@ removeProperty rids propertyName values = case ARR.head rids of
           \(pe :: PerspectRol) -> do
             users <- aisInPropertyDelta rid' rid propertyName replacementProperty (rol_pspType pe)
             -- Create a delta for all values at once.
-            delta <- pure $ RolePropertyDelta
-              { id : rid
-              , roleType: rol_pspType pe
-              , property: replacementProperty
-              , deltaType: RemoveProperty
-              , values: values
-              , subject
-              }
-            signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
+            signedDelta <- case mdelta of 
+              Just d -> pure d
+              Nothing -> signDelta (writeJSON $ stripResourceSchemes (RolePropertyDelta
+                { id : rid
+                , roleType: rol_pspType pe
+                , property: replacementProperty
+                , deltaType: RemoveProperty
+                , values: values
+                , subject
+                }))
             addDelta (DeltaInTransaction { users, delta: signedDelta})
             (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
             (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -437,8 +438,8 @@ removeProperty rids propertyName values = case ARR.head rids of
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
-deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> MonadPerspectivesTransaction Unit
-deleteProperty rids propertyName = case ARR.head rids of
+deleteProperty :: Array RoleInstance -> EnumeratedPropertyType -> Maybe SignedDelta -> MonadPerspectivesTransaction Unit
+deleteProperty rids propertyName mdelta = case ARR.head rids of
   Nothing -> pure unit
   Just _ -> do
     subject <- getSubject
@@ -454,15 +455,16 @@ deleteProperty rids propertyName = case ARR.head rids of
               -- Create a delta for all values.
               -- We must add the current values, otherwise a Transaction can only have a single 
               -- DeleteProperty delta.
-              delta <- pure $ RolePropertyDelta
-                { id : rid
-                , roleType: pspType
-                , property: replacementProperty
-                , deltaType: DeleteProperty
-                , values: maybe [] identity (lookup (unwrap replacementProperty) properties)
-                , subject
-                }
-              signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
+              signedDelta <- case mdelta of 
+                Just d -> pure d
+                Nothing -> signDelta (writeJSON $ stripResourceSchemes (RolePropertyDelta
+                  { id : rid
+                  , roleType: pspType
+                  , property: replacementProperty
+                  , deltaType: DeleteProperty
+                  , values: maybe [] identity (lookup (unwrap replacementProperty) properties)
+                  , subject
+                  }))
               addDelta (DeltaInTransaction { users, delta: signedDelta})
               (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
               (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -480,8 +482,8 @@ deleteProperty rids propertyName = case ARR.head rids of
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
 -- TODO. #26 Implement setProperty natively (not as delete- and addProperty)
-setProperty :: Array RoleInstance -> EnumeratedPropertyType -> (Updater (Array Value))
-setProperty rids propertyName values = do
+setProperty :: Array RoleInstance -> EnumeratedPropertyType -> Maybe SignedDelta -> (Updater (Array Value))
+setProperty rids propertyName mdelta values = do
   rids' <- filterA hasDifferentValues rids
   setProperty' rids'
   where
@@ -507,15 +509,16 @@ setProperty rids propertyName values = do
                   -- Create a delta for all values.
                   -- We must add the current values, otherwise a Transaction can only have a single 
                   -- DeleteProperty delta.
-                  delta <- pure $ RolePropertyDelta
-                    { id : rid
-                    , roleType: pspType
-                    , property: replacementProperty
-                    , deltaType: SetProperty
-                    , values
-                    , subject
-                    }
-                  signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
+                  signedDelta <- case mdelta of 
+                    Just d -> pure d
+                    Nothing -> signDelta (writeJSON $ stripResourceSchemes (RolePropertyDelta
+                      { id : rid
+                      , roleType: pspType
+                      , property: replacementProperty
+                      , deltaType: SetProperty
+                      , values
+                      , subject
+                      }))
                   addDelta (DeltaInTransaction { users, delta: signedDelta})
                   (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
                   (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
@@ -587,7 +590,7 @@ saveFile r property arrayBuf mimeType = do
             }
           signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
           addDelta (DeltaInTransaction { users, delta: signedDelta })
-          setProperty [rid] replacementProperty [Value usedVal]
+          setProperty [rid] replacementProperty Nothing [Value usedVal]
           pure usedVal
         else throwError (error ("Could not save file in the database"))
 
