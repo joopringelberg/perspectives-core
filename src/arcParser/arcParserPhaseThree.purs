@@ -1483,7 +1483,7 @@ handleScreens screenEs = do
               where 
               qualifyProperty ::  RoleType -> String -> PhaseThree EnumeratedPropertyType
               qualifyProperty chatRoleType prop = do 
-                candidates <- lift2 (chatRoleType ###= lookForUnqualifiedPropertyType_ messagesProperty )
+                candidates <- lift2 (chatRoleType ###= lookForUnqualifiedPropertyType_ prop )
                 case head candidates of
                   Nothing -> throwError $ UnknownProperty start' prop (roletype2string chatRoleType)
                   (Just t) | length candidates == 1 -> case t of
