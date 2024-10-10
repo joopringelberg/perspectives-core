@@ -79,6 +79,16 @@ domain model://perspectives.domains#SharedFileServices
         props (AccountName, Password, StorageType, Disabled, NrOfUploadedFiles) verbs (SetPropertyValue)
             
       screen "Shared File Servers"
+        row
+          markdown <## Configure file sharing
+                    Media files are too large to be sent directly to your peers. Consequently, MyContexts puts them in a place that you have write rights to, and from which your peers can read.
+
+                    As MyContexts is totally distributed, we cannot provide you with a central place to put the media files that all MyContexts users want to share. 
+                    However, you can easily set up your own storage. Currently we support the cloud service Mega. The company offers you a free account with 20Gb of storage. 
+                    Sign up at the [Mega website](https://mega.nz/). Write down your username and password and enter them below. Write "mega" in the field 'StorageType' and you are all set. 
+                    Rest assured: these credentials will never leave your computer (except to authenticate with Mega)! Such is the inherent safety of a truly distributed program such as MyContexts.
+                    >
+            when not (exists MySharedFileService)
         row 
           form "Your own shared file service" MySharedFileService
         row
