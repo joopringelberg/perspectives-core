@@ -64,6 +64,7 @@ domain model://perspectives.domains#SharedFileServices
           AccountName = "ignored" for defaultserver
           Password = sys:SocialMe >> binding >> SharedFileServerKey for defaultserver
           StorageType = "ppstorage" for defaultserver
+          NrOfUploadedFiles = 0 for defaultserver
     
     user Manager = sys:Me
       perspective on MySharedFileService 
@@ -75,7 +76,7 @@ domain model://perspectives.domains#SharedFileServices
       
       perspective on DefaultFileServer
         only (Create)
-        props (AccountName, Password, StorageType, Disabled) verbs (SetPropertyValue)
+        props (AccountName, Password, StorageType, Disabled, NrOfUploadedFiles) verbs (SetPropertyValue)
             
       screen "Shared File Servers"
         row 
@@ -92,3 +93,4 @@ domain model://perspectives.domains#SharedFileServices
     thing DefaultFileServer
       aspect sfs:SharedFileService
       property Disabled (Boolean)
+      property NrOfUploadedFiles (Number)

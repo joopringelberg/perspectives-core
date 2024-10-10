@@ -47,7 +47,7 @@ domain model://perspectives.domains#Introduction
     context IncomingIntroductions = sys:SocialMe >> binding >> binder Introducee >> context >> extern
     user Manager = sys:Me
       perspective on Introductions
-        only (CreateAndFill, Remove)
+        only (CreateAndFill, Remove, RemoveContext)
         props (Title) verbs (Consult, SetPropertyValue)
       perspective on IncomingIntroductions
         props (Title) verbs (Consult)
@@ -79,7 +79,7 @@ domain model://perspectives.domains#Introduction
         only (Create, Fill)
         props (FirstName, LastName) verbs (Consult)
       perspective on Conversation
-        only (Create, Remove)
+        only (Create, RemoveContext, Remove)
         props (Messages, Media) verbs (AddPropertyValue, Consult)
       screen
         row
@@ -103,7 +103,7 @@ domain model://perspectives.domains#Introduction
       perspective on Introducee
         props (FirstName, LastName) verbs (Consult)
       perspective on Conversation
-        only (Create, Remove)
+        only (Create, Remove, RemoveContext)
         props (Messages, Media) verbs (AddPropertyValue, Consult)
       screen
         row
