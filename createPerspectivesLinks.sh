@@ -34,12 +34,12 @@ ln -s ../../../purescript-kishimen v1.1.0
 
 cd ..
 
-#### PERSPECTIVES-v2.15.0 #####
+#### PERSPECTIVES-v2.16.0 #####
 cd apitypes
 
-rm -Rf v2.15.0
+rm -Rf v2.16.0
 
-ln -s ../../../perspectives-apitypes v2.15.0
+ln -s ../../../perspectives-apitypes v2.16.0
 
 cd ..
 
@@ -59,12 +59,12 @@ ln -s ../../../serialisable-nonempty-arrays v1.1.0
 
 cd ..
 
-##### PERSPECTIVES-v2.9.0 #####
+##### PERSPECTIVES-v2.9.1 #####
 cd perspectives-couchdb/
 
-rm -Rf v2.9.0
+rm -Rf v2.9.1
 
-ln -s ../../../perspectives-couchdb v2.9.0
+ln -s ../../../perspectives-couchdb v2.9.1
 
 cd ..
 

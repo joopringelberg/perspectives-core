@@ -63,7 +63,7 @@ in  upstream
     , repo =
        "https://github.com/joopringelberg/perspectives-apitypes.git"
     , version =
-        "v2.15.0"
+        "v2.16.0"
     }
 
   with perspectives-utilities =
@@ -146,7 +146,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/perspectives-couchdb.git"
     , version =
-        "v2.9.0"
+        "v2.9.1"
     }
 
   with affjax.repo = "https://github.com/joopringelberg/purescript-affjax.git"
