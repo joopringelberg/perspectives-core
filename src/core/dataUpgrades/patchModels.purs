@@ -18,6 +18,7 @@ import Simple.JSON (read) as JSON
 
 -- | For each of the named files, retrieve the text source and replace the `arc` property of the 
 -- | local domain files.
+-- | Typically apply this function before recompiling a local model.
 patchModels :: Object String -> MonadPerspectives Unit
 patchModels replacements = do 
     modelsDb <- modelsDatabaseName

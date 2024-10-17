@@ -42,7 +42,7 @@ import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DataUpgrade.PatchModels (patchModels)
 -- import Perspectives.DataUpgrade.PatchModels.PDR2501 as PDR2501
 -- import Perspectives.DataUpgrade.PatchModels.PDR2503 as PDR2503
-import Perspectives.DataUpgrade.PatchModels.PDR2505 as PDR2505
+-- import Perspectives.DataUpgrade.PatchModels.PDR2505 as PDR2505
 import Perspectives.DataUpgrade.RecompileLocalModels (recompileLocalModels)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -87,7 +87,7 @@ runDataUpgrades = do
   ----------------------------------------------------------------------------------------
   runUpgrade installedVersion "0.24.1" addFixingUpdates 
   runUpgrade installedVersion "0.24.2" indexedQueries 
-  runUpgrade installedVersion "0.25.0" updateModels0250
+  -- runUpgrade installedVersion "0.25.0" updateModels0250
   -- runUpgrade installedVersion "0.25.2" 
   --   (do 
   --     patchModels PDR2501.replacements
@@ -96,13 +96,17 @@ runDataUpgrades = do
   --   (do 
   --     patchModels PDR2503.replacements
   --     void recompileLocalModels)
-  runUpgrade installedVersion "0.25.4" updateModels0254
-  runUpgrade installedVersion "0.25.5" 
-    (do 
-      patchModels PDR2505.replacements
-      void recompileLocalModels)
-  runUpgrade installedVersion "0.25.6" 
-    (void recompileLocalModels)
+  -- runUpgrade installedVersion "0.25.4" updateModels0254
+  -- runUpgrade installedVersion "0.25.5" 
+  --   (do 
+  --     patchModels PDR2505.replacements
+  --     void recompileLocalModels)
+  -- runUpgrade installedVersion "0.25.6" 
+  --   (void recompileLocalModels)
+  runUpgrade installedVersion "0.26.0"
+    do 
+      updateModels0260
+      void recompileLocalModels
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------
@@ -112,6 +116,10 @@ runDataUpgrades = do
     then liftAff $ idbSet "CurrentPDRVersion" (unsafeToForeign pdrVersion) 
     else pure unit
 
+-- | Runs the upgrade iff
+-- |    * the currently installed version is lower than the upgradeVersion argument
+-- |    * AND
+-- |    * the upgradeVersion argument is lower than or equal to the package version (the version in package.json)
 runUpgrade :: PDRVersion -> PDRVersion -> MonadPerspectives Unit -> MonadPerspectives Unit
 runUpgrade installedVersion upgradeVersion upgrade = if installedVersion < upgradeVersion && upgradeVersion <= pdrVersion
   -- Run the upgrade
@@ -173,4 +181,14 @@ updateModels0254 = runMonadPerspectivesTransaction'
   do
     updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#CouchdbManagement@2.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")
+
+updateModels0260 :: MonadPerspectives Unit
+updateModels0260 = runMonadPerspectivesTransaction'
+  false
+  (ENR $ EnumeratedRoleType sysUser)
+  do
+    updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BodiesWithAccounts@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#CouchdbManagement@3.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")

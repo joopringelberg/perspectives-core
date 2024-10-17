@@ -37,7 +37,7 @@ import Effect.Now (now)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.AMQP.Stomp (sendToTopic)
 import Perspectives.ApiTypes (CorrelationIdentifier)
-import Perspectives.ContextAndRole (context_buitenRol, context_universeContextDelta, rol_context, rol_property, rol_propertyDelta, rol_contextDelta, rol_universeRoleDelta)
+import Perspectives.ContextAndRole (rol_contextDelta, rol_property, rol_propertyDelta, rol_universeRoleDelta)
 import Perspectives.CoreTypes (MonadPerspectives, MonadPerspectivesTransaction, (##>))
 import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.DomeinCache (saveCachedDomeinFile)
@@ -48,7 +48,7 @@ import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel) as DE
 import Perspectives.ModelDependencies (perspectivesUsersCancelled, perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Url, addDocument)
-import Perspectives.Persistent (getPerspectContext, getPerspectRol, postDatabaseName)
+import Perspectives.Persistent (getPerspectRol, postDatabaseName)
 import Perspectives.PerspectivesState (nextTransactionNumber, stompClient)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -275,17 +275,12 @@ addPublicKeysToTransaction (Transaction tr@{deltas}) = do
     getPkInfo perspectivesUser = do 
       -- The perspectivesUser is taken from the SignedDelta and is schemaless.
       authorRole <- getPerspectRol (perspectivesUser2RoleInstance $ deltaAuthor2ResourceIdentifier perspectivesUser)
-      theworld <- getPerspectContext $ rol_context authorRole
-      theWorldExternal <- getPerspectRol (context_buitenRol theworld)
       pure let 
         k@(Value key) = unsafePartial fromJust $ head $ rol_property authorRole (EnumeratedPropertyType perspectivesUsersPublicKey)
         propertyDelta = unsafePartial fromJust $ rol_propertyDelta authorRole (EnumeratedPropertyType perspectivesUsersPublicKey) k
       in
         { key, deltas: 
-          [ rol_universeRoleDelta theWorldExternal
-          , context_universeContextDelta theworld
-          , rol_contextDelta theWorldExternal
-          , rol_universeRoleDelta authorRole
+          [ rol_universeRoleDelta authorRole
           , rol_contextDelta authorRole
           , propertyDelta
           ]}
