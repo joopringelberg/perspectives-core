@@ -59,12 +59,12 @@ ln -s ../../../serialisable-nonempty-arrays v1.1.0
 
 cd ..
 
-##### PERSPECTIVES-v2.9.1 #####
+##### PERSPECTIVES-v2.9.2 #####
 cd perspectives-couchdb/
 
-rm -Rf v2.9.1
+rm -Rf v2.9.2
 
-ln -s ../../../perspectives-couchdb v2.9.1
+ln -s ../../../perspectives-couchdb v2.9.2
 
 cd ..
 
@@ -86,12 +86,12 @@ ln -s ../../../purescript-parsing v7.0.0-transformer-tagged
 
 cd ..
 
-##### v1.1.0 #####
+##### v1.2.0 #####
 cd lrucache
 
-rm -Rf v1.1.0
+rm -Rf v1.2.0
 
-ln -s ../../../purescript-lru-cache v1.1.0
+ln -s ../../../purescript-lru-cache v1.2.0
 
 cd ..
 

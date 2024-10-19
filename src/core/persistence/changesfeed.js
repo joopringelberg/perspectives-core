@@ -19,7 +19,15 @@
 
 // END LICENSE
 
-var EventSource = require('eventsource');
+let EventSource;
+
+if (typeof window === 'undefined') {
+    // Running in Node.js
+    EventSource = require('eventsource');
+} else {
+    // Running in the browser
+    EventSource = window.EventSource;
+}
 
 function createEventSourceImpl ( databaseUrl, queryParams )
 {

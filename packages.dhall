@@ -146,7 +146,7 @@ in  upstream
     , repo =
         "https://github.com/joopringelberg/perspectives-couchdb.git"
     , version =
-        "v2.9.1"
+        "v2.9.2"
     }
 
   with affjax.repo = "https://github.com/joopringelberg/purescript-affjax.git"
@@ -181,4 +181,4 @@ in  upstream
       , "unsafe-coerce"
       ]
     , repo = "https://github.com/joopringelberg/purescript-lru-cache.git"
-    , version = "v1.1.0"}
+    , version = "v1.2.0"}

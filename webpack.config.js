@@ -60,7 +60,8 @@ module.exports = function(env)
         commonjs2: "pouchdb-browser",
         amd: "pouchdb-browser",
         root: "pouchdb-browser"
-      }
+      },
+      "eventsource": 'commonjs eventsource'
     }
   }
 };
