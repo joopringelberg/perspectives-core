@@ -59,12 +59,12 @@ ln -s ../../../serialisable-nonempty-arrays v1.1.0
 
 cd ..
 
-##### PERSPECTIVES-v2.9.2 #####
+##### PERSPECTIVES-v2.9.3 #####
 cd perspectives-couchdb/
 
-rm -Rf v2.9.2
+rm -Rf v2.9.3
 
-ln -s ../../../perspectives-couchdb v2.9.2
+ln -s ../../../perspectives-couchdb v2.9.3
 
 cd ..
 
