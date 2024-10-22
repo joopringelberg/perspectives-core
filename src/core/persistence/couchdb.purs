@@ -40,9 +40,6 @@ import Data.String (Pattern(..), Replacement(..), replaceAll, toLower)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (Error, error)
 import Foreign (F, Foreign, MultipleErrors, unsafeFromForeign)
--- import Foreign.Class (class Decode, class Encode, decode)
--- import Foreign.Generic (decodeJSON, defaultOptions, genericDecode, genericEncode)
--- import Foreign.JSON (parseJSON)
 import Foreign.Object (Object, fromFoldable, empty) as OBJ
 import Perspectives.Couchdb.Revision (class Revision, changeRevision, getRev)
 import Prelude (class Eq, class Show, bind, pure, show, ($), (<$>), (<<<), (<>), (==))
@@ -85,9 +82,6 @@ derive instance genericPutCouchdbDocument :: Generic PutCouchdbDocument _
 
 derive instance newtypePutCouchdbDocument :: Newtype PutCouchdbDocument _
 
-instance decodePutCouchdbDocument :: Decode PutCouchdbDocument where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
 instance revisionPutCouchdbDocument :: Revision PutCouchdbDocument where
   rev = _.rev <<< unwrap
   changeRevision _ d = d
@@ -103,9 +97,6 @@ newtype DeleteCouchdbDocument = DeleteCouchdbDocument
 derive instance genericDeleteCouchdbDocument :: Generic DeleteCouchdbDocument _
 
 derive instance newtypeDeleteCouchdbDocument :: Newtype DeleteCouchdbDocument _
-
-instance decodeDeleteCouchdbDocument :: Decode DeleteCouchdbDocument where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 derive newtype instance ReadForeign DeleteCouchdbDocument
 
@@ -140,12 +131,6 @@ derive instance newtypeReplicationDocument :: Newtype ReplicationDocument _
 instance showReplicationDocument :: Show ReplicationDocument where
   show = genericShow
 
-instance decodeReplicationDocument :: Decode ReplicationDocument where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
-instance encodeReplicationDocument :: Encode ReplicationDocument where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
-
 -- We use the EncodeJson instance in setReplicationDocument.
 instance encodeJsonReplicationDocument :: EncodeJson ReplicationDocument where
     encodeJson (ReplicationDocument ddr) = unsafeCoerce $ write ddr
@@ -166,12 +151,6 @@ derive instance genericReplicationEndpoint :: Generic ReplicationEndpoint _
 
 instance showReplicationEndpoint :: Show ReplicationEndpoint where
   show = genericShow
-
-instance decodeReplicationEndpoint :: Decode ReplicationEndpoint where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
-instance encodeReplicationEndpoint :: Encode ReplicationEndpoint where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 
 -- We use the EncodeJson instance in setReplicationDocument.
 instance encodeJsonReplicationEndpoint :: EncodeJson ReplicationEndpoint where
@@ -205,10 +184,6 @@ type DocWithAttachmentInfoR = {_attachments :: Maybe AttachmentInfo}
 
 instance showDocWithAttachmentInfo :: Show DocWithAttachmentInfo where
   show (DocWithAttachmentInfo r) = show r
-
-instance decodeDocWithAttachmentInfo :: Decode DocWithAttachmentInfo where
-  -- decode f = readString f >>= map DocWithAttachmentInfo <<< readJSON'
-  decode f = pure $ DocWithAttachmentInfo $ unsafeFromForeign f
 
 instance revisionDocWithAttachmentInfo :: Revision DocWithAttachmentInfo where
   rev _ = Nothing
@@ -254,8 +229,6 @@ emptySelector = OBJ.fromFoldable [Tuple "contents" OBJ.empty]
 newtype DBS = DBS (Array String)
 derive instance genericDBS :: Generic DBS _
 derive instance newtypeDBS :: Newtype DBS _
-instance decodeDBS :: Decode DBS where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- GETCOUCHDBALLDOCS
@@ -270,9 +243,6 @@ newtype GetCouchdbAllDocs = GetCouchdbAllDocs
 derive instance genericCouchdbAllDocs :: Generic GetCouchdbAllDocs _
 derive instance newtypeCouchdbAllDocs :: Newtype GetCouchdbAllDocs _
 
-instance decodeGetCouchdbAllDocs :: Decode GetCouchdbAllDocs where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
 instance revisionGetCouchdbAllDocs :: Revision GetCouchdbAllDocs where
   rev _ = Nothing
   changeRevision _ d = d
@@ -281,15 +251,9 @@ newtype DocReference = DocReference { id :: String, value :: Rev}
 
 derive instance genericDocReference :: Generic DocReference _
 
-instance decodeDocReference :: Decode DocReference where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-
 newtype Rev = Rev { rev :: String}
 
 derive instance genericRef :: Generic Rev _
-
-instance decodeRev :: Decode Rev where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- AUTHENTICATION
@@ -302,8 +266,6 @@ newtype PostCouchdb_session = PostCouchdb_session
 
 derive instance genericPostCouchdb_session :: Generic PostCouchdb_session _
 derive instance newtypePostCouchdb_session :: Newtype PostCouchdb_session _
-instance decodePostCouchdb_session :: Decode PostCouchdb_session where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 
 -----------------------------------------------------------
 -- DESIGN DOCUMENT
@@ -328,10 +290,6 @@ type DesignDocumentRecord =
 
 derive instance genericDesignDocument :: Generic DesignDocument _
 derive instance newtypeDesignDocument :: Newtype DesignDocument _
-instance decodeDesignDocument :: Decode DesignDocument where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeDesignDocument :: Encode DesignDocument where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 derive newtype instance WriteForeign DesignDocument
 derive newtype instance ReadForeign DesignDocument
 
@@ -367,10 +325,6 @@ newtype View = View
 
 derive instance genericView :: Generic View _
 derive instance newtypeView :: Newtype View _
-instance decodeView :: Decode View where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
-instance encodeView :: Encode View where
-  encode = genericEncode $ defaultOptions {unwrapSingleConstructors = true}
 derive newtype instance WriteForeign View
 derive newtype instance ReadForeign View
 
@@ -437,14 +391,10 @@ derive newtype instance (ReadForeign k, ReadForeign f) => ReadForeign (ViewResul
 
 derive instance genericViewResult :: Generic (ViewResult f k) _
 derive instance newtypeViewResult :: Newtype (ViewResult f k) _
-instance decodeViewResult :: (Decode f, Decode k) => Decode (ViewResult f k) where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
 derive newtype instance (ReadForeign k, ReadForeign f) => ReadForeign (ViewResult f k)
 
 derive instance genericViewResultRow :: Generic (ViewResultRow f k) _
 derive instance newtypeViewResultRow :: Newtype (ViewResultRow f k) _
-instance decodeViewResultRow :: (Decode f, Decode k) => Decode (ViewResultRow f k) where
-  decode = genericDecode $ defaultOptions {unwrapSingleConstructors = true}
   -- Decodeer het eerste niveau. Pas decode to op f: dan wordt de revisie gezet.
   -- decode = readString >=> parseJSON >=> decode
 
@@ -477,14 +427,8 @@ derive instance newtypeSecurityDocument :: Newtype SecurityDocument _
 instance readForeignSecurityDocument :: ReadForeign SecurityDocument where
   readImpl sd = SecurityDocument <$> readImpl sd
 
-instance decodeSecurityDocument :: Decode SecurityDocument where
-  decode = readImpl
-
 instance writeForeignSecurityDocument :: WriteForeign SecurityDocument where
   writeImpl (SecurityDocument sd) = writeImpl sd
-
-instance encodeSecurityDocument :: Encode SecurityDocument where
-  encode = writeImpl
 
 instance showSecurityDocument :: Show SecurityDocument where
   show = genericShow
@@ -578,41 +522,5 @@ handleError n statusCodes fname =
             (Just m) -> throwError $ error $  "Failure in " <> fname <> ". " <> m
             Nothing -> throwError $ error $ "Failure in " <> fname <> ". " <> "Unknown HTTP statuscode " <> show n
 
--- | Parses the string to a JSON object and then decodes that,
--- | while setting the _rev of the payload (the entity) to that of the envelope (the document as stored in Couchdb).
--- | Throws an error when the result could not be decoded to the required type.
--- | Applies the supplied function to the entity, but returns the entity itself.
-onCorrectCallAndResponse :: forall a m.
-  MonadError Error m =>
-  Decode a =>
-  Revision a =>
-  CouchdbFunctionName ->
-  String ->
-  m a
-onCorrectCallAndResponse fname r = do
-  -- TODO. Dit gold voor generic encoding maar geldt niet langer omdat we nu Simple-JSON gebruiken.
-  (x :: Either MultipleErrors a) <- pure $ runExcept (decodeResource r)
-  case x of
-    (Left e) -> do
-      throwError $ error (fname <> ": error in decoding result: " <> show e)
-    (Right result) -> pure result
-  where
-    -- Takes the _rev of the document (the 'outer' revision) before decoding
-    -- and sets it in the _rev of the content (the inner revision).
-    decodeResource :: String -> F a
-    -- decodeResource = parseJSON >=> decode
-    decodeResource s = do
-      (json :: Foreign) <- parseJSON s
-      rev <- getRev json
-      a <- decode json
-      pure $ (changeRevision rev) a
-
 escapeCouchdbDocumentName :: String -> String
 escapeCouchdbDocumentName s = replaceAll (Pattern ":") (Replacement "%3A") (replaceAll (Pattern "$") (Replacement "%24") s)
-
-version :: forall m. MonadError Error m => Array ResponseHeader -> m (Maybe String)
-version headers =  case find (\rh -> toLower (name rh) == "etag") headers of
-  Nothing -> throwError $  error ("Perspectives.Instances.version: couchdb returns no ETag header holding a document version number")
-  (Just h) -> case runExcept $ decodeJSON (value h) of
-    Left _ -> pure Nothing
-    Right v -> pure $ Just v
