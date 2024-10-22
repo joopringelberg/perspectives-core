@@ -96,47 +96,6 @@ in  upstream
         "SERIALIZABLENONEMPTYARRAY"
     }
 
-  with perspectives-couchdb =
-    { dependencies =
-      [ "console"
-      , "effect"
-      , "prelude"
-      , "avar-monadask"
-      , "affjax"
-      , "foreign-generic"
-      , "simple-json"
-      , "b64"
-      , "test-unit"
-      , "aff-promise"
-      , "aff"
-      , "aff-coroutines"
-      , "arrays"
-      , "avar"
-      , "coroutines"
-      , "either"
-      , "exceptions"
-      , "foldable-traversable"
-      , "foreign"
-      , "foreign-object"
-      , "free"
-      , "http-methods"
-      , "maybe"
-      , "media-types"
-      , "newtype"
-      , "ordered-collections"
-      , "partial"
-      , "strings"
-      , "tailrec"
-      , "transformers"
-      , "tuples"
-      , "unsafe-coerce"
-      ]
-    , repo =
-        "https://github.com/joopringelberg/perspectives-couchdb.git"
-    , version =
-        "COUCHDB"
-    }
-
   with affjax.repo = "https://github.com/joopringelberg/purescript-affjax.git"
   with affjax.version = "AFFJAX"
 

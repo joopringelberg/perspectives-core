@@ -60,7 +60,6 @@ to generate this file without the comments in this block.
   , "ordered-collections"
   , "parsing"
   , "partial"
-  , "perspectives-couchdb"
   , "perspectives-utilities"
   , "prelude"
   , "profunctor-lenses"
