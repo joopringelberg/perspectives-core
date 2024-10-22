@@ -35,7 +35,8 @@ import Data.Newtype (unwrap)
 import Foreign.Object (values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree)
+import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseThree, withDomeinFile)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (Role(..), identifierOfRole, kindOfRole, perspectivesOfRole, pos, posOfRole, roleIsFunctional)
@@ -49,9 +50,15 @@ import Perspectives.Types.ObjectGetters (propertiesInPerspective)
 
 checkPerspectiveModifiers :: PhaseThree Unit
 checkPerspectiveModifiers = do 
-  {enumeratedProperties} <- lift $ State.gets _.dfr
-  for_ enumeratedProperties checkAuthorOnly
-  for_ enumeratedProperties checkSelfOnly
+  df@{id} <- lift $ State.gets _.dfr
+  -- Take the DomeinFile from PhaseTwoState and temporarily store it in the cache.
+  withDomeinFile
+    id
+    (DomeinFile df)
+    do 
+      {enumeratedProperties} <- lift $ State.gets _.dfr
+      for_ enumeratedProperties checkAuthorOnly
+      for_ enumeratedProperties checkSelfOnly
 
 findRolesWithProperty :: PropertyType -> PhaseThree (Array EnumeratedRole)
 findRolesWithProperty pt = do
