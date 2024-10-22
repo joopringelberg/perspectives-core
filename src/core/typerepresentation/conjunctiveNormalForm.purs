@@ -26,7 +26,6 @@ import Data.Array (concat, intercalate, nub, null)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Set (fromFoldable) as SET
-import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.ExpandedADT (ExpandedADT(..))
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -43,9 +42,9 @@ data DSUM a = DSUM (Array a)
 
 derive instance Generic (DSUM a) _
 instance (WriteForeign a) => WriteForeign (DSUM a) where
-  writeImpl f = writeImpl( genericSumToVariant f)
+  writeImpl (DSUM as) = writeImpl as
 instance (ReadForeign a) => ReadForeign (DSUM a) where
-  readImpl f = map variantToGenericSum (readImpl f)
+  readImpl f = DSUM <$> readImpl f
 instance (Show a) => Show (DSUM a) where
   show (DSUM adts) = "(" <> "DSUM" <> show adts <> ")"
 instance (Show a, PrettyPrint a) => PrettyPrint (DSUM a) where 
@@ -68,10 +67,10 @@ instance (Show a, PrettyPrint a) => PrettyPrint (DPROD a) where
   prettyPrint' t (DPROD terms) = t <> "(DPROD [\n" <> (intercalate ",\n" $ prettyPrint' (t <> "  ") <$> terms) <> "\n" <> t <> "  ])"
 
 instance (WriteForeign a) => WriteForeign (DPROD a) where
-  writeImpl f = writeImpl( genericSumToVariant f)
+  writeImpl (DPROD sums) = writeImpl sums
 
 instance (ReadForeign a) => ReadForeign (DPROD a) where
-  readImpl f = map variantToGenericSum (readImpl f)
+  readImpl f = DPROD <$> readImpl f
 
 -- To be applied to an expanded tree only. In the expanded tree, UET will not occur.
 toConjunctiveNormalForm :: forall a. Eq a => Ord a => ExpandedADT a -> DPROD a

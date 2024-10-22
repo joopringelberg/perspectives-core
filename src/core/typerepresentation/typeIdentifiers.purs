@@ -46,10 +46,10 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Ord.Generic (genericCompare)
 import Data.Show.Generic (genericShow)
 import Foreign (unsafeToForeign)
-import Kishimen (genericSumToVariant, variantToGenericSum)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Utilities (class PrettyPrint)
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
 newtype ContextType = ContextType String
 derive instance newtypeContextType :: Newtype ContextType _
@@ -110,9 +110,14 @@ instance ordRoleType :: Ord RoleType where
 instance prettyPrintRoleType :: PrettyPrint RoleType where
   prettyPrint' t = show
 instance writeForeignRoleType :: WriteForeign RoleType where
-  writeImpl = writeImpl <<< genericSumToVariant
+  writeImpl (ENR ert) = writeImpl {type: "ENR", value: unwrap ert} 
+  writeImpl (CR crt) = writeImpl {type: "CR", value: unwrap crt} 
 instance readForeightRoleType :: ReadForeign RoleType where
-  readImpl f = map variantToGenericSum (readImpl f)
+  readImpl f = do 
+    x :: {type :: String, value :: String} <- read' f
+    unsafePartial case x.type, x.value of 
+      "ENR", ert -> pure $ ENR $ EnumeratedRoleType ert
+      "CR", crt -> pure $ CR $ CalculatedRoleType crt
 
 -- | We have rare occasions where we want to lose the difference between
 -- | CalculatedRoletype and EnumeratedRoleType.
@@ -197,9 +202,15 @@ instance eqPropertyType :: Eq PropertyType where
 instance prettyPrintPropertyType :: PrettyPrint PropertyType where
   prettyPrint' t = show
 instance writeForeignPropertyType :: WriteForeign PropertyType where
-  writeImpl = writeImpl <<< genericSumToVariant
+  writeImpl (ENP ept) = writeImpl {type: "ENP", value: unwrap ept} 
+  writeImpl (CP cpt) = writeImpl {type: "CP", value: unwrap cpt} 
+
 instance readForeightPropertyType :: ReadForeign PropertyType where
-  readImpl f = map variantToGenericSum (readImpl f)
+  readImpl f = do 
+    x :: {type :: String, value :: String} <- read' f
+    unsafePartial case x.type, x.value of 
+      "ENP", ept -> pure $ ENP $ EnumeratedPropertyType ept
+      "CP", cpt -> pure $ CP $ CalculatedPropertyType cpt
 
 newtype ViewType = ViewType String
 derive instance newtypeViewType :: Newtype ViewType _

@@ -30,18 +30,6 @@ in  upstream
         "v2.2.0"
     }
 
-  with kishimen =
-    { dependencies =
-      [ "prelude"
-      , "variant"
-      , "typelevel-prelude"
-      ]
-    , repo =
-       "https://github.com/joopringelberg/purescript-kishimen.git"
-    , version =
-        "v1.1.0"
-    }
-
   with apitypes =
     { dependencies =
       [ "console"

@@ -43,13 +43,12 @@ import Data.Monoid.Disj (Disj(..))
 import Data.Newtype (unwrap)
 import Data.Set (fromFoldable, subset) as SET
 import Data.Traversable (class Traversable, sequenceDefault, traverse)
-import Kishimen (genericSumToVariant, variantToGenericSum)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Representation.CNF (CNF, DPROD(..), DSUM(..), toConjunctiveNormalForm)
 import Perspectives.Representation.ExpandedADT (ExpandedADT(..), foldMapExpandedADT)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<<<), (<>), (>>=), (==))
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, writeImpl)
+import Prelude (class Applicative, class Bind, class Eq, class Functor, class HeytingAlgebra, class Monoid, class Ord, class Show, disj, flip, map, not, pure, show, ($), (&&), (/=), (<#>), (<$>), (<<<), (<>), (>>=), (==), bind)
+import Simple.JSON (class ReadForeign, class WriteForeign, writeImpl, writeJSON, read', readJSON')
 
 --------------------------------------------------------------------------------------------------
 ---- ADT
@@ -128,10 +127,20 @@ collect f adt = case adt of
     SUM as -> fold (collect f <$> as)
 
 instance (WriteForeign a) => WriteForeign (ADT a) where
-  writeImpl f = writeImpl( genericSumToVariant f)
+  writeImpl (ST a) = writeImpl {constructor: "ST", arg: writeJSON a}
+  writeImpl (UET a) = writeImpl {constructor: "UET", arg: writeJSON a}
+  writeImpl (SUM as) = writeImpl { constructor: "SUM", arg: writeJSON as}
+  writeImpl (PROD as) = writeImpl { constructor: "PROD", arg: writeJSON as}
+
 
 instance (ReadForeign a) => ReadForeign (ADT a) where
-  readImpl f = map variantToGenericSum (readImpl f)
+  readImpl f = do
+    x :: {constructor :: String, arg :: String} <- read' f
+    unsafePartial case x.constructor, x.arg of
+      "ST", a -> ST <$> readJSON' a
+      "UET", a -> UET <$> readJSON' a
+      "SUM", as -> SUM <$> readJSON' as
+      "PROD", as -> PROD <$> readJSON' as
 
 --------------------------------------------------------------------------------------------------
 ---- HARRAY: AN ARRAY THAT HAS AN INSTANCE OF HEYTINGALGEBRA

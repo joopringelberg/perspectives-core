@@ -30,18 +30,6 @@ in  upstream
         "AVAR_MONADASK"
     }
 
-  with kishimen =
-    { dependencies =
-      [ "prelude"
-      , "variant"
-      , "typelevel-prelude"
-      ]
-    , repo =
-       "https://github.com/joopringelberg/purescript-kishimen.git"
-    , version =
-        "KISHIMEN"
-    }
-
   with apitypes =
     { dependencies =
       [ "console"
