@@ -1,0 +1,95 @@
+package:
+  dependencies:
+  - aff
+  - aff-coroutines
+  - aff-promise
+  - affjax
+  - apitypes
+  - argonaut
+  - arraybuffer
+  - arraybuffer-builder
+  - arraybuffer-types
+  - arrays
+  - avar
+  - avar-monadask
+  - b64
+  - console
+  - control
+  - coroutines
+  - datetime
+  - effect
+  - either
+  - enums
+  - exceptions
+  - foldable-traversable
+  - foreign
+  - foreign-object
+  - free
+  - functions
+  - http-methods
+  - identity
+  - integers
+  - js-iterators
+  - js-date
+  - lists
+  - lrucache
+  # - math
+  - maybe
+  - media-types
+  - newtype
+  - node-buffer
+  - node-fs
+  - node-path
+  - node-process
+  - now
+  - nullable
+  - ordered-collections
+  - parsing
+  - partial
+  - perspectives-utilities
+  - prelude
+  - profunctor-lenses
+  - random
+  - record
+  - safe-coerce
+  - serializablenonemptyarray
+  - simple-json
+  - strings
+  # - subtlecrypto
+  - tailrec
+  - test-unit
+  - transformers
+  - tuples
+  - uint
+  - unicode
+  - unsafe-coerce
+  - web-encoding
+  name: perspectives-core
+workspace:
+  extra_packages:
+    apitypes:
+      path: ../perspectives-apitypes
+      # git: https://github.com/joopringelberg/perspectives-apitypes.git
+      # ref: v3.0.0
+    avar-monadask:
+      path: ../purescript-avar-monadask
+      # git: https://github.com/joopringelberg/purescript-avar-monadask.git
+      # ref: v3.0.0
+    lrucache:
+      path: ../purescript-lru-cache
+      # git: https://github.com/joopringelberg/purescript-lru-cache.git
+      # ref: v2.0.0
+    parsing:
+      path: ../purescript-parsing
+      # git: https://github.com/joopringelberg/purescript-parsing.git
+      # ref: v10.2.0-transformer
+    perspectives-utilities:
+      path: ../perspectives-utilities
+      # git: https://github.com/joopringelberg/perspectives-utilities.git
+      # ref: v2.0.0
+    serializablenonemptyarray:
+      path: ../serialisable-nonempty-arrays
+      # git: https://github.com/joopringelberg/serialisable-nonempty-arrays.git
+      # ref: v2.0.0
+  package_set:
+    registry: 60.6.0
