@@ -3,8 +3,9 @@
 
 // NOTE. We have to decide in coding time whether to include the browser or the Node version
 // Otherwise, we'd carry the Node code to the browser and vice versa.
-var PouchDB = require('pouchdb-browser').default;
+// var PouchDB = require('pouchdb-browser').default;
 // var PouchDB = require('pouchdb');
+import {default as Pouchb} from 'pouchdb-browser';
 
 function convertPouchError( originalE )
 {
@@ -66,7 +67,7 @@ function captureFetch(url, opts)
   return fetch(url, opts);
 }
 
-exports.createDatabaseImpl = function( databaseName )
+export function createDatabaseImpl( databaseName )
 {
   return new PouchDB( 
     databaseName
@@ -77,7 +78,7 @@ exports.createDatabaseImpl = function( databaseName )
     );
 }
 
-exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
+export function createRemoteDatabaseImpl( databaseName, couchdbUrl )
 {
   var P = PouchDB.defaults(
     { prefix: couchdbUrl
@@ -89,7 +90,7 @@ exports.createRemoteDatabaseImpl = function( databaseName, couchdbUrl )
   return new P(databaseName);
 }
 
-exports.deleteDatabaseImpl = function ( database ) {
+export function deleteDatabaseImpl ( database ) {
   return function (onError, onSuccess) {
     database.destroy( function(err, response)
       {
@@ -111,7 +112,7 @@ exports.deleteDatabaseImpl = function ( database ) {
   };
 };
 
-exports.documentsInDatabaseImpl = function( database, options ) {
+export function documentsInDatabaseImpl( database, options ) {
   return function (onError, onSuccess) {
     database.allDocs( options, function(err, response)
       {
@@ -133,7 +134,7 @@ exports.documentsInDatabaseImpl = function( database, options ) {
   };
 };
 
-exports.databaseInfoImpl = function ( database ) {
+export function databaseInfoImpl ( database ) {
   return function (onError, onSuccess) {
     database.info( function(err, response)
       {
@@ -155,7 +156,7 @@ exports.databaseInfoImpl = function ( database ) {
   };
 };
 
-exports.addDocumentImpl = function ( database, doc ) {
+export function addDocumentImpl ( database, doc ) {
   return function (onError, onSuccess) {
     database.put(doc, function(err, response)
       {
@@ -177,7 +178,7 @@ exports.addDocumentImpl = function ( database, doc ) {
   };
 };
 
-exports.bulkDocsImpl = function( database, docs, deleteP )
+export function bulkDocsImpl( database, docs, deleteP )
 {
   if (deleteP)
     {
@@ -203,7 +204,7 @@ exports.bulkDocsImpl = function( database, docs, deleteP )
   };
 }
 
-exports.deleteDocumentImpl = function ( database, docName, rev ) {
+export function deleteDocumentImpl ( database, docName, rev ) {
   return function (onError, onSuccess) {
     database.remove(docName, rev, function(err, response)
       {
@@ -225,7 +226,7 @@ exports.deleteDocumentImpl = function ( database, docName, rev ) {
   };
 };
 
-exports.getDocumentImpl = function ( database, docName ) {
+export function getDocumentImpl ( database, docName ) {
   return function (onError, onSuccess) {
     database.get( docName, function(err, response)
       {
@@ -263,7 +264,7 @@ catch (e)
 }
 
 // db.putAttachment(docId, attachmentId, [rev], attachment, type, [callback]);
-exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, attachment, type) {
+export function addAttachmentImpl ( database, docName, attachmentId, mrev, attachment, type) {
   return function (onError, onSuccess) {
     database.putAttachment(docName, attachmentId, mrev, attachment, type, function(err, response)
       {
@@ -285,7 +286,7 @@ exports.addAttachmentImpl = function ( database, docName, attachmentId, mrev, at
   };
 };
 
-exports.getAttachmentImpl = function( database, docName, attachmentId )
+export function getAttachmentImpl( database, docName, attachmentId )
 {
   return function (onError, onSucces)
   {
@@ -308,7 +309,7 @@ exports.getAttachmentImpl = function( database, docName, attachmentId )
   };
 }
 
-exports.getViewOnDatabaseImpl = function( database, viewname, key, multipleKeys, includeDocs )
+export function getViewOnDatabaseImpl( database, viewname, key, multipleKeys, includeDocs )
 {
   return function (onError, onSucces)
   {
@@ -376,13 +377,13 @@ exports.getViewOnDatabaseImpl = function( database, viewname, key, multipleKeys,
   };
 }
 
-exports.toFileImpl = function( fileName, mimeType, arrayBuffer )
+export function toFileImpl( fileName, mimeType, arrayBuffer )
 {
   return new File( [arrayBuffer], fileName, {type: mimeType});
 }
 
 // Returns a promise for the text in the blob.
-exports.fromBlobImpl = function( blob )
+export function fromBlobImpl( blob )
 {
   return blob.text()
 }

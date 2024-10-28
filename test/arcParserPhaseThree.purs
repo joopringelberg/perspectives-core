@@ -46,7 +46,7 @@ import Test.Parsing.DomeinFileSelectors (ensureCRole, ensureDescription, ensureE
 import Test.Perspectives.Utils (runP)
 import Test.Unit (Test, TestF, TestSuite, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 
 withDomeinFile :: forall a. Namespace -> DomeinFile -> MonadPerspectives a -> MonadPerspectives a
 withDomeinFile ns df mpa = do

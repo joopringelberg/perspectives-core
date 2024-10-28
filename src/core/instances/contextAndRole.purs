@@ -32,12 +32,11 @@ import Data.Lens.Iso.Newtype (_Newtype)
 import Data.Lens.Record (prop)
 import Data.Maybe (Maybe(..), fromJust, maybe)
 import Data.Newtype (unwrap, over) as NT
+import Data.Number (ln10, log)
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
-import Data.Symbol (SProxy(..))
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
-import Math (ln10, log)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace)
@@ -50,6 +49,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedP
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
 import Prelude (bind, eq, flip, identity, pure, show, ($), (+), (/), (<#>), (<$>), (<<<), (<>))
+import Type.Proxy (Proxy(..))
 
 -- CONTEXT
 
@@ -119,13 +119,13 @@ _roleInstances :: EnumeratedRoleType -> Traversal' PerspectContext (Array RoleIn
 _roleInstances (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t <<< _Just
   where
     _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
-    _rolInContext = prop (SProxy :: SProxy "rolInContext")
+    _rolInContext = prop (Proxy :: Proxy "rolInContext")
 
 _roleInstances' :: EnumeratedRoleType -> Traversal' PerspectContext (Maybe (Array RoleInstance))
 _roleInstances' (EnumeratedRoleType t) = _Newtype <<< _rolInContext <<< at t
   where
     _rolInContext :: forall a r. Lens' { rolInContext :: a | r } a
-    _rolInContext = prop (SProxy :: SProxy "rolInContext")
+    _rolInContext = prop (Proxy :: Proxy "rolInContext")
 
 addContext_rolInContext :: PerspectContext -> EnumeratedRoleType -> RoleInstance -> PerspectContext
 addContext_rolInContext (PerspectContext cr@{rolInContext}) r@(EnumeratedRoleType rolName) rolId = case lookup rolName rolInContext of
@@ -263,13 +263,13 @@ _propertyValues :: EnumeratedPropertyType -> Traversal' PerspectRol (Array Value
 _propertyValues (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t <<< _Just
   where
     _properties :: forall a r. Lens' { properties :: a | r } a
-    _properties = prop (SProxy :: SProxy "properties")
+    _properties = prop (Proxy :: Proxy "properties")
 
 _propertyValues' :: EnumeratedPropertyType -> Traversal' PerspectRol (Maybe (Array Value))
 _propertyValues' (EnumeratedPropertyType t) = _Newtype <<< _properties <<< at t
   where
     _properties :: forall a r. Lens' { properties :: a | r } a
-    _properties = prop (SProxy :: SProxy "properties")
+    _properties = prop (Proxy :: Proxy "properties")
 
 rol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value
 rol_property (PerspectRol{properties}) pn = maybe [] identity (lookup (NT.unwrap pn) properties)

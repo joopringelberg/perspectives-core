@@ -31,11 +31,10 @@ import Data.Maybe (Maybe(..))
 import Data.String (toLower)
 import Data.String.CodeUnits as SCU
 import Perspectives.Parsing.Arc.IndentParser (ArcParser)
-import Text.Parsing.Parser (ParserT, fail)
-import Text.Parsing.Parser.Combinators (try, (<?>))
-import Text.Parsing.Parser.Pos (Position)
-import Text.Parsing.Parser.String (oneOf)
-import Text.Parsing.Parser.Token (GenLanguageDef(..), GenTokenParser, alphaNum, makeTokenParser, upper)
+import Parsing (ParserT, fail, Position)
+import Parsing.Combinators (try, (<?>))
+import Parsing.String.Basic (oneOf)
+import Parsing.Token (GenLanguageDef(..), GenTokenParser, alphaNum, makeTokenParser, upper)
 
 type IndentTokenParser = GenTokenParser String (StateT Position ArcParser)
 
@@ -271,8 +270,8 @@ reservedIdentifier = token.lexeme $ try go
 
 -----------------------------------------------------------
 -- Identifiers & Reserved words
--- This section is replicated from Text.Parsing.Parser.Token.
--- We need isReservedName but it is not exported from Text.Parsing.Parser.Token.
+-- This section is replicated from Parsing.Token.
+-- We need isReservedName but it is not exported from Parsing.Token.
 -----------------------------------------------------------
 
 isReservedName :: forall m . Monad m => GenLanguageDef String m -> String -> Boolean

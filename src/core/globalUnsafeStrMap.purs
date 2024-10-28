@@ -25,7 +25,7 @@
 
 module Perspectives.GlobalUnsafeStrMap
   ( GLStrMap
-  , new
+  , newMap
   , peek
   , poke
   , delete
@@ -51,7 +51,7 @@ import Unsafe.Coerce (unsafeCoerce)
 foreign import data GLStrMap :: Type -> Type
 
 -- | Create a new, empty mutable map
-foreign import new :: forall a. Unit -> GLStrMap a
+foreign import newMap :: forall a. Unit -> GLStrMap a
 
 -- | Get the value for a key in a global map
 peek :: forall a. GLStrMap a -> String -> (Maybe a)

@@ -46,10 +46,10 @@ import Perspectives.Representation.QueryFunction (FunctionName(..))
 import Perspectives.Representation.Range (Duration_(..), Range(..))
 import Perspectives.Time (date2String, dateTime2String, time2String)
 import Prelude (bind, not, pure, show, ($), (&&), (*>), (+), (<$>), (<*), (<*>), (<<<), (>), (>>=), (<>), eq, (/=))
-import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (between, lookAhead, manyTill, option, optionMaybe, try, (<?>))
-import Text.Parsing.Parser.String (char, satisfy)
-import Text.Parsing.Parser.Token (alphaNum)
+import Parsing (fail)
+import Parsing.Combinators (between, lookAhead, manyTill, option, optionMaybe, try, (<?>))
+import Parsing.String (char, satisfy)
+import Parsing.Token (alphaNum)
 
 step :: IP Step
 step = defer \_ -> step_ false

@@ -20,10 +20,10 @@
 
 // END LICENSE
 
-var Stomp = require( "@stomp/stompjs" );
+import * as Stomp from "@stomp/stompjs";
 
 
-function createStompClientImpl ( url )
+export function createStompClientImpl ( url )
 {
   var client = new Stomp.Client({ brokerURL: url});
 
@@ -42,7 +42,7 @@ function createStompClientImpl ( url )
 // queueId is the secret identification of that queue.
 // If the queue does not exist, it will be created as a durable queue that will not be deleted
 // on server shutdown.
-function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emit)
+export function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emit)
 {
   stompClient.connectHeaders =
     { login: params.login
@@ -105,13 +105,13 @@ function connectAndSubscribeImpl (stompClient, params, emitStep, finishStep, emi
   };
 
 // Unsubscribe from a queue.
-function unsubscribeImpl( stompClient, queueId )
+export function unsubscribeImpl( stompClient, queueId )
 {
   stompClient.unsubscribe( queueId );
 }
 
 // Send a message. We do not support additional headers.
-function sendImpl( stompClient, destination, receiptId, messageString )
+export function sendImpl( stompClient, destination, receiptId, messageString )
 {
   stompClient.watchForReceipt( receiptId,
     function()
@@ -125,10 +125,3 @@ function sendImpl( stompClient, destination, receiptId, messageString )
     // , skipContentLengthHeader: true
     });
 }
-
-module.exports =
-  { createStompClientImpl: createStompClientImpl
-  , connectAndSubscribeImpl: connectAndSubscribeImpl
-  , unsubscribeImpl: unsubscribeImpl
-  , sendImpl: sendImpl
-  }

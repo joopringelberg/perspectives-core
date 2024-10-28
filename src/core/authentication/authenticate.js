@@ -1,5 +1,5 @@
 
-exports.bytesToBase64DataUrlImpl = function (bytes) {
+export function bytesToBase64DataUrlImpl (bytes) {
   const type = "application/octet-stream";
   return new Promise((resolve, reject) => 
   {
@@ -12,7 +12,7 @@ exports.bytesToBase64DataUrlImpl = function (bytes) {
   })
 }
 
-exports.dataUrlToBytesImpl = function (dataUrl) 
+export function dataUrlToBytesImpl (dataUrl) 
 {
   return fetch(dataUrl)
     .then( function(res) 

@@ -22,7 +22,7 @@
 
 module Perspectives.Representation.InstanceIdentifiers where
 
-import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep (class Generic) 
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
 import Perspectives.Utilities (class PrettyPrint)

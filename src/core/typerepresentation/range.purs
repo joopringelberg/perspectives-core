@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Representation.Range where
+module Perspectives.Representation.Range where 
 
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)

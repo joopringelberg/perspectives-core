@@ -46,7 +46,7 @@ import Perspectives.Parsing.Messages (MultiplePerspectivesErrors, PerspectivesEr
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Prelude (bind, discard, pure, show, ($), (<<<), (==))
-import Text.Parsing.Parser (ParseError(..))
+import Parsing (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
 -- | Some functions expect a CRL file with the same name and add the instances found in them

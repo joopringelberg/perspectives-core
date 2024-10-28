@@ -24,13 +24,12 @@
 -- | Purescript compiler. We will unsafely coerce that type to the function we like
 -- | when we feel we can do it.
 
-module Perspectives.HiddenFunction where
+module Perspectives.HiddenFunction where 
 
 import Prelude
 
 
 
-import Foreign.NullOrUndefined (null)
 import Simple.JSON (class ReadForeign, class WriteForeign)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -48,9 +47,9 @@ instance eqHiddenFunction :: Eq HiddenFunction where
 -- As we never read a HiddenFunction, this does not matter.
 
 
-
 instance WriteForeign HiddenFunction where
-  writeImpl _ = null
+-- The javascript null value, typed as Foreign
+  writeImpl _ = unsafeCoerce ""
 
 -- As we never read a HiddenFunction, this does not matter.
 instance ReadForeign HiddenFunction where

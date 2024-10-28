@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-exports.roleView = (function (doc)
+export const roleView = (function (doc)
 {
   // a proxy for being a role:
   if (doc.universeRoleDelta)
@@ -18,7 +18,7 @@ exports.roleView = (function (doc)
 }).toString();
 
 // OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
-exports.pendingInvitations = (function(doc)
+export const pendingInvitations = (function(doc)
 {
   if (doc.properties["model://perspectives.domains#System$Invitation$External$Message"])
   {
@@ -26,7 +26,7 @@ exports.pendingInvitations = (function(doc)
   }
 }).toString();
 
-exports.contextView = (function (doc)
+export const contextView = (function (doc)
 {
   emit(doc.pspType, doc.id);
 }).toString();
@@ -36,7 +36,7 @@ exports.contextView = (function (doc)
 //  * the context should be a certain value.
 // In order to abstract from the storage scheme, we only emit
 // the part of the context identifier following the hash (#).
-exports.roleFromContextView = (function (doc)
+export const roleFromContextView = (function (doc)
  {
   function takeGuid(s)
   {
@@ -55,7 +55,7 @@ exports.roleFromContextView = (function (doc)
  }.toString())
 
 //  This is a view in the models database.
-exports.roleSpecialisations = (function( doc )
+export const roleSpecialisations = (function( doc )
  {
    var eroles = doc.enumeratedRoles;
    Object.values( eroles ).forEach(
@@ -73,7 +73,7 @@ exports.roleSpecialisations = (function( doc )
  }.toString());
 
 //  This is a view in the models database.
-exports.contextSpecialisations = (function( doc )
+export const contextSpecialisations = (function( doc )
  {
    Object.values( doc.contexts ).forEach(
      function(context)
@@ -89,7 +89,7 @@ exports.contextSpecialisations = (function( doc )
    );
  }.toString());
 
- exports.credentials = (function (doc)
+ export const credentials = (function (doc)
  {
     // Only PerspectRol instances have an isMe field. roleAliases
     if (doc.isMe && doc.allTypes.find( t => t == "model://perspectives.domains#System$WithCredentials"))
@@ -102,7 +102,7 @@ exports.contextSpecialisations = (function( doc )
 
 // This view is a table [filler; filled]
 // Use it by selecting on filler to obtain those roles that are filled by it.
-exports.filler2filledView = (function(filled)
+export const filler2filledView = (function(filled)
   {
     // a proxy for being a role:
     if (filled.universeRoleDelta)
@@ -113,7 +113,7 @@ exports.filler2filledView = (function(filled)
 
 // This view is a table [filled; {filler, filledContextType, filledRoleType}].
 // Use it by selecting on filled to obtain the role that fills it.
-exports.filled2fillerView = (function(filler)
+export const filled2fillerView = (function(filler)
 {
   // a proxy for being a role:
   if (filler.universeRoleDelta)
@@ -138,7 +138,7 @@ exports.filled2fillerView = (function(filler)
 
 // This view is a table [context; role].
 // Use it by selecting on role to obtain its context.
-exports.context2roleView = (function(role)
+export const context2roleView = (function(role)
 {
   // a proxy for being a role:
   if (role.universeRoleDelta)
@@ -149,7 +149,7 @@ exports.context2roleView = (function(role)
 
 // This view is a table [role; context]
 // Use it by selecting on context to obtain its roles.
-exports.role2contextView = (function(context)
+export const role2contextView = (function(context)
 {
   // a proxy for being a context.
   if (context.universeContextDelta)
@@ -177,7 +177,7 @@ exports.role2contextView = (function(context)
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Emit the model identifier so we can quickly remove the query when the model is removed.
-  exports.modelView = (function(queryDoc)
+export const modelView = (function(queryDoc)
 {
   emit( queryDoc.model, queryDoc._id);
 }).toString();
@@ -195,8 +195,8 @@ const invertedQueryViewTemplate = (function(queryDoc)
   }
 }).toString();
 
-exports.rTPropertyKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTPropertyKey");
-exports.rTRoleKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTRoleKey");
-exports.rTContextKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTContextKey");
-exports.rTFillerKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFillerKey");
-exports.rTFilledKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFilledKey");
+export const rTPropertyKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTPropertyKey");
+export const rTRoleKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTRoleKey");
+export const rTContextKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTContextKey");
+export const rTFillerKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFillerKey");
+export const rTFilledKeyView = invertedQueryViewTemplate.replace( "KEYKIND", "RTFilledKey");

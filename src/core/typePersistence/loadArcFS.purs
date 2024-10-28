@@ -47,7 +47,7 @@ import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwoState, runPhaseTwo_')
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId)
 import Prelude (bind, pure, show, ($), (*>), (<>))
-import Text.Parsing.Parser (ParseError(..))
+import Parsing (ParseError(..))
 
 -- | The functions in this module load Arc files and parse and compile them to DomeinFiles.
 -- | Some functions expect a CRL file with the same name and add the instances found in them

@@ -27,7 +27,7 @@ where
 
 import Prelude
 
-import Affjax as AJ
+import Affjax.Web as AJ
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))

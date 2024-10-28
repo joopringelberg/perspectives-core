@@ -1,7 +1,7 @@
-const idbKeyval = require('idb-keyval')
+import * as idbKeyval from 'idb-keyval';
 
-exports.getValueByKeyImpl = idbKeyval.get;
+export const getValueByKeyImpl = idbKeyval.get;
 
-exports.setKeyValueImpl = idbKeyval.set;
+export const setKeyValueImpl = idbKeyval.set;
 
-exports.clear = function () { idbKeyval.clear(); }
+export function clear () { idbKeyval.clear(); }

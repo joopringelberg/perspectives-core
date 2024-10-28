@@ -35,7 +35,7 @@ import Data.List.NonEmpty (head) as LNE
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (unwrap)
 import Data.String.Regex (test)
-import Data.Symbol (SProxy(..))
+import Type.Proxy (Proxy(..))
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Foreign.Object (Object, fromFoldable, insert, union)
@@ -168,7 +168,7 @@ traverseContextE (ContextE {id, kindOfContext, public, contextParts, pos}) ns = 
 
     addContextToDomeinFile :: Context -> DomeinFileRecord -> DomeinFileRecord
     addContextToDomeinFile c@(Context{id: (ContextType ident)}) domeinFile = LN.over
-      (prop (SProxy :: SProxy "contexts"))
+      (prop (Proxy :: Proxy "contexts"))
       (insert ident c)
       domeinFile
 
@@ -411,11 +411,11 @@ traverseViewE (ViewE {id, viewParts, pos}) rtype = do
 
 addRoleToDomeinFile :: Role -> DomeinFileRecord -> DomeinFileRecord
 addRoleToDomeinFile (E r@(EnumeratedRole{id})) domeinFile = LN.over
-  (prop (SProxy :: SProxy "enumeratedRoles"))
+  (prop (Proxy :: Proxy "enumeratedRoles"))
   (insert (unwrap id) r)
   domeinFile
 addRoleToDomeinFile (C r@(CalculatedRole{id})) domeinFile = LN.over
-  (prop (SProxy :: SProxy "calculatedRoles"))
+  (prop (Proxy :: Proxy "calculatedRoles"))
   (insert (unwrap id) r)
   domeinFile
 

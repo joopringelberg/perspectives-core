@@ -27,7 +27,7 @@ import Prelude
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
 import Simple.JSON (class ReadForeign, class WriteForeign)
-
+ 
 -- | `Position` represents the position of the parser in the input.
 -- |
 -- | - `line` is the current line in the input

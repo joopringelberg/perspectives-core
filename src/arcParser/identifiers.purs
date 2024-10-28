@@ -36,9 +36,10 @@ import Perspectives.Parsing.Arc.IndentParser (IP)
 import Perspectives.Parsing.Arc.Token (token)
 import Perspectives.ResourceIdentifiers (hasPublicResourceShape)
 import Prelude (Unit, bind, discard, not, pure, ($), (*>), (/=), (<<<), (<>))
-import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (try, (<?>))
-import Text.Parsing.Parser.String (string, satisfy, whiteSpace)
+import Parsing (fail)
+import Parsing.Combinators (try, (<?>))
+import Parsing.String (string, satisfy)
+import Parsing.String.Basic (whiteSpace)
 
 reserved :: String -> IP Unit
 reserved = token.reserved

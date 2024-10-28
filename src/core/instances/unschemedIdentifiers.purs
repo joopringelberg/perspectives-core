@@ -9,7 +9,7 @@ module Perspectives.UnschemedIdentifiers
 import Prelude
 
 import Data.Array.NonEmpty (index)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..)) 
 import Data.Newtype (class Newtype, over)
 import Data.String.Regex (Regex, match)
 import Data.String.Regex.Flags (noFlags)

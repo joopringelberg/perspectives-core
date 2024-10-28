@@ -24,7 +24,7 @@
 
 module Perspectives.Extern.Utilities where
 
-import Affjax (Response, printError, request)
+import Affjax.Web (Response, printError, request)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Control.Monad.AvarMonadAsk (gets)
@@ -71,7 +71,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.ResourceIdentifiers (createCuid)
 import Prelude (class Show, bind, discard, pure, show, void, ($), (<<<), (<>), (>=>), (>>=), (*>))
 import Simple.JSON (readJSON, writeJSON)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.

@@ -1,3 +1,4 @@
 // PDR VERSION 25.01
-exports.couchdbManagement = require ('../../src/model/patches/2504/couchdbManagement.arc' );
+import couchdbManagement from '../../src/model/patches/2504/couchdbManagement.arc';
 
+export {couchdbManagement}

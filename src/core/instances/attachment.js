@@ -1,1 +1,1 @@
-exports.getAttachmentsImpl = function (r) { return r._attachments}
+export function getAttachmentsImpl(r) { return r._attachments}

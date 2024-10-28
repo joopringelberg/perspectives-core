@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Data.EncodableMap
+module Perspectives.Data.EncodableMap 
   ( EncodableMap(..)
   , addAll
   , delete

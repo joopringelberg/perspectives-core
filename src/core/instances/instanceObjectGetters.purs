@@ -29,7 +29,7 @@ import Control.Plus (empty) as Plus
 import Data.Array (catMaybes, concat, cons, elemIndex, filter, findIndex, foldMap, foldl, head, index, length, nub, null, singleton, union)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldWithIndexM)
-import Data.Iterable (toArray)
+import JS.Iterable (toArray)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
@@ -103,7 +103,7 @@ getUnlinkedRoleInstances rn c = ArrayT $ try
     filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleFromContext" (Key [unwrap rn, takeGuid (unwrap c)])
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
-      cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       cachedRoles <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       pure $ rol_id <$> filter (roleFromContextFilter rn c) cachedRoles
       )
@@ -345,7 +345,7 @@ filler2filledFromDatabase_ (Filler_ filler) = try
     filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/filler2filledView" (Key $ unwrap filler)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
-      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       pure $ rol_id <$> filter (filler2filledFilter filler) cachedRoles
       )
@@ -364,7 +364,7 @@ filled2fillerFromDatabase_ rid = try
     fillerRolesInDatabase :: Array FillerInfo <- getViewOnDatabase db "defaultViews/filled2fillerView" (Key $ unwrap rid)
     fillerRoleInCache :: Array FillerInfo <- (do 
       cache <- roleCache
-      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       -- There may be empty AVars.
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       for (filter (filled2fillerFilter rid) cachedRoles)
@@ -389,7 +389,7 @@ role2contextFromDatabase_ rid = try
     contextInDatabase :: Array ContextInstance <- getViewOnDatabase db "defaultViews/role2ContextView" (Key $ unwrap rid)
     contextInCache :: Array ContextInstance <- (do 
       cache <- contextCache
-      cachedContextAvars :: Array (AVar IP.PerspectContext) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedContextAvars :: Array (AVar IP.PerspectContext) <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       cachedContexts :: Array IP.PerspectContext <- catMaybes <$> (lift $ traverse tryRead cachedContextAvars)
       pure $ context_id <$> filter (context2RoleFilter rid) cachedContexts
       )
@@ -408,7 +408,7 @@ context2roleFromDatabase_ cid = try
     contextRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/context2RoleView" (Key $ unwrap cid)
     contextRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
-      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoleAvars :: Array (AVar IP.PerspectRol) <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       cachedRoles :: Array IP.PerspectRol <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       pure $ rol_id <$> filter (role2ContextFilter cid) cachedRoles
       )

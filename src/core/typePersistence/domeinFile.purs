@@ -21,7 +21,7 @@
 -- END LICENSE
 
 module Perspectives.DomeinFile
-
+ 
   where
 
 import Control.Monad.State (State, execState, modify)

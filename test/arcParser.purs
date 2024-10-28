@@ -27,7 +27,7 @@ import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..)) as RV
 import Test.Parsing.ArcAstSelectors (actionExists, allPropertyVerbs, ensureAction, ensureContext, ensureOnEntry, ensureOnExit, ensurePerspectiveOf, ensurePerspectiveOn, ensurePropertyVerbsForPropsOrView, ensureRoleVerbs, ensureStateInContext, ensureStateInRole, ensureSubState, ensureUserRole, failure, hasAutomaticAction, isImplicitRoleOnIdentifier, isIndexed, isNotified, isStateWithContext, isStateWithExplicitRole, isStateWithExplicitRole_, perspectiveExists, stateExists, stateParts)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError(..))
+import Parsing (ParseError(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 testDirectory :: String

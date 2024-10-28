@@ -26,7 +26,7 @@ module Perspectives.AMQP.RabbitMQManagement where
 
 import Prelude
 
-import Affjax (Request, Response, printError, request)
+import Affjax.Web (Request, Response, printError, request)
 import Affjax.RequestBody as RequestBody
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as ResponseFormat

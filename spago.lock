@@ -8,7 +8,7 @@
             "aff",
             "aff-coroutines",
             "aff-promise",
-            "affjax",
+            "affjax-web",
             "apitypes",
             "argonaut",
             "arraybuffer",
@@ -59,6 +59,7 @@
             "serializablenonemptyarray",
             "simple-json",
             "strings",
+            "subtlecrypto",
             "tailrec",
             "test-unit",
             "transformers",
@@ -73,6 +74,7 @@
             "aff-coroutines",
             "aff-promise",
             "affjax",
+            "affjax-web",
             "apitypes",
             "argonaut",
             "argonaut-codecs",
@@ -154,6 +156,7 @@
             "simple-json",
             "st",
             "strings",
+            "subtlecrypto",
             "tailrec",
             "test-unit",
             "transformers",
@@ -713,6 +716,9 @@
       },
       "serializablenonemptyarray": {
         "path": "../serialisable-nonempty-arrays"
+      },
+      "subtlecrypto": {
+        "path": "../purescript-subtlecrypto"
       }
     }
   },
@@ -777,6 +783,18 @@
         "refs",
         "unsafe-coerce",
         "web-xhr"
+      ]
+    },
+    "affjax-web": {
+      "type": "registry",
+      "version": "1.0.0",
+      "integrity": "sha256-n/yJUk1wMxMN7fJ2TJ+fELgieomy29N617yOshAnrc0=",
+      "dependencies": [
+        "aff",
+        "affjax",
+        "either",
+        "maybe",
+        "prelude"
       ]
     },
     "apitypes": {
@@ -1899,6 +1917,26 @@
         "tailrec",
         "tuples",
         "unfoldable",
+        "unsafe-coerce"
+      ]
+    },
+    "subtlecrypto": {
+      "type": "local",
+      "path": "../purescript-subtlecrypto",
+      "dependencies": [
+        "aff",
+        "aff-promise",
+        "arraybuffer-types",
+        "console",
+        "effect",
+        "either",
+        "exceptions",
+        "foreign",
+        "functions",
+        "maybe",
+        "prelude",
+        "transformers",
+        "tuples",
         "unsafe-coerce"
       ]
     },

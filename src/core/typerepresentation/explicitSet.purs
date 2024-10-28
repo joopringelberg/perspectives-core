@@ -21,7 +21,7 @@
 -- END LICENSE
 
 module Perspectives.Representation.ExplicitSet where
-
+ 
 import Prelude
 
 import Data.Array (delete, elemIndex, find, foldM, foldl, intersect, nub, null, uncons)

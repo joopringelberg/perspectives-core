@@ -33,7 +33,7 @@ import Perspectives.Utilities (prettyPrint)
 import Test.Perspectives.Utils (runP, withModel_, withSystem)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip, suiteOnly)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 
 testDirectory :: String
 testDirectory = "test"

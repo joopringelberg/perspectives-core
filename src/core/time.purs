@@ -28,13 +28,13 @@ import Control.Monad.Error.Class (class MonadError)
 import Data.DateTime (Date, DateTime, Hour, Time(..), date, hour, millisecond, minute, second)
 import Data.DateTime.Instant (fromDate, fromDateTime, instant, toDateTime, unInstant)
 import Data.Enum (fromEnum, toEnum)
+import Data.Number (floor)
 import Data.Int as Int
 import Data.Maybe (Maybe, fromJust)
 import Data.Newtype (unwrap)
 import Data.Time.Duration (Milliseconds(..))
 import Effect.Class (class MonadEffect)
 import Effect.Exception (Error)
-import Math as Math
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Instances.Values (parseNumber)
 import Simple.JSON (unsafeStringify)
@@ -79,9 +79,9 @@ millisToTime (Milliseconds ms') =
     hourLength = 3600000.0
     minuteLength = 60000.0
     secondLength = 1000.0
-    hours = Math.floor (ms' / hourLength)
-    minutes = Math.floor ((ms' - hours * hourLength) / minuteLength)
-    seconds = Math.floor ((ms' - (hours * hourLength + minutes * minuteLength)) / secondLength)
+    hours = floor (ms' / hourLength)
+    minutes = floor ((ms' - hours * hourLength) / minuteLength)
+    seconds = floor ((ms' - (hours * hourLength + minutes * minuteLength)) / secondLength)
     milliseconds = ms' - (hours * hourLength + minutes * minuteLength + seconds * secondLength)
   in
     unsafePartial fromJust $

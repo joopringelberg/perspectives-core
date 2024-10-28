@@ -19,7 +19,7 @@
 
 -- END LICENSE
 
-module Perspectives.Couchdb.Revision where
+module Perspectives.Couchdb.Revision where 
 
 import Data.Maybe (Maybe(..))
 import Foreign (F, Foreign, readNullOrUndefined, readString)

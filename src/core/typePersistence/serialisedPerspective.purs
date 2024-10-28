@@ -28,7 +28,7 @@
 module Perspectives.TypePersistence.PerspectiveSerialisation.Data where
 
 import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype)
+import Data.Newtype (class Newtype) 
 import Foreign.Object (Object)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (ContextType, PropertyType, RoleKind)

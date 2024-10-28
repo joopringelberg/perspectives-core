@@ -20,7 +20,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Utilities (prettyPrint)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError(..))
+import Parsing (ParseError(..))
 
 theSuite :: Free TestF Unit
 theSuite = suite "Perspectives.Parsing.Arc.Expression" do

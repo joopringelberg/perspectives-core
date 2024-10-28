@@ -25,10 +25,11 @@ module Perspectives.Representation.Class.EnumReadForeign where
 import Control.Alt ((<|>))
 import Control.Monad.Error.Class (throwError)
 import Data.Generic.Rep (class Generic, Constructor(..), NoArguments(..), Sum(..), to)
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Foreign (Foreign, F, ForeignError(..))
 import Prelude ((<<<), (==), (<$>), bind, ($), pure, (<>))
-import Simple.JSON (readImpl)
+import Simple.JSON (readImpl) 
+import Type.Proxy (Proxy(..))
 
 enumReadForeign :: forall a rep
    . Generic a rep
@@ -60,4 +61,4 @@ instance constructorEnumReadForeign ::
        else throwError <<< pure <<< ForeignError $
             "Enum string " <> s <> " did not match expected string " <> name
     where
-      name = reflectSymbol (SProxy :: SProxy name)
+      name = reflectSymbol (Proxy :: Proxy name)

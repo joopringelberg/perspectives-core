@@ -26,7 +26,7 @@ import Data.Map (Map)
 import Data.Maybe (Maybe)
 import Data.Newtype (unwrap)
 import Perspectives.CoreTypes (Updater, type (~~>))
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, filterKeys)
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, newMap, peek, poke, filterKeys)
 import Perspectives.Identifiers (startsWithSegments)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
 import Perspectives.Representation.TypeIdentifiers (PropertyType, RoleType, StateIdentifier, DomeinFileId(..))
@@ -47,7 +47,7 @@ type CompiledContextState =
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 contextStateCache :: ContextStateCache
-contextStateCache = new unit
+contextStateCache = newMap unit
 
 cacheCompiledContextState :: StateIdentifier -> CompiledContextState -> CompiledContextState
 cacheCompiledContextState a u = const u (poke contextStateCache (unwrap a) u)
@@ -75,7 +75,7 @@ type CompiledRoleState =
   }
 
 roleStateCache :: RoleStateCache
-roleStateCache = new unit
+roleStateCache = newMap unit
 
 cacheCompiledRoleState :: StateIdentifier -> CompiledRoleState -> CompiledRoleState
 cacheCompiledRoleState a u = const u (poke roleStateCache (unwrap a) u)

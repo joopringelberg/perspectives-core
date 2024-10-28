@@ -22,7 +22,7 @@
 
 module Perspectives.Persistent.PublicStore where
 
-import Prelude
+import Prelude 
 
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)

@@ -37,7 +37,7 @@ import Data.Array (union, delete) as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import Data.Iterable (toArray)
+import JS.Iterable (toArray)
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
@@ -125,7 +125,7 @@ roleInstancesFromCouchdb roleTypes _ = try
         instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/roleView" (maybe NoKey Key (head roleTypes))
         instancesInCache <- lift (do
           cache <- roleCache
-          cachedRoleAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
+          cachedRoleAvars <- liftAff $ liftEffect (rvalues cache >>= pure <<< toArray)
           cachedRoles <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
           pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType rt) cachedRoles
           )
@@ -142,7 +142,7 @@ contextInstancesFromCouchdb contextTypeArr _ = try
         instancesInCouchdb <- (lift entitiesDatabaseName) >>= \db -> lift $ getViewOnDatabase db "defaultViews/contextView" (maybe NoKey Key (head contextTypeArr))
         instancesInCache <- lift (do
           cache <- contextCache
-          cachedContextAvars <- liftAff $ liftEffect (rvalues cache >>= toArray)
+          cachedContextAvars <- liftAff $ liftEffect (rvalues cache >>= pure <<< toArray)
           cachedContexts <- catMaybes <$> (lift $ traverse tryRead cachedContextAvars)
           pure $ context_id <$> filter (contextViewFilter $ ContextType ct) cachedContexts
           )
@@ -156,7 +156,7 @@ pendingInvitations _ = try
     filledRolesInDatabase :: Array RoleInstance <- getViewOnDatabase db "defaultViews/roleView" (Key DEP.invitation)
     filledRolesInCache :: Array RoleInstance <- (do 
       cache <- roleCache
-      cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= toArray)
+      cachedRoleAvars <- liftAff $ liftEffect $ (rvalues cache >>= pure <<< toArray)
       cachedRoles <- catMaybes <$> (lift $ traverse tryRead cachedRoleAvars)
       pure $ rol_id <$> filter (roleViewFilter $ EnumeratedRoleType DEP.invitation) cachedRoles
       )

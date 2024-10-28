@@ -35,11 +35,12 @@
 
 module Perspectives.Query.Interpreter where
 
+import Control.Bind (join)
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (WriterT, execWriterT, tell)
-import Control.MonadZero (empty, join, void)
+import Control.Plus (empty)
 import Data.Array (concat, elemIndex, foldl, head, index, length, null, union, unsafeIndex)
 import Data.List (List(..))
 import Data.List.NonEmpty (fromList, singleton, tail)
@@ -84,7 +85,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.Range (Range(..), isDateOrTime, isPDuration)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', propertyAliases, roleTypeModelName', generalisesRoleType)
-import Prelude (Unit, bind, discard, eq, flip, map, notEq, pure, show, unit, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||))
+import Prelude (Unit, bind, discard, eq, flip, map, notEq, pure, show, unit, ($), (&&), (+), (<#>), (<$>), (<<<), (<=), (<>), (==), (>=>), (>>=), (||), void)
 import Unsafe.Coerce (unsafeCoerce)
 
 lift2MPQ :: forall a. MP a -> MPQ a

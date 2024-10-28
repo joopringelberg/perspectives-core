@@ -24,7 +24,7 @@
 module Perspectives.Persistence.Types where
 
 import Prelude
-
+ 
 import Control.Alt ((<|>))
 import Control.Monad.Except (runExcept)
 import Control.Monad.Reader (ReaderT, runReaderT)

@@ -30,7 +30,7 @@ import Data.Map (Map, lookup)
 import Data.Maybe (Maybe(..), maybe)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
-import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.String.Regex.Unsafe (unsafeRegex) 
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
 import Perspectives.CoreTypes (StorageScheme(..)) as CT

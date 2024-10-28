@@ -29,7 +29,7 @@ if (typeof window === 'undefined') {
     EventSource = window.EventSource;
 }
 
-function createEventSourceImpl ( databaseUrl, queryParams )
+export function createEventSourceImpl ( databaseUrl, queryParams )
 {
   return new EventSource( databaseUrl + "/_changes?feed=eventsource" + queryParams );
 }
@@ -37,7 +37,7 @@ function createEventSourceImpl ( databaseUrl, queryParams )
 // This function will be called from Perspectives Core if it want to set up an internal channel to a GUI.
 // emitStep will be bound to the constructor Emit, finishStep will be the constructor Finish.
 // databaseUrl should point to the database. It need not be terminated with a slash.
-function createChangeEmitterImpl (es, emitStep, finishStep, emit)
+export function createChangeEmitterImpl (es, emitStep, finishStep, emit)
 {
   // Set the handler.
   es.onmessage = function(e) {
@@ -58,14 +58,8 @@ function createChangeEmitterImpl (es, emitStep, finishStep, emit)
   };
 }
 
-function closeEventSourceImpl( es )
+export function closeEventSourceImpl( es )
 {
   es.dispatchEvent({type: "message", detail: "finish"});
   es.close();
 }
-
-module.exports = {
-  createEventSourceImpl: createEventSourceImpl,
-  createChangeEmitterImpl: createChangeEmitterImpl,
-  closeEventSourceImpl: closeEventSourceImpl
-};

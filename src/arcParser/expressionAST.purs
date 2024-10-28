@@ -25,13 +25,13 @@ module Perspectives.Parsing.Arc.Expression.AST where
 import Prelude
 
 import Data.Eq.Generic (genericEq)
-import Data.Foldable (intercalate)
+import Data.Foldable (intercalate) 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
 import Perspectives.Parsing.Arc.Expression.RegExP (RegExP)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Representation.QueryFunction (FunctionName) as QF
+import Perspectives.Representation.QueryFunction (FunctionName) as QF 
 import Perspectives.Representation.Range (Range)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
 

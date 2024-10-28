@@ -20,29 +20,77 @@
 
 -- END LICENSE
 
-module Perspectives.Parsing.Arc.IndentParser where
+module Perspectives.Parsing.Arc.IndentParser
+  ( ArcParser
+  , ArcParserState
+  , arcPosition2Position
+  , containsTab
+  , entireBlock
+  , entireBlock1
+  , get'
+  , getArcParserState
+  , getCurrentContext
+  , getCurrentState
+  , getObject
+  , getPosition
+  , getStateIdentifier
+  , getSubject
+  , inSubContext
+  , initialArcParserState
+  , IP
+  , isIndented
+  , isNextLine
+  , isSameOrIndented
+  , modifyArcParserState
+  , nestedBlock
+  , nextLine
+  , onSameLine
+  , outdented'
+  , position2ArcPosition
+  , protectLabel
+  , protectObject
+  , protectOnEntry
+  , protectOnExit
+  , protectSubject
+  , put'
+  , runIndentParser
+  , sameOrOutdented'
+  , setLabel
+  , setObject
+  , setOnEntry
+  , setOnExit
+  , setSourceLine
+  , setSubject
+  , sourceColumn
+  , sourceLine
+  , unlessOutdented
+  , upperLeft
+  , withArcParserState
+  , withEntireBlock
+  )
+  where
 
 import Prim.Row
 
 import Control.Alt (void, (<|>))
-import Control.Monad.State (StateT, evalStateT, gets, lift, modify)
+import Control.Monad.State (StateT, evalStateT, lift, modify)
 import Control.Monad.State.Trans (get, put)
 import Data.Either (Either)
 import Data.List (List(..), many, singleton, some)
 import Data.Maybe (Maybe(..), isNothing)
 import Data.Newtype (unwrap)
 import Data.String (Pattern(..), indexOf)
-import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
+import Data.Symbol (class IsSymbol, reflectSymbol)
 import Effect.Aff (Aff)
+import Parsing (ParseError, ParseState(..), fail, getParserT, runParserT, Position)
+import Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
+import Parsing.String (eof)
 import Perspectives.Parsing.Arc.AST (RoleIdentification, StateSpecification(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.Position (ArcPosition(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..))
-import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||), (>=))
+import Prelude (class Monad, Unit, bind, discard, flip, not, pure, show, unit, ($), (&&), (*>), (<), (<*), (<<<), (<=), (<>), (==), (>), (>>=), (||), (>=), (<$>))
 import Record (get, set) as Record
-import Text.Parsing.Indent (IndentParser, checkIndent, runIndent, sameLine, withPos)
-import Text.Parsing.Parser (ParseError, ParseState(..), fail, runParserT)
-import Text.Parsing.Parser.Pos (Position)
-import Text.Parsing.Parser.String (eof)
+import Type.Proxy (Proxy(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 -- type IndentParser m s a = ParserT s (StateT Position m) a
@@ -74,6 +122,8 @@ type ArcParserState =
   }
 
 type ArcParser = StateT ArcParserState Aff
+
+-- IP a :: ParserT String (StateT Position ArcParser) a
 type IP a = IndentParser ArcParser String a
 
 initialArcParserState :: ArcParserState
@@ -141,7 +191,7 @@ setLabel :: forall a l r'. IsSymbol l =>
   , onEntry :: Maybe StateTransitionE
   , onExit :: Maybe StateTransitionE
   ) =>
-  SProxy l -> a -> IP Unit
+  Proxy l -> a -> IP Unit
 setLabel l newValue = do
   (oldValue :: Maybe a) <- getArcParserState >>= pure <<< Record.get l
   if isNothing oldValue
@@ -154,12 +204,12 @@ setLabel l newValue = do
 -- | sets the current user (the user having a perspective).
 -- | 'subject' is a misnomer: it should be 'user', i.e. setUser.
 setSubject :: RoleIdentification -> IP Unit
-setSubject = setLabel (SProxy :: SProxy "subject")
+setSubject = setLabel (Proxy :: Proxy "subject")
 
 -- | Referring to the lexical analysis of the source text,
 -- | sets the current object (the object of the perspective).
 setObject :: RoleIdentification -> IP Unit
-setObject = setLabel (SProxy :: SProxy "object")
+setObject = setLabel (Proxy :: Proxy "object")
 
 protectLabel :: forall a l r' b. IsSymbol l =>
   Cons l (Maybe a) r' (currentContext :: ContextType
@@ -169,7 +219,7 @@ protectLabel :: forall a l r' b. IsSymbol l =>
   , onEntry :: Maybe StateTransitionE
   , onExit :: Maybe StateTransitionE
   ) =>
-  SProxy l -> IP b -> IP b
+  Proxy l -> IP b -> IP b
 protectLabel l f = do
   (oldValue :: Maybe a) <- getArcParserState >>= pure <<< Record.get l
   void $ modifyArcParserState \s -> Record.set l Nothing s
@@ -178,16 +228,16 @@ protectLabel l f = do
   pure result
 
 protectSubject :: forall a. IP a -> IP a
-protectSubject = protectLabel (SProxy :: SProxy "subject")
+protectSubject = protectLabel (Proxy :: Proxy "subject")
 
 protectObject :: forall a. IP a -> IP a
-protectObject = protectLabel (SProxy :: SProxy "object")
+protectObject = protectLabel (Proxy :: Proxy "object")
 
 protectOnEntry :: forall a. IP a -> IP a
-protectOnEntry = protectLabel (SProxy :: SProxy "onEntry")
+protectOnEntry = protectLabel (Proxy :: Proxy "onEntry")
 
 protectOnExit :: forall a. IP a -> IP a
-protectOnExit = protectLabel (SProxy :: SProxy "onExit")
+protectOnExit = protectLabel (Proxy :: Proxy "onExit")
 
 -- | Stores a fully qualified state identifier.
 setOnEntry :: StateSpecification -> IP Unit
@@ -213,8 +263,15 @@ onSameLine :: forall m s a. Monad m => IndentParser m s a -> IndentParser m s a
 onSameLine p = withPos (p <* sameLine)
 
 -- | Returns the position as recorded in `ParseState`
+-- type IP a = IndentParser ArcParser String a
+-- IP a :: ParserT String (StateT Position ArcParser) a
+-- type ArcParser = StateT ArcParserState Aff
+-- IP a :: ParserT String (StateT Position (StateT ArcParserState Aff )) a
+-- data ParseState s = ParseState s Position Boolean
+
 getPosition :: IP ArcPosition
-getPosition = gets \(ParseState _ pos _) -> position2ArcPosition pos
+-- getPosition = gets \(ParseState _ pos _) -> position2ArcPosition pos
+getPosition = (\(ParseState _ pos _) -> position2ArcPosition pos) <$> getParserT
 
 -- | Returns the position as recorded by the IndentParser.
 get' :: IP ArcPosition
@@ -296,7 +353,7 @@ nestedBlock p = do
     else pure Nil
 
 -- | True iff the Parser Position is further to the right than the reference position.
--- NOTE: this is the same as Text.Parsing.Indent.indented' but returns a Boolean.
+-- NOTE: this is the same as Parsing.Indent.indented' but returns a Boolean.
 isIndented :: IP Boolean
 isIndented = do
     (indentParserPosition :: ArcPosition) <- get'
@@ -355,7 +412,7 @@ nextLine = do
 
 containsTab :: IP Boolean
 containsTab = do
-  input <- gets \(ParseState input _ _) -> input
+  input <- (\(ParseState input _ _) -> input) <$> getParserT
   case indexOf (Pattern "\t") input of
     Nothing -> pure true
     Just pos -> fail $ "Tab found at string position " <> (show pos) <> ". Remove all tabs as they confuse the index computation, leading to errors in parsing your model. "

@@ -33,7 +33,7 @@ import Data.Maybe (Maybe(..), isNothing)
 import Data.Show.Generic (genericShow)
 import Perspectives.Parsing.Arc.Expression.AST (Step, VarBinding)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
-import Perspectives.Utilities (class PrettyPrint, prettyPrint')
+import Perspectives.Utilities (class PrettyPrint, prettyPrint') 
 
 data Statements = Let LetStep | Statements (Array Assignment)
 

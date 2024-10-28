@@ -36,7 +36,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedP
 import Test.Parsing.DomeinFileSelectors (all, ensureERole, ensureEnumeratedProperty, ensureEnumeratedRoleHasProperty, ensureState, enumeratedPropertyHasRange, enumeratedPropertyIsFunctional, enumeratedPropertyIsMandatory, exists)
 import Test.Unit (TestF, suite, test)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 
 testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"

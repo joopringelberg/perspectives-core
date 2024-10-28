@@ -3,7 +3,7 @@ package:
   - aff
   - aff-coroutines
   - aff-promise
-  - affjax
+  - affjax-web
   - apitypes
   - argonaut
   - arraybuffer
@@ -33,7 +33,6 @@ package:
   - js-date
   - lists
   - lrucache
-  # - math
   - maybe
   - media-types
   - newtype
@@ -55,7 +54,7 @@ package:
   - serializablenonemptyarray
   - simple-json
   - strings
-  # - subtlecrypto
+  - subtlecrypto
   - tailrec
   - test-unit
   - transformers
@@ -91,5 +90,7 @@ workspace:
       path: ../serialisable-nonempty-arrays
       # git: https://github.com/joopringelberg/serialisable-nonempty-arrays.git
       # ref: v2.0.0
+    subtlecrypto:
+      path: ../purescript-subtlecrypto
   package_set:
     registry: 60.6.0

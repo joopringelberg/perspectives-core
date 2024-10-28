@@ -20,7 +20,7 @@ import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.TypeIdentifiers (RoleKind(..))
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 
 testDirectory :: String
 testDirectory = "/Users/joopringelberg/Code/perspectives-core/test"

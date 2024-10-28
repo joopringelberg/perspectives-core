@@ -23,7 +23,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedR
 import Test.Perspectives.Utils (runP)
 import Test.Unit (TestF, suite, suiteSkip, test, testOnly, testSkip)
 import Test.Unit.Assert (assert)
-import Text.Parsing.Parser (ParseError)
+import Parsing (ParseError)
 
 theSuite :: Free TestF Unit
 theSuite = suite  "Perspectives.Representation.ADT" do

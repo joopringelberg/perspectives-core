@@ -26,11 +26,8 @@ import Control.Monad.Reader (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
 import Effect.Aff.AVar (AVar, empty, new) 
-import Foreign.Object (singleton)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
-import Perspectives.ModelDependencies (sysMe)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState)
-import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..))
 import Prelude (bind, show, ($), (<>))
 
 -- | Run an action in MonadPerspectives, given a username and password.

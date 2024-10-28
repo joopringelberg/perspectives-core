@@ -23,12 +23,11 @@ module Perspectives.Couchdb where
 
 import Affjax (Response)
 import Affjax (printError, Error) as AJ
-import Affjax.ResponseHeader (ResponseHeader, name, value)
+ 
 import Affjax.StatusCode (StatusCode)
 import Control.Monad.Error.Class (class MonadError, throwError)
-import Control.Monad.Except (runExcept)
 import Data.Argonaut (class DecodeJson, class EncodeJson, Json, decodeJson, encodeJson, fromObject, fromString, jsonSingletonObject)
-import Data.Array (elemIndex, find)
+import Data.Array (elemIndex)
 import Data.Either (Either(..))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
@@ -36,13 +35,12 @@ import Data.Map (Map, fromFoldable, lookup, empty)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype, unwrap)
 import Data.Show.Generic (genericShow)
-import Data.String (Pattern(..), Replacement(..), replaceAll, toLower)
+import Data.String (Pattern(..), Replacement(..), replaceAll)
 import Data.Tuple (Tuple(..))
 import Effect.Exception (Error, error)
-import Foreign (F, Foreign, MultipleErrors, unsafeFromForeign)
 import Foreign.Object (Object, fromFoldable, empty) as OBJ
-import Perspectives.Couchdb.Revision (class Revision, changeRevision, getRev)
-import Prelude (class Eq, class Show, bind, pure, show, ($), (<$>), (<<<), (<>), (==))
+import Perspectives.Couchdb.Revision (class Revision)
+import Prelude (class Eq, class Show, show, ($), (<$>), (<<<), (<>), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write, writeImpl)
 import Unsafe.Coerce (unsafeCoerce)
 

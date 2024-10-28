@@ -25,7 +25,6 @@ import Test.ArrayT as ARRT
 import Test.Sync.HandleTransaction as HTA
 import Test.Utilities as UT
 import Test.DomeinFile.Encoding as DFE
-import Test.Guid as GUID 
 import Test.RabbitMQ as RB
 import Test.Class.Role as ROLE
 import Test.Perspectives.Representation.ADT.DisjunctiveNormalForm as DNF

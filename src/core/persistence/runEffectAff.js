@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-exports.runEffectFnAff2 = function runEffectFnAff2(fn) {
+export function runEffectFnAff2(fn) {
   return function(a) {
     return function(b) {
         return fn(a, b);
@@ -9,7 +9,7 @@ exports.runEffectFnAff2 = function runEffectFnAff2(fn) {
   };
 };
 
-exports.runEffectFnAff3 = function runEffectFnAff3(fn) {
+export function runEffectFnAff3(fn) {
   return function(a) {
     return function(b) {
       return function(c){
@@ -19,7 +19,7 @@ exports.runEffectFnAff3 = function runEffectFnAff3(fn) {
   };
 };
 
-exports.runEffectFnAff4 = function runEffectFnAff4(fn) {
+export function runEffectFnAff4(fn) {
   return function(a) {
     return function(b) {
       return function(c){
@@ -32,7 +32,7 @@ exports.runEffectFnAff4 = function runEffectFnAff4(fn) {
   };
 };
 
-exports.runEffectFnAff5 = function runEffectFnAff5(fn) {
+export function runEffectFnAff5(fn) {
   return function(a) {
     return function(b) {
       return function(c){
@@ -47,7 +47,7 @@ exports.runEffectFnAff5 = function runEffectFnAff5(fn) {
   };
 };
 
-exports.runEffectFnAff6 = function runEffectFnAff6(fn) {
+export function runEffectFnAff6(fn) {
   return function(a) {
     return function(b) {
       return function(c){

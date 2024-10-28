@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-exports.validate_doc_update = (function (newDoc, oldDoc, userCtx, secObj)
+export const validate_doc_update = (function (newDoc, oldDoc, userCtx, secObj)
 { 
   var is_server_or_database_admin = function(userCtx, secObj) {
     // see if the user is a server admin

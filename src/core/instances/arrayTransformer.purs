@@ -34,7 +34,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadError, class MonadThrow, catchError, throwError, try)
 import Control.Monad.Trans.Class (class MonadTrans, lift)
-import Control.MonadZero (class Alternative, class MonadZero)
+import Control.Alternative (class Alternative)
 import Control.Plus (class Alt, class Plus)
 import Data.Array (catMaybes) as Arr
 import Data.Array (concat, head, null, singleton)
@@ -122,7 +122,7 @@ instance plusArrayT :: (Monad m, MonadError e m) => Plus (ArrayT m)  where
 
 instance alternativeArrayT :: (Monad m, MonadError e m) => Alternative (ArrayT m)
 
-instance monadZeroArrayT :: (Monad m, MonadError e m) => MonadZero (ArrayT m)
+-- instance monadZeroArrayT :: (Monad m, MonadError e m) => MonadZero (ArrayT m)
 
 instance monadThrowArrayT :: MonadThrow e m => MonadThrow e (ArrayT m) where
   throwError e = lift (throwError e)

@@ -39,7 +39,7 @@ import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedR
 import Prelude (class Eq, class Show, map, show, (<<<), (==), (<$>))
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
------------------------------------------------------------
+----------------------------------------------------------- 
 -- CONTEXT
 -----------------------------------------------------------
 newtype Context = Context ContextRecord

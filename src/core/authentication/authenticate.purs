@@ -38,7 +38,7 @@ import Control.Monad.Except (runExcept)
 import Control.Monad.Trans.Class (lift)
 import Control.Promise (Promise, toAffE)
 import Crypto.Subtle.Constants.AES (aesCBC, l256)
-import Crypto.Subtle.Constants.EC as ECConstants
+import Crypto.Subtle.Constants.EC as ECConstants 
 import Crypto.Subtle.Hash (sha1, sha384)
 import Crypto.Subtle.Key.Derive (deriveBits, pbkdf2)
 import Crypto.Subtle.Key.Generate (aes, generateKey)

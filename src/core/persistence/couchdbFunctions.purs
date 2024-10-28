@@ -39,7 +39,7 @@ module Perspectives.Persistence.CouchdbFunctions
 import Prelude
 
 import Affjax (Response)
-import Affjax as AJ
+import Affjax.Web as AJ
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.ResponseHeader (ResponseHeader, name, value)

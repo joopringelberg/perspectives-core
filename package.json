@@ -5,11 +5,11 @@
   "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
   "dependencies": {
-    "idb-keyval": "^6.2.1",
-    "lru-cache": "^11.0.1",
     "@paralleldrive/cuid2": "^2.2.2",
     "@stomp/stompjs": "^7.0.0",
     "fuzzysort": "^3.1.0",
+    "idb-keyval": "^6.2.1",
+    "lru-cache": "^11.0.1",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.21.1",
     "pouchdb": "^9.0.0",
     "pouchdb-browser": "^9.0.0",

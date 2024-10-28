@@ -28,7 +28,7 @@
 -- | when we feel we can do it.
 -- | Notice that we will actually never encode such values: we replace them with Nothing in the act.
 
-module Perspectives.InvertedQuery where
+module Perspectives.InvertedQuery where 
 
 import Prelude
 
@@ -43,7 +43,7 @@ import Foreign.Object (Object, insert, lookup)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription(..), RoleInContext(..), isContextDomain, isRoleDomain, range)
-import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf)
+import Perspectives.Representation.ExplicitSet (ExplicitSet, isElementOf) 
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, PropertyType, RoleType, StateIdentifier)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')

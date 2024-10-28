@@ -3,17 +3,17 @@
 
 "use strict";
 
-exports["new"] = function () {
+export function newMap () {
   return {};
 };
 
-exports.peekImpl = function (m) {
+export function peekImpl (m) {
   return function (k) {
     return m[k];
   };
 };
 
-exports.poke = function (m) {
+export function poke (m) {
   return function (k) {
     return function (v) {
       m[k] = v;
@@ -22,7 +22,7 @@ exports.poke = function (m) {
   };
 };
 
-exports["delete_"] = function (m) {
+export function delete_ (m) {
   return function (k) {
     var r = m[k];
     delete m[k];
@@ -30,7 +30,7 @@ exports["delete_"] = function (m) {
   };
 };
 
-exports["clear"] = function(m) {
+export function clear(m) {
   return function ()
   {
     Object.keys(m).forEach(
@@ -42,15 +42,15 @@ exports["clear"] = function(m) {
   }
 }
 
-exports["keys"] = function(m) {
+export function keys(m) {
   return Object.keys(m);
 }
 
-exports["values"] = function(m) {
+export function values(m) {
   return Object.values(m);
 }
 
-exports["filterKeys"] = function(predicate){
+export function filterKeys(predicate){
   return function(m){
     Object.keys(m).forEach(function(key) {
       if (!predicate( key ))

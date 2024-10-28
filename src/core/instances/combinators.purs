@@ -24,7 +24,7 @@ module Perspectives.Instances.Combinators where
 
 import Control.Monad.Error.Class (class MonadError)
 import Control.Monad.Trans.Class (lift)
-import Control.MonadZero (guard, map)
+import Control.Alternative (guard, map)
 import Data.Array (cons, elemIndex, foldM, foldMap, head, intersect, null, union)
 import Data.HeytingAlgebra (not, (&&)) as HA
 import Data.Maybe (Maybe(..), maybe)

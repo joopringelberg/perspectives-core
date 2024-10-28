@@ -1,3 +1,4 @@
 // PDR VERSION 25.01
-exports.simpleChat = require ('../../src/model/patches/2503/simpleChat.arc' );
+import simpleChat from '../../src/model/patches/2503/simpleChat.arc';
+export {simpleChat}
 

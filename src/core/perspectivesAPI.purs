@@ -43,7 +43,6 @@ import Effect.Aff (catchError, try)
 import Effect.Class (liftEffect)
 import Effect.Uncurried (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
 import Foreign (Foreign, ForeignError, unsafeToForeign)
-import Foreign.Class (decode)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ApiEffect, RequestType(..)) as Api
@@ -126,9 +125,9 @@ setupApi :: MonadPerspectives Unit
 setupApi = runProcess $ (requestProducer $~ (forever (transform decodeRequest))) $$ consumeRequest
 
 decodeRequest :: Foreign -> Request
-decodeRequest f = case unwrap $ runExceptT (decode f) of
+decodeRequest f = case read f of
   (Right r) -> r
-  (Left e) -> case unwrap $ runExceptT (decode f) of
+  (Left e) -> case read f of
     -- If we have a correlation identifier and a callback, we can send a message back to the client.
     Right (RecordWithCorrelationidentifier {corrId, reactStateSetter}) -> 
       Request
@@ -489,7 +488,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     -- TODO/NOTE that we cannot provide a context role type that will bind these contexts.
     -- This can only be correct if the contexts have the aspect RootContext.
     -- TODO/NOTE the context type must be fully qualified with a model URN.
-    Api.ImportContexts -> case unwrap $ runExceptT $ decode contextDescription of
+    Api.ImportContexts -> case read contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> sendResponse (Error corrId (show e)) setter
       (Right (ContextsSerialisation ctxts) :: Either (NonEmptyList ForeignError) ContextsSerialisation) -> void $
         runMonadPerspectivesTransaction' false authoringRole do
@@ -767,7 +766,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             (Just (qrolname :: RoleType)) -> effect qrolname
 
     withNewContext :: RoleType -> (Maybe RoleType) -> (ContextInstance -> MonadPerspectivesTransaction Unit) -> MonadPerspectives Unit
-    withNewContext authoringRole mroleType effect = case unwrap $ runExceptT $ decode contextDescription of
+    withNewContext authoringRole mroleType effect = case read contextDescription of
       (Left e :: Either (NonEmptyList ForeignError) ContextSerialization) -> sendResponse (Error corrId (show e)) setter
       (Right cd@(ContextSerialization {ctype}) :: Either (NonEmptyList ForeignError) ContextSerialization) -> do
         void $ runMonadPerspectivesTransaction authoringRole do

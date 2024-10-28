@@ -20,7 +20,7 @@
 
 -- END LICENSE
 
-module Perspectives.Repetition where
+module Perspectives.Repetition where 
 
 import Prelude
 

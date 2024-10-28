@@ -3,26 +3,26 @@
 
 "use strict";
 
-exports.empty = {};
+export const empty = {};
 
-exports._lookup = function (no, yes, k, m) {
+export function _lookup (no, yes, k, m) {
   return k in m ? yes(m[k]) : no;
 };
 
-exports._pushFrame = function(env) {
+export function _pushFrame(env) {
   var fr = {};
   Object.setPrototypeOf(fr, env);
   return fr;
 }
 
-exports._addVariable = function(varName, value, environment) {
+export function _addVariable(varName, value, environment) {
   environment[varName] = value;
   return environment;
 }
 
 // (Environment a) -> (Array (Object a))
 // The first element corresponds to the frame at the top of the stack.
-exports._toObjectArray = function( env ) {
+export function _toObjectArray( env ) {
   // The prototype of the prototype of empty is null.
   var proto = Object.getPrototypeOf( env );
   var accumulator = [env];
@@ -33,7 +33,7 @@ exports._toObjectArray = function( env ) {
   return accumulator;
 }
 
-exports._fromObjectArray = function( frames ) {
+export function _fromObjectArray( frames ) {
   var i = 0;
   while (i < length( frames ) - 1 ) {
     Object.setPrototypeOf( frames[i], frames[ i + 1]);

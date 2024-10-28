@@ -19,4 +19,4 @@
 
 // END LICENSE
 
-exports.getRev_ = function(json) {return json._rev}
+export function getRev_(json) {return json._rev}

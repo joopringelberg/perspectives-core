@@ -24,7 +24,7 @@ module Perspectives.DependencyTracking.Dependency where
 
 -- | A Dependency is a combination of a resource (ContextInstance or RoleInstance) and a type
 -- | (EnumeratedRoleType, CalculatedRoleType, EnumeratedPropertyType or CalculatedPropertyType).
--- | However, in the dependency administration we omit these newtypes.
+-- | However, in the dependency administration we omit these newMaptypes.
 
 import Prelude
 
@@ -39,7 +39,7 @@ import Foreign.Object (Object, insert, lookup, singleton, values)
 import Persistence.Attachment (class Attachment)
 import Perspectives.ApiTypes (ApiEffect, Response(..), CorrelationIdentifier)
 import Perspectives.CoreTypes (class Persistent, type (~~>), ArrayWithoutDoubles, Assumption, InformedAssumption(..), MP, assumption, runMonadPerspectivesQuery, (###=))
-import Perspectives.GlobalUnsafeStrMap (GLStrMap, new, peek, poke, delete) as GLS
+import Perspectives.GlobalUnsafeStrMap (GLStrMap, newMap, peek, poke, delete) as GLS
 import Perspectives.ModelDependencies (indexedContextFuzzies)
 import Perspectives.Persistent (entityExists)
 import Perspectives.PerspectivesState (queryAssumptionRegister, queryAssumptionRegisterModify)
@@ -67,13 +67,13 @@ lookupActiveSupportedEffect = show >>> GLS.peek activeSupportedEffects
 -- | A global store of SupportedEffect-s
 -- | This index cannot be part of the PerspectivesState. The compiler loops on it.
 activeSupportedEffects :: ActiveSupportedEffects
-activeSupportedEffects = GLS.new unit
+activeSupportedEffects = GLS.newMap unit
 
 -- | Unless `onlyOnce` equals true, egister the ApiEffect and the TrackedObjectsGetter with the CorrelationIdentifier and run it once.
 -- | Running means: compute the result of the TrackedObjectsGetter, add the computed Assumptions to
 -- | the SupportedEffect and push the resulting values into the ApiEffect.
 -- | As a result:
--- |  1. we have cached a new SupportedEffect in the ActiveSupportedEffects.
+-- |  1. we have cached a newMap SupportedEffect in the ActiveSupportedEffects.
 -- |  2. we have registered the dependency of this SupportedEffect in the AssumptionRegister in the PerspectivesState.
 registerSupportedEffect :: forall a b x. Attachment x => Persistent x a => Newtype b String =>
   CorrelationIdentifier ->
@@ -83,7 +83,7 @@ registerSupportedEffect :: forall a b x. Attachment x => Persistent x a => Newty
   Boolean ->
   MP Unit
 registerSupportedEffect corrId ef q arg onlyOnce = do
-  -- Add a new effect to activeSupportedEffects, for now with zero assumptions.
+  -- Add a newMap effect to activeSupportedEffects, for now with zero assumptions.
   _ <- if onlyOnce 
     then pure unit
     else void $ pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: []}
@@ -107,9 +107,9 @@ registerSupportedEffect corrId ef q arg onlyOnce = do
               (oldSupports :: Array Assumption) <- pure x.assumptions
               -- (oldSupports :: Array Assumption) <- pure <<< unsafePartial $ (fromJust moldSupports).assumptions
               _ <- pure $ GLS.poke activeSupportedEffects (show corrId) {runner: apiEffectRunner, assumptions: assumptions}
-              -- destructively register the correlationIdentifier with new assumptions
-              {no: new} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
-              for_ new (registerDependency corrId)
+              -- destructively register the correlationIdentifier with newMap assumptions
+              {no: newMap} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex oldSupports) assumptions
+              for_ newMap (registerDependency corrId)
               -- destructively deregister the correlationIdentifier from vanished assumptions
               {no: vanished} <- pure $ partition ((maybe false (const true)) <<< flip elemIndex assumptions) oldSupports
               for_ vanished (deregisterDependency corrId)

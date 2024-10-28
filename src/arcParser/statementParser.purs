@@ -37,9 +37,9 @@ import Perspectives.Parsing.Arc.IndentParser (IP, getPosition, outdented', sameO
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), AssignmentOperator(..), LetABinding(..), LetStep(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Prelude (bind, discard, pure, ($), (*>), (<$>), (<*), (<*>), (<>), (>>=))
-import Text.Parsing.Indent (indented', withPos)
-import Text.Parsing.Parser (fail)
-import Text.Parsing.Parser.Combinators (lookAhead, manyTill, option, optionMaybe, (<?>))
+import Parsing.Indent (indented', withPos)
+import Parsing (fail)
+import Parsing.Combinators (lookAhead, manyTill, option, optionMaybe, (<?>))
 
 assignment :: IP Assignment
 assignment = isPropertyAssignment >>= if _

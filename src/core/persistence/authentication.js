@@ -3,7 +3,7 @@
 // The function below applies an empirically grown collection of tests to see if the error
 // originates from a signal from Couchdb that the request is not authorized.
 
-exports.isUnauthorized = function (e)
+export function isUnauthorized (e)
 {
   var unauthorizedRegex = new RegExp(/unauthorized/i);
   return (

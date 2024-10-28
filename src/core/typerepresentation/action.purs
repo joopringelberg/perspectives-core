@@ -24,7 +24,7 @@ module Perspectives.Representation.Action where
 
 import Prelude
 
-import Control.Alt ((<|>))
+import Control.Alt ((<|>)) 
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
