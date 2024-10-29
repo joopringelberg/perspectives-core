@@ -11,9 +11,7 @@
     "@stomp/stompjs": "^7.0.0",
     "fuzzysort": "^3.1.0",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#PERSPECTIVESPROXY",
-    "pouchdb": "^9.0.0",
-    "pouchdb-browser": "^9.0.0",
-    "xhr2-cookies": "^1.1.0"
+    "pouchdb-browser": "^9.0.0"
   },
   "peerDependencies": {
     "eventsource": "^2.0.2"

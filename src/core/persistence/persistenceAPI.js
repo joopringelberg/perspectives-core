@@ -5,7 +5,16 @@
 // Otherwise, we'd carry the Node code to the browser and vice versa.
 // var PouchDB = require('pouchdb-browser').default;
 // var PouchDB = require('pouchdb');
-import {default as Pouchb} from 'pouchdb-browser';
+
+// The construction below is the only way I have found to make Webpack 5.95.0 compile correctly.
+// It compiles to:
+// var pouchdb_browser__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! pouchdb-browser */ \"./node_modules/pouchdb-browser/lib/index.es.js\");
+// const PouchDB = pouchdb_browser__WEBPACK_IMPORTED_MODULE_0__[\"default\"]
+// import {default as PouchDB_} from 'pouchdb-browser';
+// const PouchDB = PouchDB_;
+
+// And yet this works as well. Shoot me.
+import PouchDB from "pouchdb-browser";
 
 function convertPouchError( originalE )
 {

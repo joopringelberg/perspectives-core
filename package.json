@@ -11,9 +11,7 @@
     "idb-keyval": "^6.2.1",
     "lru-cache": "^11.0.1",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.21.1",
-    "pouchdb": "^9.0.0",
-    "pouchdb-browser": "^9.0.0",
-    "xhr2-cookies": "^1.1.0"
+    "pouchdb-browser": "^9.0.0"
   },
   "peerDependencies": {
     "eventsource": "^2.0.2"

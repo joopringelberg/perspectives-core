@@ -27,15 +27,4 @@ s/PARSING/${PARSING}/g;\
 s/LRUCACHE/${LRUCACHE}/g;\
 " packages.template.dhall > packages.dhall
 
-sed "s/AVAR_MONADASK/${AVAR_MONADASK}/g;\
-s/KISHIMEN/${KISHIMEN}/g;\
-s/APITYPES/${APITYPES}/g;\
-s/UTILITIES/${UTILITIES}/g;\
-s/SERIALIZABLENONEMPTYARRAY/${SERIALIZABLENONEMPTYARRAY}/g;\
-s/COUCHDB/${COUCHDB}/g;\
-s/AFFJAX/${AFFJAX}/g;\
-s/PARSING/${PARSING}/g;\
-s/LRUCACHE/${LRUCACHE}/g;\
-" createPerspectivesLinks.template.sh > createPerspectivesLinks.sh
-
 sed "s/PERSPECTIVESPROXY/${PERSPECTIVESPROXY}/g;" package.template.json > package.json

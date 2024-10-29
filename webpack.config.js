@@ -26,7 +26,7 @@ module.exports = function(env)
         {
           test: /\.arc/,
           type: 'asset/source'
-        }        
+        }
       ]
     },
     plugins: [
@@ -36,31 +36,8 @@ module.exports = function(env)
       })        
       ],
     externals: {
-      "perspectives-proxy": {
-        commonjs: 'perspectives-proxy',
-        commonjs2: 'perspectives-proxy',
-        amd: 'perspectives-proxy',
-        root: 'perspectives-proxy'
-      },
-      // These are Affjax dependencies when running on node.
-      "xhr2-cookies": {
-        commonjs: "xhr2-cookies",
-        commonjs2: "xhr2-cookies",
-        amd: "xhr2-cookies",
-        root: "xhr2-cookies"
-      },
-      "url": {
-        commonjs: "url",
-        commonjs2: "url",
-        amd: "url",
-        root: "url"
-      },
-      "pouchdb-browser": {
-        commonjs: "pouchdb-browser",
-        commonjs2: "pouchdb-browser",
-        amd: "pouchdb-browser",
-        root: "pouchdb-browser"
-      },
+      "perspectives-proxy": "umd perspectives-proxy",
+      // "pouchdb": "umd pouchdb",
       "eventsource": 'commonjs eventsource'
     }
   }
