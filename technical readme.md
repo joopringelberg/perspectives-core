@@ -78,25 +78,17 @@ __NOTE__ do not use the `pulp docs` command. It [generates documentation](https:
 ### Symlinks for easy updates
 `package.json` contains a run target `symlinks` that will replace the subdirectories of dependencies that are co-developed with perspectives-core with symlinks to those projects, assuming that they live side-by-side with perspectives-core. Run this script after calling `npm install` or `spago install`. A change in this project is then immediately picked up by webpack (when watching, of course).
 
-## Publishing a new version
-Start by setting a new version number in package.json.
-
-Then commit all source changes to Git and sync them with Github.
-
-Before publishing a new version (through Github), all dependencies need to be up to date. Use the executable script `bumpVersions.sh` for this. Update version variables of dependencies that are maintained in the Perspective project in this script. They look like this:
-
-```
-AVAR_MONADASK=v2.1.1
-KISHIMEN=v1.1.0
-```
-
- Then run it. This will produce up to date versions of
-
-* package.json
-* packages.dhall
-* createPerspectivesLinks.sh
-
-Now you're ready to commit these changes (including the adapted `bumpversions.sh` file). Tag this commit with a new version number.
+## Publish new package version:
+1. In spago.yaml: update the version of `perspectives-apitypes` at `ref`;
+2. outcomment the `path` section;
+3. incomment the `git` and `ref` sections.
+3. Repeat this for: `purescript-avar-monadask`, `purescript-lru-cache`, `purescript-parsing`, `perspectives-utilities`, `serialisable-nonempty-arrays`, `purescript-subtlecrypto`.
+4. In package.template.json: update the version of `perspectives-proxy`;
+4. increase the package number.
+5. Commit.
+6. Create tag.
+7. Push tag.
+8. In spago.yaml: switch back to the local versions.
 
 ## Adding new dependencies
 When you add a new dependency with npm and use the --save or --save-dev flag, it will be registered in the `package.json` file. **However**, the next time you run `bumpVersions.sh`, these additions will be lost **unless** you add the new dependency manually to the `package.template.json` file, too.
