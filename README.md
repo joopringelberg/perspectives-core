@@ -41,3 +41,15 @@ The PDR is being intensively developed by the core team. We appreciate feedback 
 
 ### License information
 This project is available as open source under the terms of the GPL-3.0-or-later license. For accurate information, please check individual files.
+
+## Publish new package version:
+1. In spago.yaml: update the version of `perspectives-apitypes` at `ref`;
+2. outcomment the `path` section;
+3. incomment the `git` and `ref` sections.
+3. Repeat this for: `purescript-avar-monadask`, `purescript-lru-cache`, `purescript-parsing`, `perspectives-utilities`, `serialisable-nonempty-arrays`, `purescript-subtlecrypto`.
+4. In package.json: update the version of `perspectives-proxy`;
+4. increase the package number.
+5. Commit.
+6. Create tag.
+7. Push tag.
+8. In spago.yaml: switch back to the local versions.
