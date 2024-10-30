@@ -91,6 +91,7 @@ workspace:
       # git: https://github.com/joopringelberg/serialisable-nonempty-arrays.git
       # ref: v2.0.0
     subtlecrypto:
-      path: ../purescript-subtlecrypto
+      # git: https://github.com/rowtype-yoga/purescript-yoga-subtlecrypto.git
+      path: ../purescript-yoga-subtlecrypto
   package_set:
     registry: 60.6.0
