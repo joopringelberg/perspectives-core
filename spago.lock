@@ -718,7 +718,7 @@
         "path": "../serialisable-nonempty-arrays"
       },
       "subtlecrypto": {
-        "path": "../purescript-subtlecrypto"
+        "path": "../purescript-yoga-subtlecrypto"
       }
     }
   },
@@ -1922,7 +1922,7 @@
     },
     "subtlecrypto": {
       "type": "local",
-      "path": "../purescript-subtlecrypto",
+      "path": "../purescript-yoga-subtlecrypto",
       "dependencies": [
         "aff",
         "aff-promise",
