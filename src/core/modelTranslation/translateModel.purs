@@ -30,13 +30,20 @@ import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.Writer (Writer, execWriter, tell)
+import Data.Either (Either)
+import Data.Foldable (for_)
+import Data.FoldableWithIndex (forWithIndex_)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Newtype (unwrap)
 import Data.Set (toUnfoldable) as SET
 import Data.Traversable (for)
+import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, lookup, toUnfoldable)
+import Effect (Effect)
+import Effect.Exception (Error)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, lookup, mapWithKey, singleton, toUnfoldable)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup) as EM
@@ -49,28 +56,34 @@ import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType, roletype2string)
+import Purescript.YAML (load)
 
 -- The keys are the languages; the values are the translations of the local type name.
 -- They can be translations of any type.
 newtype Translations = Translations (Object String)
 
+instance Semigroup Translations where
+  append (Translations t1) (Translations t2) = Translations (t1 <> t2)
+
 -- The translations of many properties.
--- The keys are the local property names; the values are their translations.
+-- The keys are the property names; the values are their translations.
 newtype PropertiesTranslation = PropertiesTranslation (Object Translations)
 
+-- The keys are the Action names. Even though Action names are not qualified in the 
+-- DomeinFile, we have qualified them in the Translation.
 newtype ActionsTranslation = ActionsTranslation (Object Translations)
 
 -- In the translation table we will generate a pseudo-qualified action name from the stateSpec and the local action name.
 newtype ActionsPerStateTranslation = ActionsPerStateTranslation (Object ActionsTranslation)
 
-type RoleTranslation = 
+newtype RoleTranslation = RoleTranslation
   { translations :: Translations
   , properties :: PropertiesTranslation
   , actions :: ActionsPerStateTranslation
   }
 
 -- The keys are the local role names.
-type RolesTranslation = Object RoleTranslation
+newtype RolesTranslation = RolesTranslation (Object RoleTranslation)
 
 newtype ContextTranslation = ContextTranslation
   { translations :: Translations
@@ -78,12 +91,14 @@ newtype ContextTranslation = ContextTranslation
   , things :: RolesTranslation
   , contextroles :: RolesTranslation
   -- The keys are the local context names
-  , contexts :: Object ContextTranslation}
+  , contexts :: ContextsTranslation}
+
+newtype ContextsTranslation = ContextsTranslation (Object ContextTranslation)
 
 -- A singleton object. The key is the model name.
 type ModelTranslation = 
   { namespace :: String
-  , contexts :: Maybe (Object ContextTranslation)
+  , contexts :: Maybe ContextsTranslation
   , roles :: Maybe RolesTranslation
   }
 
@@ -99,13 +114,13 @@ generateFirstTranslation (DomeinFile dr) = flip runReader dr do
   toplevelContexts <- pure $ filterKeys isDefinedAtTopLevel dr.contexts
   contexts <- if isEmpty toplevelContexts
     then pure Nothing 
-    else Just <$> (for dr.contexts translateContext)
+    else Just <<< ContextsTranslation <$> (for dr.contexts translateContext)
   eroles <- for (filterKeys isDefinedAtTopLevel dr.enumeratedRoles)
     (translateRole <<< E)
   croles <- for (filterKeys isDefinedAtTopLevel dr.calculatedRoles)
    (translateRole <<< C)
   allRoles <- pure $ fromFoldable ((toUnfoldable eroles <> toUnfoldable croles) :: Array (Tuple String RoleTranslation))
-  roles <- if isEmpty allRoles then pure Nothing else pure $ Just allRoles
+  roles <- if isEmpty allRoles then pure Nothing else pure $ Just $ RolesTranslation allRoles
   pure { namespace: dr.namespace, contexts, roles}
   where
   isDefinedAtTopLevel :: String -> Boolean
@@ -116,7 +131,7 @@ translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedCon
   users <- translateRoles gebruikerRol
   things <- translateRoles rolInContext
   contextroles <- translateRoles contextRol
-  contexts <- fromFoldable <$> for nestedContexts \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
+  contexts <- ContextsTranslation <<< fromFoldable <$> for nestedContexts \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
   pure $ ContextTranslation
     { translations: Translations empty
     , users
@@ -125,7 +140,7 @@ translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedCon
     , contexts}
   where
   translateRoles :: Array RoleType -> Reader DomeinFileRecord RolesTranslation
-  translateRoles roles = fromFoldable <$> for roles 
+  translateRoles roles = RolesTranslation <$> fromFoldable <$> for roles 
     (\rt -> (lookupRoleType rt >>= translateRole >>= pure <<< Tuple (roletype2string rt)))
 
 
@@ -149,10 +164,10 @@ translateRole (E (EnumeratedRole rec)) = do
     (ps :: Array (Tuple String Translations)) <- (for rec.properties translatePropertyType)
     pure $ PropertiesTranslation $ fromFoldable ps
   actions <- translateActions rec.actions
-  pure {translations: Translations empty, properties, actions}
+  pure $ RoleTranslation {translations: Translations empty, properties, actions}
 translateRole (C (CalculatedRole rec)) = do 
   actions <- translateActions rec.actions
-  pure {translations: Translations empty, properties: PropertiesTranslation empty, actions}
+  pure $ RoleTranslation {translations: Translations empty, properties: PropertiesTranslation empty, actions}
 
 translateActions :: EncodableMap StateSpec (Object Action) -> Reader DomeinFileRecord ActionsPerStateTranslation
 translateActions actions = ActionsPerStateTranslation <<< fromFoldable <$> 
@@ -165,6 +180,147 @@ translateActions actions = ActionsPerStateTranslation <<< fromFoldable <$>
 translatePropertyType :: PropertyType -> Reader DomeinFileRecord (Tuple String Translations)
 translatePropertyType (CP (CalculatedPropertyType p)) =  pure $ Tuple p (Translations empty)
 translatePropertyType (ENP (EnumeratedPropertyType p)) = pure $ Tuple p (Translations empty)
+
+-------------------------------------------------------------------------------
+---- THE TRANSLATION CLASS
+-------------------------------------------------------------------------------
+class Translation a where 
+  qualify :: String -> a -> a
+  writeKeys :: a -> Writer (Object Translations) Unit
+  writeYaml :: String -> a -> Writer String Unit
+  addTranslations :: TranslationTable -> a -> a
+
+instance Translation Translations where
+  qualify _ a = a
+  writeKeys _ = pure unit
+  writeYaml indent (Translations translations) = do
+    tell (i indent "translations" colonNl)
+    void $ for (object2array translations)
+      \(Tuple lang translation) -> do
+        tell (i indent tab lang colonSpace translation nl)
+  addTranslations _ t = t 
+
+instance Translation PropertiesTranslation where
+  qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
+  writeKeys (PropertiesTranslation translations) = tell translations
+  writeYaml indent (PropertiesTranslation properties) = void $ forWithIndex properties
+    \propName translations -> do
+      tell (i indent (typeUri2LocalName_ propName) colonNl)
+      writeYaml (indent <> tab) translations
+  addTranslations (TranslationTable table) (PropertiesTranslation obj) = PropertiesTranslation $
+    flip mapWithKey obj \propName translations -> case lookup propName table of 
+      Nothing -> translations
+      Just ts -> ts
+
+instance Translation ActionsTranslation where
+  qualify namespace (ActionsTranslation obj) = ActionsTranslation $ qualifyObjectKeys namespace obj
+  writeKeys (ActionsTranslation translations) = tell translations
+  writeYaml indent (ActionsTranslation actions) = void $ forWithIndex actions
+    \actionName translations -> do
+      tell (i indent actionName colonNl)
+      writeYaml (indent <> tab) translations
+  addTranslations (TranslationTable table) (ActionsTranslation a) = ActionsTranslation $ 
+    flip mapWithKey a \actionName translations -> case lookup actionName table of
+      Nothing -> translations
+      Just ts -> ts
+
+instance Translation ActionsPerStateTranslation where
+  qualify namespace (ActionsPerStateTranslation obj) = ActionsPerStateTranslation $ qualifyObjectKeys namespace obj
+  writeKeys (ActionsPerStateTranslation actiontranslations) = void $ for actiontranslations writeKeys
+  writeYaml indent (ActionsPerStateTranslation actions) = case actions of
+    none | isEmpty none -> pure unit
+    actions' -> do
+      tell (i indent "actions" colonNl)
+      void $ forWithIndex actions'
+        \stateName acts -> do 
+          tell (i (indent <> tab) (typeUri2LocalName_ stateName) colonNl)
+          void $ for_ actions (writeYaml (indent <> tab <> tab))
+  addTranslations table (ActionsPerStateTranslation a) = ActionsPerStateTranslation $ addTranslations table <$> a
+
+instance Translation RolesTranslation where
+  qualify namespace (RolesTranslation obj) = RolesTranslation ((qualify namespace) <$> obj)
+  writeKeys (RolesTranslation roleTranslations) = forWithIndex_ roleTranslations 
+    \roleName (RoleTranslation {translations, properties, actions}) -> do 
+      tell (singleton roleName translations)
+      writeKeys properties
+      writeKeys actions
+  writeYaml indent (RolesTranslation userRoles) = void $ for (object2array userRoles)
+    \(Tuple roleName roleTranslation) -> do
+      tell (i indent (typeUri2LocalName_ roleName) colonSpace)
+      writeYaml (indent <> tab) roleTranslation
+  addTranslations tbl@(TranslationTable table) (RolesTranslation a) = RolesTranslation $ flip mapWithIndex a 
+    \roleName r@(RoleTranslation rec) -> case lookup roleName table of 
+      Nothing -> addTranslations tbl r
+      Just ts -> addTranslations tbl (RoleTranslation rec {translations = ts})
+
+instance Translation RoleTranslation where
+  qualify namespace (RoleTranslation {translations, properties, actions}) = let 
+    properties' = qualify namespace properties
+    actions' = qualify namespace actions
+    in
+    RoleTranslation {translations, properties: properties', actions: actions'}
+  writeKeys _ = pure unit
+  writeYaml indent (RoleTranslation {translations, properties, actions}) = do
+    writeYaml indent translations
+    writeYaml indent properties
+    writeYaml indent actions
+  addTranslations table (RoleTranslation {translations, properties, actions}) = RoleTranslation $ 
+    { translations
+    , properties: addTranslations table properties
+    , actions: addTranslations table actions}
+
+instance Translation ContextTranslation where
+  qualify namespace (ContextTranslation {translations, users, things, contextroles, contexts}) = let 
+    users' = qualify namespace users
+    things' = qualify namespace things
+    contextroles' = qualify namespace contextroles
+    contexts' = qualify namespace contexts
+    in
+    ContextTranslation {translations, users: users', things: things', contextroles: contextroles', contexts: contexts'}
+  writeKeys _ = pure unit
+  writeYaml indent (ContextTranslation {translations, users, things, contextroles, contexts:ctxts}) = do 
+    writeYaml indent translations
+    tell (i indent "users" colonNl)
+    writeYaml (indent <> tab) users
+    tell (i indent "things" colonNl)
+    writeYaml (indent <> tab) things
+    tell (i indent "contextroles" colonNl)
+    writeYaml (indent <> tab) contextroles
+    tell (i indent "contexts" colonNl)
+    writeYaml (indent <> tab) ctxts
+  addTranslations table (ContextTranslation {translations, users, things, contextroles, contexts:ctxts}) = ContextTranslation 
+    { translations
+    , users: addTranslations table users
+    , things: addTranslations table things
+    , contextroles: addTranslations table contextroles
+    , contexts: addTranslations table ctxts
+    }
+
+instance Translation ContextsTranslation where
+  qualify namespace (ContextsTranslation obj) = ContextsTranslation ((qualify namespace) <$> obj)
+  writeKeys (ContextsTranslation contextTranslations) = forWithIndex_ contextTranslations
+    \contextName (ContextTranslation {translations, users, things, contextroles, contexts}) -> do
+      tell (singleton contextName translations)
+      writeKeys users
+      writeKeys things
+      writeKeys contextroles
+      writeKeys contexts
+  writeYaml indent (ContextsTranslation ctxts) = void $ for (object2array ctxts)
+    \(Tuple contextName contextTranslation) -> do
+      tell (i indent (typeUri2LocalName_ contextName) colonSpace)
+      writeYaml (indent <> tab) contextTranslation
+  addTranslations tbl@(TranslationTable table) (ContextsTranslation a) = ContextsTranslation $ flip mapWithIndex a 
+    \contextName r@(ContextTranslation rec) -> case lookup contextName table of 
+      Nothing -> addTranslations tbl r
+      Just ts -> addTranslations tbl (ContextTranslation rec {translations = ts})
+
+qualifyObjectKeys :: forall a. Translation a => String -> Object a -> Object a
+qualifyObjectKeys namespace obj = fromFoldable 
+  (((toUnfoldable obj) :: Array (Tuple String a)) <#> 
+    \(Tuple key val) -> Tuple (i namespace "$" key) (qualify (i namespace "$" key) val))
+
+object2array :: forall a. Object a -> Array (Tuple String a)
+object2array = toUnfoldable
 
 -------------------------------------------------------------------------------
 ---- GENERATE YAML FROM TRANSLATION
@@ -184,77 +340,49 @@ nl = "\n"
 writeTranslationYaml :: ModelTranslation -> String
 writeTranslationYaml {namespace, contexts, roles} = execWriter 
   do
-    tell $ namespace <> colonNl
-    case contexts of 
-      Nothing -> pure unit
-      Just c -> do 
-        tell (i tab "contexts" colonNl)
-        void $ for (object2array c)
-          (writeContext (tab <> tab))
-  
-  where
-  writeContext :: String -> (Tuple String ContextTranslation) -> Writer String Unit
-  writeContext indent (Tuple cname (ContextTranslation {translations, users, things, contextroles, contexts:ctxts})) = do 
-    -- ContextName: 
-    tell indent
-    tell $ (typeUri2LocalName_ cname) <> colonNl
-    -- translations: 
-    --   en: Context name
-    --   nl: Context naam
-    writeTranslations (indent <> tab) translations
-    -- users: 
-    tell (i indent "users" colonNl)
-    writeRoles (indent <> tab) users
-    -- things: 
-    tell (i indent "things" colonNl)
-    writeRoles (indent <> tab) things
-    -- contextroles: 
-    tell (i indent "contextroles" colonNl)
-    writeRoles (indent <> tab) contextroles
-    -- Nested contexts
-    tell (i indent "contexts" colonNl)
-    writeNestedContexts (indent <> tab) ctxts
+    tell (namespace <> colonNl)
+    for_ contexts \contexts' -> do
+      tell (i tab "contexts" colonNl)
+      writeYaml tab contexts'
+    for_ roles \roles' -> do
+      tell (i tab "roles" colonNl)
+      writeYaml tab roles'
 
-  writeNestedContexts :: String -> Object ContextTranslation -> Writer String Unit
-  writeNestedContexts indent contextTypes = do 
-    void $ for (object2array contextTypes)
-      (writeContext  indent)
+-------------------------------------------------------------------------------
+---- QUALIFY NAMES IN TRANSLATION
+-------------------------------------------------------------------------------
+qualifyModelTranslation :: ModelTranslation -> ModelTranslation
+qualifyModelTranslation {namespace, contexts, roles} = let
+  contexts' = (qualify namespace) <$> contexts 
+  roles' = (qualify namespace) <$> roles
+  in
+  {namespace, contexts, roles}
 
-  writeRoles :: String -> RolesTranslation -> Writer String Unit
-  writeRoles indent userRoles = do
-    void $ for (object2array userRoles)
-      \(Tuple roleName {translations, properties, actions}) -> do
-        tell (i indent roleName colonSpace)
-        writeTranslations (indent <> tab) translations
-        case properties of 
-          PropertiesTranslation properties' -> void $ for (object2array properties') (writeProperty (indent <> tab))
-        case actions of
-          ActionsPerStateTranslation none | isEmpty none -> pure unit
-          ActionsPerStateTranslation actions' -> do
-            tell (i indent tab "actions" colonNl)
-            void $ for (object2array actions') (writeActions (indent <> tab <> tab))
-  
-  writeActions :: String -> Tuple String ActionsTranslation -> Writer String Unit
-  writeActions indent (Tuple state (ActionsTranslation actions)) = do
-    tell (i indent state colonNl)
-    void $ for (object2array actions) (writeAction (indent <> tab))
+-------------------------------------------------------------------------------
+---- CONSTRUCT TRANSLATIONTABLE FROM TRANSLATION
+-------------------------------------------------------------------------------
+-- Each key is the string representation of a type (ContextType, EnumeratedRoleType,
+-- CalculatedRoleType, EnumeratedPropertyType, CalculatedPropertyType) or of the combination 
+-- of a StateIdentifier and an Action name (separated by '$').
+newtype TranslationTable = TranslationTable (Object Translations)
 
-  writeAction :: String -> Tuple String Translations -> Writer String Unit
-  writeAction indent (Tuple action translations) = do 
-    tell (i indent action colonNl)
-    writeTranslations (indent <> tab) translations
+generateTranslationTable :: ModelTranslation -> TranslationTable
+generateTranslationTable {contexts, roles} = TranslationTable $ execWriter do
+  for_ contexts writeKeys
+  for_ roles writeKeys
 
-  writeProperty :: String -> Tuple String Translations -> Writer String Unit
-  writeProperty indent (Tuple prop translations) = do
-    tell (i indent prop colonNl)
-    writeTranslations (indent <> tab) translations
-  
-  writeTranslations :: String -> Translations -> Writer String Unit
-  writeTranslations indent (Translations translations) = do
-    tell (i indent "translations" colonNl)
-    void $ for (object2array translations)
-      \(Tuple lang translation) -> do
-        tell (i indent tab lang colonSpace translation nl)
+-------------------------------------------------------------------------------
+---- PARSE YAML TO TRANSLATION
+-------------------------------------------------------------------------------
+parseTranslation :: String -> Effect (Either Error ModelTranslation)
+parseTranslation source = map qualifyModelTranslation <$> load source
 
-object2array :: forall a. Object a -> Array (Tuple String a)
-object2array = toUnfoldable
+-------------------------------------------------------------------------------
+---- ADD TRANSLATIONS
+-- Add existing translations from a TranslationTable to a new Translations derived from a DomeinFile
+-------------------------------------------------------------------------------
+augmentModelTranslation :: TranslationTable -> ModelTranslation -> ModelTranslation
+augmentModelTranslation table {namespace, contexts, roles} = 
+  { namespace
+  , contexts: addTranslations table <$> contexts
+  , roles: addTranslations table <$> roles}

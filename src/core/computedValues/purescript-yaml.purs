@@ -32,10 +32,12 @@ import Effect.Exception (Error)
 
 foreign import loadImpl :: forall a. String -> Effect a
 
+-- | From a YAML source, produce JSON.
 load :: forall a. String -> Effect (Either Error a)
 load source = try (runFn1 loadImpl source)
 
 foreign import dumpImpl :: forall a. a -> Effect String
 
+-- | From a JSON source, produce a YAML string.
 dump :: forall a. a -> Effect (Either Error String)
 dump a = try (runFn1 dumpImpl a)
