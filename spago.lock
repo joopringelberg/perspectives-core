@@ -34,6 +34,7 @@
             "http-methods",
             "identity",
             "integers",
+            "interpolate",
             "js-date",
             "js-iterators",
             "lists",
@@ -115,6 +116,7 @@
             "http-methods",
             "identity",
             "integers",
+            "interpolate",
             "invariant",
             "js-date",
             "js-iterators",
@@ -1345,6 +1347,15 @@
       "dependencies": [
         "maybe",
         "numbers",
+        "prelude"
+      ]
+    },
+    "interpolate": {
+      "type": "registry",
+      "version": "5.0.2",
+      "integrity": "sha256-0AtQzAH38GHBlHcclutpGptFq7h6fjWWrw/kq6LsCSw=",
+      "dependencies": [
+        "partial",
         "prelude"
       ]
     },

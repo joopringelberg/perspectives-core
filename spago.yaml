@@ -1,71 +1,72 @@
 package:
   dependencies:
-  - aff
-  - aff-coroutines
-  - aff-promise
-  - affjax-web
-  - apitypes
-  - argonaut
-  - arraybuffer
-  - arraybuffer-builder
-  - arraybuffer-types
-  - arrays
-  - avar
-  - avar-monadask
-  - b64
-  - console
-  - control
-  - coroutines
-  - datetime
-  - effect
-  - either
-  - enums
-  - exceptions
-  - foldable-traversable
-  - foreign
-  - foreign-object
-  - free
-  - functions
-  - http-methods
-  - identity
-  - integers
-  - js-iterators
-  - js-date
-  - lists
-  - lrucache
-  - maybe
-  - media-types
-  - newtype
-  - node-buffer
-  - node-fs
-  - node-path
-  - node-process
-  - now
-  - nullable
-  - ordered-collections
-  - parsing
-  - partial
-  - perspectives-utilities
-  - prelude
-  - profunctor-lenses
-  - random
-  - record
-  - safe-coerce
-  - serializablenonemptyarray
-  - simple-json
-  - strings
-  - subtlecrypto
-  - tailrec
-  - test-unit
-  - transformers
-  - tuples
-  - uint
-  - unicode
-  - unsafe-coerce
-  - web-encoding
+    - aff
+    - aff-coroutines
+    - aff-promise
+    - affjax-web
+    - apitypes
+    - argonaut
+    - arraybuffer
+    - arraybuffer-builder
+    - arraybuffer-types
+    - arrays
+    - avar
+    - avar-monadask
+    - b64
+    - console
+    - control
+    - coroutines
+    - datetime
+    - effect
+    - either
+    - enums
+    - exceptions
+    - foldable-traversable
+    - foreign
+    - foreign-object
+    - free
+    - functions
+    - http-methods
+    - identity
+    - integers
+    - interpolate
+    - js-date
+    - js-iterators
+    - lists
+    - lrucache
+    - maybe
+    - media-types
+    - newtype
+    - node-buffer
+    - node-fs
+    - node-path
+    - node-process
+    - now
+    - nullable
+    - ordered-collections
+    - parsing
+    - partial
+    - perspectives-utilities
+    - prelude
+    - profunctor-lenses
+    - random
+    - record
+    - safe-coerce
+    - serializablenonemptyarray
+    - simple-json
+    - strings
+    - subtlecrypto
+    - tailrec
+    - test-unit
+    - transformers
+    - tuples
+    - uint
+    - unicode
+    - unsafe-coerce
+    - web-encoding
   name: perspectives-core
 workspace:
-  extra_packages:
+  extraPackages:
     apitypes:
       path: ../perspectives-apitypes
       # git: https://github.com/joopringelberg/perspectives-apitypes.git
@@ -93,5 +94,5 @@ workspace:
     subtlecrypto:
       # git: https://github.com/rowtype-yoga/purescript-yoga-subtlecrypto.git
       path: ../purescript-yoga-subtlecrypto
-  package_set:
+  packageSet:
     registry: 60.6.0

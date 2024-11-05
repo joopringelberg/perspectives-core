@@ -9,6 +9,7 @@
     "@stomp/stompjs": "^7.0.0",
     "fuzzysort": "^3.1.0",
     "idb-keyval": "^6.2.1",
+    "js-yaml": "^4.1.0",
     "lru-cache": "^11.0.1",
     "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.21.4",
     "pouchdb-browser": "^9.0.0"

@@ -41,7 +41,7 @@ import Foreign (Foreign, unsafeToForeign)
 import Foreign.Object (Object, empty)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), MonadPerspectivesTransaction, MonadPerspectives)
+import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocWithAttachmentInfo(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -176,6 +176,10 @@ compileRepositoryModels modelsurl_ manifestsurl_ _ = try
     Just modelsurl, Just manifestsurl -> recompileModelsAtUrl modelsurl manifestsurl
     _, _ -> logPerspectivesError $ Custom ("compileRepositoryModels lacks arguments"))
   >>= handleExternalStatementError "model://perspectives.domains#Parsing$CompileRepositoryModels"
+
+-- parseYAMLTranslationSource :: 
+--   Array String -> 
+--   Array RoleInstance -> MonadPerspectivesTransaction Translation
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
