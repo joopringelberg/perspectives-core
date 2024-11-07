@@ -24,7 +24,7 @@
 ---- TRANSLATION
 -------------------------------------------------------------------------------
 
-module Purescript.ModelTranslation where
+module Perspectives.ModelTranslation where
 
 import Prelude
 
@@ -57,10 +57,13 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType, roletype2string)
 import Purescript.YAML (load)
+import Simple.JSON (class ReadForeign, class WriteForeign, read', write)
 
 -- The keys are the languages; the values are the translations of the local type name.
 -- They can be translations of any type.
 newtype Translations = Translations (Object String)
+derive newtype instance WriteForeign Translations
+derive newtype instance ReadForeign Translations
 
 instance Semigroup Translations where
   append (Translations t1) (Translations t2) = Translations (t1 <> t2)
@@ -68,22 +71,32 @@ instance Semigroup Translations where
 -- The translations of many properties.
 -- The keys are the property names; the values are their translations.
 newtype PropertiesTranslation = PropertiesTranslation (Object Translations)
+derive newtype instance WriteForeign PropertiesTranslation
+derive newtype instance ReadForeign PropertiesTranslation
 
 -- The keys are the Action names. Even though Action names are not qualified in the 
 -- DomeinFile, we have qualified them in the Translation.
 newtype ActionsTranslation = ActionsTranslation (Object Translations)
+derive newtype instance WriteForeign ActionsTranslation
+derive newtype instance ReadForeign ActionsTranslation
 
 -- In the translation table we will generate a pseudo-qualified action name from the stateSpec and the local action name.
 newtype ActionsPerStateTranslation = ActionsPerStateTranslation (Object ActionsTranslation)
+derive newtype instance WriteForeign ActionsPerStateTranslation
+derive newtype instance ReadForeign ActionsPerStateTranslation
 
 newtype RoleTranslation = RoleTranslation
   { translations :: Translations
   , properties :: PropertiesTranslation
   , actions :: ActionsPerStateTranslation
   }
+derive newtype instance WriteForeign RoleTranslation
+derive newtype instance ReadForeign RoleTranslation
 
 -- The keys are the local role names.
 newtype RolesTranslation = RolesTranslation (Object RoleTranslation)
+derive newtype instance WriteForeign RolesTranslation
+derive newtype instance ReadForeign RolesTranslation
 
 newtype ContextTranslation = ContextTranslation
   { translations :: Translations
@@ -93,7 +106,16 @@ newtype ContextTranslation = ContextTranslation
   -- The keys are the local context names
   , contexts :: ContextsTranslation}
 
+instance WriteForeign ContextTranslation where
+  writeImpl (ContextTranslation rec) = write rec
+instance ReadForeign ContextTranslation where
+  readImpl f = read' f
+
 newtype ContextsTranslation = ContextsTranslation (Object ContextTranslation)
+instance WriteForeign ContextsTranslation where
+  writeImpl (ContextsTranslation obj) = write obj
+instance ReadForeign ContextsTranslation where
+  readImpl f = read' f
 
 -- A singleton object. The key is the model name.
 type ModelTranslation = 
@@ -365,6 +387,7 @@ qualifyModelTranslation {namespace, contexts, roles} = let
 -- CalculatedRoleType, EnumeratedPropertyType, CalculatedPropertyType) or of the combination 
 -- of a StateIdentifier and an Action name (separated by '$').
 newtype TranslationTable = TranslationTable (Object Translations)
+derive newtype instance ReadForeign TranslationTable
 
 generateTranslationTable :: ModelTranslation -> TranslationTable
 generateTranslationTable {contexts, roles} = TranslationTable $ execWriter do
@@ -386,3 +409,7 @@ augmentModelTranslation table {namespace, contexts, roles} =
   { namespace
   , contexts: addTranslations table <$> contexts
   , roles: addTranslations table <$> roles}
+
+-------------------------------------------------------------------------------
+---- RETRIEVE THE LOCAL TRANSLATION TABLE FOR A MODEL
+-------------------------------------------------------------------------------

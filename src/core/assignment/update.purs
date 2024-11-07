@@ -560,7 +560,7 @@ saveFile r property arrayBuf mimeType = do
       , propertyType: replacementProperty
       , mimeType
       , database: dbLoc
-      , roleFileName: Just documentName
+      , roleFileName: documentName
       }
     Just val -> case parsePerspectivesFile $ unwrap val of
       Left e -> pure $ writePerspectivesFile
@@ -568,9 +568,9 @@ saveFile r property arrayBuf mimeType = do
         , propertyType: replacementProperty
         , mimeType
         , database: dbLoc
-        , roleFileName: Just documentName
+        , roleFileName: documentName
         }
-      Right rec ->  pure $ writePerspectivesFile $ rec {database = dbLoc, roleFileName = Just documentName}
+      Right rec ->  pure $ writePerspectivesFile $ rec {database = dbLoc, roleFileName = documentName}
   case parsePerspectivesFile usedVal of
     Left e -> throwError $ error ("Could not parse '" <> usedVal <> "' trying to save file:" <> show e)
     Right rec -> do

@@ -30,19 +30,18 @@ fileText fileInfo_ _ = try
     Just v -> case parsePerspectivesFile v of
       Left e -> pure []
       Right {propertyType, roleFileName, database, mimeType} -> if isATextType mimeType
-        then case roleFileName, database of 
-          Just rid, Just db -> do
-            (ma :: Maybe Foreign) <- lift $ getAttachment db rid (typeUri2couchdbFilename $ unwrap propertyType)
+        then case database of 
+          Just db -> do
+            (ma :: Maybe Foreign) <- lift $ getAttachment db roleFileName (typeUri2couchdbFilename $ unwrap propertyType)
             case ma of
               Nothing -> pure []
               Just a -> (lift $ lift $ fromBlob a) >>= pure <<< singleton
-          Just rid, Nothing -> do 
+          Nothing -> do 
             db <- lift $ entitiesDatabaseName
-            (ma :: Maybe Foreign) <- lift $ getAttachment db rid (typeUri2couchdbFilename $ unwrap propertyType)
+            (ma :: Maybe Foreign) <- lift $ getAttachment db roleFileName (typeUri2couchdbFilename $ unwrap propertyType)
             case ma of
               Nothing -> pure []
               Just a -> (lift $ lift $ fromBlob a) >>= pure <<< singleton
-          _, _ -> pure []
         else pure []
     Nothing -> pure [])
   >>= handleExternalFunctionError "model://perspectives.domains#Files$FileText"
