@@ -165,7 +165,8 @@ type PerspectivesFile =
   , propertyType :: EnumeratedPropertyType  -- The identifier of the attachment of the role instance.
   , mimeType :: MIME
   , database :: Maybe String                -- The database where the role instance is stored. 
-  , roleFileName :: Maybe String            -- The name of the role instance document. 
+                                            -- (is Nothing for IndexedDB)
+  , roleFileName :: String                  -- The name of the role instance document. 
   }
 
 parsePerspectivesFile :: String -> Either MultipleErrors PerspectivesFile

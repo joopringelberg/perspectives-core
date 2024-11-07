@@ -73,6 +73,7 @@ import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunctio
 import Perspectives.Representation.QueryFunction (QueryFunction(..)) as QF
 import Perspectives.Representation.ThreeValuedLogic (pessimistic)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
+import Perspectives.ResourceIdentifiers (databaseLocation, resourceIdentifier2DocLocator)
 import Perspectives.SaveUserData (removeBinding, setBinding, setFirstBinding, scheduleRoleRemoval, scheduleContextRemoval)
 import Perspectives.ScheduledAssignment (ScheduledAssignment(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -276,10 +277,14 @@ compileAssignment (MQD _ (QF.CreateFileF mimeType qualifiedProperty) args _ _ _)
       -- Notice that the content is a string. It is eventually passed on to toFile as a Foreign value and 
       -- then passed on to the File constructor. This constructor accepts Strings just as well as ArrayBuffers.
       Just roleInstance, Just content, Just (Value fileName) -> do
-        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
+        dbLoc <- lift $ databaseLocation $ unwrap roleInstance
+        {documentName} <- lift $ resourceIdentifier2DocLocator (unwrap roleInstance)
+        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: dbLoc, roleFileName: documentName}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign content) mimeType
       Just roleInstance, Nothing, Just (Value fileName) -> do
-        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: Nothing, roleFileName: Nothing}]
+        dbLoc <- lift $ databaseLocation $ unwrap roleInstance
+        {documentName} <- lift $ resourceIdentifier2DocLocator (unwrap roleInstance)
+        setProperty roles qualifiedProperty Nothing [Value $ writePerspectivesFile {fileName, mimeType, propertyType: qualifiedProperty, database: dbLoc, roleFileName: documentName}]
         void $ saveFile roleInstance qualifiedProperty (unsafeToForeign "") mimeType
       Nothing, _, Just (Value fileName) -> throwError (error $ "No role instance found to attach the file '" <> fileName <> "' to.")
       _, _, _ -> throwError (error $ "some of the arguments to create file are missing.")

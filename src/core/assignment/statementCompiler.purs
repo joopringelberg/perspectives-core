@@ -61,7 +61,7 @@ import Perspectives.Representation.Class.Role (roleTypeIsFunctional) as ROLE
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..)) as QF
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), pessimistic)
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..)) as Verbs
 import Perspectives.Types.ObjectGetters (externalRole, generalisesRoleType_, hasPerspectiveOnPropertyWithVerb, isDatabaseQueryRole, isEnumeratedProperty, lookForRoleTypeOfADT, lookForUnqualifiedPropertyType, lookForUnqualifiedRoleTypeOfADT)
@@ -424,7 +424,9 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
                   Just e -> do
                     qfd <- compileExpression originDomain e
                     case range qfd of
-                      (RDOM _) -> pure qfd
+                      (RDOM _) -> if pessimistic $ functional qfd 
+                        then pure qfd
+                        else throwError $ NotFunctional (startOf e) (endOf e) e
                       otherwise -> throwError $ NotARoleDomain (range qfd) (startOf e) (endOf e)
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
         pure $ MQD originDomain (QF.CreateFileF mimeType qualifiedProperty) [filenameQfd, contentQfd, roleQfd] originDomain True False

@@ -535,7 +535,7 @@ setProperty rids propertyName mdelta values = do
 -----------------------------------------------------------
 -- SAVEFILE
 -----------------------------------------------------------
--- | From a Foreign value that represents an ArrayBuffer, create a File and save it with a role instance document.
+-- | From a Foreign value that represents an ArrayBuffer or String, create a File and save it with a role instance document.
 -- | Updates the revision of the role instance.
 saveFile :: RoleInstance -> EnumeratedPropertyType -> Foreign -> String -> MonadPerspectivesTransaction String
 saveFile r property arrayBuf mimeType = do
