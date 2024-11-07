@@ -29,7 +29,7 @@ import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.AvarMonadAsk (modify, gets) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
-import Control.Monad.State (execState)
+import Control.Monad.State (StateT, execState, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Array (catMaybes, cons, filter, head, union)
@@ -37,7 +37,6 @@ import Data.Array (union, delete) as ARR
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
-import JS.Iterable (toArray)
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (over, unwrap)
@@ -47,12 +46,15 @@ import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign.Object (empty, fromFoldable, singleton)
+import Foreign (Foreign)
+import Foreign.Object (empty, fromFoldable, singleton, Object)
+import JS.Iterable (toArray)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.ApiTypes (ContextSerialization(..), PropertySerialization(..), RolSerialization(..))
@@ -61,7 +63,7 @@ import Perspectives.Assignment.Update (withAuthoringRole)
 import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
-import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
+import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_, rev)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
@@ -81,13 +83,13 @@ import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase, Keys(..))
+import Perspectives.Persistence.API (addAttachment) as P
 import Perspectives.Persistence.API (deleteDocument) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (addAttachment) as P
 import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
@@ -269,21 +271,24 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
     , referredModels
     , invertedQueriesInOtherDomains
     , upstreamStateNotifications
-    , upstreamAutomaticEffects} <- lift $ getDocument repositoryUrl documentName
+    , upstreamAutomaticEffects
+    , _attachments} <- lift $ getDocument repositoryUrl documentName
+
+  attachments <- case _attachments of
+    Nothing -> pure empty
+    Just atts ->  lift $ traverseWithIndex
+      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment repositoryUrl documentName attName)
+      atts
 
   -- Store the model in Couchdb, that is: in the local store of models.
   -- Save it with the revision of the local version that we have, if any (do not use the repository version).
   {documentName:unversionedDocumentName} <- lift $ resourceIdentifier2WriteDocLocator unversionedModelname
   lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName, _attachments = Nothing})
   -- saveCachedDomeinFile takes care of revisions.
-  revision <- lift $ saveCachedDomeinFile id >>= pure <<< rev
+  newRev <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
-  -- Copy the attachment
-  mAttachment <- lift $ getAttachment repositoryUrl documentName "screens.js"
-  case mAttachment of
-    Nothing -> pure unit
-    Just attachment -> lift $ void $ P.addAttachment dfid "screens.js" attachment (MediaType "text/ecmascript")
-
+  -- Add all attachments.
+  void $ lift $ execStateT (addAttachments repositoryUrl documentName attachments) newRev
 
   if isInitialLoad'
     then do 
@@ -318,6 +323,20 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
+  where
+    -- As each attachment that we add will bump the document version, we have to catch it and use it on the
+    -- next attachment.
+    addAttachments :: String -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
+    addAttachments documentUrl documentName attachments = do 
+      forWithIndex_ 
+        attachments 
+        (\attName (Tuple mimetype mattachment) -> do 
+          case mattachment of
+            Nothing -> pure unit
+            Just attachment -> do
+              newRev <- get
+              DeleteCouchdbDocument {rev} <- lift $ P.addAttachment documentUrl documentName newRev attName attachment mimetype
+              put rev)
 
 createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
 createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest = do
