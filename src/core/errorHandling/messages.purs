@@ -138,6 +138,7 @@ data PerspectivesError
     | NoCalculatedAspect ArcPosition String
 
     | DomeinFileIdIncompatible DomeinFileId DomeinFileId ArcPosition
+    | PerspectivesFileFormatError String String
 
     -- Screens
     | ScreenForUserRoleOnly ArcPosition ArcPosition
@@ -172,6 +173,7 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (IncompatibleQueryArgument pos dom step) = "(IncompatibleQueryArgument) Cannot get " <> show step <> " from " <> show dom <> ", at: " <> show pos
   show (NoCalculatedAspect start calculatedRoleName) = "(NoCalculatedAspect) The role '" <> calculatedRoleName <> "' is implied to be an aspect (by providing an explicit context type) but CalculatedRoles cannot be used as an Aspect."
   show (DomeinFileIdIncompatible manifestDfid sourceDfid start) = "(DomeinFileIdIncompatible) The manifest is for " <> show manifestDfid <> " while the arc source mentions " <> show sourceDfid <> "."
+  show (PerspectivesFileFormatError pfileString errorString) = "(PerspectivesFileFormatError) This string cannot be parsed as a valid PFile value: '" <> pfileString <> "', because: " <> errorString
   show (ScreenForUserRoleOnly start end) = "(ScreenForUserRoleOnly) Only a user role may contain a screen definition!"
   show (WidgetCardinalityMismatch start end) = "(WidgetCardinalityMismatch) The cardinality of the Widget and the Role do not suit each other (between " <> show start <> " and " <> show end <> ")."
   show (MarkDownExpressionMustBeFunctional start end) = "(MarkDownExpressionMustBeFunctional) The expression used here to supply MarkDown must be functional! Between " <> show start <> " and " <> show end <> ")."

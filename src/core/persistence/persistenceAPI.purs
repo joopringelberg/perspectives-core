@@ -641,7 +641,7 @@ foreign import data File :: Type
 foreign import toFileImpl :: EffectFn3
   FileName
   MimeType
-  Foreign -- ArrayBuffer argument to be turned into a file
+  Foreign -- ArrayBuffer or String argument to be turned into a file
   File
 
 toFile :: FileName -> MimeType -> Foreign -> Effect File

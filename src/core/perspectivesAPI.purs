@@ -655,7 +655,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             case mv of
               Nothing -> sendResponse (Error corrId ("No file information found for property " <> predicate <> ".")) setter
               Just (Value v) -> case parsePerspectivesFile v of
-                Left e -> sendResponse (Error corrId ("Could not parse the value of this property, because: " <> show e)) setter
+                Left e -> sendResponse (Error corrId (show (PerspectivesFileFormatError v (show e)))) setter
                 Right rec -> do
                   file <- liftEffect $ toFile rec.fileName rec.mimeType a
                   -- Notice that we force the foreign value to comply to String. 
