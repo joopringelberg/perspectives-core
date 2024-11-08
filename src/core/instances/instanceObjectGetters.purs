@@ -33,13 +33,12 @@ import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (class Newtype, ala, over, unwrap)
-import Data.String.Regex (match, test)
+import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for, for_, traverse)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..), fst, snd)
-import Effect.Aff (error, throwError)
 import Effect.Aff.AVar (AVar, tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
@@ -52,16 +51,14 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, runMonadPerspectivesQuery, (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
-import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri, typeUri2couchdbFilename)
+import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..), externalRole, states) as IP
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
-import Perspectives.Instances.Values (PerspectivesFile, parsePerspectivesFile)
 import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
 import Perspectives.Names (getMySystem)
-import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (Keys(..), getAttachment, getViewOnDatabase)
+import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, tryGetPerspectRol)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.QueryTypes (RoleInContext)
@@ -74,11 +71,10 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
 import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleKind(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, takeGuid)
+import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
 import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<#>))
 import Simple.JSON (readJSON)
-import Unsafe.Coerce (unsafeCoerce)
 
 -----------------------------------------------------------
 -- FUNCTIONS FROM CONTEXT
@@ -667,23 +663,3 @@ deltaAuthor2ResourceIdentifier (PerspectivesUser author) = if isInPublicScheme a
 
 isUserRole :: RoleInstance -> MonadPerspectives Boolean
 isUserRole rl = roleType_ rl >>= getEnumeratedRole >>= (\role -> pure $ ((kindOfRole role) == UserRole))
-
------------------------------------------------------------
--- PERSPECTIVESFILE
------------------------------------------------------------
-getPFileTextValue :: String -> MonadPerspectives (Maybe String)
-getPFileTextValue s = case parsePerspectivesFile s of 
-  Left e -> throwError (error $ show (PerspectivesFileFormatError s (show e)))
-  Right p -> getPFileTextValue_ p
-
--- | Returns a text value for files that have a text/X mime type.
-getPFileTextValue_ :: PerspectivesFile -> MonadPerspectives (Maybe String)
-getPFileTextValue_ {mimeType, propertyType, roleFileName} = 
-  if isJust $ match (unsafeRegex "text/" noFlags) mimeType
-    then do 
-      {database, documentName} <- resourceIdentifier2DocLocator roleFileName
-      ma <- getAttachment database roleFileName (typeUri2couchdbFilename $ unwrap propertyType)
-      case ma of
-        Nothing -> pure Nothing
-        Just a -> pure $ unsafeCoerce a
-    else pure Nothing
