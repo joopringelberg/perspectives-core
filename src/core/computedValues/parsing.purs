@@ -58,7 +58,7 @@ import Perspectives.ModelTranslation (ModelTranslation)
 import Perspectives.ModelTranslation (ModelTranslation, augmentModelTranslation, generateFirstTranslation, parseTranslation, writeTranslationYaml) as MT
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment) as Persistence
-import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, retrieveDocumentVersion, toFile, tryGetDocument_)
+import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
 import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
@@ -186,16 +186,20 @@ compileRepositoryModels modelsurl_ manifestsurl_ _ = try
 ---- MODEL TRANSLATION
 -------------------------------------------------------------------------------
 -- | From the DomeinFile indicated by the namespace, generate ModelTranslation and serialise it to a PString.
+-- | The DomeinFileName should be versioned (e.g. model://perspectives.domains#System@1.0).
 generateFirstTranslation :: Array DomeinFileName -> (RoleInstance ~~> Value)
 generateFirstTranslation modelURI_ _ = case head modelURI_ of
   Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$GenerateFirstTranslation"
         (Left (error "Model URI should be provided."))
   Just dfName -> do 
-    x <- try $ lift $ lift $ getDomeinFile (DomeinFileId dfName)
-    case x of 
-      Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$GenerateFirstTranslation"
-        (Left e)
-      Right df -> pure $ Value $ writeJSON $ MT.generateFirstTranslation df
+    case (unsafePartial modelUri2ModelUrl dfName) of
+      {repositoryUrl, documentName} -> do 
+        x <- try $ lift $ lift $ getDocument repositoryUrl documentName
+        -- x <- try $ lift $ lift $ getDomeinFile (DomeinFileId dfName)
+        case x of 
+          Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$GenerateFirstTranslation"
+            (Left e)
+          Right df -> pure $ Value $ writeJSON $ MT.generateFirstTranslation df
 
 -- | From a serialised ModelTranslation, generate YAML (a PString)
 getTranslationYaml :: Array String -> (RoleInstance ~~> Value)

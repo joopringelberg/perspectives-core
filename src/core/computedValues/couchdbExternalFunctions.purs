@@ -287,9 +287,6 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   -- saveCachedDomeinFile takes care of revisions.
   newRev <- lift $ saveCachedDomeinFile id >>= pure <<< rev
 
-  -- Add all attachments.
-  void $ lift $ execStateT (addAttachments repositoryUrl documentName attachments) newRev
-
   if isInitialLoad'
     then do 
       createInitialInstances unversionedModelname versionedModelName patch build (_.versionedModelManifest <$> x)
@@ -323,6 +320,11 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
         \(DomeinFile dfr) -> do
           -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
+
+  -- Add all attachments.
+  dbName <- lift modelsDatabaseName
+  void $ lift $ execStateT (addAttachments dbName documentName attachments) newRev
+
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
     -- next attachment.

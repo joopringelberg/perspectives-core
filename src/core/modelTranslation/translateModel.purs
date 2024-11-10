@@ -30,14 +30,18 @@ import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.Writer (Writer, execWriter, tell)
+import Data.Array (filter)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Set (toUnfoldable) as SET
+import Data.String.Regex (match)
+import Data.String.Regex.Flags (noFlags)
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
@@ -48,7 +52,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup) as EM
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_)
+import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_, startsWithSegments)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Role (Role(..))
@@ -136,7 +140,7 @@ generateFirstTranslation (DomeinFile dr) = flip runReader dr do
   toplevelContexts <- pure $ filterKeys isDefinedAtTopLevel dr.contexts
   contexts <- if isEmpty toplevelContexts
     then pure Nothing 
-    else Just <<< ContextsTranslation <$> (for dr.contexts translateContext)
+    else Just <<< ContextsTranslation <$> (for (filterKeys (not <<< eq dr.namespace) dr.contexts) translateContext)
   eroles <- for (filterKeys isDefinedAtTopLevel dr.enumeratedRoles)
     (translateRole <<< E)
   croles <- for (filterKeys isDefinedAtTopLevel dr.calculatedRoles)
@@ -146,14 +150,16 @@ generateFirstTranslation (DomeinFile dr) = flip runReader dr do
   pure { namespace: dr.namespace, contexts, roles}
   where
   isDefinedAtTopLevel :: String -> Boolean
-  isDefinedAtTopLevel s = dr.namespace == typeUri2typeNameSpace_ s
+  isDefinedAtTopLevel s = dr.namespace == typeUri2typeNameSpace_ s && (isNothing $ match (unsafeRegex "External$" noFlags) s )
 
 translateContext :: Context -> Reader DomeinFileRecord ContextTranslation
 translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedContexts}) = do 
   users <- translateRoles gebruikerRol
   things <- translateRoles rolInContext
   contextroles <- translateRoles contextRol
-  contexts <- ContextsTranslation <<< fromFoldable <$> for nestedContexts \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
+  contexts <- ContextsTranslation <<< fromFoldable <$> for 
+    (filter (\ct -> (unwrap ct) `startsWithSegments` (unwrap id) ) nestedContexts) 
+    \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
   pure $ ContextTranslation
     { translations: Translations empty
     , users
@@ -162,10 +168,11 @@ translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedCon
     , contexts}
   where
   translateRoles :: Array RoleType -> Reader DomeinFileRecord RolesTranslation
-  translateRoles roles = RolesTranslation <$> fromFoldable <$> for roles 
+  translateRoles roles = RolesTranslation <$> fromFoldable <$> for 
+    (filter (\rt -> (roletype2string rt) `startsWithSegments` (unwrap id)) roles)
     (\rt -> (lookupRoleType rt >>= translateRole >>= pure <<< Tuple (roletype2string rt)))
 
-
+-- Aspect roles that have been added as is will turn up here, but should not be translated.
 lookupRoleType :: RoleType -> Reader DomeinFileRecord Role
 lookupRoleType rt = do 
   {enumeratedRoles, calculatedRoles} <- ask
