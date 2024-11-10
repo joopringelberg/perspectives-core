@@ -662,32 +662,32 @@ propertyE = do
           authoronly = (reserved "authoronly" *> (pure AuthoronlyAttribute))
 
     propertyFacets :: Range -> IP (List PropertyFacet)
-    propertyFacets r = nestedBlock propertyFacet
+    propertyFacets r = nestedBlock (propertyFacet r)
       where
 
-      propertyFacet :: IP PropertyFacet
-      propertyFacet = do
+      propertyFacet :: Range -> IP PropertyFacet
+      propertyFacet r'' = do
         facet <- reservedIdentifier
         case facet of
           "minLength" -> reserved "=" *> (MinLength <$> token.integer)
           "maxLength" -> reserved "=" *> (MaxLength <$> token.integer)
-          "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 (unsafePartial typedValue)))
+          "enumeration" -> reserved "=" *> (Enumeration <<< fromFoldable <$> token.parens (token.commaSep1 (unsafePartial typedValue r'')))
           "pattern" -> reserved "=" *> (Pattern <$> regexExpression <*> token.stringLiteral)
-          "maxInclusive" -> reserved "=" *> (MaxInclusive <$> boundaryValue)
-          "minInclusive" -> reserved "=" *> (MinInclusive <$> boundaryValue)
+          "maxInclusive" -> reserved "=" *> (MaxInclusive <$> boundaryValue r'')
+          "minInclusive" -> reserved "=" *> (MinInclusive <$> boundaryValue r'')
           kw -> fail ("Expected `minLength`, `maxLength`, `enumeration` but got: " <> kw <> ". ")
 
       -- Partial, because we cannot have File instances in the ARC syntax.
-      typedValue :: Partial => IP String
-      typedValue = case r of
+      typedValue :: Partial => Range -> IP String
+      typedValue r' = case r' of
         PString -> token.stringLiteral
         PBool -> boolean
         PNumber -> show <$> token.integer
         PDate ->  parseDateString
         PEmail -> email
 
-      boundaryValue :: IP String
-      boundaryValue = case r of
+      boundaryValue :: Range -> IP String
+      boundaryValue r' = case r' of
         PNumber -> show <$> token.integer
         PDate -> parseDateString
         _ -> fail "minInclusive and maxInclusive can only be applied to numbers and dates. "
