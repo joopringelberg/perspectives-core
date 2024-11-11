@@ -61,7 +61,7 @@ import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdentifier)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType, roletype2string)
 import Purescript.YAML (load)
-import Simple.JSON (class ReadForeign, class WriteForeign, read', write)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
 
 -- The keys are the languages; the values are the translations of the local type name.
 -- They can be translations of any type.
@@ -112,21 +112,25 @@ newtype ContextTranslation = ContextTranslation
 
 instance WriteForeign ContextTranslation where
   writeImpl (ContextTranslation rec) = write rec
-instance ReadForeign ContextTranslation where
-  readImpl f = read' f
+derive newtype instance ReadForeign ContextTranslation
 
 newtype ContextsTranslation = ContextsTranslation (Object ContextTranslation)
 instance WriteForeign ContextsTranslation where
   writeImpl (ContextsTranslation obj) = write obj
 instance ReadForeign ContextsTranslation where
-  readImpl f = read' f
+  readImpl f = do 
+    (ct :: Object ContextTranslation) <- readImpl f
+    pure $ ContextsTranslation ct
 
 -- A singleton object. The key is the model name.
-type ModelTranslation = 
+newtype ModelTranslation = ModelTranslation
   { namespace :: String
   , contexts :: Maybe ContextsTranslation
   , roles :: Maybe RolesTranslation
   }
+
+derive newtype instance WriteForeign ModelTranslation
+derive newtype instance ReadForeign ModelTranslation
 
 -------------------------------------------------------------------------------
 ---- GENERATE FIRST TRANSLATION FROM DOMEINFILE
@@ -140,14 +144,14 @@ generateFirstTranslation (DomeinFile dr) = flip runReader dr do
   toplevelContexts <- pure $ filterKeys isDefinedAtTopLevel dr.contexts
   contexts <- if isEmpty toplevelContexts
     then pure Nothing 
-    else Just <<< ContextsTranslation <$> (for (filterKeys (not <<< eq dr.namespace) dr.contexts) translateContext)
+    else Just <<< ContextsTranslation <$> (for (filterKeys (not <<< eq dr.namespace) toplevelContexts) translateContext)
   eroles <- for (filterKeys isDefinedAtTopLevel dr.enumeratedRoles)
     (translateRole <<< E)
   croles <- for (filterKeys isDefinedAtTopLevel dr.calculatedRoles)
    (translateRole <<< C)
   allRoles <- pure $ fromFoldable ((toUnfoldable eroles <> toUnfoldable croles) :: Array (Tuple String RoleTranslation))
   roles <- if isEmpty allRoles then pure Nothing else pure $ Just $ RolesTranslation allRoles
-  pure { namespace: dr.namespace, contexts, roles}
+  pure $ ModelTranslation { namespace: dr.namespace, contexts, roles}
   where
   isDefinedAtTopLevel :: String -> Boolean
   isDefinedAtTopLevel s = dr.namespace == typeUri2typeNameSpace_ s && (isNothing $ match (unsafeRegex "External$" noFlags) s )
@@ -367,7 +371,7 @@ nl :: String
 nl = "\n"
 
 writeTranslationYaml :: ModelTranslation -> String
-writeTranslationYaml {namespace, contexts, roles} = execWriter 
+writeTranslationYaml (ModelTranslation {namespace, contexts, roles}) = execWriter 
   do
     tell (namespace <> colonNl)
     for_ contexts \contexts' -> do
@@ -381,11 +385,11 @@ writeTranslationYaml {namespace, contexts, roles} = execWriter
 ---- QUALIFY NAMES IN TRANSLATION
 -------------------------------------------------------------------------------
 qualifyModelTranslation :: ModelTranslation -> ModelTranslation
-qualifyModelTranslation {namespace, contexts, roles} = let
+qualifyModelTranslation (ModelTranslation{namespace, contexts, roles}) = let
   contexts' = (qualify namespace) <$> contexts 
   roles' = (qualify namespace) <$> roles
   in
-  {namespace, contexts, roles}
+  ModelTranslation {namespace, contexts, roles}
 
 -------------------------------------------------------------------------------
 ---- CONSTRUCT TRANSLATIONTABLE FROM TRANSLATION
@@ -395,11 +399,16 @@ qualifyModelTranslation {namespace, contexts, roles} = let
 -- of a StateIdentifier and an Action name (separated by '$').
 newtype TranslationTable = TranslationTable (Object Translations)
 derive newtype instance ReadForeign TranslationTable
+derive newtype instance WriteForeign TranslationTable
 
 generateTranslationTable :: ModelTranslation -> TranslationTable
-generateTranslationTable {contexts, roles} = TranslationTable $ execWriter do
-  for_ contexts writeKeys
-  for_ roles writeKeys
+generateTranslationTable (ModelTranslation {contexts, roles}) = TranslationTable $ execWriter do
+  case contexts of 
+    Just (ContextsTranslation cs) -> for_ cs writeKeys
+    Nothing -> pure unit
+  case roles of 
+    Just (RolesTranslation rs) -> for_ rs writeKeys
+    Nothing -> pure unit
 
 -------------------------------------------------------------------------------
 ---- PARSE YAML TO TRANSLATION
@@ -412,7 +421,7 @@ parseTranslation source = map qualifyModelTranslation <$> load source
 -- Add existing translations from a TranslationTable to a new Translations derived from a DomeinFile
 -------------------------------------------------------------------------------
 augmentModelTranslation :: TranslationTable -> ModelTranslation -> ModelTranslation
-augmentModelTranslation table {namespace, contexts, roles} = 
+augmentModelTranslation table (ModelTranslation {namespace, contexts, roles}) = ModelTranslation
   { namespace
   , contexts: addTranslations table <$> contexts
   , roles: addTranslations table <$> roles}

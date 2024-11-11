@@ -38,6 +38,7 @@ import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (error)
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import Foreign (Foreign, unsafeToForeign)
 import Foreign.Object (Object, empty)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
@@ -55,11 +56,10 @@ import Perspectives.Identifiers (DomeinFileName, ModelUri, isModelUri, modelUri2
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.ModelTranslation (ModelTranslation)
-import Perspectives.ModelTranslation (ModelTranslation, augmentModelTranslation, generateFirstTranslation, parseTranslation, writeTranslationYaml) as MT
+import Perspectives.ModelTranslation (ModelTranslation, augmentModelTranslation, generateFirstTranslation, parseTranslation, writeTranslationYaml, generateTranslationTable) as MT
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addAttachment) as Persistence
 import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
-import Perspectives.Persistent (getDomeinFile)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -227,34 +227,31 @@ parseYamlTranslation pfile_ _ = case head pfile_ of
             (Left e)
           Right translation -> pure $ Value $ writeJSON translation
 
--- | From a PFile that holds a ModelTranslation, generate the table and upload to the repository.
+-- | From a PString that holds a ModelTranslation, generate the table and upload to the repository.
 -- | The DomeinFileName should be versioned (e.g. model://perspectives.domains#System@1.0).
 generateTranslationTable :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
-generateTranslationTable pfile_ domeinFileName_ _ = case head pfile_, head domeinFileName_ of 
+generateTranslationTable translation_ domeinFileName_ _ = case head translation_, head domeinFileName_ of 
   Nothing, _ -> handleExternalStatementError "model://perspectives.domains#Parsing$GenerateTranslationTable"
-    (Left (error "A ModelTranslation file should be provided."))
+    (Left (error "A String holding a ModelTranslation should be provided."))
   _, Nothing -> handleExternalStatementError "model://perspectives.domains#Parsing$GenerateTranslationTable"
     (Left (error "A Versioned model name should be provided. (e.g. model://perspectives.domains#System@1.0)"))
-  Just pfile, Just domeinFileName -> do 
-    mModelTranslation <- lift $ getPFileTextValue pfile
-    case mModelTranslation of 
-      -- Fail silently
-      Nothing -> pure unit
-      Just modelTranslationString -> case readJSON_ modelTranslationString of 
-        -- Fail silently
-        Nothing -> pure unit
-        -- Generate the table and upload as attachment to the repository DomeinFile.
-        Just modelTranslation -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
-          {repositoryUrl, documentName} -> do 
-            mRev <- lift $ retrieveDocumentVersion repositoryUrl documentName
-            -- Ignore the new revision. We do not have a local representation of the remote DomeinFile.
-            void $ lift $ Persistence.addAttachment 
-              repositoryUrl 
-              documentName 
-              mRev
-              "translationtable.json"
-              (generateTranslationTable modelTranslation )
-              (MediaType "text/json")
+  Just modelTranslationString, Just domeinFileName -> case readJSON modelTranslationString of 
+    -- Fail silently
+    Left e -> log ("generateTranslationTable: " <> show e)
+    -- Generate the table and upload as attachment to the repository DomeinFile.
+    Right (modelTranslation :: ModelTranslation) -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
+      {repositoryUrl, documentName} -> do 
+        table <- pure (MT.generateTranslationTable modelTranslation)
+        theFile <- liftEffect $ toFile "translationtable.json" "application/json" (unsafeToForeign $ writeJSON table)
+        mRev <- lift $ retrieveDocumentVersion repositoryUrl documentName
+        -- Ignore the new revision. We do not have a local representation of the remote DomeinFile.
+        void $ lift $ Persistence.addAttachment 
+          repositoryUrl 
+          documentName 
+          mRev
+          "translationtable.json"
+          theFile
+          (MediaType "text/json")
 
 -- | Fill a ModelTranslation freshly generated from a DomeinFile, with translations taken from a TranslationTable.
 -- | NOTE: the TranslationTable must be available on the versioned model in the repository. It is not a property value.
