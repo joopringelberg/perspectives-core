@@ -1,4 +1,4 @@
--- CouchdbManagement - Copyright Joop Ringelberg and Cor Baars 2021 - 2022
+-- CouchdbManagement - Copyright Joop Ringelberg and Cor Baars 2021 - 2024
 
 domain model://perspectives.domains#CouchdbManagement
   use sys for model://perspectives.domains#System
@@ -921,6 +921,12 @@ domain model://perspectives.domains#CouchdbManagement
       -- The property will have no value in a new installation, effectively preventing upload on receiving a new Version
       property AutoUpload (Boolean)
 
+      -- TESTING YAML TRANSLATION
+      property ModelTranslation = callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
+      property TranslationYaml (File)
+        pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `text//yaml."
+
+
       on exit
         do for Author
           -- Delete the DomeinFile.
@@ -957,8 +963,8 @@ domain model://perspectives.domains#CouchdbManagement
     user Author (relational) filledBy cm:ModelManifest$Author
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
-        props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload) verbs (SetPropertyValue)
+        props (DomeinFileName, Version, ArcSource, LastUpload, ModelTranslation) verbs (Consult)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload, TranslationYaml) verbs (Consult, SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Manifest >> context >> Versions
@@ -966,6 +972,14 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Author
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
+      action CreateTranslation
+        callEffect p:GenerateTranslationTable( extern >> ModelTranslation, extern >> VersionedModelURI)
+      action CreateYaml
+        letA
+            text <- callExternal p:GetTranslationYaml( extern >> ModelTranslation ) returns String
+          in
+            create file ("translation_of_" + extern >> VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml for External
+              text
       screen "Model version"
         tab "Version" default
           row
