@@ -30,7 +30,7 @@ import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (filter)
+import Data.Array (filter, null)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -84,7 +84,9 @@ newtype ActionsTranslation = ActionsTranslation (Object Translations)
 derive newtype instance WriteForeign ActionsTranslation
 derive newtype instance ReadForeign ActionsTranslation
 
--- In the translation table we will generate a pseudo-qualified action name from the stateSpec and the local action name.
+-- Keys are the string representations of StateSpecs.
+-- In the translation table we will generate a pseudo-qualified action name from the stateSpec 
+-- and the local action name.
 newtype ActionsPerStateTranslation = ActionsPerStateTranslation (Object ActionsTranslation)
 derive newtype instance WriteForeign ActionsPerStateTranslation
 derive newtype instance ReadForeign ActionsPerStateTranslation
@@ -228,7 +230,10 @@ instance Translation Translations where
   writeKeys _ = pure unit
   writeYaml indent (Translations translations) = do
     tell (i indent "translations" colonNl)
-    void $ for (object2array translations)
+    translations' <- case object2array translations of
+      none | null none -> pure [Tuple "en" "", Tuple "nl" ""]
+      ts -> pure ts
+    void $ for translations'
       \(Tuple lang translation) -> do
         tell (i indent tab lang colonSpace translation nl)
   addTranslations _ t = t 
@@ -267,7 +272,7 @@ instance Translation ActionsPerStateTranslation where
       void $ forWithIndex actions'
         \stateName acts -> do 
           tell (i (indent <> tab) (typeUri2LocalName_ stateName) colonNl)
-          void $ for_ actions (writeYaml (indent <> tab <> tab))
+          writeYaml (indent <> tab <> tab) acts
   addTranslations table (ActionsPerStateTranslation a) = ActionsPerStateTranslation $ addTranslations table <$> a
 
 instance Translation RolesTranslation where
@@ -279,7 +284,7 @@ instance Translation RolesTranslation where
       writeKeys actions
   writeYaml indent (RolesTranslation userRoles) = void $ for (object2array userRoles)
     \(Tuple roleName roleTranslation) -> do
-      tell (i indent (typeUri2LocalName_ roleName) colonSpace)
+      tell (i indent (typeUri2LocalName_ roleName) colonNl)
       writeYaml (indent <> tab) roleTranslation
   addTranslations tbl@(TranslationTable table) (RolesTranslation a) = RolesTranslation $ flip mapWithIndex a 
     \roleName r@(RoleTranslation rec) -> case lookup roleName table of 
@@ -340,7 +345,7 @@ instance Translation ContextsTranslation where
       writeKeys contexts
   writeYaml indent (ContextsTranslation ctxts) = void $ for (object2array ctxts)
     \(Tuple contextName contextTranslation) -> do
-      tell (i indent (typeUri2LocalName_ contextName) colonSpace)
+      tell (i indent (typeUri2LocalName_ contextName) colonNl)
       writeYaml (indent <> tab) contextTranslation
   addTranslations tbl@(TranslationTable table) (ContextsTranslation a) = ContextsTranslation $ flip mapWithIndex a 
     \contextName r@(ContextTranslation rec) -> case lookup contextName table of 
@@ -365,7 +370,7 @@ colonSpace :: String
 colonSpace = ":"
 
 colonNl :: String
-colonNl = ":"
+colonNl = ":\n"
 
 nl :: String
 nl = "\n"
