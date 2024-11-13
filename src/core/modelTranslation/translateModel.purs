@@ -30,7 +30,7 @@ import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (filter, null)
+import Data.Array (filter, head, null)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -38,6 +38,7 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
+import Data.Nullable (Nullable, toMaybe, null, notNull) as NULL
 import Data.Set (toUnfoldable) as SET
 import Data.String.Regex (match)
 import Data.String.Regex.Flags (noFlags)
@@ -47,12 +48,12 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (Error)
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, lookup, mapWithKey, singleton, toUnfoldable)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup) as EM
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_, startsWithSegments)
+import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_, startsWithSegments, buitenRol)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Role (Role(..))
@@ -62,6 +63,10 @@ import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdenti
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType, roletype2string)
 import Purescript.YAML (load)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
+
+-------------------------------------------------------------------------------
+---- MODEL TRANSLATION REPRESENTATION
+-------------------------------------------------------------------------------
 
 -- The keys are the languages; the values are the translations of the local type name.
 -- They can be translations of any type.
@@ -106,6 +111,7 @@ derive newtype instance ReadForeign RolesTranslation
 
 newtype ContextTranslation = ContextTranslation
   { translations :: Translations
+  , external :: RoleTranslation
   , users :: RolesTranslation
   , things :: RolesTranslation
   , contextroles :: RolesTranslation
@@ -135,6 +141,88 @@ derive newtype instance WriteForeign ModelTranslation
 derive newtype instance ReadForeign ModelTranslation
 
 -------------------------------------------------------------------------------
+---- YAML FILE PARSE REPRESENTATION
+---- In a YAML file we omit members that are empty in the ModelTranslation.
+---- On reconstructing the Model Translation from the YAML, we should add them again.
+-------------------------------------------------------------------------------
+newtype ModelTranslation_ = ModelTranslation_
+  { namespace :: NULL.Nullable String
+  , contexts :: NULL.Nullable ContextsTranslation_
+  , roles :: NULL.Nullable RolesTranslation_
+  }
+
+newtype ContextTranslation_ = ContextTranslation_
+  { translations :: Translations
+  , external :: NULL.Nullable RoleTranslation_
+  , users :: NULL.Nullable RolesTranslation_
+  , things :: NULL.Nullable RolesTranslation_
+  , contextroles :: NULL.Nullable RolesTranslation_
+  -- The keys are the local context names
+  , contexts :: NULL.Nullable ContextsTranslation_
+  }
+
+newtype ContextsTranslation_ = ContextsTranslation_ (Object ContextTranslation_)
+
+newtype RolesTranslation_ = RolesTranslation_ (Object RoleTranslation_)
+
+newtype RoleTranslation_ = RoleTranslation_
+  { translations :: Translations
+  , properties :: NULL.Nullable PropertiesTranslation
+  , actions :: NULL.Nullable ActionsPerStateTranslation
+  }
+
+-------------------------------------------------------------------------------
+---- CLASS REHYDRATE
+-------------------------------------------------------------------------------
+
+class (Translation modeltranslation) <= Rehydrate fromyaml modeltranslation | fromyaml -> modeltranslation where 
+  hydrate :: fromyaml -> modeltranslation
+
+instance Rehydrate RoleTranslation_ RoleTranslation where
+  hydrate (RoleTranslation_ {translations, properties, actions}) = RoleTranslation { translations, properties: properties', actions: actions'}
+    where
+    properties' = case NULL.toMaybe properties of 
+      Nothing -> PropertiesTranslation empty
+      Just p -> p
+    actions' = case NULL.toMaybe actions of 
+      Nothing -> ActionsPerStateTranslation empty
+      Just a -> a
+
+instance Rehydrate ContextTranslation_ ContextTranslation where
+  hydrate (ContextTranslation_ {translations, external, users, things, contextroles, contexts}) = let
+    external' = case NULL.toMaybe external of 
+      Nothing -> RoleTranslation { translations: Translations empty, properties: PropertiesTranslation empty, actions: ActionsPerStateTranslation empty}
+      Just e@(RoleTranslation_ _) -> (hydrate e)
+    users' = case NULL.toMaybe users of 
+      Nothing -> RolesTranslation empty
+      Just (RolesTranslation_ u) -> RolesTranslation (map hydrate u)
+    things' = case NULL.toMaybe things of 
+      Nothing -> RolesTranslation empty
+      Just (RolesTranslation_ t) -> RolesTranslation (map hydrate t)
+    contextroles' = case NULL.toMaybe contextroles of 
+      Nothing -> RolesTranslation empty
+      Just (RolesTranslation_ t) -> RolesTranslation (map hydrate t)
+    contexts' = case NULL.toMaybe contexts of 
+      Nothing -> ContextsTranslation empty
+      Just (ContextsTranslation_ t) -> ContextsTranslation (map hydrate t)
+    in 
+    ContextTranslation {translations, external:external', users:users', things:things', contextroles:contextroles', contexts:contexts'}
+
+instance Rehydrate ModelTranslation_ ModelTranslation where
+  hydrate (ModelTranslation_ { namespace, contexts, roles}) = let 
+    namespace' = case NULL.toMaybe namespace of 
+      Nothing -> "MissingNamespace" 
+      Just n -> n
+    contexts' = case NULL.toMaybe contexts of 
+      Nothing -> ContextsTranslation empty
+      Just (ContextsTranslation_ t) -> ContextsTranslation (map hydrate t)
+    roles' = case NULL.toMaybe roles of 
+      Nothing -> RolesTranslation empty
+      Just (RolesTranslation_ t) -> RolesTranslation (map hydrate t)
+    in 
+    ModelTranslation {namespace:namespace', contexts:Just contexts', roles:Just roles'}
+
+-------------------------------------------------------------------------------
 ---- GENERATE FIRST TRANSLATION FROM DOMEINFILE
 ---- Generate a structure that can be declared to be JSON.
 ---- This is the canonical form that we generate from the YAML.
@@ -159,15 +247,19 @@ generateFirstTranslation (DomeinFile dr) = flip runReader dr do
   isDefinedAtTopLevel s = dr.namespace == typeUri2typeNameSpace_ s && (isNothing $ match (unsafeRegex "External$" noFlags) s )
 
 translateContext :: Context -> Reader DomeinFileRecord ContextTranslation
-translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedContexts}) = do 
+translateContext (Context {id:contextId, gebruikerRol, contextRol, rolInContext, nestedContexts}) = do 
+  {enumeratedRoles} <- ask
+  external <- unsafePartial case lookup (buitenRol $ unwrap contextId) enumeratedRoles of 
+    Just e -> translateRole (E e)
   users <- translateRoles gebruikerRol
   things <- translateRoles rolInContext
   contextroles <- translateRoles contextRol
   contexts <- ContextsTranslation <<< fromFoldable <$> for 
-    (filter (\ct -> (unwrap ct) `startsWithSegments` (unwrap id) ) nestedContexts) 
+    (filter (\ct -> (unwrap ct) `startsWithSegments` (unwrap contextId) ) nestedContexts) 
     \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
   pure $ ContextTranslation
     { translations: Translations empty
+    , external
     , users
     , things
     , contextroles
@@ -175,7 +267,7 @@ translateContext (Context {id, gebruikerRol, contextRol, rolInContext, nestedCon
   where
   translateRoles :: Array RoleType -> Reader DomeinFileRecord RolesTranslation
   translateRoles roles = RolesTranslation <$> fromFoldable <$> for 
-    (filter (\rt -> (roletype2string rt) `startsWithSegments` (unwrap id)) roles)
+    (filter (\rt -> (roletype2string rt) `startsWithSegments` (unwrap contextId)) roles)
     (\rt -> (lookupRoleType rt >>= translateRole >>= pure <<< Tuple (roletype2string rt)))
 
 -- Aspect roles that have been added as is will turn up here, but should not be translated.
@@ -217,7 +309,7 @@ translatePropertyType (CP (CalculatedPropertyType p)) =  pure $ Tuple p (Transla
 translatePropertyType (ENP (EnumeratedPropertyType p)) = pure $ Tuple p (Translations empty)
 
 -------------------------------------------------------------------------------
----- THE TRANSLATION CLASS
+---- CLASS TRANSLATION 
 -------------------------------------------------------------------------------
 class Translation a where 
   qualify :: String -> a -> a
@@ -241,10 +333,14 @@ instance Translation Translations where
 instance Translation PropertiesTranslation where
   qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
   writeKeys (PropertiesTranslation translations) = tell translations
-  writeYaml indent (PropertiesTranslation properties) = void $ forWithIndex properties
-    \propName translations -> do
-      tell (i indent (typeUri2LocalName_ propName) colonNl)
-      writeYaml (indent <> tab) translations
+  writeYaml indent (PropertiesTranslation properties) = if isEmpty properties
+    then pure unit
+    else do 
+      tell (i indent "properties" colonNl)
+      void $ forWithIndex properties
+        \propName translations -> do
+          tell (i (indent <> tab) (typeUri2LocalName_ propName) colonNl)
+          writeYaml (indent <> tab <> tab) translations
   addTranslations (TranslationTable table) (PropertiesTranslation obj) = PropertiesTranslation $
     flip mapWithKey obj \propName translations -> case lookup propName table of 
       Nothing -> translations
@@ -276,7 +372,12 @@ instance Translation ActionsPerStateTranslation where
   addTranslations table (ActionsPerStateTranslation a) = ActionsPerStateTranslation $ addTranslations table <$> a
 
 instance Translation RolesTranslation where
-  qualify namespace (RolesTranslation obj) = RolesTranslation ((qualify namespace) <$> obj)
+  qualify namespace (RolesTranslation obj) = 
+    RolesTranslation $ fromFoldable
+      (( toUnfoldable obj <#> \(Tuple unqualifiedName role) -> let 
+        qualifiedName = namespace <> "$" <> unqualifiedName
+        in Tuple qualifiedName (qualify qualifiedName role)
+      ) :: Array (Tuple String RoleTranslation))
   writeKeys (RolesTranslation roleTranslations) = forWithIndex_ roleTranslations 
     \roleName (RoleTranslation {translations, properties, actions}) -> do 
       tell (singleton roleName translations)
@@ -308,26 +409,52 @@ instance Translation RoleTranslation where
     , actions: addTranslations table actions}
 
 instance Translation ContextTranslation where
-  qualify namespace (ContextTranslation {translations, users, things, contextroles, contexts}) = let 
+  qualify namespace (ContextTranslation {translations, external:ext, users, things, contextroles, contexts}) = let 
+    external = qualify namespace ext
     users' = qualify namespace users
     things' = qualify namespace things
     contextroles' = qualify namespace contextroles
     contexts' = qualify namespace contexts
     in
-    ContextTranslation {translations, users: users', things: things', contextroles: contextroles', contexts: contexts'}
+    ContextTranslation {translations, external, users: users', things: things', contextroles: contextroles', contexts: contexts'}
   writeKeys _ = pure unit
-  writeYaml indent (ContextTranslation {translations, users, things, contextroles, contexts:ctxts}) = do 
+  writeYaml indent (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts}) = do 
     writeYaml indent translations
-    tell (i indent "users" colonNl)
-    writeYaml (indent <> tab) users
-    tell (i indent "things" colonNl)
-    writeYaml (indent <> tab) things
-    tell (i indent "contextroles" colonNl)
-    writeYaml (indent <> tab) contextroles
-    tell (i indent "contexts" colonNl)
-    writeYaml (indent <> tab) ctxts
-  addTranslations table (ContextTranslation {translations, users, things, contextroles, contexts:ctxts}) = ContextTranslation 
+    case external of 
+      RoleTranslation {properties, actions} -> case properties, actions of
+        PropertiesTranslation properties', ActionsPerStateTranslation actions' -> if isEmpty properties' && isEmpty actions'
+          then pure unit
+          else do 
+            tell (i indent "external" colonNl)
+            writeYaml (indent <> tab) properties
+            writeYaml (indent <> tab) actions
+    case users of
+      RolesTranslation users' -> if isEmpty users'
+        then pure unit
+        else do 
+          tell (i indent "users" colonNl)
+          writeYaml (indent <> tab) users
+    case things of
+      RolesTranslation things' -> if isEmpty things'
+        then pure unit
+        else do 
+          tell (i indent "things" colonNl)
+          writeYaml (indent <> tab) things
+    case contextroles of
+      RolesTranslation contextroles' -> if isEmpty contextroles'
+        then pure unit
+        else do 
+          tell (i indent "contextroles" colonNl)
+          writeYaml (indent <> tab) contextroles
+    case ctxts of
+      ContextsTranslation ctxts' -> if isEmpty ctxts'
+        then pure unit
+        else do 
+          tell (i indent "contexts" colonNl)
+          writeYaml (indent <> tab) ctxts
+  addTranslations table (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts}) = ContextTranslation 
     { translations
+    , external: addTranslations table external
     , users: addTranslations table users
     , things: addTranslations table things
     , contextroles: addTranslations table contextroles
@@ -335,7 +462,12 @@ instance Translation ContextTranslation where
     }
 
 instance Translation ContextsTranslation where
-  qualify namespace (ContextsTranslation obj) = ContextsTranslation ((qualify namespace) <$> obj)
+  qualify namespace (ContextsTranslation obj) = 
+    ContextsTranslation $ fromFoldable
+      (( toUnfoldable obj <#> \(Tuple unqualifiedName ctxt) -> let 
+        qualifiedName = namespace <> "$" <> unqualifiedName
+        in Tuple qualifiedName (qualify qualifiedName ctxt)
+      ) :: Array (Tuple String ContextTranslation))
   writeKeys (ContextsTranslation contextTranslations) = forWithIndex_ contextTranslations
     \contextName (ContextTranslation {translations, users, things, contextroles, contexts}) -> do
       tell (singleton contextName translations)
@@ -351,6 +483,32 @@ instance Translation ContextsTranslation where
     \contextName r@(ContextTranslation rec) -> case lookup contextName table of 
       Nothing -> addTranslations tbl r
       Just ts -> addTranslations tbl (ContextTranslation rec {translations = ts})
+
+instance Translation ModelTranslation where
+  qualify namespace (ModelTranslation{contexts, roles}) = let
+    contexts' = (qualify namespace) <$> contexts 
+    roles' = (qualify namespace) <$> roles
+    in
+    ModelTranslation {namespace, contexts:contexts', roles:roles'}
+  writeKeys (ModelTranslation {contexts, roles}) = do
+    case contexts of 
+      Just (ContextsTranslation cs) -> for_ cs writeKeys
+      Nothing -> pure unit
+    case roles of 
+      Just (RolesTranslation rs) -> for_ rs writeKeys
+      Nothing -> pure unit
+  writeYaml indent (ModelTranslation {namespace, contexts, roles}) = do
+    tell (namespace <> colonNl)
+    for_ contexts \contexts' -> do
+      tell (i tab "contexts" colonNl)
+      writeYaml (tab <> tab) contexts'
+    for_ roles \roles' -> do
+      tell (i tab "roles" colonNl)
+      writeYaml (tab <> tab) roles'
+  addTranslations table (ModelTranslation {namespace, contexts, roles}) = ModelTranslation
+    { namespace
+    , contexts: addTranslations table <$> contexts
+    , roles: addTranslations table <$> roles}
 
 qualifyObjectKeys :: forall a. Translation a => String -> Object a -> Object a
 qualifyObjectKeys namespace obj = fromFoldable 
@@ -376,25 +534,13 @@ nl :: String
 nl = "\n"
 
 writeTranslationYaml :: ModelTranslation -> String
-writeTranslationYaml (ModelTranslation {namespace, contexts, roles}) = execWriter 
-  do
-    tell (namespace <> colonNl)
-    for_ contexts \contexts' -> do
-      tell (i tab "contexts" colonNl)
-      writeYaml tab contexts'
-    for_ roles \roles' -> do
-      tell (i tab "roles" colonNl)
-      writeYaml tab roles'
+writeTranslationYaml modeltranslation = execWriter (writeYaml "" modeltranslation)
 
 -------------------------------------------------------------------------------
 ---- QUALIFY NAMES IN TRANSLATION
 -------------------------------------------------------------------------------
 qualifyModelTranslation :: ModelTranslation -> ModelTranslation
-qualifyModelTranslation (ModelTranslation{namespace, contexts, roles}) = let
-  contexts' = (qualify namespace) <$> contexts 
-  roles' = (qualify namespace) <$> roles
-  in
-  ModelTranslation {namespace, contexts, roles}
+qualifyModelTranslation m@(ModelTranslation{namespace}) = qualify namespace m
 
 -------------------------------------------------------------------------------
 ---- CONSTRUCT TRANSLATIONTABLE FROM TRANSLATION
@@ -407,29 +553,32 @@ derive newtype instance ReadForeign TranslationTable
 derive newtype instance WriteForeign TranslationTable
 
 generateTranslationTable :: ModelTranslation -> TranslationTable
-generateTranslationTable (ModelTranslation {contexts, roles}) = TranslationTable $ execWriter do
-  case contexts of 
-    Just (ContextsTranslation cs) -> for_ cs writeKeys
-    Nothing -> pure unit
-  case roles of 
-    Just (RolesTranslation rs) -> for_ rs writeKeys
-    Nothing -> pure unit
+generateTranslationTable modeltranslation = TranslationTable $ execWriter (writeKeys modeltranslation)
 
 -------------------------------------------------------------------------------
 ---- PARSE YAML TO TRANSLATION
 -------------------------------------------------------------------------------
 parseTranslation :: String -> Effect (Either Error ModelTranslation)
-parseTranslation source = map qualifyModelTranslation <$> load source
+parseTranslation source = do 
+  parseResult :: Either Error ParsedYaml <- load source
+  modelTranslation :: Either Error ModelTranslation <- pure (map (hydrate <<< toModelTranslation_) parseResult)
+  pure (map qualifyModelTranslation modelTranslation)
+  where
+  toModelTranslation_ :: ParsedYaml -> ModelTranslation_
+  toModelTranslation_ yaml = case head $ keys yaml of 
+    Just namespace -> let 
+      {contexts, roles} = unsafePartial fromJust $ lookup namespace yaml
+      in 
+      ModelTranslation_ {namespace: NULL.notNull namespace, contexts, roles}
+    Nothing -> ModelTranslation_ { namespace: NULL.notNull "IllegalYaml", contexts: NULL.null, roles: NULL.null}
 
+type ParsedYaml = Object {contexts :: NULL.Nullable ContextsTranslation_, roles :: NULL.Nullable RolesTranslation_}
 -------------------------------------------------------------------------------
 ---- ADD TRANSLATIONS
 -- Add existing translations from a TranslationTable to a new Translations derived from a DomeinFile
 -------------------------------------------------------------------------------
 augmentModelTranslation :: TranslationTable -> ModelTranslation -> ModelTranslation
-augmentModelTranslation table (ModelTranslation {namespace, contexts, roles}) = ModelTranslation
-  { namespace
-  , contexts: addTranslations table <$> contexts
-  , roles: addTranslations table <$> roles}
+augmentModelTranslation = addTranslations
 
 -------------------------------------------------------------------------------
 ---- RETRIEVE THE LOCAL TRANSLATION TABLE FOR A MODEL

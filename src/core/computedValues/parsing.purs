@@ -204,7 +204,7 @@ generateFirstTranslation modelURI_ _ = case head modelURI_ of
 -- | From a serialised ModelTranslation, generate YAML (a PString)
 getTranslationYaml :: Array String -> (RoleInstance ~~> Value)
 getTranslationYaml modelTranslation_ _ = case head modelTranslation_ of 
-  Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$GenerateFirstTranslation"
+  Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$GetTranslationYaml"
     (Left (error "A ModelTranslation should be provided."))
   Just modelTranslation -> case readJSON modelTranslation of 
     Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$GetTranslationYaml"
@@ -214,7 +214,7 @@ getTranslationYaml modelTranslation_ _ = case head modelTranslation_ of
 -- | From a YAML string, generate a (serialised) ModelTranslation.
 parseYamlTranslation :: Array String -> (RoleInstance ~~> Value)
 parseYamlTranslation pfile_ _ = case head pfile_ of 
-  Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$ParseTranslation"
+  Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
     (Left (error "A YAML file should be provided."))
   Just pfile -> do 
     mYaml <- lift $ lift $ getPFileTextValue pfile
@@ -223,7 +223,7 @@ parseYamlTranslation pfile_ _ = case head pfile_ of
       Just yaml -> do
         translation' <- liftEffect $ MT.parseTranslation yaml
         case translation' of 
-          Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$GetTranslationYaml"
+          Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
             (Left e)
           Right translation -> pure $ Value $ writeJSON translation
 

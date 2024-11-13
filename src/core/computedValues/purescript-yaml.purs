@@ -26,18 +26,18 @@ module Purescript.YAML where
 
 import Control.Monad.Error.Class (try)
 import Data.Either (Either)
-import Data.Function.Uncurried (runFn1)
 import Effect (Effect)
 import Effect.Exception (Error)
+import Effect.Uncurried (EffectFn1, runEffectFn1)
 
-foreign import loadImpl :: forall a. String -> Effect a
+foreign import loadImpl :: forall a. EffectFn1 String a
 
 -- | From a YAML source, produce JSON.
 load :: forall a. String -> Effect (Either Error a)
-load source = try (runFn1 loadImpl source)
+load source = try (runEffectFn1 loadImpl source)
 
-foreign import dumpImpl :: forall a. a -> Effect String
+foreign import dumpImpl :: forall a. EffectFn1 a String
 
 -- | From a JSON source, produce a YAML string.
 dump :: forall a. a -> Effect (Either Error String)
-dump a = try (runFn1 dumpImpl a)
+dump a = try (runEffectFn1 dumpImpl a)

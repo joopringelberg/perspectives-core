@@ -1,11 +1,11 @@
-import {default as yaml} from 'js-yaml';
+import {load, dump} from 'js-yaml';
 
 export function loadImpl (s)
 {
-  return yaml.load(s);
+  return load(s);
 }
 
 export function dumpImpl (a)
 {
-  return yaml.dump(a);
+  return dump(a);
 }

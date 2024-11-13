@@ -4,7 +4,7 @@ import Prelude
 
 import Control.Monad.Error.Class (try)
 import Control.Monad.Trans.Class (lift)
-import Data.Array (head)
+import Data.Array (head, elemIndex)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), isJust)
 import Data.Newtype (unwrap)
@@ -50,7 +50,8 @@ getPFileTextValue v = case parsePerspectivesFile v of
     else pure Nothing
   where
     isATextType :: String -> Boolean
-    isATextType = isJust <<< match (unsafeRegex "^text/" noFlags)
+    isATextType s = (isJust $ match (unsafeRegex "^text/" noFlags) s) || 
+      (isJust $ elemIndex s ["application/x-yaml"])
 
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =

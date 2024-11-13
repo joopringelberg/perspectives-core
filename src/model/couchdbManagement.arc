@@ -924,7 +924,8 @@ domain model://perspectives.domains#CouchdbManagement
       -- TESTING YAML TRANSLATION
       property ModelTranslation = callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
       property TranslationYaml (File)
-        pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `text//yaml."
+        pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
+      property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
 
 
       on exit
@@ -963,7 +964,7 @@ domain model://perspectives.domains#CouchdbManagement
     user Author (relational) filledBy cm:ModelManifest$Author
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
-        props (DomeinFileName, Version, ArcSource, LastUpload, ModelTranslation) verbs (Consult)
+        props (DomeinFileName, Version, ArcSource, LastUpload, ModelTranslation, ParsedYaml) verbs (Consult)
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload, TranslationYaml) verbs (Consult, SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
