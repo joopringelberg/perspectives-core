@@ -64,7 +64,7 @@ import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
 import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), SecurityDocument(..))
-import Perspectives.Couchdb.Revision (Revision_, rev)
+import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
@@ -285,7 +285,7 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   {documentName:unversionedDocumentName} <- lift $ resourceIdentifier2WriteDocLocator unversionedModelname
   lift $ void $ cacheEntity id (DomeinFile dfrecord { _rev = Nothing, _id = unversionedDocumentName, _attachments = Nothing})
   -- saveCachedDomeinFile takes care of revisions.
-  newRev <- lift $ saveCachedDomeinFile id >>= pure <<< rev
+  void $ lift $ saveCachedDomeinFile id
 
   if isInitialLoad'
     then do 
@@ -323,7 +323,8 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
 
   -- Add all attachments.
   dbName <- lift modelsDatabaseName
-  void $ lift $ execStateT (addAttachments dbName documentName attachments) newRev
+  (DomeinFile {_rev}) <- lift $ getDomeinFile id
+  void $ lift $ execStateT (addAttachments dbName unversionedDocumentName attachments) _rev
 
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the

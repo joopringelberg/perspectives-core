@@ -170,6 +170,7 @@ getPatchAndBuild rid = do
 -- | A name not preceded or followed by a forward slash.
 type DatabaseName = String
 
+-- NOTE: the revision of the returned DomeinFile will be outdated!
 saveCachedDomeinFile :: DomeinFileId -> MonadPerspectives DomeinFile
 saveCachedDomeinFile dfid = do
   updateRevision dfid
