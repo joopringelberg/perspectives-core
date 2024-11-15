@@ -30,7 +30,7 @@ import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (filter, head, null)
+import Data.Array (filter, head, null, catMaybes)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -152,7 +152,7 @@ newtype ModelTranslation_ = ModelTranslation_
   }
 
 newtype ContextTranslation_ = ContextTranslation_
-  { translations :: Translations
+  { translations :: Translations_
   , external :: NULL.Nullable RoleTranslation_
   , users :: NULL.Nullable RolesTranslation_
   , things :: NULL.Nullable RolesTranslation_
@@ -166,11 +166,18 @@ newtype ContextsTranslation_ = ContextsTranslation_ (Object ContextTranslation_)
 newtype RolesTranslation_ = RolesTranslation_ (Object RoleTranslation_)
 
 newtype RoleTranslation_ = RoleTranslation_
-  { translations :: Translations
-  , properties :: NULL.Nullable PropertiesTranslation
-  , actions :: NULL.Nullable ActionsPerStateTranslation
+  { translations :: Translations_
+  , properties :: NULL.Nullable PropertiesTranslation_
+  , actions :: NULL.Nullable ActionsPerStateTranslation_
   }
 
+newtype PropertiesTranslation_ = PropertiesTranslation_ (Object {translations :: Translations_})
+
+newtype ActionsPerStateTranslation_ = ActionsPerStateTranslation_ (Object ActionsTranslation_)
+
+newtype ActionsTranslation_ = ActionsTranslation_ (Object { translations :: Translations_})
+
+newtype Translations_ = Translations_ (Object (NULL.Nullable String))
 -------------------------------------------------------------------------------
 ---- CLASS REHYDRATE
 -------------------------------------------------------------------------------
@@ -178,18 +185,29 @@ newtype RoleTranslation_ = RoleTranslation_
 class (Translation modeltranslation) <= Rehydrate fromyaml modeltranslation | fromyaml -> modeltranslation where 
   hydrate :: fromyaml -> modeltranslation
 
+instance Rehydrate Translations_ Translations where
+  hydrate (Translations_ obj) = Translations $ fromFoldable $ catMaybes ((toUnfoldable obj) <#> \(Tuple language ntranslation) -> case NULL.toMaybe ntranslation of 
+    Just translation -> Just (Tuple language translation)
+    _ -> Nothing)
+
+instance Rehydrate ActionsTranslation_ ActionsTranslation where
+  -- Do away with the extra "translations" layer.
+  hydrate (ActionsTranslation_ obj) = ActionsTranslation (obj <#> _.translations >>> hydrate)
+
 instance Rehydrate RoleTranslation_ RoleTranslation where
-  hydrate (RoleTranslation_ {translations, properties, actions}) = RoleTranslation { translations, properties: properties', actions: actions'}
+  hydrate (RoleTranslation_ {translations, properties, actions}) = RoleTranslation { translations: translations', properties: properties', actions: actions'}
     where
     properties' = case NULL.toMaybe properties of 
       Nothing -> PropertiesTranslation empty
-      Just p -> p
+      Just (PropertiesTranslation_ obj) -> PropertiesTranslation (obj <#> _.translations >>> hydrate)
     actions' = case NULL.toMaybe actions of 
       Nothing -> ActionsPerStateTranslation empty
-      Just a -> a
+      Just (ActionsPerStateTranslation_ acts) -> ActionsPerStateTranslation (hydrate <$> acts)
+    translations' = hydrate translations
 
 instance Rehydrate ContextTranslation_ ContextTranslation where
   hydrate (ContextTranslation_ {translations, external, users, things, contextroles, contexts}) = let
+    translations' = hydrate translations
     external' = case NULL.toMaybe external of 
       Nothing -> RoleTranslation { translations: Translations empty, properties: PropertiesTranslation empty, actions: ActionsPerStateTranslation empty}
       Just e@(RoleTranslation_ _) -> (hydrate e)
@@ -206,7 +224,7 @@ instance Rehydrate ContextTranslation_ ContextTranslation where
       Nothing -> ContextsTranslation empty
       Just (ContextsTranslation_ t) -> ContextsTranslation (map hydrate t)
     in 
-    ContextTranslation {translations, external:external', users:users', things:things', contextroles:contextroles', contexts:contexts'}
+    ContextTranslation {translations:translations', external:external', users:users', things:things', contextroles:contextroles', contexts:contexts'}
 
 instance Rehydrate ModelTranslation_ ModelTranslation where
   hydrate (ModelTranslation_ { namespace, contexts, roles}) = let 
@@ -332,7 +350,8 @@ instance Translation Translations where
 
 instance Translation PropertiesTranslation where
   qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
-  writeKeys (PropertiesTranslation translations) = tell translations
+  writeKeys (PropertiesTranslation propTranslations) = forWithIndex_ propTranslations
+    \propertyName translations -> tell (singleton propertyName translations)
   writeYaml indent (PropertiesTranslation properties) = if isEmpty properties
     then pure unit
     else do 
@@ -348,7 +367,8 @@ instance Translation PropertiesTranslation where
 
 instance Translation ActionsTranslation where
   qualify namespace (ActionsTranslation obj) = ActionsTranslation $ qualifyObjectKeys namespace obj
-  writeKeys (ActionsTranslation translations) = tell translations
+  writeKeys (ActionsTranslation actionTranslations) = forWithIndex_ actionTranslations
+    \actionName translations -> tell (singleton actionName translations)
   writeYaml indent (ActionsTranslation actions) = void $ forWithIndex actions
     \actionName translations -> do
       tell (i indent actionName colonNl)
@@ -492,10 +512,10 @@ instance Translation ModelTranslation where
     ModelTranslation {namespace, contexts:contexts', roles:roles'}
   writeKeys (ModelTranslation {contexts, roles}) = do
     case contexts of 
-      Just (ContextsTranslation cs) -> for_ cs writeKeys
+      Just cs -> writeKeys cs
       Nothing -> pure unit
     case roles of 
-      Just (RolesTranslation rs) -> for_ rs writeKeys
+      Just rs -> writeKeys rs
       Nothing -> pure unit
   writeYaml indent (ModelTranslation {namespace, contexts, roles}) = do
     tell (namespace <> colonNl)

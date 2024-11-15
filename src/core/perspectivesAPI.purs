@@ -620,22 +620,21 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         sendResponse (Result corrId ["Ok"]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: "SaveFile"
-    -- , subject: rolID
-    -- , predicate: propertyName
-    -- , object: mimeType
+    -- , subject: PerspectivesFile serialised (may be without database)
     -- , contextDescription: buf
     -- , authoringRole: myroletype
     -- , onlyOnce: true}
     Api.SaveFile -> catchError      
-      (do
-        newVal <- runMonadPerspectivesTransaction authoringRole 
-          (saveFile (RoleInstance subject) (EnumeratedPropertyType predicate) contextDescription object)
-        sendResponse (Result corrId [newVal]) setter)
+      (case parsePerspectivesFile subject of 
+        Left errs -> sendResponse (Error corrId ("Could not parse PerspectivesFile: " <> subject <> ".")) setter
+        Right {roleFileName, propertyType, mimeType} -> do
+          newVal <- runMonadPerspectivesTransaction authoringRole 
+            (do
+              result <- saveFile (RoleInstance roleFileName) propertyType contextDescription mimeType
+              setProperty [RoleInstance roleFileName] propertyType Nothing [Value result]
+              pure result)
+          sendResponse (Result corrId [newVal]) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
-    -- { request: "GetFile"
-    -- , subject: RoleInstance
-    -- , predicate: propertyName
-    -- }
     Api.GetFile -> catchError
       (do 
         mrid <- getPropertyBearingRoleInstance (EnumeratedPropertyType predicate) (RoleInstance subject)
