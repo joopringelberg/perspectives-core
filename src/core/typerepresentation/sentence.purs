@@ -23,20 +23,16 @@ module Perspectives.Representation.Sentence where
 
 import Prelude
 
-import Control.Alt ((<|>))
-import Data.Eq.Generic (genericEq)
-import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
-import Data.Show.Generic (genericShow)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
-import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -- The String part is the original sentence where the expressions have been replaced
 -- by replacement identifiers. So for example "Hello {Person}, how are you?" has become
 -- "Hello $1, how are you?"
 -- The Array of SentenceParts contains the computable parts, where a parts position in the array
 -- corresponds to the replacement identifier in the string.
-newtype Sentence = Sentence {sentence :: String, parts :: Array SentencePart}
+newtype Sentence = Sentence {sentence :: String, parts :: Array QueryFunctionDescription}
 
 derive instance newtypeSentence :: Newtype Sentence _
 derive newtype instance showSentence :: Show Sentence
@@ -44,25 +40,3 @@ derive newtype instance eqSentence :: Eq Sentence
 
 derive newtype instance ReadForeign Sentence
 derive newtype instance WriteForeign Sentence
-
-data SentencePart =
-    HR String
-  | CP QueryFunctionDescription
-
-derive instance genericSentencePart :: Generic SentencePart _
-instance showSentencePart :: Show SentencePart where show = genericShow
-instance eqSentencePart :: Eq SentencePart where eq = genericEq
-
-instance WriteForeign SentencePart where
-  writeImpl (HR s) = writeImpl { constructor: "HR", s }
-  writeImpl (CP calculation) = writeImpl { constructor: "CP", calculation }
-
-instance ReadForeign SentencePart where
-  readImpl f = 
-    do
-      {constructor, s} :: {constructor :: String, s :: String} <- read' f
-      pure $ HR s
-    <|>
-    do
-      {constructor, calculation} :: {constructor :: String, calculation :: QueryFunctionDescription} <- read' f
-      pure $ CP calculation

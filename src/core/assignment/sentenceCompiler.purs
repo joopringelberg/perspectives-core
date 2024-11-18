@@ -31,8 +31,8 @@ import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, ty
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (context2string, role2string)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
-import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (bind, flip, pure, (<$>), (<<<), (<>), (>>=))
+import Perspectives.Representation.Sentence (Sentence(..))
+import Prelude (bind, flip, pure, (<$>), (<<<), (<>), (>=>))
 
 type CompiledSentence a = a -> MonadPerspectives String
 
@@ -42,10 +42,7 @@ compileSentence :: forall a.
   Sentence ->
   MonadPerspectives (CompiledSentence a)
 compileSentence xToString (Sentence {sentence, parts}) = do
-  compiledParts <- traverse
-    case _ of
-      HR s -> pure \_ -> pure [s]
-      CP calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
+  compiledParts <- traverse (xToString >=> pure <<< flip evalMonadPerspectivesQuery)
     parts
   pure \roleId -> do
     (replacements :: Array String) <- concat <$> traverse (\p -> p roleId) compiledParts

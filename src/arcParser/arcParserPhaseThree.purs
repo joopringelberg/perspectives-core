@@ -88,7 +88,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.ScreenDefinition (ChatDef(..), ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), ScreenMap, TabDef(..), TableDef(..), WidgetCommonFieldsDef)
-import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..)) as Sentence
+import Perspectives.Representation.Sentence (Sentence(..)) as Sentence
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..), StateRecord, constructState)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), and, optimistic, pessimistic)
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType(..), RoleKind(..), RoleType(..), ViewType(..), propertytype2string, roletype2string)
@@ -795,10 +795,10 @@ handlePostponedStateQualifiedParts = do
 
           compileSentence :: Domain -> SentenceE -> ADT QT.RoleInContext -> Array StateIdentifier -> AST.StateSpecification -> PhaseThree Sentence.Sentence
           compileSentence currentDomain (SentenceE {parts, sentence}) usersInContext states stateSpec = do
-            parts' <- traverse (unsafePartial compilePart) parts
+            parts' <- traverse compilePart parts
             pure $ Sentence.Sentence {sentence, parts: parts'} 
             where
-              compilePart :: Partial => SentencePartE -> PhaseThree Sentence.SentencePart
+              compilePart :: SentencePartE -> PhaseThree QueryFunctionDescription
               compilePart (CPpart stp) = do 
                 expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                   [ computeOrigin (transition2stateSpec transition) start
@@ -806,8 +806,7 @@ handlePostponedStateQualifiedParts = do
                   , unsafePartial makeTypeTimeOnlyRoleStep "notifieduser" usersInContext start
                   ]
                   stp
-                compiledPart <- compileExpression currentDomain expressionWithEnvironment
-                pure (Sentence.CP compiledPart)
+                compileExpression currentDomain expressionWithEnvironment
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start, end})) = do
