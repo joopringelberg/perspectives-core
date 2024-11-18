@@ -28,12 +28,11 @@ import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.Identifiers (isTypeUri, typeUri2typeNameSpace)
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), AuthorOnly(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AuthorOnly(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyVerbE(..), PropsOrView(..), RoleIdentification(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), SentenceE(..), SentencePartE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.Expression.AST (BinaryStep(..), ComputationStep(..), ComputedType(..), PureLetStep(..), SimpleStep(..), Step(..), UnaryStep(..), VarBinding(..))
 import Perspectives.Parsing.Arc.PhaseTwoDefs (PhaseTwo, expandNamespace)
 import Perspectives.Parsing.Arc.Statement.AST (Assignment(..), LetABinding(..), LetStep(..), Statements(..))
 import Perspectives.Query.QueryTypes (Calculation(..))
-import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Prelude (class Monad, bind, discard, flip, pure, unit, void, ($), (<$>), (<*>), (<<<), (>>=))
 
@@ -234,6 +233,15 @@ instance containsPrefixesStateQualifiedPart :: ScanSymbols StateQualifiedPart wh
     pure (AE (AutomaticEffectE r {subject = subject', object = object', transition = transition', effect = effect'}))
   scan (SUBSTATE s) = SUBSTATE <$> scan s
 
+instance ScanSymbols SentenceE where
+  scan (SentenceE {sentence, parts}) = do 
+    parts' <- traverse scan parts
+    pure $ SentenceE {sentence, parts: parts'}
+
+instance containsPrefixesSentencPart :: ScanSymbols SentencePartE where
+  scan (HRpart s) = pure $ HRpart s
+  scan (CPpart c) = CPpart <$> scan c
+
 instance expandPrefixRoleVerbE :: ScanSymbols RoleVerbE where
   scan (RoleVerbE r@{subject, object, state}) = do
     subject' <- scan subject
@@ -271,13 +279,6 @@ instance containsPrefixesStateSpecification :: ScanSymbols StateSpecification wh
 instance containsPrefixesStateTransitionE :: ScanSymbols StateTransitionE where
   scan (Entry s) = Entry <$> scan s
   scan (Exit s) = Exit <$> scan s
-
-instance containsPrefixesSentence :: ScanSymbols Sentence where
-  scan (Sentence sparts) = traverse scan sparts >>= pure <<< Sentence
-
-instance containsPrefixesSentencPart :: ScanSymbols SentencePart where
-  scan (HR s) = pure $ HR s
-  scan (CP c) = CP <$> scan c
 
 instance containsprefixesStatements :: ScanSymbols Statements where
   scan (Let stp) = Let <$> scan stp

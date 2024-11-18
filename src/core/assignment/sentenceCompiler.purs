@@ -22,18 +22,17 @@
 
 module Perspectives.Assignment.SentenceCompiler where
 
-import Control.Monad.Error.Class (throwError)
-import Data.Array (concat, foldl)
-import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..), indexOf)
+import Data.Array (concat)
+import Data.FoldableWithIndex (foldlWithIndex)
+import Data.Show (show)
+import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (traverse)
-import Effect.Exception (error)
 import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, type (~~>))
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (context2string, role2string)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.Sentence (Sentence(..), SentencePart(..))
-import Prelude (bind, flip, mempty, pure, show, ($), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (bind, flip, pure, (<$>), (<<<), (<>), (>>=))
 
 type CompiledSentence a = a -> MonadPerspectives String
 
@@ -42,27 +41,16 @@ compileSentence :: forall a.
   (QueryFunctionDescription -> MonadPerspectives (a ~~> String)) ->
   Sentence ->
   MonadPerspectives (CompiledSentence a)
-compileSentence xToString (Sentence parts) = do
+compileSentence xToString (Sentence {sentence, parts}) = do
   compiledParts <- traverse
     case _ of
       HR s -> pure \_ -> pure [s]
-      CP c -> case c of
-        S step _ -> throwError (error $ "Sentence parts must be compiled, but found " <> show step)
-        Q calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
+      CP calc -> xToString calc >>= pure <<< flip evalMonadPerspectivesQuery
     parts
-  pure \roleId ->
-    intercalate' " " <<< concat <$> traverse (\p -> p roleId) compiledParts
-  where
-    intercalate' :: String -> Array String -> String
-    intercalate' sep xs = (foldl go { init: true, acc: mempty } xs).acc
-      where
-      go { init: true } x = { init: false, acc: x }
-      go { acc: acc }   x | isDot x = { init: false, acc: acc <> x }
-      go { acc: acc }   x = { init: false, acc: acc <> sep <> x }
-
-      isDot :: String -> Boolean
-      isDot s = indexOf (Pattern ".") s == Just 0
-
+  pure \roleId -> do
+    (replacements :: Array String) <- concat <$> traverse (\p -> p roleId) compiledParts
+    -- TODO: replace sentence with its translation before applying the expression value replacements to it.
+    pure (foldlWithIndex (\i s next -> replace (Pattern ("$" <> show i)) (Replacement next) s) sentence replacements)
 
 -- | From a Sentence, create a function that takes a ContextInstance and produces a String in MonadPerspectives.
 compileContextSentence :: Sentence -> MonadPerspectives (CompiledSentence ContextInstance)

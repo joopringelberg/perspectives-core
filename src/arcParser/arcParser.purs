@@ -26,9 +26,10 @@ import Control.Alt (map, void, (<|>))
 import Control.Lazy (defer)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (fromFoldable)
+import Data.FunctorWithIndex (mapWithIndex)
 import Data.Int (toNumber)
 import Data.JSDate (toISOString)
-import Data.List (find, List(..), concat, filter, many, some, null, singleton, (:))
+import Data.List (List(..), concat, filter, find, intercalate, many, null, singleton, some, (:))
 import Data.List.NonEmpty (NonEmptyList, toList, singleton) as LNE
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (unwrap)
@@ -39,9 +40,13 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Parsing (fail, failWithPosition)
+import Parsing.Combinators (between, lookAhead, option, optionMaybe, sepBy, sepBy1, try, (<?>))
+import Parsing.Indent (checkIndent, sameOrIndented, withPos)
+import Parsing.String (char, eof, satisfy)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.Identifiers (getFirstMatch, isModelUri) 
-import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), AuthorOnly(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
+import Perspectives.Identifiers (getFirstMatch, isModelUri)
+import Perspectives.Parsing.Arc.AST (ActionE(..), AuthorOnly(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), SentenceE(..), SentencePartE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
 import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
@@ -52,20 +57,14 @@ import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoRes
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
 import Perspectives.Parsing.Arc.Token (reservedIdentifier, token)
 import Perspectives.Persistent.PublicStore (PublicStore(..))
-import Perspectives.Query.QueryTypes (Calculation(..))
 import Perspectives.Repetition (Duration(..), Repeater(..))
 import Perspectives.Representation.Context (ContextKind(..))
 import Perspectives.Representation.ExplicitSet (ExplicitSet(..))
 import Perspectives.Representation.Range (Range(..))
-import Perspectives.Representation.Sentence (SentencePart(..), Sentence(..))
 import Perspectives.Representation.State (NotificationLevel(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), RoleKind(..), RoleType(..))
 import Perspectives.Representation.Verbs (RoleVerb(..), PropertyVerb(..), RoleVerbList(..))
 import Prelude (bind, discard, flip, not, pure, show, ($), (&&), (*>), (<$>), (<*), (<*>), (<<<), (<>), (==), (>>=), (||))
-import Parsing.Indent (checkIndent, sameOrIndented, withPos)
-import Parsing (fail, failWithPosition)
-import Parsing.Combinators (between, lookAhead, option, optionMaybe, sepBy, sepBy1, try, (<?>))
-import Parsing.String (char, eof, satisfy)
 
 contextE :: IP ContextPart
 contextE = withPos do
@@ -1346,21 +1345,27 @@ actionE = do
       end <- getPosition
       pure $ singleton $ AC $ ActionE {id, subject: s, object: o, state, effect, start, end}
 
-sentenceE :: IP Sentence
+sentenceE :: IP SentenceE
 sentenceE = do
   start <- getPosition
-  parts <- between (char '"') (char '"') (many (sentencePart <|> exprPart))
+  allparts <- between (char '"') (char '"') (many (sentencePart <|> exprPart))
   _ <- token.whiteSpace
   end <- getPosition
-  pure $ Sentence (fromFoldable parts)
+  sentence <- pure $ intercalate " " (flip mapWithIndex allparts \i p -> case p of 
+    HRpart s -> s
+    CPpart _ -> "$" <> show i)
+  parts <- pure $ filter (\p -> case p of
+    CPpart _ -> true
+    _ -> false) allparts
+  pure $ SentenceE { parts: (fromFoldable parts), sentence} 
   where
-    sentencePart :: IP SentencePart
+    sentencePart :: IP SentencePartE
     sentencePart = do
       chars <- some (satisfy (\c -> not (c == '{') && not (c == '"')))
-      pure $ HR $ trim $ fromCharArray $ fromFoldable chars
+      pure $ HRpart $ trim $ fromCharArray $ fromFoldable chars
 
-    exprPart :: IP SentencePart
-    exprPart = CP <<< flip S false <$> between (token.symbol "{") (token.symbol "}") step
+    exprPart :: IP SentencePartE
+    exprPart = CPpart <$> (between (token.symbol "{") (token.symbol "}") step)
 
 reserved' :: String -> IP String
 reserved' name = token.reserved name *> pure name

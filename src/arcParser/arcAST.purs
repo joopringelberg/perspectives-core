@@ -44,7 +44,7 @@ import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
 import Perspectives.Representation.Context (ContextKind)
 import Perspectives.Representation.ExplicitSet (ExplicitSet)
 import Perspectives.Representation.Range (Range)
-import Perspectives.Representation.Sentence (Sentence) 
+ 
 import Perspectives.Representation.TypeIdentifiers (ContextType, RoleKind, RoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb, RoleVerbList)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
@@ -291,7 +291,7 @@ newtype AuthorOnly = AuthorOnly
 newtype NotificationE = NotificationE
   { user :: RoleIdentification
   , transition :: StateTransitionE
-  , message :: Sentence
+  , message :: SentenceE
   -- , level :: NotificationLevel
   , object :: Maybe RoleIdentification
   , startMoment :: Maybe Duration
@@ -300,6 +300,14 @@ newtype NotificationE = NotificationE
   , start :: ArcPosition
   , end :: ArcPosition
   }
+
+--------------------------------------------------------------------------------
+---- SENTENCE
+--------------------------------------------------------------------------------
+newtype SentenceE = SentenceE {parts :: Array SentencePartE, sentence :: String}
+data SentencePartE =
+    HRpart String
+  | CPpart Step
 
 --------------------------------------------------------------------------------
 ---- AUTOMATICEFFECT
@@ -486,6 +494,12 @@ instance showStateQualifiedPart :: Show StateQualifiedPart where show = genericS
 
 derive instance genericNotificationE :: Generic NotificationE _
 instance showNotificationE :: Show NotificationE where show = genericShow
+
+derive instance Generic SentenceE _
+instance Show SentenceE where show = genericShow
+
+derive instance Generic SentencePartE _
+instance Show SentencePartE where show = genericShow
 
 derive instance genericStateTransitionE :: Generic StateTransitionE _
 instance showStateTransitionE :: Show StateTransitionE where show = genericShow

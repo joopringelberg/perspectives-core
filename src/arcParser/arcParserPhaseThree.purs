@@ -55,7 +55,7 @@ import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegmen
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), AuthorOnly(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, SentenceE(..), SentencePartE(..), StateTransitionE(..))
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -793,13 +793,13 @@ handlePostponedStateQualifiedParts = do
                       })
                 stateId
 
-          compileSentence :: Domain -> Sentence.Sentence -> ADT QT.RoleInContext -> Array StateIdentifier -> AST.StateSpecification -> PhaseThree Sentence.Sentence
-          compileSentence currentDomain (Sentence.Sentence parts) usersInContext states stateSpec = Sentence.Sentence <$> traverse compilePart parts
+          compileSentence :: Domain -> SentenceE -> ADT QT.RoleInContext -> Array StateIdentifier -> AST.StateSpecification -> PhaseThree Sentence.Sentence
+          compileSentence currentDomain (SentenceE {parts, sentence}) usersInContext states stateSpec = do
+            parts' <- traverse (unsafePartial compilePart) parts
+            pure $ Sentence.Sentence {sentence, parts: parts'} 
             where
-              compilePart :: Sentence.SentencePart -> PhaseThree Sentence.SentencePart
-              compilePart hr@(Sentence.HR _) = pure hr
-              compilePart cp@(Sentence.CP (Q _)) = pure cp
-              compilePart (Sentence.CP (S stp _)) = do
+              compilePart :: Partial => SentencePartE -> PhaseThree Sentence.SentencePart
+              compilePart (CPpart stp) = do 
                 expressionWithEnvironment <- pure $ addContextualBindingsToExpression
                   [ computeOrigin (transition2stateSpec transition) start
                   , computeCurrentContext (transition2stateSpec transition) start
@@ -807,7 +807,7 @@ handlePostponedStateQualifiedParts = do
                   ]
                   stp
                 compiledPart <- compileExpression currentDomain expressionWithEnvironment
-                pure (Sentence.CP (Q compiledPart))
+                pure (Sentence.CP compiledPart)
 
     -- | Modifies the DomeinFile in PhaseTwoState.
     handlePart (AST.AC (AST.ActionE{id, subject, object:syntacticObject, state, effect, start, end})) = do

@@ -28,10 +28,15 @@ import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Perspectives.Query.QueryTypes (Calculation)
+import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Simple.JSON (class ReadForeign, class WriteForeign, read', writeImpl)
 
-newtype Sentence = Sentence (Array SentencePart)
+-- The String part is the original sentence where the expressions have been replaced
+-- by replacement identifiers. So for example "Hello {Person}, how are you?" has become
+-- "Hello $1, how are you?"
+-- The Array of SentenceParts contains the computable parts, where a parts position in the array
+-- corresponds to the replacement identifier in the string.
+newtype Sentence = Sentence {sentence :: String, parts :: Array SentencePart}
 
 derive instance newtypeSentence :: Newtype Sentence _
 derive newtype instance showSentence :: Show Sentence
@@ -42,7 +47,7 @@ derive newtype instance WriteForeign Sentence
 
 data SentencePart =
     HR String
-  | CP Calculation
+  | CP QueryFunctionDescription
 
 derive instance genericSentencePart :: Generic SentencePart _
 instance showSentencePart :: Show SentencePart where show = genericShow
@@ -59,5 +64,5 @@ instance ReadForeign SentencePart where
       pure $ HR s
     <|>
     do
-      {constructor, calculation} :: {constructor :: String, calculation :: Calculation} <- read' f
+      {constructor, calculation} :: {constructor :: String, calculation :: QueryFunctionDescription} <- read' f
       pure $ CP calculation
