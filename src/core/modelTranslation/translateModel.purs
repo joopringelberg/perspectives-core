@@ -29,6 +29,7 @@ module Perspectives.ModelTranslation where
 import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
+import Control.Monad.State (get, lift, modify, runStateT)
 import Control.Monad.Writer (Writer, execWriter, tell)
 import Data.Array (filter, head, null, catMaybes)
 import Data.Either (Either)
@@ -38,7 +39,7 @@ import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
-import Data.Nullable (Nullable, toMaybe, null, notNull) as NULL
+import Data.Nullable (Nullable, notNull, null, toMaybe) as NULL
 import Data.Set (toUnfoldable) as SET
 import Data.String.Regex (match)
 import Data.String.Regex.Flags (noFlags)
@@ -48,10 +49,10 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (Error)
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
-import Perspectives.Data.EncodableMap (keys, lookup) as EM
+import Perspectives.Data.EncodableMap (keys, lookup, values) as EM
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
 import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_, startsWithSegments, buitenRol)
 import Perspectives.Representation.Action (Action)
@@ -60,6 +61,7 @@ import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdentifier)
+import Perspectives.Representation.State (Notification(..), State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType, roletype2string)
 import Purescript.YAML (load)
 import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
@@ -76,6 +78,11 @@ derive newtype instance ReadForeign Translations
 
 instance Semigroup Translations where
   append (Translations t1) (Translations t2) = Translations (t1 <> t2)
+
+-- The keys are the original notification texts.
+newtype NotificationsTranslation = NotificationsTranslation (Object Translations)
+derive newtype instance WriteForeign NotificationsTranslation
+derive newtype instance ReadForeign NotificationsTranslation
 
 -- The translations of many properties.
 -- The keys are the property names; the values are their translations.
@@ -100,6 +107,7 @@ newtype RoleTranslation = RoleTranslation
   { translations :: Translations
   , properties :: PropertiesTranslation
   , actions :: ActionsPerStateTranslation
+  , notifications :: NotificationsTranslation
   }
 derive newtype instance WriteForeign RoleTranslation
 derive newtype instance ReadForeign RoleTranslation
@@ -115,6 +123,7 @@ newtype ContextTranslation = ContextTranslation
   , users :: RolesTranslation
   , things :: RolesTranslation
   , contextroles :: RolesTranslation
+  , notifications :: NotificationsTranslation
   -- The keys are the local context names
   , contexts :: ContextsTranslation}
 
@@ -159,6 +168,10 @@ newtype ContextTranslation_ = ContextTranslation_
   , contextroles :: NULL.Nullable RolesTranslation_
   -- The keys are the local context names
   , contexts :: NULL.Nullable ContextsTranslation_
+  -- The keys are generated numbers and are of no interest.
+  -- The original texts are stored under the key 'orig'.
+  -- These notifications are lexically embedded in context state transitions.
+  , notifications :: NULL.Nullable Notifications_
   }
 
 newtype ContextsTranslation_ = ContextsTranslation_ (Object ContextTranslation_)
@@ -169,6 +182,9 @@ newtype RoleTranslation_ = RoleTranslation_
   { translations :: Translations_
   , properties :: NULL.Nullable PropertiesTranslation_
   , actions :: NULL.Nullable ActionsPerStateTranslation_
+  , markdowns :: NULL.Nullable (Object Translations_)
+  -- These notifications are lexically embedded in role state transitions.
+  , notifications :: NULL.Nullable Notifications_
   }
 
 newtype PropertiesTranslation_ = PropertiesTranslation_ (Object {translations :: Translations_})
@@ -178,6 +194,10 @@ newtype ActionsPerStateTranslation_ = ActionsPerStateTranslation_ (Object Action
 newtype ActionsTranslation_ = ActionsTranslation_ (Object { translations :: Translations_})
 
 newtype Translations_ = Translations_ (Object (NULL.Nullable String))
+
+-- The keys are generated numbers and are of no interest.
+-- The original texts are stored under the key 'orig'.
+newtype Notifications_ = Notifications_ (Object Translations_)
 -------------------------------------------------------------------------------
 ---- CLASS REHYDRATE
 -------------------------------------------------------------------------------
@@ -190,12 +210,20 @@ instance Rehydrate Translations_ Translations where
     Just translation -> Just (Tuple language translation)
     _ -> Nothing)
 
+instance Rehydrate Notifications_ NotificationsTranslation where
+  hydrate (Notifications_ obj) = NotificationsTranslation $ fromFoldable $ (values obj) <#> (\t -> let 
+    Translations t' = hydrate t 
+    orig = unsafePartial fromJust $ lookup "orig" t'
+    in Tuple orig (Translations t')
+  )
+
 instance Rehydrate ActionsTranslation_ ActionsTranslation where
   -- Do away with the extra "translations" layer.
   hydrate (ActionsTranslation_ obj) = ActionsTranslation (obj <#> _.translations >>> hydrate)
 
 instance Rehydrate RoleTranslation_ RoleTranslation where
-  hydrate (RoleTranslation_ {translations, properties, actions}) = RoleTranslation { translations: translations', properties: properties', actions: actions'}
+  hydrate (RoleTranslation_ {translations, properties, actions, markdowns, notifications}) = 
+    RoleTranslation { translations: translations', properties: properties', actions: actions', notifications: notifications'}
     where
     properties' = case NULL.toMaybe properties of 
       Nothing -> PropertiesTranslation empty
@@ -204,12 +232,19 @@ instance Rehydrate RoleTranslation_ RoleTranslation where
       Nothing -> ActionsPerStateTranslation empty
       Just (ActionsPerStateTranslation_ acts) -> ActionsPerStateTranslation (hydrate <$> acts)
     translations' = hydrate translations
+    notifications' = case NULL.toMaybe notifications of 
+      Nothing -> NotificationsTranslation empty
+      Just (Notifications_ notifications_) -> NotificationsTranslation (hydrate <$> notifications_)
 
 instance Rehydrate ContextTranslation_ ContextTranslation where
-  hydrate (ContextTranslation_ {translations, external, users, things, contextroles, contexts}) = let
+  hydrate (ContextTranslation_ {translations, external, users, things, contextroles, contexts, notifications}) = let
     translations' = hydrate translations
     external' = case NULL.toMaybe external of 
-      Nothing -> RoleTranslation { translations: Translations empty, properties: PropertiesTranslation empty, actions: ActionsPerStateTranslation empty}
+      Nothing -> RoleTranslation 
+        { translations: Translations empty
+        , properties: PropertiesTranslation empty
+        , actions: ActionsPerStateTranslation empty
+        , notifications: NotificationsTranslation empty}
       Just e@(RoleTranslation_ _) -> (hydrate e)
     users' = case NULL.toMaybe users of 
       Nothing -> RolesTranslation empty
@@ -223,8 +258,18 @@ instance Rehydrate ContextTranslation_ ContextTranslation where
     contexts' = case NULL.toMaybe contexts of 
       Nothing -> ContextsTranslation empty
       Just (ContextsTranslation_ t) -> ContextsTranslation (map hydrate t)
+    notifications' = case NULL.toMaybe notifications of 
+      Nothing -> NotificationsTranslation empty
+      Just (Notifications_ notifications_) -> NotificationsTranslation (hydrate <$> notifications_)
     in 
-    ContextTranslation {translations:translations', external:external', users:users', things:things', contextroles:contextroles', contexts:contexts'}
+    ContextTranslation 
+      { translations:translations'
+      , external:external'
+      , notifications: notifications'
+      , users:users'
+      , things:things'
+      , contextroles:contextroles'
+      , contexts:contexts'}
 
 instance Rehydrate ModelTranslation_ ModelTranslation where
   hydrate (ModelTranslation_ { namespace, contexts, roles}) = let 
@@ -275,18 +320,30 @@ translateContext (Context {id:contextId, gebruikerRol, contextRol, rolInContext,
   contexts <- ContextsTranslation <<< fromFoldable <$> for 
     (filter (\ct -> (unwrap ct) `startsWithSegments` (unwrap contextId) ) nestedContexts) 
     \ct -> (lookupContextType ct >>= translateContext >>= pure <<< Tuple (unwrap ct))
+  notifications <- do
+    {states} <- ask
+    pure $ NotificationsTranslation (execWriter $ for_ states (\(State {stateFulObject, notifyOnEntry, notifyOnExit}) -> case stateFulObject of 
+      Cnt c | c == contextId -> for_ (EM.values notifyOnEntry) translateNotification
+      _ -> pure unit))
   pure $ ContextTranslation
     { translations: Translations empty
     , external
+    , notifications
     , users
     , things
     , contextroles
     , contexts}
   where
+  -- Writes singletons with the original sentence and empty translations
+
   translateRoles :: Array RoleType -> Reader DomeinFileRecord RolesTranslation
   translateRoles roles = RolesTranslation <$> fromFoldable <$> for 
     (filter (\rt -> (roletype2string rt) `startsWithSegments` (unwrap contextId)) roles)
     (\rt -> (lookupRoleType rt >>= translateRole >>= pure <<< Tuple (roletype2string rt)))
+
+translateNotification :: Notification -> Writer (Object Translations) Unit
+translateNotification (ContextNotification {sentence}) = tell $ singleton (_.sentence $ unwrap sentence) (Translations empty)
+translateNotification (RoleNotification {sentence}) = tell $ singleton (_.sentence $ unwrap sentence) (Translations empty)
 
 -- Aspect roles that have been added as is will turn up here, but should not be translated.
 lookupRoleType :: RoleType -> Reader DomeinFileRecord Role
@@ -309,10 +366,16 @@ translateRole (E (EnumeratedRole rec)) = do
     (ps :: Array (Tuple String Translations)) <- (for rec.properties translatePropertyType)
     pure $ PropertiesTranslation $ fromFoldable ps
   actions <- translateActions rec.actions
-  pure $ RoleTranslation {translations: Translations empty, properties, actions}
+  notifications <- do
+    {states} <- ask
+    pure $ NotificationsTranslation (execWriter $ for_ states (\(State {stateFulObject, notifyOnEntry, notifyOnExit}) -> case stateFulObject of 
+      Orole r | r == rec.id -> for_ (EM.values notifyOnEntry) translateNotification
+      Srole r | r == rec.id -> for_ (EM.values notifyOnEntry) translateNotification
+      _ -> pure unit))
+  pure $ RoleTranslation {translations: Translations empty, properties, actions, notifications}
 translateRole (C (CalculatedRole rec)) = do 
   actions <- translateActions rec.actions
-  pure $ RoleTranslation {translations: Translations empty, properties: PropertiesTranslation empty, actions}
+  pure $ RoleTranslation {translations: Translations empty, properties: PropertiesTranslation empty, actions, notifications: NotificationsTranslation empty}
 
 translateActions :: EncodableMap StateSpec (Object Action) -> Reader DomeinFileRecord ActionsPerStateTranslation
 translateActions actions = ActionsPerStateTranslation <<< fromFoldable <$> 
@@ -347,6 +410,28 @@ instance Translation Translations where
       \(Tuple lang translation) -> do
         tell (i indent tab lang colonSpace translation nl)
   addTranslations _ t = t 
+
+instance Translation NotificationsTranslation where
+  qualify _ n = n
+  writeKeys (NotificationsTranslation notifications) = forWithIndex_ notifications
+    \original translations -> tell (singleton original translations)
+  writeYaml indent (NotificationsTranslation notifications) = if isEmpty notifications
+    then pure unit
+    else do
+      tell (i indent "notifications" colonNl)
+      void $ runStateT
+        (forWithIndex notifications
+          \original translations -> do
+            nr <- get
+            lift $ tell (i indent tab nr colonNl)
+            lift $ writeYaml (indent <> tab <> tab) translations
+            modify ((+) 1)
+            )
+        0
+  addTranslations (TranslationTable table) (NotificationsTranslation notifications) = NotificationsTranslation $
+    flip mapWithKey notifications \original translations -> case lookup original table of 
+      Nothing -> translations
+      Just ts -> ts
 
 instance Translation PropertiesTranslation where
   qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
@@ -413,30 +498,31 @@ instance Translation RolesTranslation where
       Just ts -> addTranslations tbl (RoleTranslation rec {translations = ts})
 
 instance Translation RoleTranslation where
-  qualify namespace (RoleTranslation {translations, properties, actions}) = let 
+  qualify namespace (RoleTranslation {translations, properties, actions, notifications}) = let 
     properties' = qualify namespace properties
     actions' = qualify namespace actions
     in
-    RoleTranslation {translations, properties: properties', actions: actions'}
+    RoleTranslation {translations, properties: properties', actions: actions', notifications}
   writeKeys _ = pure unit
   writeYaml indent (RoleTranslation {translations, properties, actions}) = do
     writeYaml indent translations
     writeYaml indent properties
     writeYaml indent actions
-  addTranslations table (RoleTranslation {translations, properties, actions}) = RoleTranslation $ 
+  addTranslations table (RoleTranslation {translations, properties, actions, notifications}) = RoleTranslation $ 
     { translations
     , properties: addTranslations table properties
-    , actions: addTranslations table actions}
+    , actions: addTranslations table actions
+    , notifications: addTranslations table notifications}
 
 instance Translation ContextTranslation where
-  qualify namespace (ContextTranslation {translations, external:ext, users, things, contextroles, contexts}) = let 
+  qualify namespace (ContextTranslation {translations, external:ext, users, things, contextroles, contexts, notifications}) = let 
     external = qualify namespace ext
     users' = qualify namespace users
     things' = qualify namespace things
     contextroles' = qualify namespace contextroles
     contexts' = qualify namespace contexts
     in
-    ContextTranslation {translations, external, users: users', things: things', contextroles: contextroles', contexts: contexts'}
+    ContextTranslation {translations, external, users: users', things: things', contextroles: contextroles', contexts: contexts', notifications}
   writeKeys _ = pure unit
   writeYaml indent (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts}) = do 
     writeYaml indent translations
@@ -472,13 +558,14 @@ instance Translation ContextTranslation where
         else do 
           tell (i indent "contexts" colonNl)
           writeYaml (indent <> tab) ctxts
-  addTranslations table (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts}) = ContextTranslation 
+  addTranslations table (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts, notifications}) = ContextTranslation 
     { translations
     , external: addTranslations table external
     , users: addTranslations table users
     , things: addTranslations table things
     , contextroles: addTranslations table contextroles
     , contexts: addTranslations table ctxts
+    , notifications: addTranslations table notifications
     }
 
 instance Translation ContextsTranslation where
