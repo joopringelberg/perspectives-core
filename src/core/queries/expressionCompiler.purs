@@ -46,7 +46,7 @@ import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.DomeinCache (modifyCalculatedPropertyInDomeinFile, modifyCalculatedRoleInDomeinFile)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionIsEffect, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (endsWithSegments, isExternalRole, isTypeUri, qualifyWith, typeUri2ModelUri)
 import Perspectives.Instances.ObjectGetters (contextType_, roleType_)
 import Perspectives.Names (lookupIndexedContext, lookupIndexedRole)
@@ -857,43 +857,45 @@ compileVarBinding currentDomain (VarBinding varName step) = do
   pure $ UQD currentDomain (QF.BindVariable varName) step_ (range step_) isF (mandatory step_)
 
 compileComputationStep :: Domain -> ComputationStep -> FD
-compileComputationStep currentDomain (ComputationStep {functionName, arguments, computedType, start, end}) = do
-  case (typeUri2ModelUri functionName) of
-    Nothing -> throwError (NotWellFormedName start functionName)
-    Just modelName -> if isExternalCoreModule modelName
-      then do
-        -- We cannot call addAllExternalFunctions without introducing a cycle.
-        -- Instead, we start up main with addAllExternalFunctions
-        compiledArgs <- traverse (compileStep currentDomain) arguments
-        (let
-          mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName
-          in case mexpectedNrOfArgs of
-            Nothing -> throwError (UnknownExternalFunction start end functionName)
-            Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
-              then do 
-                isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality functionName
-                case computedType of
-                  -- Collect property instances.
-                  ComputedRange r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
-                  OtherType s -> (lift $ lift $ typeExists (ContextType s)) >>= if _
-                    -- Collect Context instances.
-                    then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (UET (ContextType s))) isFunctional Unknown
+compileComputationStep currentDomain (ComputationStep {functionName, arguments, computedType, start, end}) = if lookupHiddenFunctionIsEffect functionName
+  then throwError (NotAFunction start end functionName)
+  else do
+    case (typeUri2ModelUri functionName) of
+      Nothing -> throwError (NotWellFormedName start functionName)
+      Just modelName -> if isExternalCoreModule modelName
+        then do
+          -- We cannot call addAllExternalFunctions without introducing a cycle.
+          -- Instead, we start up main with addAllExternalFunctions
+          compiledArgs <- traverse (compileStep currentDomain) arguments
+          (let
+            mexpectedNrOfArgs = lookupHiddenFunctionNArgs functionName
+            in case mexpectedNrOfArgs of
+              Nothing -> throwError (UnknownExternalFunction start end functionName)
+              Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
+                then do 
+                  isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality functionName
+                  case computedType of
+                    -- Collect property instances.
+                    ComputedRange r -> pure $ MQD currentDomain (QF.ExternalCorePropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) isFunctional Unknown
+                    OtherType s -> (lift $ lift $ typeExists (ContextType s)) >>= if _
+                      -- Collect Context instances.
+                      then pure $ SQD currentDomain (QF.ExternalCoreContextGetter functionName) (CDOM (UET (ContextType s))) isFunctional Unknown
 
-                    -- Collect role instances. Having no other information, we conjecture these instances to have their
-                    -- role type in their lexical context.
-                    else do
-                      context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType s)
-                      pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context, role: EnumeratedRoleType s})) isFunctional Unknown
-              else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
-      else do
-        compiledArgs <- traverse (compileStep currentDomain) arguments
-        -- TODO. This is a stub.
-        -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
-        case computedType of 
-          ComputedRange r -> 
-            pure $ MQD currentDomain (QF.ForeignPropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
-          OtherType s -> 
-            pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context: ContextType "", role: EnumeratedRoleType s})) Unknown Unknown
+                      -- Collect role instances. Having no other information, we conjecture these instances to have their
+                      -- role type in their lexical context.
+                      else do
+                        context <- lift2 $ enumeratedRoleContextType (EnumeratedRoleType s)
+                        pure $ MQD currentDomain (QF.ExternalCoreRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context, role: EnumeratedRoleType s})) isFunctional Unknown
+                else throwError (WrongNumberOfArguments start end functionName expectedNrOfArgs (length arguments)))
+        else do
+          compiledArgs <- traverse (compileStep currentDomain) arguments
+          -- TODO. This is a stub.
+          -- TODO. Check whether the foreign function exists and whether it has been given the right number of arguments.
+          case computedType of 
+            ComputedRange r -> 
+              pure $ MQD currentDomain (QF.ForeignPropertyGetter functionName) (fromFoldable compiledArgs) (VDOM r Nothing) Unknown Unknown
+            OtherType s -> 
+              pure $ MQD currentDomain (QF.ForeignRoleGetter functionName) (fromFoldable compiledArgs) (RDOM (UET $ RoleInContext {context: ContextType "", role: EnumeratedRoleType s})) Unknown Unknown
 
   -- where
 

@@ -248,12 +248,12 @@ startListening _ = try (lift retrieveBrokerService)
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce prepareAMQPaccount, nArgs: 6, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setBindingKey, nArgs: 5, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 5, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 4, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$DeleteQueue" {func: unsafeCoerce deleteQueue_, nArgs: 4, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$SetPermissionsForAMQPaccount" {func: unsafeCoerce setPermissionsForAMQPaccount, nArgs: 5, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$StartListening" {func: unsafeCoerce startListening, nArgs: 0, isFunctional: True}
-  , Tuple "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ" {func: unsafeCoerce selfRegisterWithRabbitMQ, nArgs: 4, isFunctional: True}
+  [ Tuple "model://perspectives.domains#RabbitMQ$PrepareAMQPaccount" {func: unsafeCoerce prepareAMQPaccount, nArgs: 6, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetBindingKey" {func: unsafeCoerce setBindingKey, nArgs: 5, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetPassword" {func: unsafeCoerce setPassword, nArgs: 5, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$DeleteAMQPaccount" {func: unsafeCoerce deleteAMQPaccount, nArgs: 4, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$DeleteQueue" {func: unsafeCoerce deleteQueue_, nArgs: 4, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$SetPermissionsForAMQPaccount" {func: unsafeCoerce setPermissionsForAMQPaccount, nArgs: 5, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$StartListening" {func: unsafeCoerce startListening, nArgs: 0, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#RabbitMQ$SelfRegisterWithRabbitMQ" {func: unsafeCoerce selfRegisterWithRabbitMQ, nArgs: 4, isFunctional: True, isEffect: false}
   ]

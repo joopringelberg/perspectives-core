@@ -58,8 +58,7 @@ import Perspectives.ModelDependencies (sysUser)
 import Perspectives.ModelTranslation (ModelTranslation)
 import Perspectives.ModelTranslation (ModelTranslation, augmentModelTranslation, generateFirstTranslation, parseTranslation, writeTranslationYaml, generateTranslationTable) as MT
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment) as Persistence
-import Perspectives.Persistence.API (addDocument, deleteDocument, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
+import Perspectives.Persistence.API (addAttachment, addDocument, deleteDocument, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
@@ -149,12 +148,12 @@ uploadToRepository_ splitName (DomeinFile df) invertedQueries = do
             Nothing -> pure unit
             Just attachment -> do
               newRev <- get
-              DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
+              DeleteCouchdbDocument {rev} <- lift $ addAttachment documentUrl documentName newRev attName attachment mimetype
               put rev)
       -- Lastly, add the StoredQueries
       (newRev :: Revision_) <- get
       theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ writeJSON invertedQueries)
-      lift $ void $ Persistence.addAttachment documentUrl documentName newRev "storedQueries.json" theFile (MediaType "application/json")
+      lift $ void $ addAttachment documentUrl documentName newRev "storedQueries.json" theFile (MediaType "application/json")
 
 removeFromRepository :: 
   Array ModelUri ->
@@ -245,7 +244,7 @@ generateTranslationTable translation_ domeinFileName_ _ = case head translation_
         theFile <- liftEffect $ toFile "translationtable.json" "application/json" (unsafeToForeign $ writeJSON table)
         mRev <- lift $ retrieveDocumentVersion repositoryUrl documentName
         -- Ignore the new revision. We do not have a local representation of the remote DomeinFile.
-        void $ lift $ Persistence.addAttachment 
+        void $ lift $ addAttachment 
           repositoryUrl 
           documentName 
           mRev
@@ -255,46 +254,42 @@ generateTranslationTable translation_ domeinFileName_ _ = case head translation_
 
 -- | Fill a ModelTranslation freshly generated from a DomeinFile, with translations taken from a TranslationTable.
 -- | NOTE: the TranslationTable must be available on the versioned model in the repository. It is not a property value.
--- | The ModelTranslation must be passed in as a PFile Value. 
+-- | The ModelTranslation must be passed in as a string.
 -- | The result is the (serialised) ModelTranslation.
 -- | The original ModelTranslation is returned when there is no TranslationTable or when it cannot be parsed correctly.
 -- | An empty result is returned when the ModelTranslation cannot be read from file.
 augmentModelTranslation :: Array String -> Array String -> (RoleInstance ~~> Value)
-augmentModelTranslation pfile_ domeinFileName_ _ = ArrayT $ case head pfile_, head domeinFileName_ of 
-  Nothing, _ -> runArrayT $ handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
-    (Left (error "A ModelTranslation file should be provided."))
-  _, Nothing -> runArrayT $ handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
+augmentModelTranslation translation_ domeinFileName_ _ = case head translation_, head domeinFileName_ of 
+  Nothing, _ -> handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
+    (Left (error "A String holding a ModelTranslation should be provided."))
+  _, Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
     (Left (error "A Versioned model name should be provided. (e.g. model://perspectives.domains#System@1.0)"))
-  Just pfile, Just domeinFileName -> do 
-    mModelTranslation <- lift $ getPFileTextValue pfile
-    case mModelTranslation of 
-      -- Fail silently
-      Nothing -> pure []
-      Just modelTranslationString -> case readJSON_ modelTranslationString of 
-        -- Fail silently
-        Nothing -> pure []
-        -- Retrieve the Existing Translation and apply it to the ModelTranslation.
-        Just (modelTranslation :: ModelTranslation) -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
-          {repositoryUrl, documentName} -> do 
-            mTranslationTable <- lift $ getAttachment repositoryUrl documentName "translationtable.json"
-            case mTranslationTable of 
-              Nothing -> pure $ [Value modelTranslationString]
-              Just translationTableString -> case read translationTableString of 
-                Left e -> pure $ [Value modelTranslationString]
-                Right translationTable -> pure $ [Value $ writeJSON (MT.augmentModelTranslation translationTable modelTranslation)]
+  Just modelTranslationString, Just domeinFileName -> case readJSON_ modelTranslationString of 
+    -- Fail silently
+    Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
+      (Left (error "The model translation string could not be parsed."))
+    -- Retrieve the Existing Translation and apply it to the ModelTranslation.
+    Just (modelTranslation :: ModelTranslation) -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
+      {repositoryUrl, documentName} -> do 
+        mTranslationTable <- lift $ lift $ getAttachment repositoryUrl documentName "translationtable.json"
+        case mTranslationTable of 
+          Nothing -> pure $ Value modelTranslationString
+          Just translationTableString -> case read translationTableString of 
+            Left e -> pure $ Value modelTranslationString
+            Right translationTable -> pure $ Value $ writeJSON (MT.augmentModelTranslation translationTable modelTranslation)
 
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 2, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 2, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$GenerateFirstTranslation" {func: unsafeCoerce generateFirstTranslation, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$GetTranslationYaml" {func: unsafeCoerce getTranslationYaml, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$ParseYamlTranslation" {func: unsafeCoerce parseYamlTranslation, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$GenerateTranslationTable" {func: unsafeCoerce generateTranslationTable, nArgs: 2, isFunctional: True}
-  , Tuple "model://perspectives.domains#Parsing$AugmentModelTranslation" {func: unsafeCoerce augmentModelTranslation, nArgs: 2, isFunctional: True}
+  [ Tuple "model://perspectives.domains#Parsing$ParseAndCompileArc" {func: unsafeCoerce parseAndCompileArc, nArgs: 2, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Parsing$UploadToRepository" {func: unsafeCoerce uploadToRepository, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Parsing$RemoveFromRepository" {func: unsafeCoerce removeFromRepository, nArgs: 1, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Parsing$CompileRepositoryModels" {func: unsafeCoerce compileRepositoryModels, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Parsing$GenerateFirstTranslation" {func: unsafeCoerce generateFirstTranslation, nArgs: 1, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Parsing$GetTranslationYaml" {func: unsafeCoerce getTranslationYaml, nArgs: 1, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Parsing$ParseYamlTranslation" {func: unsafeCoerce parseYamlTranslation, nArgs: 1, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Parsing$GenerateTranslationTable" {func: unsafeCoerce generateTranslationTable, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Parsing$AugmentModelTranslation" {func: unsafeCoerce augmentModelTranslation, nArgs: 2, isFunctional: True, isEffect: false}
 ]

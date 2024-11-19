@@ -55,5 +55,5 @@ getPFileTextValue v = case parsePerspectivesFile v of
 
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Files$FileText" {func: unsafeCoerce fileText, nArgs: 1, isFunctional: True}
+  [ Tuple "model://perspectives.domains#Files$FileText" {func: unsafeCoerce fileText, nArgs: 1, isFunctional: True, isEffect: false}
   ]

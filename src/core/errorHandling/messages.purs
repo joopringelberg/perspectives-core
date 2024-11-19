@@ -104,6 +104,8 @@ data PerspectivesError
     | NotAPropertyRange  ArcPosition ArcPosition RAN.Range
     | WrongNumberOfArguments ArcPosition ArcPosition String Int Int
     | UnknownExternalFunction ArcPosition ArcPosition String
+    | NotAnEffect ArcPosition ArcPosition String
+    | NotAFunction ArcPosition ArcPosition String
     | CannotFindContextType ArcPosition ArcPosition String
     | NoPropertyTypeWithValue ArcPosition ArcPosition
     | CurrentObjectNotAllowed ArcPosition ArcPosition
@@ -212,6 +214,8 @@ instance showPerspectivesError :: Show PerspectivesError where
   show (NotAPropertyRange start end expected) = "(NotAPropertyRange) Expression does not yield a property value. Expected the range '" <> show expected <> "', between " <> show start <> " and " <> show end
   show (WrongNumberOfArguments start end functionName nrExpected nrGiven) = "(WrongNumberOfArguments) The function '" <> functionName <> "' expects " <> show nrExpected <> " arguments but received " <> show nrGiven <> ", between " <> show start <> " and " <> show end
   show (UnknownExternalFunction start end functionName) = "(UnknownExternalFunction) The external function name '" <> functionName <> "' is unknown, between " <> show start <> " and " <> show end
+  show (NotAnEffect start end functionName) = "(NotAnEffect) The external function '" <> functionName <> "' is not an effect but a function. Use 'callExternal' rather than 'callEffect'."
+  show (NotAFunction start end functionName) = "(NotAFunction) The external function '" <> functionName <> "' is not a function but an effect. Use 'callEffect' rather than 'callExternal'."
   show (CannotFindContextType start end ctype) = "(CannotFindContextType) The context type name '" <> ctype <> "' cannot be resolved, between " <> show start <> " and " <> show end
   show (NoPropertyTypeWithValue start end) = "(NoPropertyTypeWithValue) The property value computed by this expression is not associated with a Property Type (this throws up a problem in combination with, for example, `modelname`)"
   show (CurrentObjectNotAllowed start end) = "(CurrentObjectNotAllowed) The variable `currentobject` is illegal in the expression between " <> show start <> " and " <> show end <> "."

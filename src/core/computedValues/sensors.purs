@@ -111,5 +111,5 @@ readSensor device' sensor' _ = try
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2, isFunctional: True}
+  [ Tuple "model://perspectives.domains#Sensor$ReadSensor" {func: unsafeCoerce readSensor, nArgs: 2, isFunctional: True, isEffect: false}
   ]

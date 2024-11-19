@@ -212,8 +212,8 @@ addConnectedPartnerToChannel userArr channelArr cid = try
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
 externalFunctions =
-  [ Tuple "model://perspectives.domains#Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1, isFunctional: True}
-  , Tuple "model://perspectives.domains#Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0, isFunctional: True}
-  , Tuple "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2, isFunctional: True}
-  , Tuple "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1, isFunctional: True}
+  [ Tuple "model://perspectives.domains#Serialise$SerialiseFor" {func: unsafeCoerce serialiseFor, nArgs: 1, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Serialise$AddChannel" {func: unsafeCoerce addChannel, nArgs: 0, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Serialise$AddConnectedPartnerToChannel" {func: unsafeCoerce addConnectedPartnerToChannel, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Serialise$CreateCopyOfChannelDatabase" {func: unsafeCoerce createCopyOfChannelDatabase, nArgs: 1, isFunctional: True, isEffect: true}
   ]
