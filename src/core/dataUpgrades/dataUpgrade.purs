@@ -109,6 +109,8 @@ runDataUpgrades = do
       void recompileLocalModels
   runUpgrade installedVersion "0.26.3"
     (void recompileLocalModels)
+  runUpgrade installedVersion "0.26.5"
+    (void recompileLocalModels)
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------

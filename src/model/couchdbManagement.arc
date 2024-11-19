@@ -912,7 +912,7 @@ domain model://perspectives.domains#CouchdbManagement
       property PublicUrl (functional) = binder Versions >> context >> extern >> PublicUrl
       -- Only one VersionedModelManifest can be the recommended version at a time.
       property IsRecommended (Boolean)
-      -- The (Javascript) DateTime value of the last upload.
+      -- The (Javascript) DateTime value of the last Arc file upload.
       property LastChangeDT (DateTime)
       -- The readable date and time of the last upload.
       property LastUpload = callExternal util:FormatDateTime( LastChangeDT, "nl-NL", "{\"dateStyle\": \"short\", \"timeStyle\": \"short\"}" ) returns String
@@ -920,12 +920,16 @@ domain model://perspectives.domains#CouchdbManagement
       -- This must be writerOnly.
       -- The property will have no value in a new installation, effectively preventing upload on receiving a new Version
       property AutoUpload (Boolean)
+      property GenerateYaml (Boolean)
+      -- The (Javascript) DateTime value of the last Yaml file upload.
+      property LastYamlChangeDT (DateTime)
 
       -- TESTING YAML TRANSLATION
       property ModelTranslation = callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
       property TranslationYaml (File)
         pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
       property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
+      property AugmentedModelTranslation (String)
 
 
       on exit
@@ -944,13 +948,16 @@ domain model://perspectives.domains#CouchdbManagement
               -- Set the version to download.
               VersionToInstall = Version for binder Versions >> context >> extern
       
-      state ProcessArc = AutoUpload and (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT) or not exists LastChangeDT)
+      -- This state triggers UploadToRepository.
+      state ProcessArc = AutoUpload and (exists ArcSource) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastChangeDT + 10 seconds) or not exists LastChangeDT)
         on entry
           do for Author
             ArcFeedback = callExternal p:ParseAndCompileArc( ModelURI, ArcSource ) returns String
             LastChangeDT = callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime
             MustUpload = true
 
+      -- NOTE. This state triggers GenerateYaml.
+      -- Why not roll up both states into one? I hope this design ensures that the required files are available.!
       state UploadToRepository = (ArcFeedback matches regexp "^OK") and MustUpload
         on entry
           do for Author
@@ -958,14 +965,38 @@ domain model://perspectives.domains#CouchdbManagement
               callExternal util:ReplaceR( "bind publicrole.*in sys:MySystem", "", ArcSource ) returns String)
             Build = Build + 1
             MustUpload = false
+            GenerateYaml = true
           notify Author
             "Version {External$Version} (build {Build}) has been uploaded to the repository for {binder Versions >> context >> Repository >> NameSpace >>= first}."
+      
+      -- Construct a (new version of the) YAML file that the Author can download to add translations.
+      state GenerateYaml = GenerateYaml and ArcFeedback matches regexp "^OK"
+        on entry
+          do for Author
+            letA
+                modeltranslation <- callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
+                text <- callExternal p:GetTranslationYaml( modeltranslation ) returns String
+              in
+                create file ("translation_of_" + VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml
+                  text
+                GenerateYaml = false
+      
+      -- Construct a new TranslationTable from the YAML that the author has enriched with translations.
+      -- Will be triggered on each new version of TranslationYaml, whether generated in state GenerateYaml or uploaded by the end user.
+      state GenerateTranslationTable = (exists TranslationYaml) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastYamlChangeDT + 10 seconds) or not exists LastYamlChangeDT)
+        on entry
+          do for Author
+            letA
+              modeltranslation <- callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
+            in
+              callEffect p:GenerateTranslationTable( modeltranslation, VersionedModelURI)
+              LastYamlChangeDT = callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime
 
     user Author (relational) filledBy cm:ModelManifest$Author
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
         props (DomeinFileName, Version, ArcSource, LastUpload, ModelTranslation, ParsedYaml) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload, TranslationYaml) verbs (Consult, SetPropertyValue)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload, TranslationYaml, GenerateYaml, LastYamlChangeDT, AugmentedModelTranslation) verbs (Consult, SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Manifest >> context >> Versions
@@ -975,6 +1006,9 @@ domain model://perspectives.domains#CouchdbManagement
         props (FirstName, LastName) verbs (Consult)
       action CreateTranslation
         callEffect p:GenerateTranslationTable( extern >> ModelTranslation, extern >> VersionedModelURI)
+      action AugmentTranslation
+        AugmentedModelTranslation = callExternal p:AugmentModelTranslation( extern >> ModelTranslation, extern >> VersionedModelURI) returns String for External
+      -- TODO: kan weg zodra state GenerateYaml goed werkt.
       action CreateYaml
         letA
             text <- callExternal p:GetTranslationYaml( extern >> ModelTranslation ) returns String

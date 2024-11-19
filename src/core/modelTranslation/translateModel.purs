@@ -49,7 +49,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (Error)
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values, insert)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup, values) as EM
@@ -421,10 +421,10 @@ instance Translation NotificationsTranslation where
       tell (i indent "notifications" colonNl)
       void $ runStateT
         (forWithIndex notifications
-          \original translations -> do
+          \original (Translations translations) -> do
             nr <- get
             lift $ tell (i indent tab nr colonNl)
-            lift $ writeYaml (indent <> tab <> tab) translations
+            lift $ writeYaml (indent <> tab <> tab) (Translations $ insert "orig" original translations)
             modify ((+) 1)
             )
         0
@@ -504,8 +504,9 @@ instance Translation RoleTranslation where
     in
     RoleTranslation {translations, properties: properties', actions: actions', notifications}
   writeKeys _ = pure unit
-  writeYaml indent (RoleTranslation {translations, properties, actions}) = do
+  writeYaml indent (RoleTranslation {translations, properties, actions, notifications}) = do
     writeYaml indent translations
+    writeYaml indent notifications
     writeYaml indent properties
     writeYaml indent actions
   addTranslations table (RoleTranslation {translations, properties, actions, notifications}) = RoleTranslation $ 
@@ -524,7 +525,7 @@ instance Translation ContextTranslation where
     in
     ContextTranslation {translations, external, users: users', things: things', contextroles: contextroles', contexts: contexts', notifications}
   writeKeys _ = pure unit
-  writeYaml indent (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts}) = do 
+  writeYaml indent (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts, notifications}) = do 
     writeYaml indent translations
     case external of 
       RoleTranslation {properties, actions} -> case properties, actions of
@@ -534,6 +535,7 @@ instance Translation ContextTranslation where
             tell (i indent "external" colonNl)
             writeYaml (indent <> tab) properties
             writeYaml (indent <> tab) actions
+    writeYaml indent notifications
     case users of
       RolesTranslation users' -> if isEmpty users'
         then pure unit
@@ -632,7 +634,7 @@ tab :: String
 tab = "  "
 
 colonSpace :: String
-colonSpace = ":"
+colonSpace = ": "
 
 colonNl :: String
 colonNl = ":\n"
