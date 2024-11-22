@@ -227,15 +227,8 @@ phase1 share authoringRole r = do
 phase2 :: forall o. Boolean -> RoleType -> o -> MonadPerspectivesTransaction o
 phase2 share authoringRole r = do
   log "Entering phase2."
-  Transaction {invertedQueryResults, createdContexts, createdRoles, rolesToExit, scheduledAssignments, modelsToBeRemoved} <- AA.get
-  (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
-  AA.modify \t -> over Transaction (\tr -> tr {invertedQueryResults = []}) t
-  if not null stateEvaluations
-    then log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
-    else pure unit
-  if null stateEvaluations
-    then pure unit
-    else runSharing share authoringRole (evaluateStates stateEvaluations)
+  runSharing share authoringRole recursivelyEvaluateStates
+  Transaction {createdContexts, createdRoles, rolesToExit, scheduledAssignments, modelsToBeRemoved} <- AA.get
   -- Is there a reason to run phase1 again?
   -- Only if there are new createdContexts, createdRoles, rolesToExit, 
   -- or new scheduledAssignments that are a ContextRemoval, a RoleUnbinding or a ExecuteDestructiveEffect.
@@ -401,9 +394,26 @@ exitContext (ContextRemoval ctxt authorizedRole) = do
         \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
       lift $ restoreFrame oldFrame
 
+  
+recursivelyEvaluateStates :: MonadPerspectivesTransaction Unit
+recursivelyEvaluateStates = do
+  log "Evaluate states"
+  Transaction {invertedQueryResults} <- AA.get
+  AA.modify \t -> over Transaction (\tr -> tr {invertedQueryResults = []}) t
+  (stateEvaluations :: Array StateEvaluation) <- lift $ join <$> traverse computeStateEvaluations invertedQueryResults
+  if null stateEvaluations
+    then pure unit
+    else log ("==========RUNNING " <> (show $ length stateEvaluations) <> " OTHER STATE EVALUTIONS============")
+  evaluateStates stateEvaluations
+  -- We now may have new inverted query results (and other changes). If so, we re-run phase2.
+  Transaction {invertedQueryResults:newResults} <- AA.get
+  if null newResults
+    then pure unit
+    else recursivelyEvaluateStates
+
 evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
-evaluateStates stateEvaluations =
-  void $ for stateEvaluations \s -> case s of
+evaluateStates stateEvaluations' =
+  void $ for stateEvaluations' \s -> case s of
     ContextStateEvaluation stateId contextId -> do
       -- Provide a new frame for the current context variable binding.
       oldFrame <- lift pushFrame
