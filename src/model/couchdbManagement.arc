@@ -908,7 +908,6 @@ domain model://perspectives.domains#CouchdbManagement
       property ArcSource = callExternal files:FileText( ArcFile ) returns String
       property ArcFeedback (String)
         minLength = 81
-      -- property DomeinFile (File)
       property PublicUrl (functional) = binder Versions >> context >> extern >> PublicUrl
       -- Only one VersionedModelManifest can be the recommended version at a time.
       property IsRecommended (Boolean)
@@ -920,17 +919,6 @@ domain model://perspectives.domains#CouchdbManagement
       -- This must be writerOnly.
       -- The property will have no value in a new installation, effectively preventing upload on receiving a new Version
       property AutoUpload (Boolean)
-      property GenerateYaml (Boolean)
-      -- The (Javascript) DateTime value of the last Yaml file upload.
-      property LastYamlChangeDT (DateTime)
-
-      -- TESTING YAML TRANSLATION
-      property ModelTranslation = callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
-      property TranslationYaml (File)
-        pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
-      property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
-      property AugmentedModelTranslation (String)
-
 
       on exit
         do for Author
@@ -961,42 +949,65 @@ domain model://perspectives.domains#CouchdbManagement
       state UploadToRepository = (ArcFeedback matches regexp "^OK") and MustUpload
         on entry
           do for Author
+            -- This will upload an empty Translations table, too.
             callEffect p:UploadToRepository( VersionedModelManifest$External$VersionedModelURI, 
               callExternal util:ReplaceR( "bind publicrole.*in sys:MySystem", "", ArcSource ) returns String)
             Build = Build + 1
             MustUpload = false
-            GenerateYaml = true
+            GenerateYaml = true for context >> Translation
           notify Author
             "Version {External$Version} (build {Build}) has been uploaded to the repository for {binder Versions >> context >> Repository >> NameSpace >>= first}."
       
+    thing Translation
+      property GenerateYaml (Boolean)
+      -- The (Javascript) DateTime value of the last Yaml file upload.
+      property LastYamlChangeDT (DateTime)
+
+      -- JUST FOR TESTING
+      property ModelTranslation = callExternal p:GenerateFirstTranslation( context >> extern >> VersionedModelURI ) returns String
+      property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
+
+      -- NECESSARY
+      property TranslationYaml (File)
+        pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
+      property AugmentedModelTranslation (String)
       -- Construct a (new version of the) YAML file that the Author can download to add translations.
-      state GenerateYaml = GenerateYaml and ArcFeedback matches regexp "^OK"
+      -- Invariant for new VersionedModelManifests: a Translation table is uploaded to the repository.
+      state GenerateYaml = GenerateYaml and context >> extern >> ArcFeedback matches regexp "^OK"
         on entry
           do for Author
             letA
-                modeltranslation <- callExternal p:GenerateFirstTranslation( VersionedModelURI ) returns String
+                -- Given the invariant (a Translation table will be available in the Repository on this VersionedModelManifest), 
+                -- we can start generating an augmented model translation immediately.
+                modeltranslation <- callExternal p:AugmentModelTranslation( ModelTranslation, context >> extern >> VersionedModelURI) returns String
+                -- modeltranslation <- callExternal p:GenerateFirstTranslation( context >> extern >> VersionedModelURI ) returns String
                 text <- callExternal p:GetTranslationYaml( modeltranslation ) returns String
               in
-                create file ("translation_of_" + VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml
+                create file ("translation_of_" + context >> extern >> VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml
                   text
                 GenerateYaml = false
       
       -- Construct a new TranslationTable from the YAML that the author has enriched with translations.
       -- Will be triggered on each new version of TranslationYaml, whether generated in state GenerateYaml or uploaded by the end user.
-      state GenerateTranslationTable = (exists TranslationYaml) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastYamlChangeDT + 10 seconds) or not exists LastYamlChangeDT)
+      state GenerateTranslationTable = (exists TranslationYaml) and ((callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime > LastYamlChangeDT + 10 seconds) or not exists LastYamlChangeDT) and context >> extern >> ArcFeedback matches regexp "^OK"
         on entry
           do for Author
             letA
               modeltranslation <- callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
             in
-              callEffect p:GenerateTranslationTable( modeltranslation, VersionedModelURI)
+              callEffect p:GenerateTranslationTable( modeltranslation, context >> extern >> VersionedModelURI)
               LastYamlChangeDT = callExternal sensor:ReadSensor( "clock", "now" ) returns DateTime
+
 
     user Author (relational) filledBy cm:ModelManifest$Author
       aspect sys:ContextWithNotification$NotifiedUser
       perspective on extern
-        props (DomeinFileName, Version, ArcSource, LastUpload, ModelTranslation, ParsedYaml) verbs (Consult)
-        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload, TranslationYaml, GenerateYaml, LastYamlChangeDT, AugmentedModelTranslation) verbs (Consult, SetPropertyValue)
+        props (DomeinFileName, Version, ArcSource, LastUpload) verbs (Consult)
+        props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload) verbs (Consult, SetPropertyValue)
+      perspective on Translation
+        only (Create, Remove, Delete)
+        props (ModelTranslation, ParsedYaml) verbs (Consult)
+        props (TranslationYaml, GenerateYaml, LastYamlChangeDT, AugmentedModelTranslation) verbs (Consult, SetPropertyValue)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Manifest >> context >> Versions
@@ -1004,21 +1015,25 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Author
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
-      action CreateTranslation
-        callEffect p:GenerateTranslationTable( extern >> ModelTranslation, extern >> VersionedModelURI)
+      -- TODO: kan weg.
       action AugmentTranslation
-        AugmentedModelTranslation = callExternal p:AugmentModelTranslation( extern >> ModelTranslation, extern >> VersionedModelURI) returns String for External
-      -- TODO: kan weg zodra state GenerateYaml goed werkt.
+        AugmentedModelTranslation = callExternal p:AugmentModelTranslation( Translation >> ModelTranslation, extern >> VersionedModelURI) returns String for Translation
+      -- TODO: kan weg zodra alle modellen in de repository een translation table hebben!
+      action CreateTranslation
+        callEffect p:GenerateTranslationTable( Translation >> ModelTranslation, extern >> VersionedModelURI)
+      -- TODO: kan weg.
       action CreateYaml
         letA
-            text <- callExternal p:GetTranslationYaml( extern >> ModelTranslation ) returns String
+            text <- callExternal p:GetTranslationYaml( Translation >> ModelTranslation ) returns String
           in
-            create file ("translation_of_" + extern >> VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml for External
+            create file ("translation_of_" + extern >> VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml for Translation
               text
       screen "Model version"
         tab "Version" default
           row
             form External
+          row
+            form Translation
         tab "Authors"
           row
             table Author

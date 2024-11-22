@@ -245,6 +245,7 @@ derive newtype instance ReadForeign TabDef
 
 -------------------------------------------------------------------------------
 ---- SCREENKEY
+---- A ScreenKey is constructed in PhaseThree based on the lexical context and subject.
 -------------------------------------------------------------------------------
 data ScreenKey = ScreenKey ContextType RoleType
 derive instance genericScreenKey :: Generic ScreenKey _

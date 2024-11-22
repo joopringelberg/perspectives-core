@@ -37,10 +37,11 @@ import Data.MediaType (MediaType(..))
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (error)
+import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Foreign (Foreign, unsafeToForeign)
-import Foreign.Object (Object, empty)
+import Foreign.Object (Object, empty, singleton)
 import Main.RecompileBasicModels (recompileModelsAtUrl)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction)
@@ -55,17 +56,17 @@ import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
 import Perspectives.Identifiers (DomeinFileName, ModelUri, isModelUri, modelUri2ModelUrl, unversionedModelUri)
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.ModelDependencies (sysUser)
-import Perspectives.ModelTranslation (ModelTranslation)
 import Perspectives.ModelTranslation (ModelTranslation, augmentModelTranslation, generateFirstTranslation, parseTranslation, writeTranslationYaml, generateTranslationTable) as MT
+import Perspectives.ModelTranslation (ModelTranslation, emptyTranslationTable)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (addAttachment, addDocument, deleteDocument, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
+import Perspectives.Persistence.API (addAttachment, addDocument, deleteDocument, fromBlob, getAttachment, getDocument, retrieveDocumentVersion, toFile, tryGetDocument_)
 import Perspectives.PerspectivesState (getWarnings, resetWarnings)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runEmbeddedTransaction)
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
-import Simple.JSON (read, readJSON, readJSON_, writeJSON)
+import Simple.JSON (readJSON, readJSON_, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- | Read the .arc file, parse it and try to compile it. Does neither cache nor store.
@@ -117,6 +118,7 @@ uploadToRepository domeinFileName_ arcSource_ _ = try
 type URL = String
 
 -- | As uploadToRepository, but provide the DomeinFile as argument.
+-- | Adds an empty TranslationTable if the DomeinFile did not yet exist in the Repository.
 uploadToRepository_ :: {repositoryUrl :: String, documentName :: String} -> DomeinFile -> StoredQueries -> MonadPerspectives Unit
 uploadToRepository_ splitName (DomeinFile df) invertedQueries = do 
   -- Get the attachment info
@@ -133,8 +135,14 @@ uploadToRepository_ splitName (DomeinFile df) invertedQueries = do
   -- The _id of df will be a versionless identifier. If we don't set it to the versioned name, the document
   -- will be stored under the versionless name.
   (newRev :: Revision_) <- addDocument splitName.repositoryUrl (changeRevision mVersion (DomeinFile df {_id = splitName.documentName})) splitName.documentName
-  -- Now add the attachments.
-  void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
+  case mremoteDf of 
+    Nothing -> do 
+      -- Add an empty translations file.
+      theFile <- liftEffect $ unsafeCoerce toFile "translationtable.json" "application/json" (unsafeToForeign $ writeJSON emptyTranslationTable)
+      DeleteCouchdbDocument {rev} <- addAttachment splitName.repositoryUrl splitName.documentName newRev "translationtable.json" theFile (MediaType "application/json")
+      void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) rev
+    -- Otherwise add the attachments.
+    Just _ -> void $ execStateT (go splitName.repositoryUrl splitName.documentName attachments) newRev
 
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
@@ -212,19 +220,18 @@ getTranslationYaml modelTranslation_ _ = case head modelTranslation_ of
 
 -- | From a YAML string, generate a (serialised) ModelTranslation.
 parseYamlTranslation :: Array String -> (RoleInstance ~~> Value)
-parseYamlTranslation pfile_ _ = case head pfile_ of 
-  Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
-    (Left (error "A YAML file should be provided."))
+parseYamlTranslation pfile_ _ = ArrayT case head pfile_ of 
+  Nothing -> pure []
   Just pfile -> do 
-    mYaml <- lift $ lift $ getPFileTextValue pfile
+    mYaml <- lift $ getPFileTextValue pfile
     case mYaml of 
-      Nothing -> pure $ Value ""
+      Nothing -> pure $ []
       Just yaml -> do
         translation' <- liftEffect $ MT.parseTranslation yaml
         case translation' of 
-          Left e -> handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
+          Left e -> runArrayT $ handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
             (Left e)
-          Right translation -> pure $ Value $ writeJSON translation
+          Right translation -> pure $ [Value $ writeJSON translation]
 
 -- | From a PString that holds a ModelTranslation, generate the table and upload to the repository.
 -- | The DomeinFileName should be versioned (e.g. model://perspectives.domains#System@1.0).
@@ -257,7 +264,6 @@ generateTranslationTable translation_ domeinFileName_ _ = case head translation_
 -- | The ModelTranslation must be passed in as a string.
 -- | The result is the (serialised) ModelTranslation.
 -- | The original ModelTranslation is returned when there is no TranslationTable or when it cannot be parsed correctly.
--- | An empty result is returned when the ModelTranslation cannot be read from file.
 augmentModelTranslation :: Array String -> Array String -> (RoleInstance ~~> Value)
 augmentModelTranslation translation_ domeinFileName_ _ = case head translation_, head domeinFileName_ of 
   Nothing, _ -> handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
@@ -271,12 +277,14 @@ augmentModelTranslation translation_ domeinFileName_ _ = case head translation_,
     -- Retrieve the Existing Translation and apply it to the ModelTranslation.
     Just (modelTranslation :: ModelTranslation) -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
       {repositoryUrl, documentName} -> do 
-        mTranslationTable <- lift $ lift $ getAttachment repositoryUrl documentName "translationtable.json"
-        case mTranslationTable of 
+        mTranslationTableBlob <- lift $ lift $ getAttachment repositoryUrl documentName "translationtable.json"
+        case mTranslationTableBlob of 
           Nothing -> pure $ Value modelTranslationString
-          Just translationTableString -> case read translationTableString of 
-            Left e -> pure $ Value modelTranslationString
-            Right translationTable -> pure $ Value $ writeJSON (MT.augmentModelTranslation translationTable modelTranslation)
+          Just translationTableBlob -> do 
+            translationTableString <- liftAff $ fromBlob translationTableBlob
+            case readJSON translationTableString of 
+              Left e -> pure $ Value modelTranslationString
+              Right translationTable -> pure $ Value $ writeJSON (MT.augmentModelTranslation translationTable modelTranslation)
 
 
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
