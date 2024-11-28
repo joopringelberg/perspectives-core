@@ -1,0 +1,136 @@
+model://perspectives.domains#HyperContext:
+  contexts:
+    HyperTexts:
+      translations:
+        en: Hypertext app
+        nl: Hypertext app
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+        Initializer:
+          translations:
+            en: Initializer
+            nl: Initialisatierol
+      contextroles:
+        PublicPageCollections:
+          translations:
+            en: Public page collections
+            nl: Openbare pagina collecties
+        Pages:
+          translations:
+            en: Pages
+            nl: Paginas
+    Page:
+      translations:
+        en: Page
+        nl: Pagina
+      external:
+        properties:
+          ShowAllBlocks:
+            translations:
+              en: Show all blocks
+              nl: Toon alle blokken
+          Title:
+            translations:
+              en: Title
+              nl: Titel
+      users:
+        TestReader:
+          translations:
+            en: Test reader
+            nl: Testlezer
+        Reader:
+          translations:
+            en: Reader
+            nl: Lezer
+        Author:
+          translations:
+            en: Author
+            nl: Auteur
+      things:
+        TextBlocks:
+          translations:
+            en: Text blocks
+            nl: Tekstblokken
+          properties:
+            ShowToAuthor:
+              translations:
+                en: Show to author
+                nl: Toon aan auteur
+            ShowBlock:
+              translations:
+                en: Show block
+                nl: Toon blok
+            ConditionResult:
+              translations:
+                en: Condition result
+                nl: Conditie resultaat
+            RawConditionResult:
+              translations:
+                en: Raw condition result
+                nl: Onbewerkt conditie resultaat
+            Condition:
+              translations:
+                en: Condition
+                nl: Conditie
+            MD:
+              translations:
+                en: Markdown
+                nl: Mardown
+            Title:
+              translations:
+                en: Title
+                nl: Titel
+      contextroles:
+        LinkedPages:
+          translations:
+            en: Linked pages
+            nl: Paginas waar naar verwezen wordt
+    PublicPageCollection:
+      translations:
+        en: Public page collection
+        nl: Collectie openbare pagina's
+      external:
+        properties:
+          Name:
+            translations:
+              en: Name
+              nl: Naam
+      users:
+        Author:
+          translations:
+            en: Author
+            nl: Auteur
+        Creator:
+          translations:
+            en: Creator
+            nl: Maker
+      contextroles:
+        EntryPoint:
+          translations:
+            en: Entry point
+            nl: Beginpunt
+        PublicPages:
+          translations:
+            en: Public pages
+            nl: Openbare pagina's
+    PublicPage:
+      translations:
+        en: Public page
+        nl: Openbare pagina
+      users:
+        Visitor:
+          translations:
+            en: Visitor
+            nl: Bezoeker
+        VisitorProxy:
+          translations:
+            en: 
+            nl: 
+      contextroles:
+        LinkedPages:
+          translations:
+            en: Linked pages
+            nl: Paginas waar naar verwezen wordt

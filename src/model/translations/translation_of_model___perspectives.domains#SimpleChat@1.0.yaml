@@ -1,0 +1,57 @@
+model://perspectives.domains#SimpleChat:
+  contexts:
+    ChatApp:
+      translations:
+        en: A simple chat app
+        nl: Een eenvoudige chat app
+      users:
+        Chatter:
+          translations:
+            en: Chatter
+            nl: Kletser
+      contextroles:
+        IncomingChats:
+          translations:
+            en: Incoming chats
+            nl: Gesprekken door anderen gestart
+        Chats:
+          translations:
+            en: Chats
+            nl: Gesprekken
+    Chat:
+      translations:
+        en: Chat
+        nl: Gesprek
+      external:
+        properties:
+          Title:
+            translations:
+              en: Title
+              nl: Titel
+      users:
+        Creator:
+          translations:
+            en: Creator
+            nl: Aanmaker
+        Partner:
+          translations:
+            en: Partner
+            nl: Gesprekspartner
+        Initiator:
+          translations:
+            en: Initiator
+            nl: Initiatiefnemer
+    WithText:
+      translations:
+        en: With text
+        nl: Met text
+      users:
+        TextWriter:
+          translations:
+            en: Text writer
+            nl: Tekstscherijver
+          properties:
+            MyText:
+              translations:
+                en: My text
+                nl: Mijn tekst

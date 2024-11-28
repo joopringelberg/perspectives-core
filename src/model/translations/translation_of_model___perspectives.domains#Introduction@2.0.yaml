@@ -1,0 +1,57 @@
+model://perspectives.domains#Introduction:
+  contexts:
+    IntroductionApp:
+      translations:
+        en: Introduction app
+        nl: Introductie app
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+      contextroles:
+        IncomingIntroductions:
+          translations:
+            en: Introductions by others
+            nl: Introducties door anderen
+        Introductions:
+          translations:
+            en: Introductions by myself
+            nl: Introducties door mijzelf
+    Introduction:
+      translations:
+        en: Introduction
+        nl: Introductie
+      external:
+        properties:
+          Title:
+            translations:
+              en: Title
+              nl: Titel
+      users:
+        Introducee:
+          translations:
+            en: Introducee
+            nl: Introducee
+        Introducer:
+          translations:
+            en: Introducer
+            nl: Introducer
+        Guest:
+          translations:
+            en: Guest
+            nl: Gast
+      things:
+        Conversation:
+          translations:
+            en: Conversation
+            nl: Conversatie
+          properties:
+            Media:
+              translations:
+                en: Media
+                nl: Media
+            Messages:
+              translations:
+                en: Messages
+                nl: Berichten

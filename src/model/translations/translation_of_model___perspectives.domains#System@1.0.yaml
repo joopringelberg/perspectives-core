@@ -1,0 +1,529 @@
+model://perspectives.domains#System:
+  contexts:
+    TheWorld:
+      translations:
+        en: The World
+        nl: De Wereld
+      users:
+        Initializer:
+          translations:
+            en: Initializer
+            nl: Initialiseerder
+        NonPerspectivesUsers:
+          translations:
+            en: Non - Perspectives users
+            nl: Niet - Perspectives gebruikers
+        PerspectivesUsers:
+          translations:
+            en: Perspectives users
+            nl: Perspectives gebruikers
+          properties:
+            HasKey:
+              translations:
+                en: Has key
+                nl: Heeft sleutel
+            SharedFileServerKey:
+              translations:
+                en: Shared file server key
+                nl: Shared file server sleutel
+    SocialEnvironment:
+      translations:
+        en: Social Environment
+        nl: Sociale Omgeving
+      users:
+        SystemUser:
+          translations:
+            en: System user
+            nl: Systeemgebruiker
+        Me:
+          translations:
+            en: Me
+            nl: Mijzelf
+          properties:
+            MyIdentity:
+              translations:
+                en: My identity
+                nl: Mijn identiteit
+        Persons:
+          translations:
+            en: Persons
+            nl: Personen
+    PerspectivesSystem:
+      translations:
+        en: Perspectives System
+        nl: Perspectivessysteem
+      external:
+        properties:
+          CurrentHour:
+            translations:
+              en: Current hour
+              nl: Huidige uur
+          CurrentDate:
+            translations:
+              en: Current date
+              nl: Huidige datum
+          PDRVersion:
+            translations:
+              en: PDR version
+              nl: PDR versie
+          MyContextsVersion:
+            translations:
+              en: MyContexts version
+              nl: MyContexts versie
+          ShowLibraries:
+            translations:
+              en: Show libraries
+              nl: Toon bibliotheken
+          CardClipBoard:
+            translations:
+              en: Card clipboard
+              nl: Kaartjes klembord
+          ConnectedToAMQPBroker:
+            translations:
+              en: Connected to AMQP broker
+              nl: Verbonden met AMQP broker
+      users:
+        Installer:
+          translations:
+            en: Installer
+            nl: Installateur
+        Contacts:
+          translations:
+            en: Contacts
+            nl: Contacten
+        User:
+          translations:
+            en: User
+            nl: Gebruiker
+          properties:
+            Id:
+              translations:
+                en: Identity
+                nl: Identiteit
+            Channel:
+              translations:
+                en: Channel
+                nl: Kanaal
+      things:
+        AllNotifications:
+          translations:
+            en: All notifications
+            nl: Alle berichten
+        Databases:
+          translations:
+            en: Databases
+            nl: Databases
+          properties:
+            Identifier:
+              translations:
+                en: Identifier
+                nl: Identifier
+            Name:
+              translations:
+                en: Name
+                nl: Naam
+        IndexedRoles:
+          translations:
+            en: Indexed roles
+            nl: Geïndexeerde rollen
+          properties:
+            Name:
+              translations:
+                en: Name
+                nl: Naam
+      contextroles:
+        SystemCaches:
+          translations:
+            en: System caches
+            nl: Systeem caches
+        PendingInvitations:
+          translations:
+            en: Pending invitations
+            nl: Te beantwoorden uitnodigingen
+        StartContexts:
+          translations:
+            en: Start contexts
+            nl: Begincontexten
+        Channels:
+          translations:
+            en: Channels
+            nl: Kanalen
+        IndexedContexts:
+          translations:
+            en: Indexed contexts
+            nl: Geïndexeerde contexten
+          properties:
+            Name:
+              translations:
+                en: Name
+                nl: Naam
+        ModelsToUpdate:
+          translations:
+            en: Models to update
+            nl: Modellen om te actualiseren
+        ModelsInUse:
+          translations:
+            en: Models in use
+            nl: Modellen in gebruik
+          notifications:
+            0:
+              translations:
+                orig: Installing a new patch for $1 .
+                en: Installing a new patch for $1 .
+                nl: Bezig met installeren van een patch voor $1.
+            1:
+              translations:
+                orig: Installing build $1 of $3 (replacing $5 ).
+                en: Installing build $1 of $3 (replacing $5 ).
+                nl: Bezig met installeren van build $1 van $3 (vervanging van $5).
+          properties:
+            DetachedFiller:
+              translations:
+                en: Detached filler
+                nl: Verwijderde vuller
+            UpdateOnBuild:
+              translations:
+                en: Update on build
+                nl: Actualiseer bij nieuwe build
+            InstalledBuild:
+              translations:
+                en: Installed build
+                nl: Geïnstalleerde build
+            InstalledPatch:
+              translations:
+                en: Installed patch
+                nl: Geïnstalleerde patch
+            ModelToRemove:
+              translations:
+                en: Model to remove
+                nl: Model om te verwijderen
+        AllRepositories:
+          translations:
+            en: All app stores
+            nl: Alle ap stores
+        Repositories:
+          translations:
+            en: App stores
+            nl: App stores
+        BaseRepository:
+          translations:
+            en: Basic app store
+            nl: Basis app store
+        OutgoingInvitations:
+          translations:
+            en: Outgoing invitations
+            nl: Verstuurde uitnodigingen
+        SocialEnvironment:
+          translations:
+            en: Social Environment
+            nl: Sociale Omgeving
+    Caches:
+      translations:
+        en: Caches
+        nl: Caches
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+      things:
+        Cache:
+          translations:
+            en: Cache
+            nl: Cache
+          properties:
+            Size:
+              translations:
+                en: Size
+                nl: Afmeting
+            Name:
+              translations:
+                en: Name
+                nl: Naam
+    ContextWithNotification:
+      translations:
+        en: Context with notifications
+        nl: Context met meldingen
+      users:
+        NotifiedUser:
+          translations:
+            en: Notified user
+            nl: Vergewittigde gebruiker
+      contextroles:
+        Notifications:
+          translations:
+            en: Notifications
+            nl: Meldingen
+          properties:
+            Message:
+              translations:
+                en: Message
+                nl: Boodschap
+    ContextWithScreenState:
+      translations:
+        en: Context with screen state
+        nl: Context met scherm toestand
+      external:
+        properties:
+          IsOnScreen:
+            translations:
+              en: Is on screen
+              nl: Staat op scherm
+    PhysicalContext:
+      translations:
+        en: Physical context
+        nl: Fysieke context
+      users:
+        UserWithAddress:
+          translations:
+            en: User with address
+            nl: Gebruiker met adres
+          properties:
+            RelayPort:
+              translations:
+                en: Relay port
+                nl: Relay port
+            RelayHost:
+              translations:
+                en: Relay host
+                nl: Relay host
+            Port:
+              translations:
+                en: Port
+                nl: Poort
+            Host:
+              translations:
+                en: Host
+                nl: Host
+    Channel:
+      translations:
+        en: Channel
+        nl: Kanaal
+      external:
+        properties:
+          ChannelDatabaseName:
+            translations:
+              en: Channel database name
+              nl: Kanaaldatabasenaam
+      users:
+        You:
+          translations:
+            en: You
+            nl: Jij
+        Me:
+          translations:
+            en: Me
+            nl: Ik
+        ConnectedPartner:
+          translations:
+            en: Connected partner
+            nl: Verbonden partner
+        Initiator:
+          translations:
+            en: Initiator
+            nl: Initieerder
+    RootContext:
+      translations:
+        en: Root context
+        nl: Root context
+      external:
+        properties:
+          Name:
+            translations:
+              en: Name
+              nl: Naam
+      users:
+        RootUser:
+          translations:
+            en: Root user
+            nl: Root gebruiker
+    Invitation:
+      translations:
+        en: Invitation
+        nl: Uitnodiging
+      external:
+        properties:
+          IWantToInviteAnUnconnectedUser:
+            translations:
+              en: I want to invite an unconnected user
+              nl: Ik wil een niet-verbonden gebruiker uitnodigen
+          InviterLastName:
+            translations:
+              en: Inviter's last name
+              nl: Achternaam van uitnodiger
+          ConfirmationCode:
+            translations:
+              en: Confirmation code
+              nl: Bevestigingscode
+          CompleteMessage:
+            translations:
+              en: Complete message
+              nl: Volledige boodschap
+          Message:
+            translations:
+              en: Message
+              nl: Boodschap
+          Addressing:
+            translations:
+              en: Adressing
+              nl: Adressering
+          SerialisedInvitation:
+            translations:
+              en: Serialised invitation
+              nl: Geserialiseerde uitnodiging
+      users:
+        Guest:
+          translations:
+            en: Guest
+            nl: Gast
+        Invitee:
+          translations:
+            en: Invitee
+            nl: Uitgenodigde
+        Inviter:
+          translations:
+            en: Inviter
+            nl: Uitnodiger
+    ManifestCollection:
+      translations:
+        en: Manifest collection
+        nl: Manifestencollectie
+      external:
+        properties:
+          Domain:
+            translations:
+              en: Domain
+              nl: Domein
+          NameSpace_:
+            translations:
+              en: Namespace
+              nl: Namespace
+      contextroles:
+        Manifests:
+          translations:
+            en: Manifests
+            nl: Manifesten
+          properties:
+            LocalModelName:
+              translations:
+                en: Local model name
+                nl: Lokale modelnaam
+    ModelManifest:
+      translations:
+        en: Model manifest
+        nl: Modelmanifest
+      external:
+        properties:
+          DomeinFileName:
+            translations:
+              en: Domain filename
+              nl: Domein bestandsnaam
+          IsLibrary:
+            translations:
+              en: Is a library
+              nl: Is een bibliotheek
+          Description:
+            translations:
+              en: Description
+              nl: Beschrijving
+      contextroles:
+        Versions:
+          translations:
+            en: Versions
+            nl: Versies
+          properties:
+            VersionedLocalModelName:
+              translations:
+                en: Versioned local modelname
+                nl: Geversioneerde lokale modelnaam
+            Version:
+              translations:
+                en: Version
+                nl: Versie
+    VersionedModelManifest:
+      translations:
+        en: Versioned model manifest
+        nl: Geversioneerd modelmanifest
+      external:
+        properties:
+          Build:
+            translations:
+              en: Build
+              nl: Build
+          Patch:
+            translations:
+              en: Patch
+              nl: Patch
+          Version:
+            translations:
+              en: Version
+              nl: Versie
+          DomeinFileName:
+            translations:
+              en: Domain filename
+              nl: Domein bestandsnaam
+          Description:
+            translations:
+              en: Description
+              nl: Beschrijving
+          ModelName:
+            translations:
+              en: Model name
+              nl: Modelnaam
+      users:
+        Visitor:
+          translations:
+            en: Visitor
+            nl: Bezoeker
+  roles:
+    RoleWithId:
+      translations:
+        en: Role with identification
+        nl: Rol met identificatie
+      properties:
+        Id:
+          translations:
+            en: Identification
+            nl: Identificatie
+    WithCredentials:
+      translations:
+        en: With credentials
+        nl: Met credentials
+      properties:
+        AuthorizedDomain:
+          translations:
+            en: Authorized domain
+            nl: Geautoriseerd domein
+        Password:
+          translations:
+            en: Password
+            nl: Paswoord
+        SpecificUserName:
+          translations:
+            en: Specific username
+            nl: Specifieke gebruikersnaam
+        UserName:
+          translations:
+            en: Username
+            nl: Gebruikersnaam
+    Identifiable:
+      translations:
+        en: Identifiable
+        nl: Identificeerbaar
+      properties:
+        PublicKey:
+          translations:
+            en: Publick key
+            nl: Publieke sleutel
+        Cancelled:
+          translations:
+            en: Cancelled
+            nl: Geannuleerd
+        FirstName:
+          translations:
+            en: First name
+            nl: Voornaam
+        LastName:
+          translations:
+            en: Last name
+            nl: Achternaam

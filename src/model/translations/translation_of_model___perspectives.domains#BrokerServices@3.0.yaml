@@ -1,0 +1,232 @@
+model://perspectives.domains#BrokerServices:
+  contexts:
+    BrokerServices:
+      translations:
+        en: Message Broker Services
+        nl: Message Broker Services
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+      contextroles:
+        ContractInUse:
+          translations:
+            en: Contract in use
+            nl: Contract in gebruik
+        Contracts:
+          translations:
+            en: Contracts
+            nl: Contracten
+        PublicBrokers:
+          translations:
+            en: Public brokers
+            nl: Openbare brokers
+        ManagedBrokers:
+          translations:
+            en: Managed brokers
+            nl: Beheerde brokers
+          properties:
+            StorageLocation:
+              translations:
+                en: Storage location
+                nl: Locatie van opslag
+    BrokerService:
+      translations:
+        en: Broker service
+        nl: Broker service
+      external:
+        properties:
+          ServiceDescription:
+            translations:
+              en: Description of the service
+              nl: Beschrijving van de service
+          TerminationPeriod:
+            translations:
+              en: Termination period (after grace till termination)
+              nl: Afsluitingsperiode (na coulance tot afsluiting)
+          GracePeriod:
+            translations:
+              en: Grace period (na einddatum)
+              nl: Coulance periode (na einddatum)
+          ContractPeriod:
+            translations:
+              en: Contract period
+              nl: Contract periode
+          PublicUrl:
+            translations:
+              en: Public URL
+              nl: Openbare URL
+          SelfRegisterEndpoint:
+            translations:
+              en: Self register endpoint
+              nl: Endpoint voor zelf-registratie
+          ManagementEndpoint:
+            translations:
+              en: Management endpoint
+              nl: Endpoint voor beheer
+          Exchange:
+            translations:
+              en: Exchange
+              nl: Exchange
+          Url:
+            translations:
+              en: URL
+              nl: URL
+          Name:
+            translations:
+              en: Name
+              nl: Naam
+      users:
+        Visitor:
+          translations:
+            en: Visitor
+            nl: Bezoeker
+          actions:
+            BrokerService:
+              AddThisServer:
+                translations:
+                  en: Add this server
+                  nl: Voeg deze server toe
+        Guest:
+          translations:
+            en: Guest
+            nl: Gast
+        Administrator:
+          translations:
+            en: Administrator
+            nl: Beheerder
+          properties:
+            AdminPassword:
+              translations:
+                en: Admin password
+                nl: Paswoord van beheerder
+            AdminUserName:
+              translations:
+                en: Admin user name
+                nl: Gebruikersnaam van beheerder
+        VisitorProxy:
+          translations:
+            en: Visitor proxy
+            nl: Bezoeker proxy
+          actions:
+            BrokerService:
+              AddThisServer:
+                translations:
+                  en: Add this server
+                  nl: Voeg deze server toe
+      contextroles:
+        Accounts:
+          translations:
+            en: Accounts
+            nl: Deelnemers
+    BrokerContract:
+      translations:
+        en: Broker contract
+        nl: Broker contract
+      external:
+        properties:
+          ContractTerminated:
+            translations:
+              en: Contract terminated
+              nl: Contract beëindigd
+          TerminatesOn:
+            translations:
+              en: Contract end date
+              nl: Einddatum contract
+          GracePeriodExpiresOn:
+            translations:
+              en: Grace period end date
+              nl: Coulance periode einddatum
+          UseExpiresOn:
+            translations:
+              en: Usage ends on
+              nl: Gebruik eindigt op
+          Registered:
+            translations:
+              en: Registerd
+              nl: Geregistreerd
+          CurrentQueueName:
+            translations:
+              en: Queue name
+              nl: Queue naam
+          LastNameOfAccountHolder:
+            translations:
+              en: Last name of account holder
+              nl: Achternaam van deelnemer
+          FirstNameOfAccountHolder:
+            translations:
+              en: First name of account holder
+              nl: Voornaam van deelnemer
+          Name:
+            translations:
+              en: Name
+              nl: Naam
+          Exchange:
+            translations:
+              en: Exchange
+              nl: Exchange
+          SelfRegisterEndpoint:
+            translations:
+              en: Self register endpoint
+              nl: Endpoint voor zelf-registratie
+          ManagementEndpoint:
+            translations:
+              en: Management endpoint
+              nl: Endpoint voor beheer
+          Url:
+            translations:
+              en: URL
+              nl: URL
+      notifications:
+        0:
+          translations:
+            orig: Your lease of the BrokerService has ended. Within $1 days, you will no longer be able to receive information from peers.
+            en: Your lease of the BrokerService has ended. Within $1 days, you will no longer be able to receive information from peers.
+            nl: De einddatum van deelname is gepasseerd. Na $1 dagen zal je geen informatie van medegebruikers meer kunnen ontvangen.
+        1:
+          translations:
+            orig: You now have an account at the BrokerService $1
+            en: You now have an account at the BrokerService $1
+            nl: Je bent nu deelnemer van de BrokerService $1
+      users:
+        Administrator:
+          translations:
+            en: Administrator
+            nl: Beheerder
+        AccountHolder:
+          translations:
+            en: Account holder
+            nl: Deelnemer
+          properties:
+            AccountPassword:
+              translations:
+                en: Account password
+                nl: Deelnemers paswoord
+            AccountName:
+              translations:
+                en: Account name
+                nl: Lidmaatschap naam
+      contextroles:
+        Service:
+          translations:
+            en: Service
+            nl: Service
+        Queues:
+          translations:
+            en: Queues
+            nl: Queues
+          properties:
+            QueueName:
+              translations:
+                en: Queue name
+                nl: Queue naam
+        EmptyQueue:
+          translations:
+            en: Unfilled queue role
+            nl: Queue rol zonder vuller
+  roles:
+    Broker:
+      translations:
+        en: Broker
+        nl: Broker

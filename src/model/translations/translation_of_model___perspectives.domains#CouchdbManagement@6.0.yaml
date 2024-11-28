@@ -2,394 +2,434 @@ model://perspectives.domains#CouchdbManagement:
   contexts:
     CouchdbManagementApp:
       translations:
-        en:
-        nl:
+        en: Repository and database management
+        nl: Repository en database beheer
       users:
         Manager:
           translations:
-            en:
-            nl:
+            en: Manager
+            nl: Beheerder
           actions:
             CouchdbManagementApp:
               CreateServer:
                 translations:
-                  en:
-                  nl:
+                  en: Create server
+                  nl: Maak server
             RootContext:
               CreateServer:
                 translations:
-                  en:
-                  nl:
+                  en: Create server
+                  nl: Maak server
       contextroles:
         CouchdbServers:
           translations:
-            en:
-            nl:
+            en: Couchdb servers
+            nl: Couchdb servers
           properties:
             AdminUserName:
               translations:
-                en:
-                nl:
+                en: Administrator user name
+                nl: Beheerder gebruikersnaam
             AdminPassword:
               translations:
-                en:
-                nl:
+                en: Administrator password
+                nl: Beheerder paswoord
             CouchdbPort:
               translations:
-                en:
-                nl:
+                en: Couchdb port
+                nl: Couchdb poort
             Url:
               translations:
-                en:
-                nl:
+                en: Couchdb URL
+                nl: Couchdb URL
     CouchdbServer:
       translations:
-        en:
-        nl:
+        en: Couchdb server
+        nl: Couchdb server
       external:
+        notifications:
+          0:
+            translations:
+              orig: You now have an account with CouchdbServer $1
+              en: You now have an account with CouchdbServer $1.
+              nl: Je bent nu ingeschreven bij CouchdbServer $1.
         properties:
           Name:
             translations:
-              en:
-              nl:
+              en: Name
+              nl: Naam
           CouchdbPort:
             translations:
-              en:
-              nl:
+              en: Couchdb port
+              nl: Couchdb poort
           ServerUrl:
             translations:
-              en:
-              nl:
+              en: Couchdb URL
+              nl: Couchdb URL
       users:
         Visitor:
           translations:
-            en:
-            nl:
+            en: Visitor
+            nl: Bezoeker
         Accounts:
           translations:
-            en:
-            nl:
+            en: Accounts
+            nl: Inschrijvingen
+          notifications:
+            0:
+              translations:
+                orig: You now have an account with CouchdbServer $1
+                en: You now have an account with CouchdbServer $1.
+                nl: Je bent nu ingeschreven bij CouchdbServer $1.
           actions:
             Accounts:
               RequestDatabase:
                 translations:
-                  en:
-                  nl:
+                  en: Request your own database
+                  nl: Vraag je eigen database aan.
         Admin:
           translations:
-            en:
-            nl:
+            en: Administrator
+            nl: Beheerder
           actions:
             Admin:
               CreateRepository:
                 translations:
-                  en:
-                  nl:
+                  en: Create a repository
+                  nl: Maak een repository
         VisitorProxy:
           translations:
-            en:
-            nl:
+            en: 
+            nl: 
       contextroles:
         MyBespokeDatabases:
           translations:
-            en:
-            nl:
+            en: My own databases
+            nl: Mijn eigen databases
         BespokeDatabases:
           translations:
-            en:
-            nl:
+            en: Owned databases
+            nl: Database in eigendom
         Repositories:
           translations:
-            en:
-            nl:
+            en: App stores
+            nl: App stores
           properties:
             HasDatabases:
               translations:
-                en:
-                nl:
+                en: Databases have been created
+                nl: Databases zijn aangemaakt
             NameSpace:
               translations:
-                en:
-                nl:
+                en: Namespace
+                nl: Namespace
             AdminEndorses:
               translations:
-                en:
-                nl:
+                en: Administrator endorses
+                nl: Goedgekeurd door beheerder
         PublicRepositories:
           translations:
-            en:
-            nl:
+            en: Public App stores
+            nl: Openbare App stores
     BespokeDatabase:
       translations:
-        en:
-        nl:
+        en: Owned database
+        nl: Database in eigendom
       external:
         properties:
           Public:
             translations:
-              en:
-              nl:
+              en: Public
+              nl: Openbaar
           Description:
             translations:
-              en:
-              nl:
+              en: Description
+              nl: Beschrijving
           OwnerName:
             translations:
-              en:
-              nl:
+              en: Name of owner
+              nl: Naam van eigenaar
           BaseUrl:
             translations:
-              en:
-              nl:
+              en: Base URL
+              nl: Basis URL
           Endorsed:
             translations:
-              en:
-              nl:
+              en: Endorsed
+              nl: Goedgekeurd
           DatabaseName:
             translations:
-              en:
-              nl:
+              en: Database name
+              nl: Database naam
           DatabaseLocation:
             translations:
-              en:
-              nl:
+              en: Database location
+              nl: Database locatie
       users:
         CBAdmin:
           translations:
-            en:
-            nl:
+            en: 
+            nl: 
         Owner:
           translations:
-            en:
-            nl:
+            en: Ownder
+            nl: Eigenaar
           properties:
             BespokeDatabaseUrl:
               translations:
-                en:
-                nl:
+                en: URL of owned database
+                nl: URL van database in eigendom
     Repository:
       translations:
-        en:
-        nl:
+        en: App Store
+        nl: App Store
       external:
         properties:
           RepoHasDatabases:
             translations:
-              en:
-              nl:
+              en: App Store has databases
+              nl: App Store heeft databases
           AdminLastName:
             translations:
-              en:
-              nl:
+              en: Last name of administrator
+              nl: Achternaam van beheerder
           RepositoryUrl:
             translations:
-              en:
-              nl:
+              en: URL of App Store
+              nl: URL van App Store
           ServerUrl:
             translations:
-              en:
-              nl:
+              en: Server URL
+              nl: Server URL
           InstancesDatabase:
             translations:
-              en:
-              nl:
+              en: Database for instances
+              nl: Database voor instanties
           ModelsDatabase:
             translations:
-              en:
-              nl:
+              en: Database for models
+              nl: Database voor modellen
           NameSpace:
             translations:
-              en:
-              nl:
+              en: Namespace
+              nl: Namespace
           IsPublic:
             translations:
-              en:
-              nl:
+              en: Is public
+              nl: Is openbaar
       users:
         Visitor:
           translations:
-            en:
-            nl:
+            en: Visitor
+            nl: Bezoeker
         Accounts:
           translations:
-            en:
-            nl:
+            en: Accounts
+            nl: Lidmaadschappen
         Authors:
           translations:
-            en:
-            nl:
+            en: Authors
+            nl: Auteurs
         Admin:
           translations:
-            en:
-            nl:
+            en: Administrator
+            nl: Beheerder
           actions:
             Admin:
               CreateManifest:
                 translations:
-                  en:
-                  nl:
+                  en: Create a manifest
+                  nl: Maak een manifest
         ServerAdmin:
           translations:
-            en:
-            nl:
+            en: Server administrator
+            nl: Server beheerder
         VisitorProxy:
           translations:
-            en:
-            nl:
+            en: 
+            nl: 
       contextroles:
         Manifests:
           translations:
-            en:
-            nl:
+            en: Manifests
+            nl: Manifesten
     ModelManifest:
       translations:
-        en:
-        nl:
+        en: Model manifest
+        nl: Model manifest
       external:
         properties:
           RecomputeVersionToInstall:
             translations:
-              en:
-              nl:
+              en: Recompute version to install
+              nl: Herbereken de te installeren versie
           VersionToInstall:
             translations:
-              en:
-              nl:
+              en: Version to install
+              nl: Versie om te installeren
           RecommendedVersion:
             translations:
-              en:
-              nl:
+              en: Recommended version
+              nl: Aanbevolen versie
           HighestVersion:
             translations:
-              en:
-              nl:
+              en: Highest version
+              nl: Hoogste versie
           PublicUrl:
             translations:
-              en:
-              nl:
+              en: Public URL
+              nl: Openbare URL
           RepositoryUrl:
             translations:
-              en:
-              nl:
+              en: App Store URL
+              nl: App Store URL
           ModelURI:
             translations:
-              en:
-              nl:
+              en: Model URI
+              nl: Model URI
       users:
         Visitor:
           translations:
-            en:
-            nl:
+            en: Visitor
+            nl: Bezoeker
         Author:
           translations:
-            en:
-            nl:
+            en: Author
+            nl: Auteur
           actions:
             Author:
               CreateVersion:
                 translations:
-                  en:
-                  nl:
+                  en: Create modelmanifest version
+                  nl: Maak model manifest versie
         VisitorProxy:
           translations:
-            en:
-            nl:
+            en: 
+            nl: 
       contextroles:
         Versions:
           translations:
-            en:
-            nl:
+            en: Versions
+            nl: Versies
         Repository:
           translations:
-            en:
-            nl:
+            en: App Store
+            nl: App Store
     VersionedModelManifest:
       translations:
-        en:
-        nl:
+        en: Version of model manifest
+        nl: Versie van model manifest
       external:
+        notifications:
+          0:
+            translations:
+              orig: Version $1 (build $3 ) has been uploaded to the repository for $5 .
+              en:  Version $1 (build $3 ) has been uploaded to the repository for $5.
+              nl:  Versie $1 (build $3 ) is ge-upload naar de repository voor $5.
         properties:
-          ParsedYaml:
-            translations:
-              en:
-              nl:
-          TranslationYaml:
-            translations:
-              en:
-              nl:
-          ModelTranslation:
-            translations:
-              en:
-              nl:
           AutoUpload:
             translations:
-              en:
-              nl:
+              en: Auto upload
+              nl: Upload automatisch
           MustUpload:
             translations:
-              en:
-              nl:
+              en: Must be uploaded
+              nl: Moet worden geuploaded
           LastUpload:
             translations:
-              en:
-              nl:
+              en: Last upload
+              nl: Laatste upload
           LastChangeDT:
             translations:
-              en:
-              nl:
+              en: Date time of last change
+              nl: Datum en tijd van laatste verandering
           IsRecommended:
             translations:
-              en:
-              nl:
+              en: Is recommended
+              nl: Is aanbevolen
           PublicUrl:
             translations:
-              en:
-              nl:
+              en: Public URL
+              nl: Public URL
           ArcFeedback:
             translations:
-              en:
-              nl:
+              en: Parser feedback
+              nl: Parser feedback
           ArcSource:
             translations:
-              en:
-              nl:
+              en: Model source text
+              nl: Brontekst van model
           ArcFile:
             translations:
-              en:
-              nl:
+              en: Model file
+              nl: Bronbestand met model
           VersionedModelURI:
             translations:
-              en:
-              nl:
+              en: Versioned model URI
+              nl: Model URI met versie
           ModelURI:
             translations:
-              en:
-              nl:
+              en: Model URI
+              nl: Model URI
       users:
         Visitor:
           translations:
-            en:
-            nl:
+            en: Visitor
+            nl: Bezoeker
         Author:
           translations:
-            en:
-            nl:
+            en: Author
+            nl: Auteur
           actions:
             Author:
               CreateTranslation:
                 translations:
-                  en:
-                  nl:
+                  en: Create model translation
+                  nl: Maak model vertaling
+              AugmentTranslation:
+                translations:
+                  en: Add existing translations
+                  nl: Voeg bestaande vertalingen toe
               CreateYaml:
                 translations:
-                  en:
-                  nl:
+                  en: Create yaml translation file
+                  nl: Maak yaml vertaalbestand
         VisitorProxy:
           translations:
-            en:
-            nl:
+            en: 
+            nl: 
+      things:
+        Translation:
+          translations:
+            en: Translation
+            nl: Vertaling
+          properties:
+            AugmentedModelTranslation:
+              translations:
+                en: Modified model with existing translations
+                nl: Gewijzigd model met overgenomen vertalingen
+            ParsedYaml:
+              translations:
+                en: Parsed yaml
+                nl: Parsed yaml
+            TranslationYaml:
+              translations:
+                en: Yaml translation file
+                nl: Yaml vertaalbestand
+            ModelTranslation:
+              translations:
+                en: Model translation
+                nl: Model vertaling
+            LastYamlChangeDT:
+              translations:
+                en: Date time of last yaml file change
+                nl: Datum en tijdstip van laatste yaml file verandering
+            GenerateYaml:
+              translations:
+                en: Generate yaml automatically
+                nl: Genereer yaml automatisch
       contextroles:
         Manifest:
           translations:
-            en:
-            nl:
+            en: Manifest
+            nl: Manifest

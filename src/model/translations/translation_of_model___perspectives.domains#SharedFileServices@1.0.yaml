@@ -1,0 +1,55 @@
+model://perspectives.domains#SharedFileServices:
+  contexts:
+    SharedFileServices:
+      translations:
+        en: Shared File Services
+        nl: Shared File Services
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+      things:
+        DefaultFileServer:
+          translations:
+            en: Default file server
+            nl: Terugval file server
+          properties:
+            NrOfUploadedFiles:
+              translations:
+                en: Number of uploaded files
+                nl: Aantal geuploade bestanden
+            Disabled:
+              translations:
+                en: Disabled
+                nl: Uitgeschakeld
+        ActualSharedFileServer:
+          translations:
+            en: File server in use
+            nl: File server in gebruik
+        MySharedFileService:
+          translations:
+            en: My shared file service
+            nl: Mijn shared file service
+  roles:
+    SharedFileService:
+      translations:
+        en: Shared file service
+        nl: Shared file service
+      properties:
+        FileShareCredentials:
+          translations:
+            en: File share credentials
+            nl: File share gegevens
+        StorageType:
+          translations:
+            en: Storage type
+            nl: Type opslag
+        Password:
+          translations:
+            en: Password
+            nl: Paswoord
+        AccountName:
+          translations:
+            en: Account name
+            nl: Lidmaatschapsnaam

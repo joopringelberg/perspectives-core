@@ -1,0 +1,32 @@
+model://perspectives.domains#BodiesWithAccounts:
+  contexts:
+    BodiesWithAccountsApp:
+      translations:
+        en: Organisational bodies with accounts
+        nl: Organisatorische lichamen met deelnemers
+    Body:
+      translations:
+        en: Body
+        nl: Lichaam
+      users:
+        Accounts:
+          translations:
+            en: Accounts
+            nl: Deelnemers
+          properties:
+            IsRejected:
+              translations:
+                en: Is rejected
+                nl: Is verworpen
+            IsAccepted:
+              translations:
+                en: Is accepted
+                nl: Is geaccepteerd
+        Guest:
+          translations:
+            en: Guest
+            nl: Gast
+        Admin:
+          translations:
+            en: Administrator
+            nl: Beheerder
