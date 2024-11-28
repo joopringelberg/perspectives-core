@@ -552,11 +552,12 @@ instance Translation RolesTranslation where
         in Tuple qualifiedName (qualify qualifiedName role)
       ) :: Array (Tuple String RoleTranslation))
   writeKeys (RolesTranslation roleTranslations) = forWithIndex_ roleTranslations 
-    \roleName (RoleTranslation {translations, properties, actions, notifications}) -> do 
+    \roleName (RoleTranslation {translations, properties, actions, notifications, markdowns}) -> do 
       tell (singleton roleName translations)
       writeKeys properties
       writeKeys actions
       writeKeys notifications
+      writeKeys markdowns
   writeYaml indent (RolesTranslation userRoles) = void $ for (object2array userRoles)
     \(Tuple roleName roleTranslation) -> do
       tell (i indent (typeUri2LocalName_ roleName) colonNl)
@@ -573,11 +574,12 @@ instance Translation RoleTranslation where
     in
     RoleTranslation {translations, properties: properties', actions: actions', notifications, markdowns}
   writeKeys _ = pure unit
-  writeYaml indent (RoleTranslation {translations, properties, actions, notifications}) = do
+  writeYaml indent (RoleTranslation {translations, properties, actions, notifications, markdowns}) = do
     writeYaml indent translations
     writeYaml indent notifications
     writeYaml indent properties
     writeYaml indent actions
+    writeYaml indent markdowns
   addTranslations table (RoleTranslation {translations, properties, actions, notifications, markdowns}) = RoleTranslation $ 
     { translations
     , properties: addTranslations table properties
@@ -598,7 +600,7 @@ instance Translation ContextTranslation where
   writeYaml indent (ContextTranslation {translations, external, users, things, contextroles, contexts:ctxts, notifications}) = do 
     writeYaml indent translations
     case external of 
-      RoleTranslation {properties, actions, notifications:enotes} -> case properties, actions, enotes of
+      RoleTranslation {properties, actions, notifications:enotes, markdowns} -> case properties, actions, enotes of
         PropertiesTranslation properties', ActionsPerStateTranslation actions', NotificationsTranslation notifications' -> if isEmpty properties' && isEmpty actions' && isEmpty notifications'
           then pure unit
           else do 
@@ -606,6 +608,7 @@ instance Translation ContextTranslation where
             writeYaml (indent <> tab) enotes
             writeYaml (indent <> tab) properties
             writeYaml (indent <> tab) actions
+            writeYaml (indent <> tab) markdowns
     writeYaml indent notifications
     case users of
       RolesTranslation users' -> if isEmpty users'
@@ -652,12 +655,13 @@ instance Translation ContextsTranslation where
     \contextName (ContextTranslation {translations, external, users, things, contextroles, contexts}) -> do
       tell (singleton contextName translations)
 
-      -- We have to handle the external role here.
-      RoleTranslation {translations:etranslations, properties:eproperties, actions:eactions, notifications:enotifications} <- pure external
+      -- We have to handle the external role here, because we must construct its name from the contextName.
+      RoleTranslation {translations:etranslations, properties:eproperties, actions:eactions, notifications:enotifications, markdowns:emarkdowns} <- pure external
       tell (singleton (contextName <> "$External" ) etranslations)
       writeKeys eproperties
       writeKeys eactions
       writeKeys enotifications
+      writeKeys emarkdowns
 
       writeKeys users
       writeKeys things
