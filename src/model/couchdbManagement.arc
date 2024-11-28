@@ -561,7 +561,8 @@ domain model://perspectives.domains#CouchdbManagement
       action CreateManifest
         create role Manifests
 
-      state IsFilled = (exists binding) and (not exists AuthorizedDomain) and context >> extern >> RepoHasDatabases
+      -- If we fill Admin with a role that already has an AuthorizedDomain, we will still set AuthorizedDomain on the Admin role itself.
+      state IsFilled = (exists binding) and (not AuthorizedDomain == context >> extern >> RepositoryUrl) and context >> extern >> RepoHasDatabases
         on entry
           do for ServerAdmin
             -- Only the CouchdbServer$Admin has a Create and Fill perspective on
@@ -812,7 +813,6 @@ domain model://perspectives.domains#CouchdbManagement
         props (FirstName, LastName) verbs (Consult)
       action CreateVersion
         create role Versions
-      
       screen "Model Manifest"
         tab "Versions" default
           row 
@@ -892,6 +892,11 @@ domain model://perspectives.domains#CouchdbManagement
     aspect sys:VersionedModelManifest
     aspect sys:ContextWithNotification
 
+    state NoTranslation = not exists Translation
+      on entry
+        do for Author
+          create role Translation
+
     external
       aspect sys:VersionedModelManifest$External
       -- VersionedModelManifest$External$Description
@@ -966,11 +971,11 @@ domain model://perspectives.domains#CouchdbManagement
       -- JUST FOR TESTING
       property ModelTranslation = callExternal p:GenerateFirstTranslation( context >> extern >> VersionedModelURI ) returns String
       property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
+      property AugmentedModelTranslation (String)
 
       -- NECESSARY
       property TranslationYaml (File)
         pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
-      property AugmentedModelTranslation (String)
       -- Construct a (new version of the) YAML file that the Author can download to add translations.
       -- Invariant for new VersionedModelManifests: a Translation table is uploaded to the repository.
       state GenerateYaml = GenerateYaml and context >> extern >> ArcFeedback matches regexp "^OK"
