@@ -90,7 +90,7 @@ import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePath
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectContext, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -186,7 +186,9 @@ updateModel arrWithModelName arrWithDependencies _ = try
     updateModel' :: Boolean -> DomeinFileId -> MonadPerspectivesTransaction Unit
     updateModel' withDependencies dfid@(DomeinFileId modelName) = do
       {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelName
-      DomeinFile{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDocument repositoryUrl documentName
+      unversionedModelname <- pure $ unversionedModelUri modelName
+      -- Remove the inverted queries, upstream notifications and automatic effects of the OLD version of the model!
+      DomeinFile{upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDomeinFile (DomeinFileId unversionedModelname)
       if withDependencies
         then for_ referredModels (updateModel' withDependencies)
         else pure unit
@@ -196,7 +198,6 @@ updateModel arrWithModelName arrWithDependencies _ = try
       -- and add the inverted queries to the local database.
       lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
 
-      unversionedModelname <- pure $ unversionedModelUri modelName
       forWithIndex_ upstreamStateNotifications
         \domainName notifications -> do
           (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
@@ -532,21 +533,30 @@ createCouchdbDatabase databaseUrls databaseNames _ = try
 createEntitiesDatabase  :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
 createEntitiesDatabase databaseUrls databaseNames _ = try
   (case head databaseUrls, head databaseNames of
-    -- NOTE: misschien moet er een slash tussen
-    Just databaseUrl, Just databaseName -> lift $ withDatabase (databaseUrl <> databaseName) 
-      (\_ -> do
-        dbName <- pure (databaseUrl <> databaseName)
-        setRoleView dbName
-        setRoleFromContextView dbName
-        -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
-        setPendingInvitationView dbName
-        setContextView dbName
-        setCredentialsView dbName
-        setFiller2FilledView dbName
-        setFilled2FillerView dbName
-        setContext2RoleView dbName
-        setRole2ContextView dbName
-        )
+    Just databaseUrl, Just databaseName -> do 
+      dbName <- pure (databaseUrl <> databaseName)
+      lift $ withDatabase (databaseUrl <> databaseName) 
+        (\_ -> do
+          setRoleView dbName
+          setRoleFromContextView dbName
+          -- OBSOLETE. Remove if testing shows the current definitioin of pendingInvitations works.
+          setPendingInvitationView dbName
+          setContextView dbName
+          setCredentialsView dbName
+          setFiller2FilledView dbName
+          setFilled2FillerView dbName
+          setContext2RoleView dbName
+          setRole2ContextView dbName
+          )
+      -- dbName is also the url that is provided in a "public Visitor at <location>" declaration.
+      -- Hence we can use it to construct an instance of TheWorld in that database.
+      theworldid <- pure (ContextInstance $ "pub:" <> dbName <> "/#TheWorld")
+      mtheWorld <- lift $ tryGetPerspectContext theworldid
+      case mtheWorld of 
+        Nothing -> do 
+          void $ runExceptT $ constructEmptyContext theworldid DEP.theWorld "TheWorld" (PropertySerialization empty) Nothing
+          lift $ void $ saveEntiteit theworldid
+        _ -> pure unit
     _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#CreateEntitiesDatabase"
 

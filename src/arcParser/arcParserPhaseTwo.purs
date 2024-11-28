@@ -324,6 +324,7 @@ traverseEnumeratedRoleE_ role@(EnumeratedRole{id:rn, kindOfRole}) roleParts = do
     handleParts roleName e@(EnumeratedRole roleUnderConstruction@{id, context, kindOfRole:kind}) (ROLESTATE s@(StateE{id:stateId, subStates})) = do
       stateKind <- pure (case kind of
         TI.UserRole -> Srole id
+        TI.PublicProxy -> Srole id
         _ -> Orole id)
       state@(State{id:ident}) <- traverseStateE stateKind s
       substates <- for subStates (traverseStateE stateKind)
