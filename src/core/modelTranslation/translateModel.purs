@@ -41,8 +41,9 @@ import Data.Maybe (Maybe(..), fromJust, isNothing)
 import Data.Newtype (unwrap)
 import Data.Nullable (Nullable, notNull, null, toMaybe) as NULL
 import Data.Set (toUnfoldable) as SET
-import Data.String.Regex (match)
-import Data.String.Regex.Flags (noFlags)
+import Data.String (Pattern(..), Replacement(..), replaceAll, stripPrefix, stripSuffix)
+import Data.String.Regex (match, replace)
+import Data.String.Regex.Flags (noFlags, global)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (for)
 import Data.TraversableWithIndex (forWithIndex)
@@ -197,6 +198,7 @@ newtype RoleTranslation_ = RoleTranslation_
 
 newtype PropertiesTranslation_ = PropertiesTranslation_ (Object {translations :: Translations_})
 
+-- Keys are state identifiers.
 newtype ActionsPerStateTranslation_ = ActionsPerStateTranslation_ (Object ActionsTranslation_)
 
 newtype ActionsTranslation_ = ActionsTranslation_ (Object { translations :: Translations_})
@@ -250,6 +252,8 @@ instance Rehydrate RoleTranslation_ RoleTranslation where
       Just (PropertiesTranslation_ obj) -> PropertiesTranslation (obj <#> _.translations >>> hydrate)
     actions' = case NULL.toMaybe actions of 
       Nothing -> ActionsPerStateTranslation empty
+      -- Keys are the string representations of StateSpecs.
+      -- Values are Object ActionsTranslation, where keys are local action names.
       Just (ActionsPerStateTranslation_ acts) -> ActionsPerStateTranslation (hydrate <$> acts)
     translations' = hydrate translations
     notifications' = case NULL.toMaybe notifications of 
@@ -366,6 +370,7 @@ translateContext (Context {id:contextId, gebruikerRol, contextRol, rolInContext,
     (\rt -> (lookupRoleType rt >>= translateRole >>= pure <<< Tuple (roletype2string rt)))
 
 translateNotification :: Notification -> Writer (Object Translations) Unit
+-- TODO. Hier ontstaan verdubbelingen als dezelfde sentence meerdere keren in een model voorkomt.
 translateNotification (ContextNotification {sentence}) = tell $ singleton (_.sentence $ unwrap sentence) (Translations empty)
 translateNotification (RoleNotification {sentence}) = tell $ singleton (_.sentence $ unwrap sentence) (Translations empty)
 
@@ -423,7 +428,7 @@ translateActions actions = ActionsPerStateTranslation <<< fromFoldable <$>
   (for (SET.toUnfoldable $ EM.keys actions :: Array StateSpec) \state -> pure $ Tuple 
     (unwrap $ stateSpec2StateIdentifier state) 
     (ActionsTranslation 
-      (const (Translations empty) <$> (unsafePartial fromJust $ EM.lookup state actions))))
+      (const (Translations empty) <$> (unsafePartial fromJust $ EM.lookup state actions)))) -- Hier state met lokale action name combineren?
 
 -- The translations of a single property.
 translatePropertyType :: PropertyType -> Reader DomeinFileRecord (Tuple String Translations)
@@ -477,7 +482,7 @@ instance Translation NotificationsTranslation where
 instance Translation MarkdownsTranslation where
   qualify _ n = n
   writeKeys (MarkdownsTranslation markdowns) = forWithIndex_ markdowns
-    \original translations -> tell (singleton original translations)
+    \original (Translations translations) -> tell (singleton (unEscapeMarkdownForYaml original) (Translations $ unEscapeMarkdownForYaml <$> translations))
   writeYaml indent (MarkdownsTranslation markdowns) = if isEmpty markdowns
     then pure unit
     else do
@@ -487,7 +492,7 @@ instance Translation MarkdownsTranslation where
           \original (Translations translations) -> do
             nr <- get
             lift $ tell (i indent tab nr colonNl)
-            lift $ writeYaml (indent <> tab <> tab) (Translations $ insert "orig" original translations)
+            lift $ writeYaml (indent <> tab <> tab) (Translations $ insert "orig" (escapeMarkdownForYaml (indent <> tab <> tab <> tab <> tab) original) (escapeMarkdownForYaml (indent <> tab <> tab <> tab <> tab) <$> translations))
             modify ((+) 1)
             )
         0
@@ -495,6 +500,34 @@ instance Translation MarkdownsTranslation where
     flip mapWithKey markdowns \original translations -> case lookup original table of 
       Nothing -> translations
       Just ts -> ts
+
+
+-- Markdown is parsed from ARC to a string containing newlines (\n) and double quotes ("). The ARC indentation has been thrown out.
+-- In Yaml we need proper indentation for multiline Markdown texts. Also, it needs to be enclosed in double quotes or otherwise 
+-- newlines will not be interpreted correctly. Finally, we must escape double quotes because otherwise the enclosing double quotes will get broken.
+-- Enclose in double quotes
+-- escape \n and let it follow by indentation (for the next line): "dit staat ervoor\nen dit erachter"  becomes "dit staat ervoor\\n      en dit erachter" 
+-- escape a double quote: \" becomes \\"
+escapeMarkdownForYaml :: String -> String -> String
+escapeMarkdownForYaml indent' s = "\"" <> (replaceAll (Pattern "\"") (Replacement "\\\"") (replaceAll (Pattern "\n") (Replacement $ "\n" <> indent') s)) <> "\""
+
+-- The inverse operation of escapeMarkdownForYaml:
+-- Remove enclosing double quotes;
+-- Replace the pattern "\\n      " with "\n"
+-- Remove the backslash before a double quote.
+-- The end result should be the same as the input for escapeMarkdownForYaml (that is, the string given by the ARC parser).
+unEscapeMarkdownForYaml :: String -> String
+unEscapeMarkdownForYaml s = let 
+    unIndented = replace (unsafeRegex "\\\\n\\s+" global) "\\n" s
+    unEnclosed = case stripSuffix (Pattern "\"") unIndented of
+      Nothing -> case stripPrefix (Pattern "\"") unIndented of 
+        Nothing -> unIndented
+        Just s' -> s'
+      Just withoutEndQuotes -> case stripPrefix (Pattern "\"") withoutEndQuotes of 
+        Nothing -> withoutEndQuotes
+        Just s' -> s'
+  in
+    replaceAll (Pattern "\\\"") (Replacement "\"") unEnclosed
 
 instance Translation PropertiesTranslation where
   qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
@@ -514,8 +547,10 @@ instance Translation PropertiesTranslation where
       Just ts -> ts
 
 instance Translation ActionsTranslation where
+  -- keys are action names, namespace SHOULD be state name. MAYBE NO QUALIFICATION IS NECESSARY
   qualify namespace (ActionsTranslation obj) = ActionsTranslation $ qualifyObjectKeys namespace obj
   writeKeys (ActionsTranslation actionTranslations) = forWithIndex_ actionTranslations
+    -- We have qualified the actionName in the writeKeys function of the ActionsPerStateTranslation instance of Translation.
     \actionName translations -> tell (singleton actionName translations)
   writeYaml indent (ActionsTranslation actions) = void $ forWithIndex actions
     \actionName translations -> do
@@ -533,14 +568,21 @@ instance Translation ActionsPerStateTranslation where
     ActionsPerStateTranslation $ fromFoldable 
       (((toUnfoldable obj) :: Array (Tuple String ActionsTranslation)) <#> 
         \(Tuple key val) -> Tuple namespace' (qualify namespace' val))
-  writeKeys (ActionsPerStateTranslation actiontranslations) = void $ for actiontranslations writeKeys
+  -- Keys are the string representations of StateSpecs. Combine each key with the local action names 
+  -- to generate a pseudo qualified action name.
+  -- Do so by qualifying the keys of the (Object ActionsTranslation) with the state.
+  writeKeys (ActionsPerStateTranslation actiontranslations) = void $ for 
+    (mapWithIndex 
+      (\state (ActionsTranslation obj) -> ActionsTranslation $ qualifyObjectKeys state obj) 
+      actiontranslations) 
+    writeKeys
   writeYaml indent (ActionsPerStateTranslation actions) = case actions of
     none | isEmpty none -> pure unit
     actions' -> do
       tell (i indent "actions" colonNl)
       void $ forWithIndex actions'
         \stateName acts -> do 
-          tell (i (indent <> tab) (typeUri2LocalName_ stateName) colonNl)
+          tell (i (indent <> tab) stateName colonNl) -- Pas typeUri2LocalName_ niet toe. We verliezen dan informatie die we nodig hebben om terug te vertalen naar een ModelTranslation.
           writeYaml (indent <> tab <> tab) acts
   addTranslations table (ActionsPerStateTranslation a) = ActionsPerStateTranslation $ addTranslations table <$> a
 
