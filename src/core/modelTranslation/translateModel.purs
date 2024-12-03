@@ -29,9 +29,10 @@ module Perspectives.ModelTranslation where
 import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
-import Control.Monad.State (get, lift, modify, runStateT)
+import Control.Monad.State (get, lift, modify, runStateT, execState)
+import Control.Monad.State (State) as ST
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (filter, head, null, catMaybes)
+import Data.Array (filter, head, null, catMaybes, fold)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
@@ -50,7 +51,7 @@ import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Exception (Error)
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values, union)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup, values) as EM
@@ -98,7 +99,7 @@ newtype PropertiesTranslation = PropertiesTranslation (Object Translations)
 derive newtype instance WriteForeign PropertiesTranslation
 derive newtype instance ReadForeign PropertiesTranslation
 
--- The keys are the Action names. Even though Action names are not qualified in the 
+-- The keys are the qualified Action names. Even though Action names are not qualified in the 
 -- DomeinFile, we have qualified them in the Translation.
 newtype ActionsTranslation = ActionsTranslation (Object Translations)
 derive newtype instance WriteForeign ActionsTranslation
@@ -110,6 +111,10 @@ derive newtype instance ReadForeign ActionsTranslation
 newtype ActionsPerStateTranslation = ActionsPerStateTranslation (Object ActionsTranslation)
 derive newtype instance WriteForeign ActionsPerStateTranslation
 derive newtype instance ReadForeign ActionsPerStateTranslation
+instance Semigroup ActionsPerStateTranslation where
+  append (ActionsPerStateTranslation a1) (ActionsPerStateTranslation a2) = ActionsPerStateTranslation (a1 `union` a2)
+instance Monoid ActionsPerStateTranslation where
+  mempty = ActionsPerStateTranslation empty
 
 newtype RoleTranslation = RoleTranslation
   { translations :: Translations
@@ -394,7 +399,9 @@ translateRole (E (EnumeratedRole rec)) = do
   (properties :: PropertiesTranslation) <- do
     (ps :: Array (Tuple String Translations)) <- (for rec.properties translatePropertyType)
     pure $ PropertiesTranslation $ fromFoldable ps
-  actions <- translateActions rec.actions
+  contextActions <- translateActions rec.actions
+  (roleActions :: Array ActionsPerStateTranslation) <- for rec.perspectives (translateActions <<< _.actions <<< unwrap)
+
   notifications <- do
     {states} <- ask
     pure $ NotificationsTranslation (execWriter $ for_ states (\(State {stateFulObject, notifyOnEntry, notifyOnExit}) -> case stateFulObject of 
@@ -402,7 +409,7 @@ translateRole (E (EnumeratedRole rec)) = do
       Srole r | r == rec.id -> for_ (EM.values notifyOnEntry) translateNotification
       _ -> pure unit))
   markdowns <- markDownsInScreen (ScreenKey rec.context (ENR rec.id))
-  pure $ RoleTranslation {translations: Translations empty, properties, actions, notifications, markdowns}
+  pure $ RoleTranslation {translations: Translations empty, properties, actions: contextActions <> (fold roleActions), notifications, markdowns}
 translateRole (C (CalculatedRole rec)) = do 
   actions <- translateActions rec.actions
   markdowns <- markDownsInScreen (ScreenKey rec.context (CR rec.id))
@@ -440,7 +447,7 @@ translatePropertyType (ENP (EnumeratedPropertyType p)) = pure $ Tuple p (Transla
 -------------------------------------------------------------------------------
 class Translation a where 
   qualify :: String -> a -> a
-  writeKeys :: a -> Writer (Object Translations) Unit
+  writeKeys :: a -> ST.State (Object Translations) Unit
   writeYaml :: String -> a -> Writer String Unit
   addTranslations :: TranslationTable -> a -> a
 
@@ -459,8 +466,7 @@ instance Translation Translations where
 
 instance Translation NotificationsTranslation where
   qualify _ n = n
-  writeKeys (NotificationsTranslation notifications) = forWithIndex_ notifications
-    \original translations -> tell (singleton original translations)
+  writeKeys (NotificationsTranslation notifications) = void $ modify \allTranslations -> allTranslations `union` notifications
   writeYaml indent (NotificationsTranslation notifications) = if isEmpty notifications
     then pure unit
     else do
@@ -481,8 +487,7 @@ instance Translation NotificationsTranslation where
 
 instance Translation MarkdownsTranslation where
   qualify _ n = n
-  writeKeys (MarkdownsTranslation markdowns) = forWithIndex_ markdowns
-    \original (Translations translations) -> tell (singleton (unEscapeMarkdownForYaml original) (Translations $ unEscapeMarkdownForYaml <$> translations))
+  writeKeys (MarkdownsTranslation markdowns) = void $ modify \allTranslations -> allTranslations `union` markdowns
   writeYaml indent (MarkdownsTranslation markdowns) = if isEmpty markdowns
     then pure unit
     else do
@@ -506,19 +511,21 @@ instance Translation MarkdownsTranslation where
 -- In Yaml we need proper indentation for multiline Markdown texts. Also, it needs to be enclosed in double quotes or otherwise 
 -- newlines will not be interpreted correctly. Finally, we must escape double quotes because otherwise the enclosing double quotes will get broken.
 -- Enclose in double quotes
--- escape \n and let it follow by indentation (for the next line): "dit staat ervoor\nen dit erachter"  becomes "dit staat ervoor\\n      en dit erachter" 
+-- insert THE TEXT "\n" right before each newline \n and let the newline itself follow by indentation (for the next line): "dit staat ervoor\nen dit erachter"  becomes "dit staat ervoor\\n\n      en dit erachter" 
 -- escape a double quote: \" becomes \\"
 escapeMarkdownForYaml :: String -> String -> String
-escapeMarkdownForYaml indent' s = "\"" <> (replaceAll (Pattern "\"") (Replacement "\\\"") (replaceAll (Pattern "\n") (Replacement $ "\n" <> indent') s)) <> "\""
+escapeMarkdownForYaml indent' s = "\"" <> (replaceAll (Pattern "\"") (Replacement "\\\"") (replaceAll (Pattern "\n") (Replacement $ "\\n\n" <> indent') s)) <> "\""
 
--- The inverse operation of escapeMarkdownForYaml:
+-- The inverse operation of escapeMarkdownForYaml. 
+-- Now notice that we perform this on the parsed YAML, that has removed the actual newlines (yaml considers them to be irrelevant in values)
+-- However, the text will still contain the \\n that we inserted, but it will show up as \n which is fine.
+-- Consequently, we do not handle newlines!
 -- Remove enclosing double quotes;
--- Replace the pattern "\\n      " with "\n"
 -- Remove the backslash before a double quote.
 -- The end result should be the same as the input for escapeMarkdownForYaml (that is, the string given by the ARC parser).
 unEscapeMarkdownForYaml :: String -> String
 unEscapeMarkdownForYaml s = let 
-    unIndented = replace (unsafeRegex "\\\\n\\s+" global) "\\n" s
+    unIndented = replace (unsafeRegex "\\n\\s+" global) "\n" s
     unEnclosed = case stripSuffix (Pattern "\"") unIndented of
       Nothing -> case stripPrefix (Pattern "\"") unIndented of 
         Nothing -> unIndented
@@ -531,8 +538,7 @@ unEscapeMarkdownForYaml s = let
 
 instance Translation PropertiesTranslation where
   qualify namespace (PropertiesTranslation propsAndTranslations) = PropertiesTranslation $ qualifyObjectKeys namespace propsAndTranslations
-  writeKeys (PropertiesTranslation propTranslations) = forWithIndex_ propTranslations
-    \propertyName translations -> tell (singleton propertyName translations)
+  writeKeys (PropertiesTranslation propTranslations) = void $ modify \allTranslations -> allTranslations `union` propTranslations
   writeYaml indent (PropertiesTranslation properties) = if isEmpty properties
     then pure unit
     else do 
@@ -549,9 +555,7 @@ instance Translation PropertiesTranslation where
 instance Translation ActionsTranslation where
   -- keys are action names, namespace SHOULD be state name. MAYBE NO QUALIFICATION IS NECESSARY
   qualify namespace (ActionsTranslation obj) = ActionsTranslation $ qualifyObjectKeys namespace obj
-  writeKeys (ActionsTranslation actionTranslations) = forWithIndex_ actionTranslations
-    -- We have qualified the actionName in the writeKeys function of the ActionsPerStateTranslation instance of Translation.
-    \actionName translations -> tell (singleton actionName translations)
+  writeKeys (ActionsTranslation actionTranslations) = void $ modify \allTranslations -> allTranslations `union` actionTranslations
   writeYaml indent (ActionsTranslation actions) = void $ forWithIndex actions
     \actionName translations -> do
       tell (i indent actionName colonNl)
@@ -572,9 +576,7 @@ instance Translation ActionsPerStateTranslation where
   -- to generate a pseudo qualified action name.
   -- Do so by qualifying the keys of the (Object ActionsTranslation) with the state.
   writeKeys (ActionsPerStateTranslation actiontranslations) = void $ for 
-    (mapWithIndex 
-      (\state (ActionsTranslation obj) -> ActionsTranslation $ qualifyObjectKeys state obj) 
-      actiontranslations) 
+    actiontranslations    
     writeKeys
   writeYaml indent (ActionsPerStateTranslation actions) = case actions of
     none | isEmpty none -> pure unit
@@ -595,7 +597,9 @@ instance Translation RolesTranslation where
       ) :: Array (Tuple String RoleTranslation))
   writeKeys (RolesTranslation roleTranslations) = forWithIndex_ roleTranslations 
     \roleName (RoleTranslation {translations, properties, actions, notifications, markdowns}) -> do 
-      tell (singleton roleName translations)
+      -- tell (singleton roleName translations)
+      void $ modify \allTranslations -> insert roleName translations allTranslations
+      
       writeKeys properties
       writeKeys actions
       writeKeys notifications
@@ -695,11 +699,11 @@ instance Translation ContextsTranslation where
       ) :: Array (Tuple String ContextTranslation))
   writeKeys (ContextsTranslation contextTranslations) = forWithIndex_ contextTranslations
     \contextName (ContextTranslation {translations, external, users, things, contextroles, contexts}) -> do
-      tell (singleton contextName translations)
+      void $ modify \allTranslations -> insert contextName translations allTranslations
 
       -- We have to handle the external role here, because we must construct its name from the contextName.
       RoleTranslation {translations:etranslations, properties:eproperties, actions:eactions, notifications:enotifications, markdowns:emarkdowns} <- pure external
-      tell (singleton (contextName <> "$External" ) etranslations)
+      void $ modify \allTranslations -> insert (contextName <> "$External" ) etranslations allTranslations
       writeKeys eproperties
       writeKeys eactions
       writeKeys enotifications
@@ -787,7 +791,7 @@ derive newtype instance ReadForeign TranslationTable
 derive newtype instance WriteForeign TranslationTable
 
 generateTranslationTable :: ModelTranslation -> TranslationTable
-generateTranslationTable modeltranslation = TranslationTable $ execWriter (writeKeys modeltranslation)
+generateTranslationTable modeltranslation = TranslationTable $ execState (writeKeys modeltranslation) empty
 
 emptyTranslationTable :: TranslationTable
 emptyTranslationTable = TranslationTable empty
