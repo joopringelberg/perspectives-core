@@ -1,0 +1,62 @@
+model://joopringelberg.nl#Disconnect:
+  contexts:
+    Disconnect:
+      translations:
+        en: Disconnect app
+        nl: Verbreek verbinding app
+      users:
+        Manager:
+          translations:
+            en: Manager
+            nl: Beheerder
+        Initializer:
+          translations:
+            en: Initializer
+            nl: Initialiseerder
+      contextroles:
+        IncomingDisconnections:
+          translations:
+            en: Disconnections by others
+            nl: Door anderen verbroken verbindingen
+        DisconnectedPeers:
+          translations:
+            en: Disconnected peers
+            nl: Afgesloten anderen
+    DisconnectedPeer:
+      translations:
+        en: Disconnected peer
+        nl: Afgesloten andere gebruiker
+      external:
+        properties:
+          Disconnected:
+            translations:
+              en: Disconnected
+              nl: Afgesloten
+          Peer:
+            translations:
+              en: Peer
+              nl: Andere gebruiker
+      users:
+        Disconnected:
+          translations:
+            en: Disconnected
+            nl: Afgesloten
+          properties:
+            Reconnect:
+              translations:
+                en: Reconnect
+                nl: Verbind opnieuw
+        Disconnecter:
+          translations:
+            en: Disconnecter
+            nl: Afsluiter
+          actions:
+            Disconnecter:
+              Disconnect:
+                translations:
+                  en: Disconnect
+                  nl: Verbreek verbinding
+              Reconnect:
+                translations:
+                  en: Reconnect
+                  nl: Verbind opnieuw

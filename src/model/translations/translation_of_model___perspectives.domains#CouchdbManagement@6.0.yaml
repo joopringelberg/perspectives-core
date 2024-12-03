@@ -2,7 +2,6 @@ model://perspectives.domains#CouchdbManagement:
   contexts:
     CouchdbManagementApp:
       translations:
-        en: Repository and database management
         nl: Repository en database beheer
       users:
         Manager:
@@ -10,12 +9,12 @@ model://perspectives.domains#CouchdbManagement:
             en: Manager
             nl: Beheerder
           actions:
-            CouchdbManagementApp:
+            model://perspectives.domains#CouchdbManagement$CouchdbManagementApp:
               CreateServer:
                 translations:
                   en: Create server
                   nl: Maak server
-            RootContext:
+            model://perspectives.domains#System$RootContext:
               CreateServer:
                 translations:
                   en: Create server
@@ -82,7 +81,12 @@ model://perspectives.domains#CouchdbManagement:
                 en: You now have an account with CouchdbServer $1.
                 nl: Je bent nu ingeschreven bij CouchdbServer $1.
           actions:
-            Accounts:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+            model://perspectives.domains#CouchdbManagement$CouchdbServer$Accounts:
               RequestDatabase:
                 translations:
                   en: Request your own database
@@ -92,7 +96,12 @@ model://perspectives.domains#CouchdbManagement:
             en: Administrator
             nl: Beheerder
           actions:
-            Admin:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+            model://perspectives.domains#CouchdbManagement$CouchdbServer$Admin:
               CreateRepository:
                 translations:
                   en: Create a repository
@@ -230,16 +239,51 @@ model://perspectives.domains#CouchdbManagement:
           translations:
             en: Authors
             nl: Auteurs
+          markdowns:
+            0:
+              translations:
+                orig: "## Add a manifest\n
+                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Enter the *unqualified* name of the model in the column `LocalModelName`.\n
+                  For the domain 'model://perspectives.domains#System' for example, this is 'System'."
+                en: "## Add a manifest\n
+                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Enter the *unqualified* name of the model in the column `LocalModelName`.\n
+                  For the domain 'model://perspectives.domains#System' for example, this is 'System'."
+                nl: "## Voeg een manifest toe\n
+                  Voeg een manifest toe door de actie `CreateManifest` uit de bovenste toolbar uit te voeren.\n
+                  Vul de *ongekwalificeerde naam van het model in in de kolom `LocalModelname`.\n
+                  Voor het domein 'model://perspectives.domains#System' bijvoorbeeld, is dit 'System'."
         Admin:
           translations:
             en: Administrator
             nl: Beheerder
           actions:
-            Admin:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+            model://perspectives.domains#CouchdbManagement$Repository$Admin:
               CreateManifest:
                 translations:
                   en: Create a manifest
                   nl: Maak een manifest
+          markdowns:
+            0:
+              translations:
+                orig: "## Add a manifest\n
+                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Enter the *unqualified* name of the model in the column `LocalModelName`.\n
+                  For the domain 'model://perspectives.domains#System' for example, this is 'System'."
+                en: "## Add a manifest\n
+                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Enter the *unqualified* name of the model in the column `LocalModelName`.\n
+                  For the domain 'model://perspectives.domains#System' for example, this is 'System'."
+                nl: "## Voeg een manifest toe\n
+                  Voeg een manifest toe door de actie `CreateManifest` van de bovenste toolbar uit te voeren.\n
+                  Vul de *ongekwalificeerde* naam van het model in de kolom `LocalModelName` in.\n
+                  Voor het domein 'model://perspectives.domains#System' is dat bijvoorbeeld 'System'."
         ServerAdmin:
           translations:
             en: Server administrator
@@ -297,15 +341,70 @@ model://perspectives.domains#CouchdbManagement:
             en: Author
             nl: Auteur
           actions:
-            Author:
+            model://perspectives.domains#CouchdbManagement$ModelManifest$Author:
               CreateVersion:
                 translations:
-                  en: Create modelmanifest version
-                  nl: Maak model manifest versie
+                  en: Author
+                  nl: Auteur
+          markdowns:
+            0:
+              translations:
+                orig: "## Add a version\n
+                  In order to add a version of your manifest, use the action `CreateVersion` from the top toolbar.\n
+                  Add a version number in the row that appears. A version should be of the form \"Major.Minor\" where both\n
+                  components should be integers. For example: \"1.0\" or \"2.11\"."
+                en: "## Add a version\n
+                  In order to add a version of your manifest, use the action `CreateVersion` from the top toolbar.\n
+                  Add a version number in the row that appears. A version should be of the form \"Major.Minor\" where both\n
+                  components should be integers. For example: \"1.0\" or \"2.11\"."
+                nl: "## Voeg een versie toe\n
+                  Om een versie toe te voegen aan je manifest, gebruik je de actie `CreateVersion` uit de bovenste toolbar.\n
+                  Voeg een versienummer in in de rij die verschijnt. Een versienummer moet de vorm \"Major.Minor\" hebben, waar beide \n
+                  gehele getallen moeten zijn. Bijvoorbeeld: \"1.0\" of \"2.11\"."
         VisitorProxy:
           translations:
             en: 
             nl: 
+          actions:
+            model://perspectives.domains#CouchdbManagement$ModelManifest:
+              StartUsing:
+                translations:
+                  en: Start using
+                  nl: Neem in gebruik
+              UpdateModel:
+                translations:
+                  en: Update app
+                  nl: Actualiseer app
+              UpdateModelWithDependencies:
+                translations:
+                  en: Update app and its dependencies
+                  nl: Actualiseer app en de apps die erop voortbouwen
+            model://perspectives.domains#System$ModelManifest:
+              StartUsing:
+                translations:
+                  en: Start using
+                  nl: Neem in gebruik
+              UpdateModel:
+                translations:
+                  en: Update app
+                  nl: Actualiseer app
+              UpdateModelWithDependencies:
+                translations:
+                  en: Update app and its dependencies
+                  nl: Actualiseer app en de apps die erop voortbouwen
+            model://perspectives.domains#System$RootContext:
+              StartUsing:
+                translations:
+                  en: Start using
+                  nl: Neem in gebruik
+              UpdateModel:
+                translations:
+                  en: Update app
+                  nl: Actualiseer app
+              UpdateModelWithDependencies:
+                translations:
+                  en: Update app and its dependencies
+                  nl: Actualiseer app en de apps die erop voortbouwen
       contextroles:
         Versions:
           translations:
@@ -324,8 +423,8 @@ model://perspectives.domains#CouchdbManagement:
           0:
             translations:
               orig: Version $1 (build $3 ) has been uploaded to the repository for $5 .
-              en:  Version $1 (build $3 ) has been uploaded to the repository for $5.
-              nl:  Versie $1 (build $3 ) is ge-upload naar de repository voor $5.
+              en: Version $1 (build $3 ) has been uploaded to the repository for $5.
+              nl: Versie $1 (build $3 ) is ge-upload naar de repository voor $5.
         properties:
           AutoUpload:
             translations:
@@ -381,19 +480,49 @@ model://perspectives.domains#CouchdbManagement:
             en: Author
             nl: Auteur
           actions:
-            Author:
-              CreateTranslation:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
                 translations:
-                  en: Create model translation
-                  nl: Maak model vertaling
-              AugmentTranslation:
-                translations:
-                  en: Add existing translations
-                  nl: Voeg bestaande vertalingen toe
-              CreateYaml:
-                translations:
-                  en: Create yaml translation file
-                  nl: Maak yaml vertaalbestand
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+          markdowns:
+            0:
+              translations:
+                orig: "## Compile your model\n
+                  Select the `ArcFile` control and press enter. Then upload your file. It's domain declaration *must* be in \n
+                  the repository NameSpace (if you are not sure about that: move back to the Repositories tab of the CouchdbServer)\n
+                  and its local name *must* equal what you entered on creating the manifest (move back to the Manifests tab of the Repository).\n
+                  Compiling will take some time. Watch the `ArcFeedback` field for possible errors and correct them.\n
+                  On succes, the compiled model is uploaded automatically to the repository.\n
+                  Don't forget to update the model in your local installation!"
+                en: "## Compile your model\n
+                  Select the `ArcFile` control and press enter. Then upload your file. It's domain declaration *must* be in \n
+                  the repository NameSpace (if you are not sure about that: move back to the Repositories tab of the CouchdbServer)\n
+                  and its local name *must* equal what you entered on creating the manifest (move back to the Manifests tab of the Repository).\n
+                  Compiling will take some time. Watch the `ArcFeedback` field for possible errors and correct them.\n
+                  On succes, the compiled model is uploaded automatically to the repository.\n
+                  Don't forget to update the model in your local installation!"
+                nl: "## Compileer je model\n
+                  Selecteer de `ArcFile` control en sla enter aan. Upload dan je bestand. De domein declaratie daarin *moet* in \n
+                  de repository NameSpace vallen (als je daar niet zeker over bent, kun je het nakijken op de Repositories tab van de CouchdbServer). \n
+                  De lokale naam *moet* gelijk zijn aan wat je ingevuld hebt bij het maken van het manifest (ga terug naar de Manifests tab van de Repository\n
+                  om na te kijken). Het duurt even voordat de compilatie is voltooid. Let op het `ArcFeedback` veld voor mogelijke fouten en herstel die.\n
+                  Als compilatie slaagt wordt het resultaat automatisch geupload naar de repository.\n
+                  Vergeet niet om het model in je eigen installatie te actualiseren!"
+            1:
+              translations:
+                orig: "## Translate your model\n
+                  Start by downloading the `TranslationYaml` file. Edit in a simple text editor. Supply translations and take care to preserve \n
+                  indentation (only use 'soft tabs'. A tab should be two spaces).\n
+                  To upload your augmented translation, select the `TranslationYaml` control and press enter. Then upload your file."
+                en: "## Translate your model\n
+                  Start by downloading the `TranslationYaml` file. Edit in a simple text editor. Supply translations and take care to preserve \n
+                  indentation (only use 'soft tabs'. A tab should be two spaces).\n
+                  To upload your augmented translation, select the `TranslationYaml` control and press enter. Then upload your file."
+                nl: "## Vertaal je model\n
+                  Begin met het bestand `TranslationYaml` te downloaden. Vul de vertalingen in in een simpele teksteditor. Zorg ervoor de \n
+                  indentering te handhaven (gebruik alleen 'soft tabs': dit zijn twee spaties).\n
+                  Om je aangevulde vertaling te uploaden, selecteer je de `TranslationYaml` control en sla je enter aan. Je kunt dan uploaden."
         VisitorProxy:
           translations:
             en: 
@@ -404,14 +533,6 @@ model://perspectives.domains#CouchdbManagement:
             en: Translation
             nl: Vertaling
           properties:
-            AugmentedModelTranslation:
-              translations:
-                en: Modified model with existing translations
-                nl: Gewijzigd model met overgenomen vertalingen
-            ParsedYaml:
-              translations:
-                en: Parsed yaml
-                nl: Parsed yaml
             TranslationYaml:
               translations:
                 en: Yaml translation file
