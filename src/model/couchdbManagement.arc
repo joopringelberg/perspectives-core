@@ -637,6 +637,12 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Manifests" default
           row
             table Manifests
+          row
+            markdown <## Add a manifest
+                      Add a manifest by executing the action `CreateManifest` from the top toolbar.
+                      Enter the *unqualified* name of the model in the column `LocalModelName`.
+                      For the domain 'model://perspectives.domains#System' for example, this is 'System'.
+                     >
         tab "Authors"
           row
             table Authors
@@ -695,6 +701,12 @@ domain model://perspectives.domains#CouchdbManagement
         tab "Manifests" default
           row
             table Manifests
+          row
+            markdown <## Add a manifest
+                      Add a manifest by executing the action `CreateManifest` from the top toolbar.
+                      Enter the *unqualified* name of the model in the column `LocalModelName`.
+                      For the domain 'model://perspectives.domains#System' for example, this is 'System'.
+                     >
     
     
     user Accounts (relational, unlinked) filledBy (CouchdbServer$Accounts, CouchdbServer$Admin)
@@ -820,6 +832,12 @@ domain model://perspectives.domains#CouchdbManagement
           row
             table "Available Versions" Versions
               only (RemoveContext)
+          row
+            markdown <## Add a version
+                      In order to add a version of your manifest, use the action `CreateVersion` from the top toolbar.
+                      Add a version number in the row that appears. A version should be of the form "Major.Minor" where both
+                      components should be integers. For example: "1.0" or "2.11".
+                     >
         tab "Authors"
           row
             table "Authors" Author
@@ -968,12 +986,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- The (Javascript) DateTime value of the last Yaml file upload.
       property LastYamlChangeDT (DateTime)
 
-      -- JUST FOR TESTING
       property ModelTranslation = callExternal p:GenerateFirstTranslation( context >> extern >> VersionedModelURI ) returns String
-      property ParsedYaml = callExternal p:ParseYamlTranslation( TranslationYaml ) returns String
-      property AugmentedModelTranslation (String)
-
-      -- NECESSARY
       property TranslationYaml (File)
         pattern = "text/yaml" "Only .yaml files for translation are allowed, so use `application//x-yaml."
       -- Construct a (new version of the) YAML file that the Author can download to add translations.
@@ -1011,8 +1024,8 @@ domain model://perspectives.domains#CouchdbManagement
         props (ArcFile, ArcFeedback, Description, IsRecommended, Build, Patch, LastChangeDT, MustUpload, AutoUpload) verbs (Consult, SetPropertyValue)
       perspective on Translation
         only (Create, Remove, Delete)
-        props (ModelTranslation, ParsedYaml) verbs (Consult)
-        props (TranslationYaml, GenerateYaml, LastYamlChangeDT, AugmentedModelTranslation) verbs (Consult, SetPropertyValue)
+        props (TranslationYaml, GenerateYaml, LastYamlChangeDT) verbs (Consult, SetPropertyValue)
+        props (ModelTranslation) verbs (Consult)
       perspective on Manifest
         props (VersionToInstall) verbs (Consult, SetPropertyValue)
       perspective on Manifest >> context >> Versions
@@ -1020,25 +1033,28 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on Author
         all roleverbs
         props (FirstName, LastName) verbs (Consult)
-      -- TODO: kan weg.
-      action AugmentTranslation
-        AugmentedModelTranslation = callExternal p:AugmentModelTranslation( Translation >> ModelTranslation, extern >> VersionedModelURI) returns String for Translation
-      -- TODO: kan weg zodra alle modellen in de repository een translation table hebben!
-      action CreateTranslation
-        callEffect p:GenerateTranslationTable( Translation >> ModelTranslation, extern >> VersionedModelURI)
-      -- TODO: kan weg.
-      action CreateYaml
-        letA
-            text <- callExternal p:GetTranslationYaml( Translation >> ModelTranslation ) returns String
-          in
-            create file ("translation_of_" + extern >> VersionedModelURI + ".yaml") as "text/yaml" in TranslationYaml for Translation
-              text
       screen "Model version"
         tab "Version" default
           row
+            markdown <## Compile your model
+                      Select the `ArcFile` control and press enter. Then upload your file. It's domain declaration *must* be in 
+                      the repository NameSpace (if you are not sure about that: move back to the Repositories tab of the CouchdbServer)
+                      and its local name *must* equal what you entered on creating the manifest (move back to the Manifests tab of the Repository).
+                      Compiling will take some time. Watch the `ArcFeedback` field for possible errors and correct them.
+                      On succes, the compiled model is uploaded automatically to the repository.
+                      Don't forget to update the model in your local installation!
+                     >
+          row
             form External
           row
+            markdown <## Translate your model
+                      Start by downloading the `TranslationYaml` file. Edit in a simple text editor. Supply translations and take care to preserve 
+                      indentation (only use 'soft tabs'. A tab should be two spaces).
+                      To upload your augmented translation, select the `TranslationYaml` control and press enter. Then upload your file.
+                     >
+          row
             form Translation
+              -- props (TranslationYaml, LastYamlChangeDT) verbs (Consult, SetPropertyValue)
         tab "Authors"
           row
             table Author
