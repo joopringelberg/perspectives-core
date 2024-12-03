@@ -31,7 +31,7 @@ import Data.Enum (toEnum)
 import Data.JSDate (JSDate, parse, toDateTime)
 import Data.List (List(..))
 import Data.Maybe (Maybe(..), fromJust, isJust)
-import Data.String (Pattern(..), Replacement(..), length, replaceAll)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll, trim)
 import Data.String.CodeUnits as SCU
 import Data.String.Regex (parseFlags, regex)
 import Effect.Unsafe (unsafePerformEffect)
@@ -550,7 +550,7 @@ markDownLiteral = (go <?> "MarkDown") <* token.whiteSpace
     go = do
         (ArcPosition {column}) <- getPosition
         chars <- between (char '<') (char '>' <?> "end of MarkDown (>). ") (many markDownChar)
-        pure $ fixIndentation column $ SCU.fromCharArray chars
+        pure $ fixIndentation column $ trim $ SCU.fromCharArray chars
 
     markDownChar :: IP Char
     markDownChar = satisfy \c -> c /= '>'
