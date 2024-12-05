@@ -26,13 +26,14 @@ module Perspectives.AMQP.RabbitMQManagement where
 
 import Prelude
 
-import Affjax.Web (Request, Response, printError, request)
 import Affjax.RequestBody as RequestBody
 import Affjax.RequestHeader (RequestHeader(..))
 import Affjax.ResponseFormat as ResponseFormat
 import Affjax.StatusCode (StatusCode(..))
+import Affjax.Web (Request, Response, printError, request)
 import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT, gets)
+import Data.Argonaut (Json)
 import Data.Array (head)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
@@ -42,7 +43,7 @@ import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Foreign.Object (Object, empty)
 import Perspectives.CoreTypes (MonadPerspectives)
-import Perspectives.Couchdb (Password, onAccepted_)
+import Perspectives.Couchdb (Password, onAccepted_, toJson)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.Types (UserName)
@@ -252,15 +253,17 @@ selfRegisterWithRabbitMQ_ brokerServiceUrl userName password queueName = do
     { method: Left POST
     , url: brokerServiceUrl
     , headers: []
-    , content: Just $ RequestBody.string $ writeJSON ({ userName, password, queueName } :: SelfRegisterInformation)
-    , username: Just userName
-    , password: Just password
-    , withCredentials: true
-    , responseFormat: ResponseFormat.string
+    , content: Just $ RequestBody.json $ toJson ({ userName, password, queueName } :: SelfRegisterInformation)
+    , username: Nothing
+    , password: Nothing
+    -- See: https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/withCredentials
+    -- As this request is within the same domain, the setting has no effect.
+    , withCredentials: false
+    , responseFormat: ResponseFormat.json
     , timeout: Nothing
     }
   case res of 
     Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.selfRegisterWithRabbitMQ: error in call: " <> printError e)
-    Right (response :: Response String) -> if response.status == StatusCode 200 || response.status == StatusCode 201
+    Right (response :: Response Json) -> if response.status == StatusCode 200 || response.status == StatusCode 201
       then pure unit
       else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.selfRegisterWithRabbitMQ: unexpected statuscode " <> show response.status <> ", status text is: " <> response.statusText)
