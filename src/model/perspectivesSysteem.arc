@@ -282,6 +282,8 @@ domain model://perspectives.domains#System
         props (InviterLastName, Message) verbs (Consult)
       perspective on SystemCaches
         defaults
+        action ResetInvertedQueryDatabase
+          callEffect cdb:ClearAndFillInvertedQueriesDatabase()
       perspective on SocialEnvironment
         only (CreateAndFill, Fill)
 

@@ -78,14 +78,13 @@ import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.ObjectGetters (getEnumeratedRoleInstances)
-import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries)
+import Perspectives.InvertedQuery.Storable (getInvertedQueriesOfModel, removeInvertedQueriesContributedByModel, saveInvertedQueries, clearInvertedQueriesDatabase)
 import Perspectives.ModelDependencies (identifiableLastName, perspectivesUsersPublicKey, theWorldInitializer)
 import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase, Keys(..))
-import Perspectives.Persistence.API (addAttachment) as P
-import Perspectives.Persistence.API (deleteDocument) as Persistence
+import Perspectives.Persistence.API (addAttachment, deleteDocument, documentsInDatabase, excludeDocs) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
 import Perspectives.Persistence.CouchdbFunctions as CDB
@@ -344,7 +343,7 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
             Nothing -> pure unit
             Just attachment -> do
               newRev <- get
-              DeleteCouchdbDocument {rev} <- lift $ P.addAttachment documentUrl documentName newRev attName attachment mimetype
+              DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
               put rev)
 
 createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
@@ -759,6 +758,17 @@ addCredentials urls usernames passwords _ = try
     _, _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#AddCredentials"
 
+clearAndFillInvertedQueriesDatabase :: RoleInstance -> MonadPerspectivesTransaction Unit
+clearAndFillInvertedQueriesDatabase _ = do
+  modelsDb <- lift $ modelsDatabaseName
+  lift $ clearInvertedQueriesDatabase
+  {rows:allModels} <- lift $ Persistence.documentsInDatabase modelsDb Persistence.excludeDocs
+  for_ allModels \{id} -> reloadQueries modelsDb id
+  where
+  reloadQueries :: String ->  String -> MonadPerspectivesTransaction Unit
+  reloadQueries db modelFileName = do
+    lift (getInvertedQueriesOfModel db modelFileName >>= saveInvertedQueries)
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -796,5 +806,6 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Couchdb$PendingInvitations" {func: unsafeCoerce pendingInvitations, nArgs: 0, isFunctional: Unknown, isEffect: false}
   -- This requires no access to Couchdb.
   , Tuple "model://perspectives.domains#Couchdb$AddCredentials" {func: unsafeCoerce addCredentials, nArgs: 3, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Couchdb$ClearAndFillInvertedQueriesDatabase" {func: unsafeCoerce clearAndFillInvertedQueriesDatabase, nArgs: 0, isFunctional: True, isEffect: true}
 
   ]

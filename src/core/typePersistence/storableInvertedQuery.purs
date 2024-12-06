@@ -38,8 +38,7 @@ module Perspectives.InvertedQuery.Storable
 
 import Prelude
 
-import Control.Monad.Error.Class (catchError)
-import Data.Array (concat)
+import Data.Array (concat, filter)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Traversable (for)
@@ -52,7 +51,7 @@ import Perspectives.Identifiers (unversionedModelUri)
 import Perspectives.InvertedQuery (InvertedQuery)
 import Perspectives.InvertedQueryKey (RunTimeInvertedQueryKey, serializeInvertedQueryKey)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (Keys(..), addDocuments, createDatabase, deleteDatabase, deleteDocuments, fromBlob, getAttachment, getViewWithDocs)
+import Perspectives.Persistence.API (Keys(..), addDocuments, deleteDocuments, documentsInDatabase, excludeDocs, fromBlob, getAttachment, getViewWithDocs)
 import Perspectives.Persistent (invertedQueryDatabaseName)
 import Perspectives.PerspectivesState (queryCache)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
@@ -65,9 +64,12 @@ type StoredQueries = Array StorableInvertedQuery
 clearInvertedQueriesDatabase :: MonadPerspectives Unit
 clearInvertedQueriesDatabase = do
   iqDatabaseName <- invertedQueryDatabaseName 
-  catchError (deleteDatabase iqDatabaseName)
-    \_ -> createDatabase iqDatabaseName
-  createDatabase iqDatabaseName
+  -- Actually delete all documents, because deleting the database will destroy the design document with queries too
+  -- and we cannot import the function to recreate them here from SetupUser.
+  {rows} <- documentsInDatabase iqDatabaseName excludeDocs
+  -- Don't delete the design document!
+  documents :: Array {_id :: String, _rev :: String} <- pure $ (\{id, value} -> {_id: id, _rev: value.rev}) <$> (filter (\{id} -> id /= "_design/defaultViews") rows)
+  void $ deleteDocuments iqDatabaseName documents
 
 type QueryGetter = Array RunTimeInvertedQueryKey -> MonadPerspectives StoredQueries
 type QueryCompiler = InvertedQuery -> MonadPerspectives InvertedQuery
