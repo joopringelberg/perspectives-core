@@ -48,6 +48,7 @@ import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Traversable (traverse)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
+import Decacheable (decache)
 import Effect.Aff.AVar (tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
@@ -324,8 +325,12 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
 
   -- Add all attachments.
   dbName <- lift modelsDatabaseName
+  -- First make sure the DomeinFile has been saved:
+  lift $ saveMarkedResources
   (DomeinFile {_rev}) <- lift $ getDomeinFile id
   void $ lift $ execStateT (addAttachments dbName unversionedDocumentName attachments) _rev
+  -- Now uncache the DomeinFile, as it no longer holds the right revision, neither has the attachments.
+  lift $ decache id
 
   where
     -- As each attachment that we add will bump the document version, we have to catch it and use it on the
