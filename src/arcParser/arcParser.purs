@@ -317,7 +317,7 @@ userRoleE = do
 
 publicRoleE :: IP ContextPart
 publicRoleE = do
-  {state} <- getArcParserState
+  state <- publicState
   protectSubject $ withEntireBlock
     (\{uname, knd, pos, parts, isEnumerated} elements -> RE $ RoleE
       { id: uname
@@ -345,6 +345,13 @@ publicRoleE = do
       token.reservedOp "="
       calculation <- step
       pure {uname, knd, pos, parts: (url : (Calculation calculation isFunctional) : Nil), isEnumerated: false}
+
+    publicState :: IP StateSpecification
+    publicState = do
+      segments <- lookAhead (reserved "public" *> token.identifier)
+      ctxt@(ContextType ccontext) <- getCurrentContext
+      pos <- getPosition
+      pure $ SubjectState (ExplicitRole ctxt (ENR $ EnumeratedRoleType $ ccontext <> "$" <> segments) pos) Nothing
 
 thingRoleE :: IP ContextPart
 thingRoleE = do
