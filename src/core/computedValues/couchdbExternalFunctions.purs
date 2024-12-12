@@ -29,7 +29,7 @@ import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.AvarMonadAsk (modify, gets) as AMA
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Except (runExceptT)
-import Control.Monad.State (StateT, execState, execStateT, get, put)
+import Control.Monad.State (execState, execStateT)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Writer (tell)
 import Data.Array (catMaybes, cons, filter, head, union)
@@ -53,8 +53,7 @@ import Effect.Aff.AVar (tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Exception (error)
-import Foreign (Foreign)
-import Foreign.Object (empty, fromFoldable, singleton, Object)
+import Foreign.Object (empty, fromFoldable, singleton)
 import JS.Iterable (toArray)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
@@ -64,11 +63,11 @@ import Perspectives.Assignment.Update (withAuthoringRole)
 import Perspectives.Authenticate (getMyPublicKey)
 import Perspectives.ContextAndRole (changeRol_isMe, context_id, rol_id)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MonadPerspectives, MonadPerspectivesTransaction, (##=))
-import Perspectives.Couchdb (DatabaseName, DeleteCouchdbDocument(..), SecurityDocument(..))
+import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (addAttachments, getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -84,13 +83,13 @@ import Perspectives.ModelDependencies as DEP
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DesignDocument(..), MonadPouchdb, addDocument_, deleteDatabase, getAttachment, getDocument, getViewOnDatabase, splitRepositoryFileUrl, tryGetDocument_, withDatabase, Keys(..))
-import Perspectives.Persistence.API (addAttachment, deleteDocument, documentsInDatabase, excludeDocs) as Persistence
+import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs) as Persistence
 import Perspectives.Persistence.Authentication (addCredentials) as Authentication
 import Perspectives.Persistence.CouchdbFunctions (addRoleToUser, concatenatePathSegments, removeRoleFromUser)
 import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
-import Perspectives.Persistent (entitiesDatabaseName, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectContext, tryGetPerspectEntiteit)
+import Perspectives.Persistent (entitiesDatabaseName, forceSaveDomeinFile, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectContext, tryGetPerspectEntiteit)
 import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
@@ -203,14 +202,12 @@ updateModel arrWithModelName arrWithDependencies _ = try
           (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
-              -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
       forWithIndex_ upstreamAutomaticEffects
         \domainName automaticEffects -> do
           (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
             handleDomeinFileError "updateModel'"
             \(DomeinFile dfr) -> do
-              -- Here we must take care to preserve the screens.js attachment.
               lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
       -- Clear the caches of compiled states.
       void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
@@ -310,7 +307,6 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
       (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications addDownStreamNotification) dfr))
 
   -- Distribute upstream automatic effects over the other domains.
@@ -319,32 +315,16 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
       (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
         handleDomeinFileError "addModelToLocalStore'"
         \(DomeinFile dfr) -> do
-          -- Here we must take care to preserve the screens.js attachment.
           lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
 
   -- Add all attachments.
   dbName <- lift modelsDatabaseName
   -- First make sure the DomeinFile has been saved:
-  lift $ saveMarkedResources
+  lift $ forceSaveDomeinFile id
   (DomeinFile {_rev}) <- lift $ getDomeinFile id
   void $ lift $ execStateT (addAttachments dbName unversionedDocumentName attachments) _rev
   -- Now uncache the DomeinFile, as it no longer holds the right revision, neither has the attachments.
   lift $ decache id
-
-  where
-    -- As each attachment that we add will bump the document version, we have to catch it and use it on the
-    -- next attachment.
-    addAttachments :: String -> String -> Object (Tuple MediaType (Maybe Foreign)) -> StateT Revision_ MonadPerspectives Unit
-    addAttachments documentUrl documentName attachments = do 
-      forWithIndex_ 
-        attachments 
-        (\attName (Tuple mimetype mattachment) -> do 
-          case mattachment of
-            Nothing -> pure unit
-            Just attachment -> do
-              newRev <- get
-              DeleteCouchdbDocument {rev} <- lift $ Persistence.addAttachment documentUrl documentName newRev attName attachment mimetype
-              put rev)
 
 createInitialInstances :: String -> String -> String -> String -> Maybe RoleInstance -> MonadPerspectivesTransaction Unit
 createInitialInstances unversionedModelname versionedModelName patch build versionedModelManifest = do

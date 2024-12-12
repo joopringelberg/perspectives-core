@@ -45,7 +45,9 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
+import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Assignment.Update (addProperty, addRoleInstanceToContext, deleteProperty, moveRoleInstanceToAnotherContext, removeProperty, setProperty)
 import Perspectives.Authenticate (deserializeJWK, tryGetPublicKey, verifyDelta, verifyDelta')
 import Perspectives.Checking.Authorization (roleHasPerspectiveOnExternalRoleWithVerbs, roleHasPerspectiveOnPropertyWithVerb, roleHasPerspectiveOnRoleWithVerb)
@@ -58,17 +60,17 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, typeUri2LocalName_, typeUri2ModelUri_)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.Builders (lookupOrCreateContextInstance, lookupOrCreateRoleInstance)
+import Perspectives.Instances.Builders (lookupOrCreateContextInstance, lookupOrCreateRoleInstance, createAndAddRoleInstance)
 import Perspectives.Instances.ObjectGetters (getProperty, roleType)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
-import Perspectives.Persistence.API (getAttachment, getDocument)
-import Perspectives.Persistent (addAttachment, entityExists, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
+import Perspectives.Persistence.API (getAttachment)
+import Perspectives.Persistent (addAttachment, entityExists, forceSaveRole, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
-import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity, overwriteEntity)
+import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
-import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType)
+import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
@@ -76,7 +78,7 @@ import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (PublicKeyInfo)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublic, roleAspectsClosure)
+import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublic, roleAspectsClosure, publicUserRole)
 import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
 import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 import Simple.JSON (readJSON')
@@ -174,21 +176,14 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
                 Just val -> case parsePerspectivesFile (unwrap val) of
                   Left e -> pure unit
                   Right rec -> do 
+                    -- First make sure the cached and saved role are the same and that the role is not waiting to be saved
+                    lift $ forceSaveRole id
                     success <- lift $ addAttachment id (typeUri2LocalName_ (unwrap property)) att (MediaType rec.mimeType)
                     if success
                       then do
                         -- The revision on the cached version is no longer valid.
                         -- Neither does it have the new attachment info.
                         void $ lift $ removeInternally id
-                        -- Retrieve again so it includes the new attachment info and revision.
-                        -- But, because replication from the write database to the read database takes some time,
-                        -- if we were to retrieve from the write database, we are likely to retrieve the previous version,
-                        -- with neither attachments nor updated revision.
-                        -- So we read from the write database.
-                        {database:rdb, documentName:rdn} <- lift $ resourceIdentifier2WriteDocLocator (unwrap id)
-                        roleInstance :: PerspectRol <- lift $ getDocument rdb rdn
-                        -- save version in cache. If we use cacheEntity, the revision will not be overwritten!
-                        lift $ void $ overwriteEntity id roleInstance
                       else throwError (error ("Could not save file in the database"))
 
         else pure unit
@@ -229,6 +224,15 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                   , states = [StateIdentifier $ unwrap contextType]
                   })
               lift $ void $ saveEntiteit_ id contextInstance
+
+              -- If the context type has a public role, create an instance of its proxy.
+              publicRoles <- lift $ (contextType ###= publicUserRole)
+              publicRoleInstances <- catMaybes <$> for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
+                \t -> createAndAddRoleInstance 
+                  t 
+                  (unwrap id)
+                  (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+
               (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
               addCreatedContextToTransaction id
             else pure unit

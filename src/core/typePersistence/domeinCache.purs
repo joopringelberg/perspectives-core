@@ -25,28 +25,37 @@ module Perspectives.DomeinCache
 
 where
 
+import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Except (throwError)
+import Control.Monad.State (StateT, execStateT, get, put) as State
 import Data.Array (head)
 import Data.Foldable (for_)
+import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
+import Data.TraversableWithIndex (traverseWithIndex)
+import Data.Tuple (Tuple(..))
+import Decacheable (decache)
 import Effect.Aff.AVar (AVar, put, take)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
-import Foreign.Object (insert, lookup)
+import Foreign (Foreign)
+import Foreign.Object (Object, empty, insert, lookup)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, retrieveInternally)
+import Perspectives.Couchdb (DeleteCouchdbDocument(..))
+import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (DomeinFileName, buitenRol, deconstructBuitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.ModelDependencies (build, patch, versionToInstall)
-import Perspectives.Persistence.API (getAttachment, tryGetDocument)
-import Perspectives.Persistent (addAttachment, getPerspectRol, removeEntiteit, saveEntiteit, saveMarkedResources, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
+import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
+import Perspectives.Persistent (forceSaveDomeinFile, getPerspectRol, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
 import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.Cacheable (cacheEntity)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, setRevision)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value)
 import Perspectives.Representation.State (State(..))
@@ -184,18 +193,35 @@ storeDomeinFileInCouchdb df@(DomeinFile dfr@{id}) = do
   void $ storeDomeinFileInCache id df
   saveCachedDomeinFile id
 
+-- | Guarantees a correct revision.
 storeDomeinFileInCouchdbPreservingAttachments :: DomeinFile -> MonadPerspectives Unit
-storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{id}) = do
+storeDomeinFileInCouchdbPreservingAttachments df@(DomeinFile dfr@{id, _attachments}) = do
   {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl (unwrap id)
-  mAttachment <- getAttachment repositoryUrl documentName "screens.js"
+  attachments <- case _attachments of
+    Nothing -> pure empty
+    Just atts ->  traverseWithIndex
+      (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment repositoryUrl documentName attName)
+      atts
   void $ storeDomeinFileInCache id df
-
   (DomeinFile {_rev}) <- saveCachedDomeinFile id
   -- Unless we actually store in the database, adding attachments will go wrong.
-  saveMarkedResources
-  case mAttachment of
-    Nothing -> saveMarkedResources
-    Just attachment -> void $ addAttachment id "screens.js" attachment (MediaType "text/ecmascript")
+  forceSaveDomeinFile id
+  newRev <- State.execStateT (addAttachments repositoryUrl documentName attachments) _rev
+  setRevision id newRev
+  
+-- As each attachment that we add will bump the document version, we have to catch it and use it on the
+-- next attachment.
+addAttachments :: String -> String -> Object (Tuple MediaType (Maybe Foreign)) -> State.StateT Revision_ MonadPerspectives Unit
+addAttachments documentUrl documentName attachments = do 
+  forWithIndex_
+    attachments 
+    (\attName (Tuple mimetype mattachment) -> do 
+      case mattachment of
+        Nothing -> pure unit
+        Just attachment -> do
+          newRev <- State.get
+          DeleteCouchdbDocument {rev} <- lift $ addAttachment documentUrl documentName newRev attName attachment mimetype
+          State.put rev)
 
 -- | Remove the file from couchb. Removes the model from cache.
 removeDomeinFileFromCouchdb :: DomeinFileName -> MonadPerspectives Unit

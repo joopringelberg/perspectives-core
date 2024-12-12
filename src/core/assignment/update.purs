@@ -503,7 +503,7 @@ setProperty rids propertyName mdelta values = do
             Nothing -> pure unit
             Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
                 handlePerspectRolError
-                "deleteProperty"
+                "setProperty"
                 \(pe@(PerspectRol{properties, pspType})) -> do
                   users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
                   -- Create a delta for all values.

@@ -56,6 +56,7 @@ decache_ id = entityIsInDatabase id >>= if _
       -- Even though the entity is in the database, we have lined it up to be saved which 
       -- at least suggests it has been changed in cache wrt the database version.
       then pure unit
+      -- Remove the AVar from cache; not merely empty it.
       else void $ removeInternally id
   else pure unit
 

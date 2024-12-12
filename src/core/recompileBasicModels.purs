@@ -90,7 +90,6 @@ recompileModelsAtUrl modelsDb manifestsDb = do
           Right (Tuple df@(DomeinFile dfr@{id}) invertedQueries) -> lift $ lift do
             log $  "Recompiled '" <> namespace <> "' succesfully (" <> namespace <> ")!"
 
-            -- storeDomeinFileInCouchdbPreservingAttachments df
             mscreensAttachment <- getAttachment modelsDb _id "screens.js"
             _rev' <- addDocument modelsDb (setRevision _rev (DomeinFile dfr {_id = _id})) namespace
             case mscreensAttachment of 
@@ -130,7 +129,6 @@ recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
             (try $ getDomeinFile (DomeinFileId domainName)) >>=
               handleDomeinFileError "addModelToLocalStore'"
               \(DomeinFile dfr) -> do
-                -- Here we must take care to preserve the screens.js attachment.
                 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications addDownStreamNotification) dfr))
         -- Distribute upstream automatic effects over the other domains.
         forWithIndex_ upstreamAutomaticEffects
@@ -138,7 +136,6 @@ recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
             (try $ getDomeinFile (DomeinFileId domainName)) >>=
               handleDomeinFileError "addModelToLocalStore'"
               \(DomeinFile dfr) -> do
-                -- Here we must take care to preserve the screens.js attachment.
                 (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects addDownStreamAutomaticEffect) dfr))
     pure model
 

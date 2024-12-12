@@ -50,6 +50,9 @@ module Perspectives.Persistent
   , saveEntiteit
   , saveEntiteit_
   , saveMarkedResources
+  , forceSaveRole
+  , forceSaveDomeinFile
+  , forceSaveContext
   , tryGetPerspectContext
   , tryGetPerspectEntiteit
   , tryGetPerspectRol
@@ -86,7 +89,7 @@ import Perspectives.Persistence.API (AttachmentName, AuthoritySource(..), MonadP
 import Perspectives.Persistence.API (addAttachment) as P
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.PerspectivesState (getMissingResource)
-import Perspectives.Representation.Class.Cacheable (Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache)
+import Perspectives.Representation.Class.Cacheable (Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache, tryTakeEntiteitFromCache)
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
@@ -254,7 +257,27 @@ saveEntiteit__ entId mentiteit = do
       -- The version might be updated in the caching process.
       liftAff $ read a'
 
--- | This is the only function that removes items from `entitiesToBeStored`.
+forceSaveRole :: RoleInstance -> MonadPerspectives Unit
+forceSaveRole rid = forceSaveEntiteit (Rle rid) rid
+
+forceSaveContext :: ContextInstance -> MonadPerspectives Unit
+forceSaveContext cid = forceSaveEntiteit (Ctxt cid) cid
+
+forceSaveDomeinFile :: DomeinFileId -> MonadPerspectives Unit
+forceSaveDomeinFile dfid = forceSaveEntiteit (Dfile dfid) dfid
+
+-- | Guarantees that
+-- | There is no entity in cache or if it is, it is equal to the entity in the database, and
+-- | The entity is not waiting to be saved.
+forceSaveEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => ResourceToBeStored -> i -> MonadPerspectives Unit
+forceSaveEntiteit r entId = do 
+  mentiteit <- tryTakeEntiteitFromCache entId
+  case mentiteit of 
+    Nothing -> modify \s -> s {entitiesToBeStored = delete r s.entitiesToBeStored}
+    Just entiteit -> void $ saveCachedEntiteit r entId
+  
+
+-- | All items will be removed from `entitiesToBeStored`, whether succesfully stored or not..
 saveMarkedResources :: MonadPerspectives Unit
 saveMarkedResources = do 
   (toBeSaved :: Array ResourceToBeStored) <- gets _.entitiesToBeStored
@@ -267,6 +290,8 @@ saveMarkedResources = do
 
 -- | Assumes the entity a has been cached. 
 -- | In case saving the resource fails, the cache is left intact.
+-- | If the entity is not in cache, it remains in the queue waiting to be saved (it may arrive from a peer).
+-- | This is the only function that removes items from `entitiesToBeStored`.
 saveCachedEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => ResourceToBeStored -> i -> MonadPerspectives a
 saveCachedEntiteit r entId = do 
   entiteit <- takeEntiteitFromCache entId
