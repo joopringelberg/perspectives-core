@@ -23,7 +23,7 @@
 module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
-import Control.Monad.Error.Class (catchError, throwError, try)
+import Control.Monad.Error.Class (catchError, throwError, try) 
 import Control.Monad.Reader (lift)
 import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
@@ -837,7 +837,7 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
             pure [roleWithPropertyValue']
           else do 
             computeProperties [(singletonPath (R roleWithPropertyValue'))] (filterKeys (\k -> isJust $ elemIndex k [ENP property, ENP replacementProperty]) statesPerProperty) cwus'
-            pure $ concat (snd <$> cwus)
+            pure $ concat (snd <$> cwus)  -- Should this not be cwus'??
   
   where 
     -- It must be a perspective on the right property! 
@@ -846,6 +846,19 @@ addDeltasForPropertyChange roleWithPropertyValue property replacementProperty = 
       then (isJust $ lookup (ENP property) statesPerProperty) || (isJust $ lookup (ENP replacementProperty) statesPerProperty)
       else false
 
+-- | Compiles both the backwards and forwards functions of an `InvertedQuery`.
+-- | If the backwards function is already compiled, it returns the original `InvertedQuery`.
+-- | Otherwise, it attempts to compile both the backwards and forwards functions.
+-- | If the backwards function cannot be compiled, it logs an error.
+-- |
+-- | Parameters:
+-- | - `ac`: The `InvertedQuery` to be compiled.
+-- |
+-- | Returns:
+-- | - The `InvertedQuery` with the compiled backwards and forwards functions.
+-- |
+-- | Errors:
+-- | - Logs an error if the backwards function cannot be compiled.
 compileBoth :: InvertedQuery -> MP InvertedQuery
 compileBoth ac@(InvertedQuery iqr@{description, backwardsCompiled, forwardsCompiled}) = case backwardsCompiled of
   Just c -> pure ac

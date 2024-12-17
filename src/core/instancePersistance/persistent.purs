@@ -89,7 +89,7 @@ import Perspectives.Persistence.API (AttachmentName, AuthoritySource(..), MonadP
 import Perspectives.Persistence.API (addAttachment) as P
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.PerspectivesState (getMissingResource)
-import Perspectives.Representation.Class.Cacheable (Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache, tryTakeEntiteitFromCache)
+import Perspectives.Representation.Class.Cacheable (Revision_, cacheEntity, changeRevision, readEntiteitFromCache, rev, setRevision, takeEntiteitFromCache, tryReadEntiteitFromCache)
 import Perspectives.Representation.Class.Identifiable (identifier, identifier_)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
@@ -271,7 +271,7 @@ forceSaveDomeinFile dfid = forceSaveEntiteit (Dfile dfid) dfid
 -- | The entity is not waiting to be saved.
 forceSaveEntiteit :: forall a i. Attachment a => WriteForeign a => Persistent a i => ResourceToBeStored -> i -> MonadPerspectives Unit
 forceSaveEntiteit r entId = do 
-  mentiteit <- tryTakeEntiteitFromCache entId
+  mentiteit <- tryReadEntiteitFromCache entId
   case mentiteit of 
     Nothing -> modify \s -> s {entitiesToBeStored = delete r s.entitiesToBeStored}
     Just entiteit -> void $ saveCachedEntiteit r entId

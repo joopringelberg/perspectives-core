@@ -481,7 +481,6 @@ deleteProperty rids propertyName mdelta = case ARR.head rids of
 -- | RULE TRIGGERING
 -- | QUERY UPDATES
 -- | CURRENTUSER: there can be no change to the current user.
--- TODO. #26 Implement setProperty natively (not as delete- and addProperty)
 setProperty :: Array RoleInstance -> EnumeratedPropertyType -> Maybe SignedDelta -> (Updater (Array Value))
 setProperty rids propertyName mdelta values = do
   rids' <- filterA hasDifferentValues rids
