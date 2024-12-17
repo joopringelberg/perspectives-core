@@ -1,7 +1,7 @@
 perspectives-core
 ======================
 
-The core provides the middleware between Couchd and clients. It is used in the browser in InPlace, where it runs in a SharedService.
+The core provides the middleware between Couchd and clients. It is used in the browser in MyContexts, where it runs in a SharedService.
 
 ### Setting up
 Follow these steps to set up your development environment.
@@ -50,19 +50,15 @@ To compile the .purs source files, run:
   $ spago build
 ```
 
-Execute this command to combine the sources into a bundle, as it is used by InPlace:
+Execute this command to combine the sources into a bundle, as it is used by MyContexts:
 
 ```
 npm run build
 ```
 (which just calls `webpack`)
 
-### Develop for InPlace
-The PDR forms the base of InPlace. To make changes to the PDR effective in InPlace, you will have to build both 
-*  the [SharedWorker](https://github.com/joopringelberg/perspectives-sharedworker) package with the new PDR and 
-*  [InPlace](https://github.com/joopringelberg/inplace) with the new SharedWorker.
-
-Assuming you've set up your working environment with Symlinks (see below), just run `npm build` in the former and `npm builddevelopment` (or production) in the latter package's root directory.
+### Develop for MyContexts
+The PDR forms the base of MyContexts. To make changes to the PDR effective in MyContexts, you will have publish the new PDR to https://mycontexts.com (or https://mycontexts.com/remotetest for testing). There is a script in the package.json to do the latter: `copyCore`. You will be prompted for a password on the server.
 
 ### Program documentation
 The source files have many annotations. Moreover, the compiler can generate standard documentation from the types in the sources. The entrance point to this documentation is [here](https://joopringelberg.github.io/perspectives-core/Perspectives.Docu.Main.html#t:x).
@@ -83,14 +79,9 @@ __NOTE__ do not use the `pulp docs` command. It [generates documentation](https:
 2. outcomment the `path` section;
 3. incomment the `git` and `ref` sections.
 3. Repeat this for: `purescript-avar-monadask`, `purescript-lru-cache`, `purescript-parsing`, `perspectives-utilities`, `serialisable-nonempty-arrays`, `purescript-subtlecrypto`.
-4. In package.template.json: update the version of `perspectives-proxy`;
+4. In package.json: update the version of `perspectives-proxy`;
 4. increase the package number.
 5. Commit.
 6. Create tag.
 7. Push tag.
 8. In spago.yaml: switch back to the local versions.
-
-## Adding new dependencies
-When you add a new dependency with npm and use the --save or --save-dev flag, it will be registered in the `package.json` file. **However**, the next time you run `bumpVersions.sh`, these additions will be lost **unless** you add the new dependency manually to the `package.template.json` file, too.
-
-More rare is the occasion that a new Purescript dependency is added, for a package that is part of the Perspectives project. In that case, adapt the packages.template.dhall file.
