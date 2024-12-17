@@ -4,3 +4,5 @@
 import * as proxy from "perspectives-proxy";
 export const createRequestEmitterImpl = proxy.createRequestEmitterImpl;
 export const retrieveRequestEmitterImpl = proxy.retrieveRequestEmitterImpl
+
+export const internalChannelPromise = proxy.InternalChannelPromise;

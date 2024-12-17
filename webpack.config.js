@@ -4,11 +4,10 @@
 const path = require("path");
 const webpack = require('webpack');
 
-module.exports = function(env)
-  {
-    const {target} = env;
-    return {
-    entry: path.join(__dirname, "output/Main/index.js" ),
+module.exports = function(env) {
+  const { target } = env;
+  return {
+    entry: path.join(__dirname, "output/Main/index.js"),
     output: {
       library: "perspectives-core",
       libraryTarget: "umd",
@@ -21,11 +20,19 @@ module.exports = function(env)
     watch: false,
     mode: env.target,
     target: "webworker",
+    devtool: 'source-map',
     module: {
       rules: [
         {
           test: /\.arc/,
           type: 'asset/source'
+        },
+        {
+          test: /\.js$/,
+          enforce: 'pre',
+          use: ['source-map-loader'],
+          include: path.resolve(__dirname, 'output'),
+          exclude: /node_modules/ // Exclude node_modules from source map processing
         }
       ]
     },
@@ -33,12 +40,10 @@ module.exports = function(env)
       new webpack.DefinePlugin({
         __PDRVersion__: JSON.stringify(require("./package.json").version),
         __MYCONTEXTS__: '"https://mycontexts.com/"'
-      })        
-      ],
+      })
+    ],
     externals: {
-      "perspectives-proxy": "umd perspectives-proxy",
-      // "pouchdb": "umd pouchdb",
       "eventsource": 'commonjs eventsource'
     }
-  }
+  };
 };

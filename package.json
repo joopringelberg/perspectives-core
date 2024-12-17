@@ -28,10 +28,12 @@
     "builddevelopment": "webpack --env target=development",
     "symlinks": "./createPerspectivesLinks.sh",
     "docs": "./gendocs.sh",
-    "stats": "webpack --json > stats.json"
+    "stats": "webpack --json > stats.json",
+    "copyCore": "scp -r ./dist/* joop@inplace.works:/var/www/mycontexts.com/remotetest"
   },
   "devDependencies": {
     "webpack": "^5.95.0",
-    "webpack-cli": "^5.1.4"
+    "webpack-cli": "^5.1.4",
+    "source-map-loader": "^5.0.0"
   }
 }

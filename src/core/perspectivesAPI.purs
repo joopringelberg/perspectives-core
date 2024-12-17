@@ -25,7 +25,7 @@ module Perspectives.Api where
 -- import Control.Aff.Sockets (ConnectionProcess, connectionConsumer, connectionProducer, dataProducer, defaultTCPOptions, writeData)
 
 import Control.Coroutine (Consumer, Producer, await, runProcess, transform, ($$), ($~))
-import Control.Coroutine.Aff (Step(..), produce', Emitter)
+import Control.Coroutine.Aff (produce')
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Except (runExceptT)
 import Control.Monad.Rec.Class (forever)
@@ -41,7 +41,6 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (catchError, try)
 import Effect.Class (liftEffect)
-import Effect.Uncurried (EffectFn1, EffectFn3, runEffectFn1, runEffectFn3)
 import Foreign (Foreign, ForeignError, unsafeToForeign)
 import Foreign.Object (empty)
 import Partial.Unsafe (unsafePartial)
@@ -69,6 +68,7 @@ import Perspectives.Persistence.API (getAttachment, toFile)
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistent (getPerspectRol, saveMarkedResources)
 import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame)
+import Perspectives.Proxy (createRequestEmitter, retrieveRequestEmitter)
 import Perspectives.Query.UnsafeCompiler (getAllMyRoleTypes, getDynamicPropertyGetter, getDynamicPropertyGetterFromLocalName, getMeInRoleAndContext, getMyType, getPropertyFromTelescope, getPropertyValues, getPublicUrl, getRoleFunction, getRoleInstances)
 import Perspectives.Representation.ADT (ADT)
 import Perspectives.Representation.Action (Action(..)) as ACTION
@@ -92,28 +92,9 @@ import Prelude (Unit, bind, discard, eq, identity, map, negate, pure, show, unit
 import Simple.JSON (read, unsafeStringify, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
-
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL
 -----------------------------------------------------------
-foreign import createRequestEmitterImpl :: EffectFn3
-  (Foreign -> Step Foreign Unit)
-  (Unit -> Step Foreign Unit)
-  (Emitter Effect Foreign Unit)
-  Unit
-
--- createRequestEmitter :: Emitter Foreign Unit
-createRequestEmitter :: Emitter Effect Foreign Unit -> Effect Unit
-createRequestEmitter = runEffectFn3 createRequestEmitterImpl Emit Finish
-
-foreign import retrieveRequestEmitterImpl :: EffectFn1
-  (Emitter Effect Foreign Unit)
-  Unit
-
--- createRequestEmitter :: Emitter Foreign Unit
-retrieveRequestEmitter :: Emitter Effect Foreign Unit -> Effect Unit
-retrieveRequestEmitter = runEffectFn1 retrieveRequestEmitterImpl
-
 -- A Producer for Requests.
 requestProducer :: Producer Foreign (MonadPerspectives) Unit
 requestProducer = produce' createRequestEmitter

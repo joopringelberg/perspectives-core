@@ -25,6 +25,7 @@ where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Writer (runWriterT)
+import Control.Promise (Promise)
 import Data.Array (cons, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
@@ -45,12 +46,13 @@ import Foreign (Foreign)
 import Foreign.Object (fromFoldable, singleton)
 import IDBKeyVal (clear, idbSet)
 import Perspectives.AMQP.IncomingPost (retrieveBrokerService, incomingPost)
-import Perspectives.Api (resumeApi, setupApi)
+import Perspectives.Api (resumeApi, setupApi) as API
 import Perspectives.ApiTypes (PropertySerialization(..), RolSerialization(..))
 import Perspectives.Authenticate (getPrivateKey)
 import Perspectives.CoreTypes (IndexedResource(..), IntegrityFix(..), JustInTimeModelLoad(..), MonadPerspectives, MonadPerspectivesTransaction, PerspectivesState, RepeatingTransaction(..), RuntimeOptions, (##=), (##>>))
 import Perspectives.Couchdb (SecurityDocument(..))
 import Perspectives.DataUpgrade (runDataUpgrades)
+import Perspectives.DataUpgrade.RecompileLocalModels as RECOMPILE
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -70,8 +72,8 @@ import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, invertedQueryDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
+import Perspectives.Proxy (internalChannelPromise) as Proxy
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
-import Perspectives.DataUpgrade.RecompileLocalModels as RECOMPILE
 import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..))
@@ -186,7 +188,7 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
       (do 
         log "Starting the Perspectives API."
         -- The very first request will invoke detectPublicStateChanges.
-        runPerspectivesWithState setupApi state)
+        runPerspectivesWithState API.setupApi state)
       \e -> do
         logPerspectivesError $ Custom $ "API stopped because: " <> show e
         resumeRun state
@@ -195,7 +197,7 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
     resumeRun state = catchError 
       (do 
         log "Resuming the Perspectives API."
-        runPerspectivesWithState resumeApi state)
+        runPerspectivesWithState API.resumeApi state)
       \e -> do
         logPerspectivesError $ Custom $ "API stopped because: " <> show e
         resumeRun state
@@ -735,3 +737,6 @@ retrieveAllCredentials = do
     []
     roleInstances
   modify \s@{couchdbCredentials} -> s {couchdbCredentials = couchdbCredentials <> fromFoldable rows}
+
+internalChannelPromise :: Promise Foreign
+internalChannelPromise = Proxy.internalChannelPromise
