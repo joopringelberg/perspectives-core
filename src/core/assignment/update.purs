@@ -77,6 +77,7 @@ import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
@@ -317,6 +318,8 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
         Nothing -> pure unit
         Just (RoleProp propertyBearingInstance replacementProperty) -> (lift $ try $ getPerspectRol propertyBearingInstance) >>= handlePerspectRolError "addProperty"
           \(propertyBearingInstanceRole :: PerspectRol) -> do
+            -- Save the property values in the role instance. Do this now because it will affect computing the users.
+            lift $ void $ cacheEntity (identifier propertyBearingInstanceRole) (addRol_property propertyBearingInstanceRole replacementProperty values)
             -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
             -- Even when the property is Private or Local, we should do this, as the computation also triggers actions.
             users <- aisInPropertyDelta 
@@ -409,6 +412,7 @@ removeProperty rids propertyName mdelta values = case ARR.head rids of
         Just (RoleProp rid replacementProperty) -> (lift $ try $ getPerspectRol rid) >>=
           handlePerspectRolError "removeProperty"
           \(pe :: PerspectRol) -> do
+            -- Compute the peers first, because otherwise the query interpreter won't find the property values and thus won't find the peers.
             users <- aisInPropertyDelta rid' rid propertyName replacementProperty (rol_pspType pe)
             -- Create a delta for all values at once.
             signedDelta <- case mdelta of 
@@ -451,6 +455,7 @@ deleteProperty rids propertyName mdelta = case ARR.head rids of
             handlePerspectRolError
             "deleteProperty"
             \(pe@(PerspectRol{properties, pspType})) -> do
+              -- Compute the peers first, because otherwise the query interpreter won't find the property values and thus won't find the peers.
               users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
               -- Create a delta for all values.
               -- We must add the current values, otherwise a Transaction can only have a single 
@@ -504,6 +509,8 @@ setProperty rids propertyName mdelta values = do
                 handlePerspectRolError
                 "setProperty"
                 \(pe@(PerspectRol{properties, pspType})) -> do
+                  -- Save the property values in the role instance. Do this now because it will affect computing the users.
+                  lift $ void $ cacheEntity rid (setRol_property pe replacementProperty values)
                   users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
                   -- Create a delta for all values.
                   -- We must add the current values, otherwise a Transaction can only have a single 
@@ -524,11 +531,12 @@ setProperty rids propertyName mdelta values = do
                   -- Apply all changes to the role and then save it:
                   --  - change the property values in one go
                   --  - remove all propertyDeltas for this property.
+                  modifiedRole <- lift $ getPerspectRol rid
                   lift $ cacheAndSave 
                     rid 
                     (over PerspectRol 
                       (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const (fromFoldable (flip Tuple signedDelta <<< unwrap <$> values))) propertyDeltas}) 
-                      (setRol_property pe replacementProperty values))
+                      modifiedRole)
 
 
 -----------------------------------------------------------
@@ -547,8 +555,6 @@ saveFile r property arrayBuf mimeType = do
     Nothing -> pure $ RoleProp r property
     Just x -> pure x
   roleInstance :: PerspectRol <- lift $ getPerspectRol rid
-      -- Compute the users for this role (the property's value has no effect on this calculation). As a side effect, contexts are added to the transaction.
-  users <- aisInPropertyDelta r rid property replacementProperty (rol_pspType roleInstance)
   subject <- getSubject
   dbLoc <- lift $ databaseLocation $ unwrap rid
   {database, documentName} <- lift $ resourceIdentifier2DocLocator (unwrap rid)
@@ -588,8 +594,10 @@ saveFile r property arrayBuf mimeType = do
             , subject
             }
           signedDelta <- signDelta (writeJSON $ stripResourceSchemes delta)
-          addDelta (DeltaInTransaction { users, delta: signedDelta })
           setProperty [rid] replacementProperty Nothing [Value usedVal]
+          -- Compute the users for this role. As a side effect, contexts are added to the transaction.
+          users <- aisInPropertyDelta r rid property replacementProperty (rol_pspType roleInstance)
+          addDelta (DeltaInTransaction { users, delta: signedDelta })
           pure usedVal
         else throwError (error ("Could not save file in the database"))
 
