@@ -76,7 +76,7 @@ import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Role (kindOfRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleKind(..), RoleType(..), roletype2string)
-import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', guid)
+import Perspectives.ResourceIdentifiers (createResourceIdentifier, createResourceIdentifier', guid, isInPublicScheme)
 import Perspectives.SaveUserData (setFirstBinding)
 import Perspectives.Sync.DeltaInTransaction (DeltaInTransaction(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -129,13 +129,17 @@ constructContext mbindingRoleType c@(ContextSerialization{id, ctype, rollen, ext
           pure $ toArray (snd <$> rolInstances')
 
         lift $ lift $ void $ saveEntiteit contextInstanceId
-        -- If the context type has a public role, create an instance of its proxy.
-        publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
-        publicRoleInstances <- catMaybes <$> for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
-          \t -> lift $ createAndAddRoleInstance 
-            t 
-            (unwrap contextInstanceId) 
-            (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+        -- If the context type has a public role, create an instance of its proxy; but only when the contextId is not a public identifier.
+        -- Proxies are not created for public contexts, as they are not needed.
+        publicRoleInstances <- if isInPublicScheme (unwrap contextInstanceId)
+          then pure []
+          else do
+            publicRoles <- lift $ lift ((ContextType ctype) ###= publicUserRole)
+            catMaybes <$> for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
+              \t -> lift $ createAndAddRoleInstance 
+                t 
+                (unwrap contextInstanceId) 
+                (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
 
         -- Add a UniverseRoleDelta to the Transaction for the external role.
         -- As we've just constructed the context and its external role, no need to

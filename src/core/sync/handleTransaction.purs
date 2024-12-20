@@ -225,13 +225,17 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
                   })
               lift $ void $ saveEntiteit_ id contextInstance
 
-              -- If the context type has a public role, create an instance of its proxy.
-              publicRoles <- lift $ (contextType ###= publicUserRole)
-              publicRoleInstances <- catMaybes <$> for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
-                \t -> createAndAddRoleInstance 
-                  t 
-                  (unwrap id)
-                  (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
+              -- If the context type has a public role, create an instance of its proxy; but only when the contextId is not a public identifier.
+              -- Proxies are not created for public contexts, as they are not needed.
+              if isInPublicScheme (unwrap id)
+                then pure unit
+                else do
+                  publicRoles <- lift $ (contextType ###= publicUserRole)
+                  void $ for (EnumeratedRoleType <<< roletype2string <$> publicRoles)
+                    \t -> createAndAddRoleInstance 
+                      t 
+                      (unwrap id)
+                      (RolSerialization {id: Nothing, properties: PropertySerialization empty, binding: Nothing})
 
               (lift $ findRoleRequests (ContextInstance "def:AnyContext") (externalRoleType contextType)) >>= addCorrelationIdentifiersToTransactie
               addCreatedContextToTransaction id
