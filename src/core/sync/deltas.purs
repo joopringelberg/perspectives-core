@@ -82,7 +82,14 @@ distributeTransactie' t = do
 
 -- | If we have the visitor user, handle it by augmenting resources in the public store with the deltas.
 sendTransactie :: TransactionDestination -> TransactionForPeer -> MonadPerspectives (Maybe TransactionForPeer)
-sendTransactie (Peer perspectivesUser) t = sendTransactieToUserUsingAMQP perspectivesUser t *> pure Nothing
+-- Remove keys that are not required for the peer, given the deltas.
+-- Note that this is a suboptimal approach, as we would only have had to do this once for each user type.
+sendTransactie (Peer perspectivesUser) t = sendTransactieToUserUsingAMQP perspectivesUser (removeUnnecessaryKeys t) *> pure Nothing
+  where
+  removeUnnecessaryKeys :: TransactionForPeer -> TransactionForPeer
+  removeUnnecessaryKeys (TransactionForPeer rec@{deltas, publicKeys}) = let 
+    (occurringUsers :: Array PerspectivesUser) = map (_.author <<< unwrap) deltas
+    in TransactionForPeer rec {publicKeys = ENCMAP.filterKeys (\k -> isJust $ elemIndex k occurringUsers) publicKeys}
 sendTransactie (PublicDestination r) t = pure $ Just t
 
 -- | Send a transaction using the Couchdb Channel.

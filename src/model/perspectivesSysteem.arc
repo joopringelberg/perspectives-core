@@ -96,7 +96,7 @@ domain model://perspectives.domains#System
       -- The unique key provided to each new participant in the Perspectives Trusted Network by one of his peers.
       -- It can be used to store a limited number of media files in the perspectives sharedfile storage.
       -- PDRDEPENDENCY (actually, a MyContexts dependency)
-      property SharedFileServerKey (selfonly, String)
+      property SharedFileServerKey (String)
       state NoKey = (not HasKey) and (exists sys:SocialMe >> SharedFileServerKey)
         on entry
           do for Initializer
@@ -105,6 +105,7 @@ domain model://perspectives.domains#System
       property HasKey (Boolean)
 
       perspective on PerspectivesUsers
+        selfonly
         props (SharedFileServerKey, HasKey) verbs (Consult)
     
     user NonPerspectivesUsers (relational)

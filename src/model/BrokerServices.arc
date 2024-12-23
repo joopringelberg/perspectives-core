@@ -197,8 +197,7 @@ domain model://perspectives.domains#BrokerServices
         props (FirstName, LastName, HasKey) verbs (Consult)
       perspective on Accounts
         only (Create, Fill, CreateAndFill)
-      perspective on Accounts >> binding >> context >> AccountHolder
-        only (Create, Fill)
+      -- TODO: waarom dit perspectief?
       perspective on Accounts >> binding >> context >> Administrator
         only (Create, Fill)
       perspective on bs:MyBrokers >> PublicBrokers
