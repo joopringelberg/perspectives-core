@@ -104,7 +104,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- These credentials are only effective in the current session. 
       -- They are added (persistently) to CouchdbServer$Admin as soon as that role is filled. From then on,
       -- this installation can authenticate with the server at Url.
-      state AddCredentials = ((exists Url) and exists AdminPassword) and (exists AdminUserName) and not exists binding
+      state AddCredentials = (((exists Url) and exists CouchdbServers$CouchdbPort) and exists AdminPassword) and (exists AdminUserName) and not exists binding
         on entry
           do for Manager
             callEffect cdb:AddCredentials( Url, AdminUserName, AdminPassword )
@@ -118,7 +118,7 @@ domain model://perspectives.domains#CouchdbManagement
               letA 
                 couchdburl <- "http://localhost:" + CouchdbServers$CouchdbPort + "/"
               in 
-                callEffect cdb:CreateEntitiesDatabase( Url, "cw_servers_and_repositories" )
+                callEffect cdb:CreateEntitiesDatabase( Url, "cw_servers_and_repositories", Url >> callExternal util:Replace( "https://", "" ) returns String )
                 callEffect cdb:MakeDatabaseWriteProtected( Url, "cw_servers_and_repositories" )
                 callEffect cdb:MakeDatabasePublic( Url, "cw_servers_and_repositories" )
                 -- As the databases are now ready, we can create and publish the CouchdbServer.
@@ -134,6 +134,8 @@ domain model://perspectives.domains#CouchdbManagement
             AuthorizedDomain = Url for  binding >> context >> Admin     -- zet dit wel voor een nieuwe CouchdbServer$Admin. Password en eventueel SpecificUserName moet hij zelf zetten.
             Password = AdminPassword for binding >> context >> Admin
             SpecificUserName = AdminUserName for binding >> context >> Admin
+            -- Serverurl = Url for binding
+            -- CouchdbPort = CouchdbPort for binding
 
   -------------------------------------------------------------------------------
   ---- COUCHDBSERVER
@@ -157,7 +159,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- This covers the case we get a CouchdbServer that we did not create ourselves.
       -- If we do not refer to my indexed version of the CouchdbApp, this condition will fail because another user
       -- will have shared his App, too!
-      state AddReceivedServer = (not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin) and exists (filter context >> Admin with filledBy sys:SocialMe >> binding)
+      state AdminReceivesServer = (not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin) and exists (filter context >> Admin with filledBy sys:SocialMe >> binding)
         perspective of Admin 
           perspective on extern >> binder CouchdbServers
             -- selfonly
@@ -175,10 +177,22 @@ domain model://perspectives.domains#CouchdbManagement
               bind_ origin to server
               Url = ServerUrl for server
               CouchdbPort = CouchdbPort for server
-          do for Accounts
-            bind origin to CouchdbServers in cm:MyCouchdbApp
           notify Admin
             "You now have an account with CouchdbServer {Name}"
+
+      state AccountsReceivesServer = (not exists filter cm:MyCouchdbApp >> CouchdbServers with filledBy origin) and exists (filter context >> Accounts with filledBy sys:SocialMe >> binding)
+        perspective of Accounts 
+          perspective on extern >> binder CouchdbServers
+            only (Create, Fill)
+            props (Url, CouchdbServers$CouchdbPort) verbs (Consult, SetPropertyValue)
+        on entry
+          do for Accounts
+            letA
+              server <- create role CouchdbServers in cm:MyCouchdbApp
+            in 
+              bind_ origin to server
+              Url = ServerUrl for server
+              CouchdbPort = CouchdbPort for server
           notify Accounts
             "You now have an account with CouchdbServer {Name}"
 
@@ -416,7 +430,7 @@ domain model://perspectives.domains#CouchdbManagement
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readmodels )
               callEffect cdb:MakeDatabasePublic( baseurl, readmodels )
               -- instances
-              callEffect cdb:CreateEntitiesDatabase( baseurl, readinstances )
+              callEffect cdb:CreateEntitiesDatabase( baseurl, readinstances, Repositories$NameSpace )
               callEffect cdb:MakeDatabasePublic( baseurl, readinstances )
               callEffect cdb:MakeDatabaseWriteProtected( baseurl, readinstances )
               HasDatabases = true
@@ -558,9 +572,6 @@ domain model://perspectives.domains#CouchdbManagement
         -- WithCredentials$AuthorizedDomain
         -- As Admin, has a full perspective on Accounts.
 
-      action CreateManifest
-        create role Manifests
-
       -- If we fill Admin with a role that already has an AuthorizedDomain, we will still set AuthorizedDomain on the Admin role itself.
       state IsFilled = (exists binding) and (not AuthorizedDomain == context >> extern >> RepositoryUrl) and context >> extern >> RepoHasDatabases
         on entry
@@ -616,9 +627,9 @@ domain model://perspectives.domains#CouchdbManagement
       -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
-        only (Create, Fill, Delete, RemoveContext, DeleteContext)
+        only (Create, Fill, Delete, RemoveContext, DeleteContext, CreateAndFill)
         props (Description, LocalModelName) verbs (Consult)
-        props (DomeinFileName) verbs (SetPropertyValue)
+        props (DomeinFileName) verbs (SetPropertyValue, Consult)
         in object state NoLocalModelName
           props (LocalModelName) verbs (SetPropertyValue)
       
@@ -639,7 +650,7 @@ domain model://perspectives.domains#CouchdbManagement
             table Manifests
           row
             markdown <## Add a manifest
-                      Add a manifest by executing the action `CreateManifest` from the top toolbar.
+                      Add a manifest by clicking the `plus` button on the table toolbar.
                       Enter the *unqualified* name of the model in the column `LocalModelName`.
                       For the domain 'model://perspectives.domains#System' for example, this is 'System'.
                      >
@@ -654,7 +665,7 @@ domain model://perspectives.domains#CouchdbManagement
     -- (and that role actually requires write access to models_RepositoryUrl), this is a convenient place to arrange that.
     user Authors (relational) filledBy CouchdbServer$Accounts
       aspect acc:Body$Accounts
-      state Filled = (exists binding) and not exists AuthorizedDomain
+      state Filled = (exists binding) and not AuthorizedDomain == context >> extern >> RepositoryUrl
         on entry
           do for ServerAdmin
             letA
@@ -663,25 +674,25 @@ domain model://perspectives.domains#CouchdbManagement
               AuthorizedDomain = context >> extern >> RepositoryUrl
               callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> ModelsDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
               callEffect cdb:MakeWritingMemberOf( serverurl, context >> extern >> InstancesDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
-        state Domain = exists AuthorizedDomain
-          on entry
-            do
-              callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
-        on exit
-          do for ServerAdmin
-            letA
-              serverurl <- context >> extern >> ServerUrl
-            in
-              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ModelsDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
-              callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> InstancesDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+      state Domain = exists AuthorizedDomain
+        on entry
+          do
+            callEffect cdb:AddCredentials( AuthorizedDomain, UserName, Password)
+      on exit
+        do for ServerAdmin
+          letA
+            serverurl <- context >> extern >> ServerUrl
+          in
+            callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> ModelsDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
+            callEffect cdb:RemoveAsWritingMemberOf( serverurl, context >> extern >> InstancesDatabase, UserName ) -- UserName is the ID of the PerspectivesSystem$User.
 
       perspective on External
         props (IsPublic, NameSpace_, RepositoryUrl) verbs (Consult)
 
       perspective on Manifests
-        only (Create, Fill, Delete, RemoveContext)
+        only (Create, Fill, Delete, RemoveContext, Remove)
         props (Description, LocalModelName) verbs (Consult)
-        props (DomeinFileName) verbs (SetPropertyValue)
+        props (DomeinFileName) verbs (SetPropertyValue, DeleteProperty)
         in object state NoLocalModelName
           props (LocalModelName) verbs (SetPropertyValue)
       
@@ -703,7 +714,7 @@ domain model://perspectives.domains#CouchdbManagement
             table Manifests
           row
             markdown <## Add a manifest
-                      Add a manifest by executing the action `CreateManifest` from the top toolbar.
+                      Add a manifest by clicking the `plus` button on the table toolbar.
                       Enter the *unqualified* name of the model in the column `LocalModelName`.
                       For the domain 'model://perspectives.domains#System' for example, this is 'System'.
                      >
@@ -847,6 +858,7 @@ domain model://perspectives.domains#CouchdbManagement
       perspective on extern
         props (Description, IsLibrary, VersionToInstall, DomeinFileName) verbs (Consult)
       -- NOTA BENE: betekent dit niet dat instanties van ModelsInUse gepubliceerd worden?
+      -- TODO: dubbel perspectief??
       perspective on sys:MySystem >> ModelsInUse
         only (Fill, Remove)
       perspective on sys:MySystem >> ModelsInUse

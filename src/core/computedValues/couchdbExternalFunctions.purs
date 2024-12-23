@@ -72,7 +72,7 @@ import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, ad
 import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (getFirstMatch, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
+import Perspectives.Identifiers (Namespace, getFirstMatch, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
@@ -514,10 +514,10 @@ createCouchdbDatabase databaseUrls databaseNames _ = try
   >>= handleExternalStatementError "model://perspectives.domains#CreateCouchdbDatabase"
 
 -- | Create a database with all views that are useful for retrieving role- and context instances
-createEntitiesDatabase  :: Array Url -> Array DatabaseName -> RoleInstance -> MonadPerspectivesTransaction Unit
-createEntitiesDatabase databaseUrls databaseNames _ = try
-  (case head databaseUrls, head databaseNames of
-    Just databaseUrl, Just databaseName -> do 
+createEntitiesDatabase  :: Array Url -> Array DatabaseName -> Array Namespace -> RoleInstance -> MonadPerspectivesTransaction Unit
+createEntitiesDatabase databaseUrls databaseNames namespaces _ = try
+  (case head databaseUrls, head databaseNames, head namespaces of
+    Just databaseUrl, Just databaseName, Just namespace -> do 
       dbName <- pure (databaseUrl <> databaseName)
       lift $ withDatabase (databaseUrl <> databaseName) 
         (\_ -> do
@@ -534,14 +534,14 @@ createEntitiesDatabase databaseUrls databaseNames _ = try
           )
       -- dbName is also the url that is provided in a "public Visitor at <location>" declaration.
       -- Hence we can use it to construct an instance of TheWorld in that database.
-      theworldid <- pure (ContextInstance $ "pub:" <> dbName <> "/#TheWorld")
+      theworldid <- pure (ContextInstance $ "pub:https://" <> namespace <> "/#TheWorld")
       mtheWorld <- lift $ tryGetPerspectContext theworldid
       case mtheWorld of 
         Nothing -> do 
           void $ runExceptT $ constructEmptyContext theworldid DEP.theWorld "TheWorld" (PropertySerialization empty) Nothing
           lift $ void $ saveEntiteit theworldid
         _ -> pure unit
-    _, _ -> pure unit)
+    _, _, _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#CreateEntitiesDatabase"
 
 
@@ -756,7 +756,7 @@ externalFunctions =
   [ 
   -- SERVERADMIN
     Tuple "model://perspectives.domains#Couchdb$CreateCouchdbDatabase" {func: unsafeCoerce createCouchdbDatabase, nArgs: 2, isFunctional: True, isEffect: true}
-  , Tuple "model://perspectives.domains#Couchdb$CreateEntitiesDatabase" {func: unsafeCoerce createEntitiesDatabase, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Couchdb$CreateEntitiesDatabase" {func: unsafeCoerce createEntitiesDatabase, nArgs: 3, isFunctional: True, isEffect: true}
   , Tuple "model://perspectives.domains#Couchdb$DeleteCouchdbDatabase" {func: unsafeCoerce deleteCouchdbDatabase, nArgs: 2, isFunctional: True, isEffect: true}
   , Tuple "model://perspectives.domains#Couchdb$CreateUser" {func: unsafeCoerce createUser, nArgs: 3, isFunctional: True, isEffect: true}
   , Tuple "model://perspectives.domains#Couchdb$DeleteUser" {func: unsafeCoerce deleteUser, nArgs: 2, isFunctional: True, isEffect: true}
