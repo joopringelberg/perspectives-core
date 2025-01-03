@@ -65,7 +65,7 @@ import Perspectives.DependencyTracking.Dependency (findIndexedContextNamesReques
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
 import Perspectives.Instances.CreateContext (constructEmptyContext)
 import Perspectives.Instances.CreateRole (constructEmptyRole)
-import Perspectives.Instances.ObjectGetters (isMe)
+import Perspectives.Instances.Me (isMe)
 import Perspectives.Names (expandDefaultNamespaces, getMySystem, lookupIndexedContext, lookupIndexedRole)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectRol, saveEntiteit, tryGetPerspectEntiteit)

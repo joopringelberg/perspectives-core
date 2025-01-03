@@ -46,13 +46,14 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (hasLocalName)
 import Perspectives.Instances.Combinators (exists')
+import Perspectives.Instances.Me (getMyType)
 import Perspectives.Instances.ObjectGetters (Filler_(..), context, contextType, filler2filledFromDatabase_, getActiveRoleStates, getActiveStates, roleType, roleType_)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistent (tryRemoveEntiteit)
 import Perspectives.PerspectivesState (addBinding, clearPublicRolesJustLoaded, getPublicRolesJustLoaded, pushFrame, restoreFrame, transactionFlag)
 import Perspectives.Query.QueryTypes (Calculation(..))
-import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances, getMyType)
+import Perspectives.Query.UnsafeCompiler (context2propertyValue, getCalculatedRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleStateCompiler (enteringRoleState, evaluateRoleState, exitingRoleState)
@@ -380,8 +381,6 @@ isGuestRole (CalculatedRoleType cr) = cr `hasLocalName` "Guest"
 
 exitContext :: Partial => ScheduledAssignment -> MonadPerspectivesTransaction Unit
 exitContext (ContextRemoval ctxt authorizedRole) = do
-  -- Adds a RemoveExternalRoleInstance to the current transaction.
-  stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
   states <- lift (ctxt ##= contextType >=> liftToInstanceLevel contextRootStates)
   if null states
     then pure unit
@@ -393,6 +392,9 @@ exitContext (ContextRemoval ctxt authorizedRole) = do
       catchError (void $ for states (exitingState ctxt))
         \e -> logPerspectivesError $ Custom ("Cannot exit state, because " <> show e)
       lift $ restoreFrame oldFrame
+  -- Adds a RemoveExternalRoleInstance to the current transaction.
+  -- Severes the link between the roles and their fillers.
+  stateEvaluationAndQueryUpdatesForContext ctxt authorizedRole
 
   
 recursivelyEvaluateStates :: MonadPerspectivesTransaction Unit
@@ -411,7 +413,7 @@ recursivelyEvaluateStates = do
     then pure unit
     else recursivelyEvaluateStates
 
-evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit
+evaluateStates :: Array StateEvaluation -> MonadPerspectivesTransaction Unit 
 evaluateStates stateEvaluations' =
   void $ for stateEvaluations' \s -> case s of
     ContextStateEvaluation stateId contextId -> do

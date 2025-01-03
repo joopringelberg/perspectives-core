@@ -26,16 +26,15 @@ import Prelude
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Trans.Class (lift)
 import Data.Array.NonEmpty (index)
-import Data.Map (Map, lookup)
+import Data.Map (lookup)
 import Data.Maybe (Maybe(..), maybe)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
-import Data.String.Regex.Unsafe (unsafeRegex) 
+import Data.String.Regex.Unsafe (unsafeRegex)
 import Effect.Class (liftEffect)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction, MonadPerspectives)
 import Perspectives.CoreTypes (StorageScheme(..)) as CT
 import Perspectives.Cuid2 (cuid2)
-import Perspectives.Identifiers (isUrl)
 import Perspectives.Persistence.State (getCouchdbBaseURL, getSystemIdentifier)
 import Perspectives.Persistence.Types (MonadPouchdb, Url)
 import Perspectives.Representation.TypeIdentifiers (ResourceType)
@@ -219,24 +218,6 @@ createPublicIdentifier :: String -> String -> ResourceIdentifier
 createPublicIdentifier url s = if isInPublicScheme s
   then s
   else "pub:" <> url <> "#" <> s
-
------------------------------------------------------------
--- ADD SCHEME TO IDENTIFIER
------------------------------------------------------------
--- | Add a storage scheme to an identifier based on the users own preferences.
--- | If no preference is available, use the Public scheme if the given identifier has the form of 
--- | an URL; make it a Default scheme otherwise
--- | This function will never create a resource identifier with the model: scheme.
-addSchemeToResourceIdentifier :: Map ResourceType CT.StorageScheme -> ResourceType -> String -> ResourceIdentifier
-addSchemeToResourceIdentifier map t s = if isInPublicScheme s
-  then s
-  else if isUrl s
-    then addPublicScheme s
-    else case lookup t map of
-      Nothing -> createDefaultIdentifier s
-      Just (CT.Default _) -> createDefaultIdentifier s
-      Just (CT.Local dbName) -> createLocalIdentifier dbName s
-      Just (CT.Remote url) -> createRemoteIdentifier url s
 
 -----------------------------------------------------------
 -- GET THE SCHEME

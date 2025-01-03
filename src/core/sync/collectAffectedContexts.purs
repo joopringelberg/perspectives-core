@@ -23,7 +23,7 @@
 module Perspectives.CollectAffectedContexts where
 
 import Control.Monad.AvarMonadAsk (modify) as AA
-import Control.Monad.Error.Class (catchError, throwError, try) 
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.Reader (lift)
 import Data.Array (concat, cons, difference, elemIndex, filter, filterA, foldM, head, nub, null, union)
 import Data.Array.NonEmpty (fromArray, singleton) as ANE
@@ -46,7 +46,8 @@ import Perspectives.Deltas (addDelta)
 import Perspectives.Error.Boundaries (handlePerspectContextError, handlePerspectRolError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.InstanceRepresentation (PerspectContext(..), PerspectRol(..))
-import Perspectives.Instances.ObjectGetters (allFillers, binding, context, context', contextIsInState, contextType, contextType_, getActiveRoleStates_, getFilledRoles, getRecursivelyAllFilledRoles, notIsMe, roleIsInState, roleType_)
+import Perspectives.Instances.Me (notIsMe)
+import Perspectives.Instances.ObjectGetters (allFillers, binding, context, context', contextIsInState, contextType, contextType_, getActiveRoleStates_, getFilledRoles, getRecursivelyAllFilledRoles, roleIsInState, roleType_)
 import Perspectives.Instances.ObjectGetters (context, contextType, roleType) as OG
 import Perspectives.InvertedQuery (InvertedQuery(..), QueryWithAKink(..), backwards, backwardsQueryResultsInContext, backwardsQueryResultsInRole, forwards, shouldResultInContextStateQuery, shouldResultInRoleStateQuery)
 import Perspectives.InvertedQuery.Storable (getContextQueries, getFilledQueries, getFillerQueries, getPropertyQueries, getRoleQueries)

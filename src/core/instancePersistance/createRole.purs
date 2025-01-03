@@ -47,8 +47,9 @@ import Perspectives.Representation.Class.PersistentType (StateIdentifier(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
+import Perspectives.StrippedDelta (stripResourceSchemes)
 import Perspectives.Types.ObjectGetters (roleAspectsClosure)
-import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
+import Perspectives.TypesForDeltas (UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (bind, discard, pure, void, ($))
 import Simple.JSON (writeJSON)
 

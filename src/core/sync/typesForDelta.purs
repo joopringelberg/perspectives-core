@@ -22,32 +22,19 @@
 
 module Perspectives.TypesForDeltas where
 
-import Control.Monad.AvarMonadAsk (gets)
 import Data.Eq (class Eq)
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
-import Data.Map (Map)
-import Data.Maybe (Maybe(..), maybe)
-import Data.Newtype (class Newtype, over, unwrap)
+import Data.Maybe (Maybe)
+import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import Data.Traversable (for_, traverse)
-import Decacheable (decache)
 import Foreign (unsafeToForeign)
-import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (MonadPerspectives, StorageScheme)
-import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl(..))
-import Perspectives.Instances.ObjectGetters (context', publicUrl)
-import Perspectives.Persistent (getPerspectContext, saveEntiteit)
-import Perspectives.Query.UnsafeCompiler (getPublicUrl)
-import Perspectives.Representation.Class.Cacheable (cacheEntity)
 import Perspectives.Representation.Class.EnumReadForeign (enumReadForeign)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value)
-import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, ResourceType(..), RoleType)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, stripNonPublicIdentifiers)
-import Perspectives.ResourceIdentifiers.Parser (ResourceIdentifier)
-import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray(..), toArray)
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value)
+import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType, RoleType)
+import Perspectives.SerializableNonEmptyArray (SerializableNonEmptyArray)
 import Perspectives.Utilities (class PrettyPrint, prettyPrint')
-import Prelude (class Ord, class Show, Unit, bind, discard, map, pure, show, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=))
+import Prelude (class Ord, class Show, show, (&&), (<<<), (<>), (==))
 import Simple.JSON (class ReadForeign, class WriteForeign)
 
 -----------------------------------------------------------
@@ -81,21 +68,6 @@ derive newtype instance WriteForeign UniverseContextDelta
 derive newtype instance ReadForeign UniverseContextDelta
 
 derive instance Ord UniverseContextDelta
-
-instance StrippedDelta UniverseContextDelta where
-  stripResourceSchemes (UniverseContextDelta r) = UniverseContextDelta r 
-    { id = over ContextInstance stripNonPublicIdentifiers r.id
-    }
-  addResourceSchemes storageSchemes (UniverseContextDelta r) =  UniverseContextDelta r 
-    { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
-    }
-  addPublicResourceScheme url (UniverseContextDelta r) = do
-    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.id) >>= getUrlForPublishing url <<< ContextInstance
-    rec <- pure r
-      { id = over ContextInstance (createPublicIdentifier curl) r.id
-      }
-    void $ decache rec.id
-    pure $ UniverseContextDelta rec
 
 -----------------------------------------------------------
 -- UNIVERSECONTEXTDELTATYPE
@@ -153,25 +125,6 @@ instance prettyPrintUniverseRoleDelta :: PrettyPrint UniverseRoleDelta where
 
 derive instance Ord UniverseRoleDelta
 
-instance StrippedDelta UniverseRoleDelta where
-  stripResourceSchemes (UniverseRoleDelta r) = UniverseRoleDelta r 
-    { id = over ContextInstance stripNonPublicIdentifiers r.id
-    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance stripNonPublicIdentifiers)) r.roleInstances
-    }
-  addResourceSchemes storageSchemes (UniverseRoleDelta r) =  UniverseRoleDelta r 
-    { id = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.id
-    , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)))) r.roleInstances
-    }
-  addPublicResourceScheme url (UniverseRoleDelta r) = do
-    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.id) >>= getUrlForPublishing url <<< ContextInstance
-    rec <- pure r
-      { id = over ContextInstance (createPublicIdentifier curl) r.id
-      , roleInstances = over SerializableNonEmptyArray (map (over RoleInstance (createPublicIdentifier curl))) r.roleInstances
-      }
-    void $ decache rec.id
-    for_ (toArray rec.roleInstances) decache
-    pure $ UniverseRoleDelta rec
-
 -----------------------------------------------------------
 -- UNIVERSEROLEDELTATYPE
 -----------------------------------------------------------
@@ -219,36 +172,6 @@ instance prettyPrintContextDelta :: PrettyPrint ContextDelta where
   prettyPrint' t (ContextDelta r) = "ContextDelta " <> prettyPrint' (t <> "  ") r
 
 derive instance Ord ContextDelta
-
-instance StrippedDelta ContextDelta where
-  stripResourceSchemes (ContextDelta r) = ContextDelta r 
-    { contextInstance = over ContextInstance stripNonPublicIdentifiers r.contextInstance
-    , roleInstance = over RoleInstance stripNonPublicIdentifiers r.roleInstance
-    , destinationContext = maybe Nothing (Just <<< (over ContextInstance stripNonPublicIdentifiers)) r.destinationContext
-    }
-  addResourceSchemes storageSchemes (ContextDelta r) =  ContextDelta r 
-    { contextInstance = over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType r.contextType)) r.contextInstance
-    , roleInstance = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.roleInstance
-    , destinationContext = unsafePartial case r.destinationContext, r.destinationContextType of
-        Just dc, Just dct -> Just $ over ContextInstance (addSchemeToResourceIdentifier storageSchemes (CType dct)) dc
-        _, _ -> Nothing
-    }
-  addPublicResourceScheme url (ContextDelta r) = do 
-    curl <- addOwnStorageScheme (CType r.contextType) (unwrap r.contextInstance) >>= getUrlForPublishing url <<< ContextInstance
-    durl <- case r.destinationContext, r.destinationContextType of 
-      Just dc, Just dctype -> Just <$> (addOwnStorageScheme (CType dctype) (unwrap dc) >>= getUrlForPublishing url <<< ContextInstance)
-      _, _ -> pure Nothing
-    rec <- pure $ r
-      { contextInstance = over ContextInstance (createPublicIdentifier curl) r.contextInstance
-      , roleInstance = over RoleInstance (createPublicIdentifier curl) r.roleInstance
-      , destinationContext = case r.destinationContext, durl of
-        Just (ContextInstance dc), Just url' -> Just (ContextInstance (createPublicIdentifier url' dc))
-        _, _ -> Nothing
-      }
-    void $ decache rec.contextInstance
-    void $ decache rec.roleInstance
-    void $ traverse decache rec.destinationContext
-    pure $ ContextDelta rec
 
 -----------------------------------------------------------
 -- CONTEXTDELTATYPE
@@ -304,35 +227,6 @@ instance prettyPrintRoleBindingDelta :: PrettyPrint RoleBindingDelta where
 
 derive instance Ord RoleBindingDelta
 
-instance StrippedDelta RoleBindingDelta where
-  stripResourceSchemes (RoleBindingDelta r) = RoleBindingDelta r 
-    { filled = over RoleInstance stripNonPublicIdentifiers r.filled
-    , filler = maybe Nothing (Just <<< (over RoleInstance stripNonPublicIdentifiers)) r.filler
-    , oldFiller = maybe Nothing (Just <<< (over RoleInstance stripNonPublicIdentifiers)) r.oldFiller
-    }
-  addResourceSchemes storageSchemes (RoleBindingDelta r) =  RoleBindingDelta r 
-    { filled = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.filledType)) r.filled
-    , filler = case r.filler, r.fillerType of
-        Just f, Just ft -> Just $ over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType ft)) f
-        _, _ -> Nothing
-    , oldFiller = unsafePartial case r.oldFiller, r.oldFillerType of
-        Just f, Just ft -> Just $ over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType ft)) f
-        _, _ -> Nothing
-    }
-  addPublicResourceScheme url (RoleBindingDelta r) = do
-    fillerUrl <- case r.filler, r.fillerType of 
-      Just f, Just ftype -> addOwnStorageScheme (RType ftype) (unwrap f) >>= context' <<< RoleInstance >>= getUrlForPublishing url
-      _, _ -> pure url 
-    filledUrl <- addOwnStorageScheme (RType r.filledType) (unwrap r.filled) >>= context' <<< RoleInstance >>= getUrlForPublishing url
-    rec <- pure $ r
-      { filled = over RoleInstance (createPublicIdentifier filledUrl) r.filled 
-      , filler = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier fillerUrl))) r.filler
-      , oldFiller = maybe Nothing (Just <<< (over RoleInstance (createPublicIdentifier fillerUrl))) r.oldFiller
-      }
-    void $ traverse decache rec.filler
-    void $ decache rec.filled
-    void $ traverse decache rec.oldFiller
-    pure $ RoleBindingDelta rec
   -----------------------------------------------------------
 -- ROLEBINDINGDELTATYPE
 -----------------------------------------------------------
@@ -382,21 +276,6 @@ instance prettyPrintRolePropertyDelta :: PrettyPrint RolePropertyDelta where
 
 derive instance Ord RolePropertyDelta
 
-instance StrippedDelta RolePropertyDelta where
-  stripResourceSchemes (RolePropertyDelta r) = RolePropertyDelta r 
-    { id = over RoleInstance stripNonPublicIdentifiers r.id
-    }
-  addResourceSchemes storageSchemes (RolePropertyDelta r) =  RolePropertyDelta r 
-    { id = over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType r.roleType)) r.id
-    }
-  addPublicResourceScheme url (RolePropertyDelta r) = do
-    ctxt <- addOwnStorageScheme (RType r.roleType) (unwrap r.id) >>= context' <<< RoleInstance
-    url' <- getUrlForPublishing url ctxt
-    rec <- pure r
-        { id = over RoleInstance (createPublicIdentifier url') r.id }
-    void $ decache rec.id
-    pure $ RolePropertyDelta rec
-
 -----------------------------------------------------------
 -- ROLEPROPERTYDELTATYPE
 -----------------------------------------------------------
@@ -415,45 +294,4 @@ instance prettyPrintRolePropertyDeltaType :: PrettyPrint RolePropertyDeltaType w
   prettyPrint' t = show
 
 derive instance Ord RolePropertyDeltaType
-
------------------------------------------------------------
--- STRIPPING RESOURCE IDENTIFIERS IN A DELTA
------------------------------------------------------------
-class StrippedDelta d where
-  stripResourceSchemes :: d -> d
-  addResourceSchemes :: Map ResourceType StorageScheme -> d -> d
-  addPublicResourceScheme :: String -> d -> MonadPerspectives d 
-
--- | Given a default value for the url, return the actual url that should be used to publish the context identifier.
--- | Stores a value for `publicUrl` in the context instance if it didn't have one (most likely the value NONE).
-getUrlForPublishing :: String -> ContextInstance -> MonadPerspectives String
-getUrlForPublishing defaultUrl cid =  publicUrl cid >>= case _ of 
-  Just NONE -> pure defaultUrl
-  Just (URL url) -> pure url
-  -- the context instance doesn't have a public url associated with it.
-  Nothing -> do
-    -- Now find the url of a public role in THE TYPE of the context instance.
-    murl <- getPublicUrl cid
-    case murl of
-      Nothing -> do
-        -- Save NONE in context instance.
-        setPublicUrl (Just NONE)
-        pure defaultUrl
-      Just url -> do 
-        -- save URL url in context instance
-        setPublicUrl (Just (URL url))
-        pure url
-  where 
-  -- | Stores the publicUrl with the context instance. Notice that we regard this to be a form of caching.
-  -- | As there is no DeltaType describing PublicUrls, they are not synchronized.
-  setPublicUrl :: (Maybe PublicUrl) -> MonadPerspectives Unit
-  setPublicUrl murl = do 
-    ctxt <- getPerspectContext cid
-    void $ cacheEntity cid ctxt
-    void $ saveEntiteit cid
-
-addOwnStorageScheme :: ResourceType -> String -> MonadPerspectives ResourceIdentifier
-addOwnStorageScheme rtype s = do 
-  storageSchemes <- gets _.typeToStorage
-  pure $ addSchemeToResourceIdentifier storageSchemes rtype s
 

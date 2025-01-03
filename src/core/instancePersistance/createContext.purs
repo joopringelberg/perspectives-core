@@ -24,8 +24,9 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.TypeIdentifiers (RoleType, externalRoleType)
 import Perspectives.ResourceIdentifiers (takeGuid)
 import Perspectives.SerializableNonEmptyArray (singleton) as SNEA
+import Perspectives.StrippedDelta (stripResourceSchemes)
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, roleAspectsClosure)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), stripResourceSchemes)
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (bind, discard, pure, unit, void, ($), (<$>), (<<<), (>>=))
 import Simple.JSON (writeJSON)
 

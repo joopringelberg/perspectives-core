@@ -72,14 +72,15 @@ import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cach
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
+import Perspectives.ResourceIdentifiers (createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
 import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
+import Perspectives.StrippedDelta (addPublicResourceScheme, addResourceSchemes, addSchemeToResourceIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.Sync.Transaction (PublicKeyInfo)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.Types.ObjectGetters (contextAspectsClosure, hasAspect, isPublic, roleAspectsClosure, publicUserRole)
-import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..), addPublicResourceScheme, addResourceSchemes)
+import Perspectives.TypesForDeltas (ContextDelta(..), ContextDeltaType(..), DeltaRecord, RoleBindingDelta(..), RoleBindingDeltaType(..), RolePropertyDelta(..), RolePropertyDeltaType(..), UniverseContextDelta(..), UniverseContextDeltaType(..), UniverseRoleDelta(..), UniverseRoleDeltaType(..))
 import Prelude (class Eq, class Ord, Unit, bind, compare, discard, flip, pure, show, unit, void, ($), (*>), (+), (<$>), (<<<), (<>), (==), (>>=))
 import Simple.JSON (readJSON')
 
@@ -160,7 +161,7 @@ executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, p
         then do
           -- Currently, the id is in the public scheme. Transform to the local scheme, so we can retrieve the attachment locally.
           storageSchemes <- lift $ gets _.typeToStorage
-          {database, documentName} <- lift $ resourceIdentifier2DocLocator $ (addSchemeToResourceIdentifier storageSchemes (RType roleType)) (takeGuid (unwrap id))
+          {database, documentName} <- lift $ (addSchemeToResourceIdentifier storageSchemes (RType roleType) (takeGuid (unwrap id)) >>= resourceIdentifier2DocLocator)
           -- Retrieve the attachment from the local version of the role. 
           -- Use the last segment of the property type as the attachments name.
           matt <- lift $ getAttachment database documentName (typeUri2LocalName_ (unwrap property))
@@ -423,15 +424,15 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
       storageSchemes <- lift $ gets _.typeToStorage
       catchError
         (case runExcept $ readJSON' stringifiedDelta of
-          Right d1 -> executeRolePropertyDelta (addResourceSchemes storageSchemes d1) s
+          Right d1 -> lift (addResourceSchemes storageSchemes d1) >>= flip executeRolePropertyDelta s
           Left _ -> case runExcept $ readJSON' stringifiedDelta of
-            Right d2 -> executeRoleBindingDelta (addResourceSchemes storageSchemes d2) s
+            Right d2 -> lift (addResourceSchemes storageSchemes d2) >>= flip executeRoleBindingDelta s
             Left _ -> case runExcept $ readJSON' stringifiedDelta of
-              Right d3 -> executeContextDelta (addResourceSchemes storageSchemes d3) s
+              Right d3 -> lift (addResourceSchemes storageSchemes d3) >>= flip executeContextDelta s
               Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                Right d4 -> executeUniverseRoleDelta ((addResourceSchemes storageSchemes d4)) s
+                Right d4 -> lift ((addResourceSchemes storageSchemes d4)) >>= flip executeUniverseRoleDelta s
                 Left _ -> case runExcept $ readJSON' stringifiedDelta of
-                  Right d5 -> executeUniverseContextDelta (addResourceSchemes storageSchemes d5) s
+                  Right d5 -> lift (addResourceSchemes storageSchemes d5) >>= flip executeUniverseContextDelta s
                   Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
         (\e -> liftEffect $ log (show e))
 

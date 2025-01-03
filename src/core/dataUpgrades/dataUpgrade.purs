@@ -66,7 +66,7 @@ type PDRVersion = String
 
 runDataUpgrades :: MonadPerspectives Unit 
 runDataUpgrades = do
-  -- Get the current version
+  -- Get the current PDR version
   mcurrentVersion <- liftAff $ idbGet "CurrentPDRVersion"
   (installedVersion :: String) <- case mcurrentVersion of
     Just installedVersion -> pure (unsafeCoerce installedVersion)
@@ -111,6 +111,9 @@ runDataUpgrades = do
     (void recompileLocalModels)
   runUpgrade installedVersion "0.26.5"
     (void recompileLocalModels)
+  runUpgrade installedVersion "0.26.6"
+    updateModels0266
+
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
   ----------------------------------------------------------------------------------------
@@ -121,9 +124,9 @@ runDataUpgrades = do
     else pure unit
 
 -- | Runs the upgrade iff
--- |    * the currently installed version is lower than the upgradeVersion argument
+-- |    * the currently installed PDR  version is lower than the upgradeVersion argument
 -- |    * AND
--- |    * the upgradeVersion argument is lower than or equal to the package version (the version in package.json)
+-- |    * the upgradeVersion argument is lower than or equal to the package version (pdrVersion: the version in package.json)
 runUpgrade :: PDRVersion -> PDRVersion -> MonadPerspectives Unit -> MonadPerspectives Unit
 runUpgrade installedVersion upgradeVersion upgrade = if installedVersion < upgradeVersion && upgradeVersion <= pdrVersion
   -- Run the upgrade
@@ -195,4 +198,13 @@ updateModels0260 = runMonadPerspectivesTransaction'
     updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BodiesWithAccounts@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#CouchdbManagement@3.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")
+
+updateModels0266 :: MonadPerspectives Unit
+updateModels0266 = runMonadPerspectivesTransaction'
+  false
+  (ENR $ EnumeratedRoleType sysUser)
+  do
+    updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#CouchdbManagement@6.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")

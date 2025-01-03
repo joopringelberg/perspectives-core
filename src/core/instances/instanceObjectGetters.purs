@@ -22,7 +22,6 @@
 
 module Perspectives.Instances.ObjectGetters where 
 
-import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (empty) as Plus
@@ -32,7 +31,7 @@ import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, lookup) as Map
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (class Newtype, ala, over, unwrap)
+import Data.Newtype (class Newtype, ala, unwrap)
 import Data.String.Regex (test)
 import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
@@ -46,7 +45,7 @@ import Foreign.Object (Object, empty, keys, lookup, values)
 import JS.Iterable (toArray)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_isMe, rol_properties, rol_pspType)
+import Perspectives.ContextAndRole (context_id, context_me, context_preferredUserRoleType, context_pspType, context_publicUrl, context_rolInContext, context_rolInContext_, rol_allTypes, rol_binding, rol_context, rol_gevuldeRol, rol_gevuldeRollen, rol_id, rol_properties, rol_pspType)
 import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, runMonadPerspectivesQuery, (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
@@ -59,7 +58,7 @@ import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
-import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol, tryGetPerspectRol)
+import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
 import Perspectives.PerspectivesState (contextCache, roleCache)
 import Perspectives.Query.QueryTypes (RoleInContext)
 import Perspectives.Representation.ADT (ADT(..))
@@ -70,10 +69,10 @@ import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
-import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), ResourceType(..), RoleKind(..), RoleType, StateIdentifier)
-import Perspectives.ResourceIdentifiers (addSchemeToResourceIdentifier, createDefaultIdentifier, isInPublicScheme, takeGuid)
+import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType, StateIdentifier)
+import Perspectives.ResourceIdentifiers (createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
-import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, not, pure, show, ($), (&&), (*>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>), (<#>))
+import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, pure, show, ($), (&&), (*>), (<#>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
 import Simple.JSON (readJSON)
 
 -----------------------------------------------------------
@@ -479,39 +478,6 @@ allRoleBinders r = ArrayT $ (lift $ try $ getPerspectRol r) >>=
           pure (vals <> vals'))
         []
         filledRoles
-
--- | `isMe` has an internal error boundary. On failure, it returns false.
--- | If the role instance is a public resource, checks the binding regardless of the value of member 'me'.
--- | This is because 'me' is a purely local optimization that is never synchronized, but this fails for 
--- | obvious reasons for public resources.
--- TODO. If the identifier is in the pub: scheme, try to find a local resource with the same GUID.
--- This involves getting the type of the role instance and looking up where I store its instances.
--- If found, apply isMe to it.
--- Otherwise return false.
--- We must do this because the public version will never have a useful version of 'isMe'. Neither will it 
--- bottom out in a role that has a value for 'isMe': it will be public roles all to the bottom.
-isMe :: RoleInstance -> MP Boolean
-isMe ri = if isInPublicScheme (unwrap ri)
-  then isPublicIdentifierMe ri
-  else tryGetPerspectRol ri >>= case _ of
-    Nothing -> pure false
-    Just rol -> if rol_isMe rol
-      then pure true
-      else case rol_binding rol of
-        Nothing -> pure false
-        Just b -> isMe b
-
--- | From a RoleInstance with an identifier in the public scheme, 
--- | lookup its type and use that to create a new schemed identifier.
--- | Then apply isMe.
-isPublicIdentifierMe :: RoleInstance -> MP Boolean
-isPublicIdentifierMe rid = do
-  t <- roleType_ rid
-  storageSchemes <- gets _.typeToStorage
-  isMe (over RoleInstance (addSchemeToResourceIdentifier storageSchemes (RType t) <<< takeGuid) rid)
-
-notIsMe :: RoleInstance -> MP Boolean
-notIsMe = isMe >=> pure <<< not
 
 type Filler = RoleInstance
 type Filled = RoleInstance

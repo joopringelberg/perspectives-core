@@ -27,7 +27,7 @@
 
 module Perspectives.Query.UnsafeCompiler where
 
-import Control.Alt (map, void, (<|>))
+import Control.Alt (void, (<|>))
 import Control.Alternative (guard)
 import Control.Monad.AvarMonadAsk (modify)
 import Control.Monad.Error.Class (catchError, throwError, try)
@@ -53,10 +53,10 @@ import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHi
 import Perspectives.HiddenFunction (HiddenFunction)
 import Perspectives.Identifiers (isExternalRole)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
-import Perspectives.Instances.Combinators (available_, exists, filter, logicalAnd, logicalOr, not, some)
-import Perspectives.Instances.Combinators (conjunction, filter, intersection, orElse) as Combinators
+import Perspectives.Instances.Combinators (available_, exists, logicalAnd, logicalOr, not)
+import Perspectives.Instances.Combinators (conjunction, intersection, orElse) as Combinators
 import Perspectives.Instances.Environment (_pushFrame)
-import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getMe, getPreferredUserRoleType, getProperty, getRecursivelyFilledRoles', getUnlinkedRoleInstances, indexedContextName, indexedRoleName, isMe, roleModelName, roleType, roleType_)
+import Perspectives.Instances.ObjectGetters (binding, binding_, context, contextModelName, contextType, contextType_, externalRole, filledByCombinator, filledByOperator, fillsCombinator, getActiveRoleStates_, getActiveStates_, getEnumeratedRoleInstances, getProperty, getRecursivelyFilledRoles', getUnlinkedRoleInstances, indexedContextName, indexedRoleName, roleModelName, roleType_)
 import Perspectives.Instances.Values (parseBool, parseNumber)
 import Perspectives.ModelDependencies (roleWithId)
 import Perspectives.Names (expandDefaultNamespaces, lookupIndexedContext, lookupIndexedRole)
@@ -81,7 +81,7 @@ import Perspectives.Representation.Range (Range(..)) as RAN
 import Perspectives.Representation.State (State(..), StateFulObject(..)) as STATE
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), CalculatedRoleType(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), PropertyType(..), RoleType(..), propertytype2string)
 import Perspectives.Time (string2Date, string2DateTime, string2Time)
-import Perspectives.Types.ObjectGetters (allRoleTypesInContext, calculatedUserRole, contextAspectsClosure, contextTypeModelName', enumeratedUserRole, isUnlinked_, propertyAliases, publicUserRole, roleTypeModelName', generalisesRoleType, userRole)
+import Perspectives.Types.ObjectGetters (allRoleTypesInContext, contextTypeModelName', generalisesRoleType, propertyAliases, publicUserRole, roleTypeModelName')
 import Perspectives.Utilities (prettyPrint)
 import Prelude (class Eq, class Ord, add, bind, const, discard, eq, flip, identity, mul, negate, notEq, pure, show, sub, ($), (&&), (*), (+), (-), (/), (<), (<$>), (<*>), (<<<), (<=), (<>), (==), (>), (>=), (>=>), (>>=), (||))
 import Unsafe.Coerce (unsafeCoerce)
@@ -1006,43 +1006,6 @@ bindingInContext cType adt r = ArrayT do
           pure (eq cType fillerContextType))
     fillers
 
--- | Preferrably returns the value of the type of 'me' of the context instance:
--- | this will be the enumerated role instance that is filled (ultimately) with sys:Me.
--- | Otherwise returns all Calculated roles that are ultimately filled with sys:Me.
--- | The Guest and Visitor conventions tap in here.
-getMyType :: ContextInstance ~~> RoleType
-getMyType ctxt = getPreferredUserRoleType ctxt
-  <|>
-  (getMe >=> map ENR <<< roleType) ctxt
-  <|>
-  -- NOTE: this is a safety measure that catches cases where the 'me' administration has gone wrong.
-  findMeInEnumeratedRoles ctxt
-  <|>
-  findMeInUnlinkedRoles ctxt
-  <|>
-  findMeInCalculatedRoles ctxt
-  where
-    findMeInEnumeratedRoles :: ContextInstance ~~> RoleType
-    findMeInEnumeratedRoles = (contextType >=> Combinators.filter (liftToInstanceLevel $ contextAspectsClosure >=> enumeratedUserRole) (computesMe ctxt))
-
-    findMeInCalculatedRoles :: ContextInstance ~~> RoleType
-    findMeInCalculatedRoles = (contextType >=> Combinators.filter (liftToInstanceLevel $ contextAspectsClosure >=> calculatedUserRole) (computesMe ctxt))
-
-    findMeInUnlinkedRoles ::  ContextInstance ~~> RoleType
-    findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel (contextAspectsClosure >=> enumeratedUserRole)) isUnlinked) (computesMe ctxt)
-      where
-        isUnlinked :: RoleType ~~> Boolean
-        isUnlinked (ENR rt) = lift $ lift $ isUnlinked_ rt
-        isUnlinked (CR _) = pure false
-
-getAllMyRoleTypes :: ContextInstance ~~> RoleType
-getAllMyRoleTypes ctxt = ((contextType >=> Combinators.filter (liftToInstanceLevel userRole) (computesMe ctxt)) ctxt)
-
-computesMe :: ContextInstance -> RoleType ~~> Boolean
-computesMe ctxt' rt = some (getRoleInstances rt >=> lift <<< lift <<< isMe) ctxt'
-
-getMeInRoleAndContext :: RoleType -> ContextInstance ~~> RoleInstance
-getMeInRoleAndContext rt = filter (getRoleInstances rt) (lift <<< lift <<< isMe)
 
 -- | We look for a public role in the (type of the) ContextInstance.
 -- | We then arbitrarily take the publicUrl of the first public role to have one.

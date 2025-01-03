@@ -57,7 +57,8 @@ import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), MP, MonadPer
 import Perspectives.Identifiers (buitenRol)
 import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Combinators (filter, not') as COMB
-import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveRoleStates_, isMe)
+import Perspectives.Instances.Me (isMe)
+import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveRoleStates_)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, getPerspectivesUser)

@@ -43,7 +43,8 @@ import Perspectives.Data.EncodableMap as ENCMAP
 import Perspectives.DomeinCache (saveCachedDomeinFile)
 import Perspectives.EntiteitAndRDFAliases (ID)
 import Perspectives.Identifiers (buitenRol)
-import Perspectives.Instances.ObjectGetters (deltaAuthor2ResourceIdentifier, getProperty, notIsMe, perspectivesUsersRole_, roleType_)
+import Perspectives.Instances.Me (notIsMe)
+import Perspectives.Instances.ObjectGetters (deltaAuthor2ResourceIdentifier, getProperty, perspectivesUsersRole_, roleType_)
 import Perspectives.ModelDependencies (connectedToAMQPBroker, userChannel) as DEP
 import Perspectives.ModelDependencies (perspectivesUsersCancelled, perspectivesUsersPublicKey)
 import Perspectives.Names (getMySystem)

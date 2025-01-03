@@ -213,6 +213,7 @@ systemParameter_ parArray _ = try
     _ -> pure [])
   >>= handleExternalFunctionError "model://perspectives.domains#Utilities$SystemParameter"
 
+-- | The package version of the Perspectives Distributed Runtime.
 foreign import pdrVersion :: String
 foreign import mycontextsUrl :: String
 
