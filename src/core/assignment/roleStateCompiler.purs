@@ -62,12 +62,14 @@ import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextTy
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, getPerspectivesUser)
-import Perspectives.Query.QueryTypes (Calculation(..))
+import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..), domain, range)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), perspectivesUser2RoleInstance)
-import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..))
+import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..))
+import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ScheduledAssignment (StateEvaluation(..))
 import Perspectives.Sync.Transaction (Transaction(..))
@@ -193,7 +195,7 @@ enteringRoleState roleId stateId = do
       lift $ restoreFrame oldFrame
 
 
-  State {object} <- lift $ getState stateId
+  State {stateFulObject, object} <- lift $ getState stateId
   case object of
     Nothing -> pure unit
     Just objectQfd -> forWithIndex_ perspectivesOnEntry \(allowedUser :: RoleType) {contextGetter, properties, selfOnly, authorOnly, isSelfPerspective} -> do
@@ -205,13 +207,23 @@ enteringRoleState roleId stateId = do
         -- add these to the transaction.
         Just u' -> if authorOnly
           then pure unit
-          else serialiseRoleInstancesAndProperties
-            currentcontext
-            u'
-            objectQfd
-            properties
-            selfOnly
-            isSelfPerspective
+          else case stateFulObject of
+            -- The users acquire a perspective on the subject because it enters a state. The users should only see this instance.
+            Orole _ -> serialiseRoleInstancesAndProperties
+              currentcontext
+              u'
+              (SQD (domain objectQfd) (RoleIndividual roleId) (range objectQfd) True True)
+              properties
+              selfOnly
+              isSelfPerspective
+            -- The alternative must be Srole. When a subject (=the user) enters a state and then acquires a new perspective, it is valid for all instances.
+            _ -> serialiseRoleInstancesAndProperties
+                currentcontext
+                u'
+                objectQfd
+                properties
+                selfOnly
+                isSelfPerspective
 
   -- Recur.
   subStates <- lift $ subStates_ stateId

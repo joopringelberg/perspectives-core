@@ -273,7 +273,9 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
           Left e -> handleError e
           Right _ -> void $ lookupOrCreateRoleInstance roleType Nothing constructExternalRole
     RemoveRoleInstance -> do
-      (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove] Nothing Nothing) >>= case _ of
+      -- We justify the Delete verb with the reasoning that the user is allowed to delete all role instances, he certainly is allowed to delete one.
+      -- Similarly, if the user is allowed to remove a contextrole with its filler (requiring RemoveContext), he is allowed to remove the contctrole instance.
+      (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove, Verbs.Delete, Verbs.RemoveContext, Verbs.DeleteContext] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
         Right _ -> for_ (toNonEmptyArray roleInstances) scheduleRoleRemoval
