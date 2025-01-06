@@ -36,7 +36,7 @@ import Data.Array (cons, elemIndex, filterA, foldMap, index, null)
 import Data.Array.NonEmpty (fromArray)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Map (Map, delete, lookup)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Maybe (Maybe(..), fromJust, isJust)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (alaF, over, unwrap)
 import Data.Traversable (for_)
@@ -74,7 +74,7 @@ import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ScheduledAssignment (StateEvaluation(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_) 
+import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
 
 -- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction,
 -- | and idem of Notification and StateDependentPerspective.
@@ -217,7 +217,15 @@ enteringRoleState roleId stateId = do
               properties
               selfOnly
               isSelfPerspective
-            -- The alternative must be Srole. When a subject (=the user) enters a state and then acquires a new perspective, it is valid for all instances.
+            -- The alternative must be Srole. When a subject (=the user) enters a state and then acquires a new perspective, it is valid for all instances - but just for the user role that enters that state!
+            Srole _ -> serialiseRoleInstancesAndProperties
+                currentcontext
+                (unsafePartial fromJust (fromArray [roleId]))
+                objectQfd
+                properties
+                selfOnly
+                isSelfPerspective
+            --  Finally, the last case must be Cnt. When a context enters a state and then all users acquires a new perspective on all instances.
             _ -> serialiseRoleInstancesAndProperties
                 currentcontext
                 u'
