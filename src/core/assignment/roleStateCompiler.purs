@@ -62,18 +62,19 @@ import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextTy
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem)
 import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, getPerspectivesUser)
-import Perspectives.Query.QueryTypes (Calculation(..), QueryFunctionDescription(..), domain, range)
+import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, range)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (AutomaticAction(..))
 import Perspectives.Representation.Class.PersistentType (getState)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..), perspectivesUser2RoleInstance)
-import Perspectives.Representation.QueryFunction (QueryFunction(..))
+import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
+import Perspectives.Representation.Range (Range(..))
 import Perspectives.Representation.State (Notification(..), State(..), StateDependentPerspective(..), StateFulObject(..))
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedRoleType(..), RoleType, StateIdentifier)
 import Perspectives.ScheduledAssignment (StateEvaluation(..))
 import Perspectives.Sync.Transaction (Transaction(..))
-import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_)
+import Perspectives.Types.ObjectGetters (hasContextAspect, subStates_) 
 
 -- | This function has a Partial constraint because it only handles the AutomaticRoleAction case of AutomaticAction,
 -- | and idem of Notification and StateDependentPerspective.
@@ -212,7 +213,7 @@ enteringRoleState roleId stateId = do
             Orole _ -> serialiseRoleInstancesAndProperties
               currentcontext
               u'
-              (SQD (domain objectQfd) (RoleIndividual roleId) (range objectQfd) True True)
+              (UQD (domain objectQfd) (UnaryCombinator RoleIndividualF) (SQD (domain objectQfd) (Constant PString (unwrap roleId)) (VDOM PString Nothing) True True) (range objectQfd) True True)
               properties
               selfOnly
               isSelfPerspective
