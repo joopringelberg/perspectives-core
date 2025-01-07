@@ -176,6 +176,9 @@ type PerspectivesExtraState =
   -- Do not confuse with transactionFlag! This member is used for numbering transactions that are sent to peers.
   , transactionNumber :: Int
 
+  -- Indentation level for logging
+  , transactionLevel :: String
+
   , brokerService :: AVar BrokerService
 
   , stompClient :: Maybe StompClient
@@ -183,7 +186,7 @@ type PerspectivesExtraState =
   , warnings :: Array String
 
   -- Do not confuse with transactionNumber! This member is used in runMonadPerspectivesTransaction.
-  , transactionFlag :: AVar Int
+  , transactionFlag :: AVar Boolean
 
   , transactionWithTiming :: AVar RepeatingTransaction
 

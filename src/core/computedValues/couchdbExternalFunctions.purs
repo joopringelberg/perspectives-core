@@ -492,7 +492,7 @@ removeModelFromLocalStore versionedModelURIA rid = try
     Just versionedModelURI -> do 
       let unversionedURI = unversionedModelUri versionedModelURI
       let cid = createDefaultIdentifier ((unsafePartial modelUri2ManifestUrl unversionedURI).manifestName <> "_modelRootContext")
-      scheduleContextRemoval Nothing (ContextInstance cid)
+      scheduleContextRemoval Nothing [] (ContextInstance cid)
       scheduleDomeinFileRemoval (DomeinFileId unversionedURI)
     _ -> pure unit)
   >>= handleExternalStatementError "model://perspectives.domains#RemoveModelFromLocalStore"

@@ -34,6 +34,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.String.Regex.Unsafe (unsafeRegex)
 import Data.Tuple (Tuple(..))
 import Effect.Class (liftEffect)
+import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Partial.Unsafe (unsafePartial)
@@ -43,6 +44,7 @@ import Perspectives.Persistence.API (MonadPouchdb, deleteDocument)
 import Perspectives.Persistence.State (getCouchdbCredentials)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent.ChangesFeed (DocProducer, EventSource, createEventSource, docProducer)
+import Perspectives.PerspectivesState (transactionLevel)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
 import Perspectives.Sync.Channel (postDbName)
@@ -77,6 +79,8 @@ incomingPost url = do
         Right (Tuple id (Just t)) -> do
           -- Delete the document
           _ <- lift $ deleteDocument database id Nothing
+          padding <- lift transactionLevel
+          log $ padding <> "Executing incoming post transaction"
           lift (runMonadPerspectivesTransaction'
             false
             (ENR $ EnumeratedRoleType sysUser)

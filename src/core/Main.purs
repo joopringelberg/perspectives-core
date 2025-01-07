@@ -121,7 +121,7 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
   case decodePouchdbUser' rawPouchdbUser of
     Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in runPDR")
     Right (pouchdbUser :: PouchdbUser) -> do
-      transactionFlag <- new 0
+      transactionFlag <- new true
       brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
@@ -422,7 +422,7 @@ createAccount perspectivesUser rawPouchdbUser runtimeOptions nullableIdentityDoc
       -- Set the current PDR version.
       idbSet "CurrentPDRVersion" (unsafeCoerce pdrVersion)
 
-      transactionFlag <- new 0
+      transactionFlag <- new true
       brokerService <- empty
       transactionWithTiming <- empty
       modelToLoad <- empty
@@ -476,7 +476,7 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in reCreateInstances")
       Right (pouchdbUser :: PouchdbUser) -> do
-        transactionFlag <- new 0
+        transactionFlag <- new true
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
@@ -526,7 +526,7 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left _ -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
-        transactionFlag <- new 0
+        transactionFlag <- new true
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
@@ -632,7 +632,7 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
           , password: pdbu.password
           , couchdbUrl: pdbu.couchdbUrl
           }
-        transactionFlag <- new 0
+        transactionFlag <- new true
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty
@@ -695,7 +695,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
     case decodePouchdbUser' rawPouchdbUser of
       Left e -> throwError (error "Wrong format for parameter 'rawPouchdbUser' in resetAccount")
       Right (pouchdbUser :: PouchdbUser) -> do
-        transactionFlag <- new 0
+        transactionFlag <- new true
         brokerService <- empty
         transactionWithTiming <- empty
         modelToLoad <- empty

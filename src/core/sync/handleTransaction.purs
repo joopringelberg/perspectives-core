@@ -73,7 +73,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Per
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), ResourceType(..), RoleType(..), StateIdentifier(..), externalRoleType, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..)) as Verbs
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, isInPublicScheme, resourceIdentifier2DocLocator, resourceIdentifier2WriteDocLocator, takeGuid)
-import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding)
+import Perspectives.SaveUserData (removeBinding, removeContextIfUnbound, replaceBinding, scheduleContextRemoval, scheduleRoleRemoval, setFirstBinding, synchronise)
 import Perspectives.SerializableNonEmptyArray (toArray, toNonEmptyArray)
 import Perspectives.StrippedDelta (addPublicResourceScheme, addResourceSchemes, addSchemeToResourceIdentifier)
 import Perspectives.Sync.SignedDelta (SignedDelta(..))
@@ -278,7 +278,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType [Verbs.Remove, Verbs.Delete, Verbs.RemoveContext, Verbs.DeleteContext] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- Right _ -> for_ (toNonEmptyArray roleInstances) removeRoleInstance
-        Right _ -> for_ (toNonEmptyArray roleInstances) scheduleRoleRemoval
+        Right _ -> for_ (toNonEmptyArray roleInstances) (scheduleRoleRemoval synchronise)
 
     -- TODO Het lijkt niet nuttig om beide cases te behouden.
     RemoveUnboundExternalRoleInstance -> do
@@ -289,7 +289,7 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       (lift $ roleHasPerspectiveOnExternalRoleWithVerbs subject authorizedRole [Verbs.DeleteContext, Verbs.RemoveContext] Nothing Nothing) >>= case _ of
         Left e -> handleError e
         -- As external roles are always stored the same as their contexts, we can reliably retrieve the context instance id from the role id.
-        Right _ -> for_ (ContextInstance <<< deconstructBuitenRol <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole)
+        Right _ -> for_ (ContextInstance <<< deconstructBuitenRol <<< unwrap <$> toArray roleInstances) (scheduleContextRemoval authorizedRole [])
     where
       userCreatesThemselves :: Boolean
       userCreatesThemselves = case subject of

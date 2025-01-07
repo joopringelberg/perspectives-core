@@ -30,7 +30,9 @@
 
 module Perspectives.SaveUserData
   ( changeRoleBinding
+  , doNotSynchronise
   , handleNewPeer
+  , queryUpdatesForRole
   , removeAllRoleInstances
   , removeBinding
   , removeContextIfUnbound
@@ -41,9 +43,9 @@ module Perspectives.SaveUserData
   , scheduleRoleRemoval
   , setBinding
   , setFirstBinding
-  , stateEvaluationAndQueryUpdatesForContext
-  , stateEvaluationAndQueryUpdatesForRole
   , severeBindingLinks
+  , stateEvaluationAndQueryUpdatesForContext
+  , synchronise
   )
   where
 
@@ -94,22 +96,28 @@ import Perspectives.TypesForDeltas (RoleBindingDelta(..), RoleBindingDeltaType(.
 import Prelude (Unit, bind, discard, not, pure, unit, void, ($), (&&), (<$>), (<<<), (<>), (==), (>>=), (||))
 import Simple.JSON (writeJSON)
  
+synchronise :: Boolean
+synchronise = true
+
+doNotSynchronise :: Boolean
+doNotSynchronise = false
 
 -- | Add the role instance to the end of the roles to exit.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.
 -- | (we build a last-in, last-out stack of destructive effects)
-scheduleRoleRemoval :: RoleInstance -> MonadPerspectivesTransaction Unit 
-scheduleRoleRemoval id = do
+-- | Returns the user role instances that should be informed of the removal.
+scheduleRoleRemoval :: Boolean -> RoleInstance -> MonadPerspectivesTransaction (Array RoleInstance)
+scheduleRoleRemoval sync id = do
   -- It may happen that two public roles with the same address both have a perspective on this role instance.
   -- In that case, we remove the instance for the first public role (in a random order). 
   -- We should check whether it is still there before we try to remove it.
   if isInPublicScheme (unwrap id)
     then (lift $ tryGetPerspectRol id) >>= case _ of 
-      Nothing -> pure unit
+      Nothing -> pure []
       Just _ -> f
     else f
   where 
-    f :: MonadPerspectivesTransaction Unit
+    f :: MonadPerspectivesTransaction (Array RoleInstance)
     f = do
       contextOfRole <- lift (id ##>> context)
       -- If the role's context is scheduled to be removed, don't add its removal to the scheduledAssignments.
@@ -120,7 +128,7 @@ scheduleRoleRemoval id = do
         scheduledAssignments)
       roleIsUntouchable <- gets (\(Transaction{untouchableRoles}) -> isJust $ elemIndex id untouchableRoles)
       if contextIsScheduledToBeRemoved || roleIsUntouchable
-        then pure unit
+        then pure []
         else do 
           modify (over Transaction \t@{scheduledAssignments, rolesToExit} -> t
             { rolesToExit = rolesToExit `union` [id]
@@ -134,12 +142,21 @@ scheduleRoleRemoval id = do
                 s <- lift $ getMySystem
                 deleteProperty [RoleInstance $ buitenRol s] (EnumeratedPropertyType cardClipBoard) Nothing
               else pure unit
+          if sync
+            then (lift $ try $ (getPerspectRol id)) >>= handlePerspectRolError' "scheduleRoleRemoval" []
+              \role@(PerspectRol{pspType:roleType, context:contextId, binding}) -> do
+                -- STATE EVALUATION
+                users <- statesAndPeersForRoleInstanceToRemove role
+                -- SYNCHRONISATION ADDS DELTAS
+                synchroniseRoleRemoval role users
+                pure users
+            else pure []
 
 -- | Schedules all roles in the context, including its external role, for removal.
 -- | Add the actual removal instruction to the end of the scheduledAssignments.
 -- | (we build a last-in, last-out stack of destructive effects)
-scheduleContextRemoval :: Maybe RoleType -> ContextInstance -> MonadPerspectivesTransaction Unit
-scheduleContextRemoval authorizedRole id = 
+scheduleContextRemoval :: Maybe RoleType -> Array RoleInstance -> ContextInstance -> MonadPerspectivesTransaction Unit
+scheduleContextRemoval authorizedRole usersWithPerspectiveOnEmbeddingRole id = 
   -- It may happen that two public roles with the same address both have a perspective on this context instance.
   -- In that case, we remove the instance for the first public role (in a random order). 
   -- We should check whether it is still there before we try to remove it.
@@ -169,9 +186,10 @@ scheduleContextRemoval authorizedRole id =
           , subject
           }
         userRoleTypes <- lift (getContext (context_pspType ctxt) >>= pure <<< userRole)
+        -- TODO: we missen de users die een perspectief hebben op de contextrol waar de context in is ingebed.
         (users :: Array RoleInstance) <- lift (concat <$> (traverse (\(userRole :: RoleType) -> id ##= getRoleInstances userRole) userRoleTypes ))
         -- Remove the own user
-        addDelta $ DeltaInTransaction {users, delta: signedDelta}
+        addDelta $ DeltaInTransaction {users: users <> usersWithPerspectiveOnEmbeddingRole, delta: signedDelta}
 
         clipboard <- lift getRoleOnClipboard
         case clipboard of 
@@ -190,7 +208,7 @@ removeContextIfUnbound :: RoleInstance -> Maybe RoleType ->  MonadPerspectivesTr
 removeContextIfUnbound roleInstance@(RoleInstance rid) rtype = do
   mbinder <- lift (roleInstance ##> allRoleBinders)
   case mbinder of
-    Nothing -> scheduleContextRemoval rtype (ContextInstance $ deconstructBuitenRol rid)
+    Nothing -> scheduleContextRemoval rtype [] (ContextInstance $ deconstructBuitenRol rid)
     otherwise -> pure unit
 
 -- | Remove the context instance plus roles after detaching all its roles.
@@ -256,16 +274,10 @@ removeRoleInstance roleId = (try $ (getPerspectRol roleId)) >>= handlePerspectRo
     -- PERSISTENCE (finally remove the role instance from cache and database).
     removeEntiteit roleId
 
--- | SYNCHRONISATION by ContextDelta and UniverseRoleDelta.
--- | STATE EVALUATION
 -- | QUERY UPDATES.
-stateEvaluationAndQueryUpdatesForRole :: RoleInstance -> MonadPerspectivesTransaction Unit
-stateEvaluationAndQueryUpdatesForRole roleId = (lift $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
+queryUpdatesForRole :: RoleInstance -> MonadPerspectivesTransaction Unit
+queryUpdatesForRole roleId = (lift $ try $ (getPerspectRol roleId)) >>= handlePerspectRolError "removeRoleInstance"
   \role@(PerspectRol{pspType:roleType, context:contextId, binding}) -> do
-    -- STATE EVALUATION
-    users <- statesAndPeersForRoleInstanceToRemove role
-    -- SYNCHRONISATION
-    synchroniseRoleRemoval role users
     -- QUERY UPDATES.
     queryUpdatesForRoleRemoval role
 

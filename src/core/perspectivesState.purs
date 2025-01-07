@@ -27,21 +27,22 @@ import Control.Monad.Trans.Class (lift)
 import Data.Map (empty) as Map
 import Data.Maybe (Maybe(..))
 import Data.Nullable (null)
+import Data.String (Pattern(..), stripSuffix)
 import Effect.Aff.AVar (AVar, put, read)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, delete, get, newCache, set)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, MonadPerspectives, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, PerspectivesState)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, PerspectivesState, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), RoleInstance)
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier)
-import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=))
+import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=), (<>))
 
-newPerspectivesState :: PouchdbUser -> AVar Int -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> AVar IntegrityFix -> PerspectivesState
+newPerspectivesState :: PouchdbUser -> AVar Boolean -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> AVar IntegrityFix -> PerspectivesState
 newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate missingResource =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
@@ -60,6 +61,7 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , post: Nothing
   , developmentRepository: "http://127.0.0.1:5984/repository/"
   , transactionNumber: 0
+  , transactionLevel: ""
   , brokerService
   , stompClient: Nothing
   , databases: empty
@@ -124,7 +126,7 @@ developmentRepository = gets _.developmentRepository
 transactionNumber :: MonadPerspectives Int
 transactionNumber = gets _.transactionNumber
 
-transactionFlag :: MonadPerspectives (AVar Int)
+transactionFlag :: MonadPerspectives (AVar Boolean)
 transactionFlag = gets _.transactionFlag
 
 nextTransactionNumber :: MonadPerspectives Int
@@ -132,6 +134,20 @@ nextTransactionNumber = do
   n <- transactionNumber
   void $ modify \(s@{transactionNumber:cn}) -> s {transactionNumber = cn + 1}
   pure n
+
+-- | Increases with two spaces every time we run an embedded transaction.
+transactionLevel :: MonadPerspectives String
+transactionLevel = gets _.transactionLevel
+
+-- | Increases the transaction level with two spaces.
+increaseTransactionLevel :: MonadPerspectives Unit
+increaseTransactionLevel = modify \s -> s {transactionLevel = s.transactionLevel <> "  "}
+
+-- | Decreases the transaction level with two spaces.
+decreaseTransactionLevel :: MonadPerspectives Unit
+decreaseTransactionLevel = modify \s -> s {transactionLevel = case stripSuffix (Pattern "  ") s.transactionLevel of
+  Just s' -> s'
+  Nothing -> "" }
 
 getBrokerService :: MonadPerspectives BrokerService
 getBrokerService = gets _.brokerService >>= lift <<< read

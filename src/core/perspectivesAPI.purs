@@ -83,7 +83,7 @@ import Perspectives.Representation.View (View, propertyReferences)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid, resourceIdentifier2DocLocator)
 import Perspectives.RoleStateCompiler (evaluateRoleState)
 import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, runMonadPerspectivesTransaction, runMonadPerspectivesTransaction')
-import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, setBinding, setFirstBinding, scheduleContextRemoval, scheduleRoleRemoval)
+import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, scheduleContextRemoval, scheduleRoleRemoval, setBinding, setFirstBinding, synchronise)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
 import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
@@ -498,7 +498,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 else sendResponse (Error corrId ("Cannot remove an external role from non-database query role " <> (unwrap ctype))) setter
             (ENR rtype) -> sendResponse (Error corrId ("Cannot remove an external role from enumerated role " <> (unwrap rtype) <> " - use unbind instead!")) setter
         else do
-          void $ runMonadPerspectivesTransaction authoringRole $ scheduleRoleRemoval (RoleInstance subject)
+          void $ runMonadPerspectivesTransaction authoringRole $ scheduleRoleRemoval synchronise (RoleInstance subject)
           sendResponse (Result corrId []) setter
     -- {request: "RemoveContext", subject: rolID, predicate: rolName, authoringRole: myroletype}
     -- The context type given in object must be described in a locally installed model.
@@ -511,10 +511,11 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           void $ runMonadPerspectivesTransaction authoringRole do
             mcontextToBeRemoved <- lift ((RoleInstance subject) ##> binding >=> context)
             case mcontextToBeRemoved of
-              Nothing -> scheduleRoleRemoval (RoleInstance subject)
+              Nothing -> void $ scheduleRoleRemoval synchronise (RoleInstance subject)
               Just contextToBeRemoved -> do
-                scheduleContextRemoval (Just autorizedRole) contextToBeRemoved
-                scheduleRoleRemoval (RoleInstance subject)
+                users <- scheduleRoleRemoval synchronise (RoleInstance subject)
+                scheduleContextRemoval (Just autorizedRole) users contextToBeRemoved
+                
           sendResponse (Result corrId []) setter
         else sendResponse (Error corrId ("Cannot remove a context from a non-context role kind: " <> show autorizedRole )) setter
     Api.DeleteRole -> do

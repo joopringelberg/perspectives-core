@@ -34,7 +34,7 @@ import Prelude (bind, show, ($), (<>))
 runPerspectives :: forall a. String -> String -> String -> String -> String -> Int -> MonadPerspectives a
   -> Aff a
 runPerspectives userName password perspectivesUser systemId host port mp = do
-  transactionFlag <- new 1
+  transactionFlag <- new true
   brokerService <- empty
   transactionWithTiming <- empty
   modelToLoad <- empty

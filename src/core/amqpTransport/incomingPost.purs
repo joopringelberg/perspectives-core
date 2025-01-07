@@ -46,7 +46,7 @@ import Perspectives.ModelDependencies (accountHolder, accountHolderName, account
 import Perspectives.Names (getMySystem, lookupIndexedContext)
 import Perspectives.Persistence.API (deleteDocument, documentsInDatabase, excludeDocs, getDocument_)
 import Perspectives.Persistent (postDatabaseName)
-import Perspectives.PerspectivesState (getBrokerService, getPerspectivesUser, setBrokerService, setStompClient, stompClient)
+import Perspectives.PerspectivesState (getBrokerService, getPerspectivesUser, setBrokerService, setStompClient, stompClient, transactionLevel)
 import Perspectives.Query.UnsafeCompiler (getPropertyFunction, getRoleInstances)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedRoleType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
@@ -95,6 +95,8 @@ incomingPost = do
             -- The risk is that the PDR may not handle the message fully and then it is lost.
             lift $ acknowledge ack
             lift do 
+              padding <- transactionLevel
+              log $ padding <> "Executing incoming post transaction"
               runMonadPerspectivesTransaction'
                 false
                 (ENR $ EnumeratedRoleType sysUser)
@@ -104,6 +106,8 @@ incomingPost = do
     setConnectionState :: Boolean -> MonadPerspectives Unit
     setConnectionState c = do
       mySystem <- getMySystem
+      padding <- transactionLevel
+      log $ padding <> "Setting connection state to " <> show c
       void $ runMonadPerspectivesTransaction' false (ENR $ EnumeratedRoleType sysUser) (setProperty [RoleInstance $ buitenRol mySystem] (EnumeratedPropertyType connectedToAMQPBroker) Nothing [Value $ show c])
       pure unit
 
