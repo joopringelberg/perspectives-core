@@ -67,6 +67,7 @@ import Perspectives.ModelDependencies (rootContext)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (getAttachment)
 import Perspectives.Persistent (addAttachment, entityExists, forceSaveRole, getPerspectRol, saveEntiteit, saveEntiteit_, tryGetPerspectEntiteit)
+import Perspectives.PerspectivesState (transactionLevel)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
 import Perspectives.Representation.Class.Cacheable (EnumeratedRoleType(..), cacheEntity)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..))
@@ -94,7 +95,8 @@ import Simple.JSON (readJSON')
 
 executeContextDelta :: ContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleType, roleInstance, destinationContext, subject} ) signedDelta = do
-  log (show deltaType <> " to/from " <> show contextInstance <> " and " <> show roleInstance)
+  padding <- lift transactionLevel
+  log (padding <> show deltaType <> " to/from " <> show contextInstance <> " and " <> show roleInstance)
   case deltaType of
     -- The subject must be allowed to change the role: they must have a perspective on it that includes:
     --  * the verb CreateAndFill, in case a context role is created;
@@ -115,7 +117,8 @@ executeContextDelta (ContextDelta{deltaType, contextInstance, contextType, roleT
 
 executeRoleBindingDelta :: RoleBindingDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) signedDelta = do
-  log (show deltaType <> " of " <> show filled <> " (to) " <> show filler)
+  padding <- lift transactionLevel
+  log (padding <> show deltaType <> " of " <> show filled <> " (to) " <> show filler)
   roleType' <- lift (filled ##>> roleType)
   (lift $ roleHasPerspectiveOnRoleWithVerb subject roleType' [Verbs.Fill, Verbs.CreateAndFill] Nothing Nothing) >>= case _ of
     Left e -> handleError e
@@ -127,7 +130,8 @@ executeRoleBindingDelta (RoleBindingDelta{filled, filler, deltaType, subject}) s
 -- TODO. Wat met SetPropertyValue?
 executeRolePropertyDelta :: RolePropertyDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeRolePropertyDelta d@(RolePropertyDelta{id, roleType, deltaType, values, property, subject}) signedDelta = do
-  log (show deltaType <> " for " <> show id <> " and property " <> show property)
+  padding <- lift transactionLevel
+  log (padding <> show deltaType <> " for " <> show id <> " and property " <> show property)
   case deltaType of
     AddProperty -> do
       -- we need not check whether the model is known if we assume valid transactions:
@@ -200,7 +204,8 @@ handleError e = liftEffect $ log (show e)
 -- | role for. Hence we only have to check whether the external role exists.
 executeUniverseContextDelta :: UniverseContextDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, subject}) signedDelta = do
-  log (show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
+  padding <- lift transactionLevel
+  log (padding <> show deltaType <> " with id " <> show id <> " and with type " <> show contextType)
   allTypes <- lift (contextType ###= contextAspectsClosure)
   externalRoleExists <- lift $ entityExists (RoleInstance $ buitenRol $ unwrap id)
   if externalRoleExists
@@ -247,7 +252,8 @@ executeUniverseContextDelta (UniverseContextDelta{id, contextType, deltaType, su
 -- | Retrieves from the repository the model that holds the RoleType, if necessary.
 executeUniverseRoleDelta :: UniverseRoleDelta -> SignedDelta -> MonadPerspectivesTransaction Unit
 executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authorizedRole, deltaType, subject}) s = do
-  log (show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType <> " for user role " <> show subject)
+  padding <- lift transactionLevel
+  log (padding <> show deltaType <> " for/from " <> show id <> " with ids " <> show roleInstances <> " with type " <> show roleType <> " for user role " <> show subject)
   void $ lift $ retrieveDomeinFile (DomeinFileId $ unsafePartial typeUri2ModelUri_ $ unwrap roleType)
   case deltaType of
     ConstructEmptyRole -> do
@@ -338,7 +344,8 @@ executeUniverseRoleDelta (UniverseRoleDelta{id, roleType, roleInstances, authori
       constructExternalRole  :: MonadPerspectivesTransaction RoleInstance
       constructExternalRole = do
         externalRole <- pure (head $ toNonEmptyArray roleInstances)
-        log ("ConstructExternalRole in " <> show id)
+        padding <- lift transactionLevel
+        log (padding <> "ConstructExternalRole in " <> show id)
         -- Here we make constructing an external role idempotent. Nothing happens if it already exists.
         constructEmptyRole_ id 0 externalRole >>= if _
           then lift $ void $ saveEntiteit externalRole
@@ -423,6 +430,7 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
     -- For now, we fail silently on deltas that cannot be authenticated.
     executeDelta s Nothing = pure unit
     executeDelta s (Just stringifiedDelta) = do 
+      padding <- lift transactionLevel
       storageSchemes <- lift $ gets _.typeToStorage
       catchError
         (case runExcept $ readJSON' stringifiedDelta of
@@ -435,8 +443,8 @@ executeTransaction' t@(TransactionForPeer{deltas, publicKeys}) = do
                 Right d4 -> lift ((addResourceSchemes storageSchemes d4)) >>= flip executeUniverseRoleDelta s
                 Left _ -> case runExcept $ readJSON' stringifiedDelta of
                   Right d5 -> lift (addResourceSchemes storageSchemes d5) >>= flip executeUniverseContextDelta s
-                  Left _ -> log ("Failing to parse and execute: " <> stringifiedDelta))
-        (\e -> liftEffect $ log (show e))
+                  Left _ -> log (padding <> "Failing to parse and execute: " <> stringifiedDelta))
+        (\e -> liftEffect $ log (padding <> show e))
 
 -- | All identifiers in deltas in a transaction have been stripped from their storage schemes, except for those with the pub: scheme.
 -- | This function adds public resource schemes for the given storageUrl or, when a different publishing point is found for an identifier,
@@ -458,6 +466,7 @@ expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
   expandDelta s@(SignedDelta sr@{author, encryptedDelta, signature}) = do 
     -- Use the storageUrl to add a public scheme to the author.
     s' <- pure $ SignedDelta sr { author = over PerspectivesUser (createPublicIdentifier storageUrl) author}
+    padding <- lift transactionLevel
     case runExcept $ readJSON' encryptedDelta of
       Right (d1 :: RolePropertyDelta) -> notWhenPublicSubject (unwrap d1) (lift $ (Just <<< RPD s' <$> addPublicResourceScheme storageUrl d1))
       Left _ -> case runExcept $ readJSON' encryptedDelta of
@@ -468,7 +477,7 @@ expandDeltas t@(TransactionForPeer{deltas, publicKeys}) storageUrl = do
             Right (d4 :: UniverseRoleDelta) -> notWhenPublicSubject (unwrap d4) (lift $ (Just <<< URD s' <$> addPublicResourceScheme storageUrl d4))
             Left _ -> case runExcept $ readJSON' encryptedDelta of
               Right (d5 :: UniverseContextDelta) -> notWhenPublicSubject (unwrap d5) (lift $ (Just <<< UCD s' <$> addPublicResourceScheme storageUrl d5))
-              Left _ -> log ("Failing to parse and execute: " <> encryptedDelta) *> pure Nothing
+              Left _ -> log (padding <> "Failing to parse and execute: " <> encryptedDelta) *> pure Nothing
 
     where
       notWhenPublicSubject :: forall f. DeltaRecord f -> MonadPerspectivesTransaction (Maybe Delta) -> MonadPerspectivesTransaction (Maybe Delta)

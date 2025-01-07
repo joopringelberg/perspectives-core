@@ -56,7 +56,7 @@ import Perspectives.Instances.ObjectGetters (binding_, roleType_)
 import Perspectives.ModelDependencies (perspectivesUsersPublicKey, sysUser)
 import Perspectives.Names (getMySystem, getUserIdentifier)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.PerspectivesState (getPerspectivesUser)
+import Perspectives.PerspectivesState (getPerspectivesUser, transactionLevel)
 import Perspectives.Query.Interpreter (interpret)
 import Perspectives.Query.Interpreter.Dependencies (Dependency(..), DependencyPath, allPaths, consOnMainPath, singletonPath)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -258,7 +258,9 @@ serialiseDependency users mpreviousDependency currentDependency = do
         then pure unit
         else addBindingDelta roleId2 roleId1 >>= if _
           then pure unit
-          else log ("serialiseDependency finds two role dependencies without binding: " <> show mpreviousDependency <> ", " <> show currentDependency)
+          else do 
+            padding <- lift transactionLevel
+            log (padding <> "serialiseDependency finds two role dependencies without binding: " <> show mpreviousDependency <> ", " <> show currentDependency)
     Just (V ptypeString (Value val)), (R roleId) -> lift $ addPropertyDelta roleId ptypeString val
     _, _ -> pure unit
   pure $ Just currentDependency

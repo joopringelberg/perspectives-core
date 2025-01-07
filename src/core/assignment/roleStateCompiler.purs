@@ -61,7 +61,7 @@ import Perspectives.Instances.Me (isMe)
 import Perspectives.Instances.ObjectGetters (Filled_(..), Filler_(..), contextType, filledBy, getActiveRoleStates_)
 import Perspectives.ModelDependencies (contextWithNotification, notificationMessage, notifications)
 import Perspectives.Names (getMySystem)
-import Perspectives.PerspectivesState (addBinding, pushFrame, restoreFrame, getPerspectivesUser)
+import Perspectives.PerspectivesState (addBinding, getPerspectivesUser, pushFrame, restoreFrame, transactionLevel)
 import Perspectives.Query.QueryTypes (Calculation(..), Domain(..), QueryFunctionDescription(..), domain, range)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances, role2context, role2propertyValue)
 import Perspectives.Representation.Action (AutomaticAction(..))
@@ -134,7 +134,8 @@ evaluateRoleState roleId stateId = do
         roleWasInState <- lift $ isActive stateId roleId
         if roleWasInState
           then do
-            log ("Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
+            padding <- lift transactionLevel
+            log (padding <> "Already in role state " <> unwrap stateId <> ": " <> unwrap roleId)
             subStates <- lift $ subStates_ stateId
             for_ subStates (evaluateRoleState roleId)
           else enteringRoleState roleId stateId
@@ -159,7 +160,8 @@ evaluateRoleState roleId stateId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 enteringRoleState :: RoleInstance  -> StateIdentifier -> MonadPerspectivesTransaction Unit
 enteringRoleState roleId stateId = do
-  log ("Entering role state " <> unwrap stateId <> " for role " <> unwrap roleId)
+  padding <- lift transactionLevel
+  log (padding <> "Entering role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Add the state identifier to the states in the role instance, triggering query updates
   -- just before running the current Transaction is finished.
   setActiveRoleState stateId roleId
@@ -282,7 +284,8 @@ notify compiledSentence contextGetter roleId = do
 -- | Ensure that the current context is available in the environment before applying this function!
 exitingRoleState :: RoleInstance -> StateIdentifier -> MonadPerspectivesTransaction Unit
 exitingRoleState roleId stateId = do
-  log ("Exiting role state " <> unwrap stateId <> " for role " <> unwrap roleId)
+  padding <- lift transactionLevel
+  log (padding <> "Exiting role state " <> unwrap stateId <> " for role " <> unwrap roleId)
   -- Recur. We do this first, because we have to exit the deepest nested substate first.
   subStates <- lift $ subStates_ stateId
   for_ subStates \subStateId -> do

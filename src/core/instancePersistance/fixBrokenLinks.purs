@@ -57,6 +57,7 @@ import Perspectives.Instances.ObjectGetters (Filler_(..), context2roleFromDataba
 import Perspectives.ModelDependencies (cardClipBoard, sysUser)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol, removeEntiteit, saveMarkedResources)
+import Perspectives.PerspectivesState (transactionLevel)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RoleAssignment (filledNoLongerPointsTo) as RA
@@ -76,7 +77,8 @@ fixReferences (Dfile did) = pure unit
 -- | Notice that we do not synchronize the changes.
 fixContextReferences :: ContextInstance -> MonadPerspectives Unit
 fixContextReferences cid = do
-  log ("fixContextReferences: " <> show cid)
+  padding <- transactionLevel
+  log (padding <> "fixContextReferences: " <> show cid)
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
   saveMarkedResources
@@ -115,7 +117,8 @@ reEvaluateContextStates cid = (lift $ contextType_ cid) >>= evaluateContextState
 -- | All references from other roles and from its context must be removed.
 fixRoleReferences :: RoleInstance -> MonadPerspectives Unit
 fixRoleReferences roleId = do
-  log ("fixRoleReferences: " <> show roleId)
+  padding <- transactionLevel
+  log (padding <> "fixRoleReferences: " <> show roleId)
 
   -- As we look for dangling references in the database only, we should be sure that
   -- there is no difference between cache and database.
