@@ -35,13 +35,15 @@ import Control.Monad.Error.Class (throwError)
 import Control.Monad.State (StateT, evalStateT, gets)
 import Data.Argonaut (Json)
 import Data.Array (head)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight)
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Data.String.Base64 (btoa)
 import Effect.Aff.Class (liftAff)
 import Effect.Exception (error)
 import Foreign (MultipleErrors)
 import Foreign.Object (Object, empty)
+import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.Couchdb (Password, onAccepted_, toJson)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -87,8 +89,8 @@ runRabbitState vhost brokerServiceUrl adminUserName adminPassword computation = 
 runRabbitState' :: forall x. RabbitState -> WithRabbitState x -> MonadPerspectives x
 runRabbitState' state computation = evalStateT computation state
 
-getAuthenticationHeader :: AdminUserName -> AdminPassword -> RequestHeader
-getAuthenticationHeader uname pwd = RequestHeader uname pwd
+getAuthenticationHeader :: Partial => AdminUserName -> AdminPassword -> RequestHeader
+getAuthenticationHeader uname pwd = RequestHeader "Authorization" ("Basic " <> (fromRight "" (btoa (uname <> ":" <> pwd))))
 
 -- | A request with the credentials and url from RabbitState
 defaultRabbitRequest :: WithRabbitState (Request String)
@@ -99,10 +101,10 @@ defaultRabbitRequest = do
   pure
     { method: Left GET
     , url
-    , headers: []
+    , headers: [unsafePartial getAuthenticationHeader username password] 
     , content: Nothing
-    , username: Just username
-    , password: Just password
+    , username: Nothing
+    , password: Nothing
     , withCredentials: true
     , responseFormat: ResponseFormat.string
     , timeout: Nothing
@@ -166,7 +168,7 @@ deleteUser userName = do
     , method = Left DELETE
     })
   case res of 
-    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.createUser: error in call: " <> printError e)
+    Left e -> throwError $ error ("Perspectives.AMQP.RabbitMQManagement.deleteUser: error in call: " <> printError e)
     Right (response :: Response String) -> if response.status == StatusCode 204
       then pure unit
       else throwError $ error ("Perspectives.AMQP.RabbitMQManagement.deleteUser: unexpected statuscode " <> show response.status)
