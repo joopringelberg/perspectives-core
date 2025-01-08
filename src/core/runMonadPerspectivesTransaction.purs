@@ -276,7 +276,8 @@ phase2 share authoringRole r = do
                   -- (except that public instances will be cached)
                   -- Run embedded, do not share.
                     lift $ runEmbeddedIfNecessary false authoringRole (executeDeltas deltas)
-                  Nothing -> throwError (error $ "Cannot compute a URL to publish to for this user role type and instance: " <> show userType <> " ('" <> show userId <> "')")
+                  -- If the URL is not computed, we log this and do nothing. In this installation, there probably should not be a proxy for the public role anyway; but we don't have a way of knowing that on constructing the context.
+                  Nothing -> log (padding <> "Cannot compute a URL to publish to for this user role type and instance: " <> show userType <> " ('" <> show userId <> "')")
               Just (S _ _) -> throwError (error ("Attempt to acces QueryFunctionDescription of the url of a public role before the expression has been compiled. This counts as a system programming error. User type = " <> (show userType)))
           Peer _ -> pure unit
       -- Remove the deltas; we don't want to execute them again.
