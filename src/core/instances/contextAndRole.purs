@@ -36,7 +36,7 @@ import Data.Number (ln10, log)
 import Data.Ord (Ordering, compare)
 import Data.String (Pattern(..), lastIndexOf, splitAt)
 import Data.Tuple (Tuple(..))
-import Foreign.Object (Object, delete, empty, insert, lookup, singleton)
+import Foreign.Object (Object, delete, empty, fromFoldable, insert, lookup, singleton)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (MonadPerspectives, MP, (###=))
 import Perspectives.Identifiers (Namespace, typeUri2typeNameSpace)
@@ -298,8 +298,15 @@ removeRol_property rl propertyName values = over (_propertyValues propertyName) 
 deleteRol_property :: PerspectRol -> EnumeratedPropertyType -> PerspectRol
 deleteRol_property (PerspectRol rl@{properties}) propertyName = PerspectRol (rl {properties = delete (NT.unwrap propertyName) properties})
 
-setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
-setRol_property rl propertyName values = set (_propertyValues' propertyName) (Just values) rl
+-- setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> PerspectRol
+-- setRol_property rl propertyName values = set (_propertyValues' propertyName) (Just values) rl
+
+-- | Notice that the delta is associated with each individual value.
+setRol_property :: PerspectRol -> EnumeratedPropertyType -> Array Value -> SignedDelta -> PerspectRol
+setRol_property (PerspectRol rl@{propertyDeltas, properties}) propertyName values signedDelta = PerspectRol rl
+    { propertyDeltas = insert (NT.unwrap propertyName) (fromFoldable (flip Tuple signedDelta <<< NT.unwrap <$> values)) propertyDeltas
+    , properties = insert (NT.unwrap propertyName) values properties
+    }
 
 rol_gevuldeRollen :: PerspectRol -> Object (Object (Array RoleInstance))
 rol_gevuldeRollen (PerspectRol{filledRoles}) = filledRoles

@@ -77,7 +77,6 @@ import Perspectives.Persistent (saveEntiteit) as Instances
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (EnumeratedPropertyType, EnumeratedRoleType(..), cacheEntity)
-import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.Role (allLocallyRepresentedProperties)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.TypeIdentifiers (PropertyType(..), RoleType, StateIdentifier(..))
@@ -319,16 +318,6 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
         Nothing -> pure unit
         Just (RoleProp propertyBearingInstance replacementProperty) -> (lift $ try $ getPerspectRol propertyBearingInstance) >>= handlePerspectRolError "addProperty"
           \(propertyBearingInstanceRole :: PerspectRol) -> do
-            -- Save the property values in the role instance. Do this now because it will affect computing the users.
-            lift $ void $ cacheEntity (identifier propertyBearingInstanceRole) (addRol_property propertyBearingInstanceRole replacementProperty values)
-            -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
-            -- Even when the property is Private or Local, we should do this, as the computation also triggers actions.
-            users <- aisInPropertyDelta 
-              roleInstanceOnpath 
-              propertyBearingInstance 
-              propertyName 
-              replacementProperty 
-              (rol_pspType propertyBearingInstanceRole)
             -- TODO: Only when the property is not Local!
             deltas <- for valuesAndDeltas \(Tuple value msignedDelta) -> do
                 delta <- case msignedDelta of
@@ -345,13 +334,8 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                       }
                     signDelta (writeJSON $ stripResourceSchemes delta)
                   Just signedDelta -> pure signedDelta
-                -- TODO: For a Private property, remove users that are not another installation of the own user.
-                -- NOTICE: probably self-synchronisation (keeping installations of the same user up to date) currently doesn't work.
-                addDelta (DeltaInTransaction { users, delta: delta })
                 pure (Tuple (unwrap value) delta)
-            -- Look for requests for the original property AND the replacement property (if any).
-            (lift $ findPropertyRequests propertyBearingInstance propertyName) >>= addCorrelationIdentifiersToTransactie
-            (lift $ findPropertyRequests propertyBearingInstance replacementProperty) >>= addCorrelationIdentifiersToTransactie
+            -- Save the property values in the role instance. Do this now because it will affect computing the users.
             -- Apply all changes to the role and then save it:
             --  - change the property values in one go
             --  - add all propertyDeltas.
@@ -361,6 +345,21 @@ addProperty rids propertyName valuesAndDeltas = case ARR.head rids of
                 (\r@{propertyDeltas} -> 
                   r {propertyDeltas = setDeltasForProperty replacementProperty (OBJ.union (fromFoldable deltas)) propertyDeltas}) 
                 (addRol_property propertyBearingInstanceRole replacementProperty values))
+            -- Compute the users for this role (the value has no effect). As a side effect, contexts are added to the transaction.
+            -- Even when the property is Private or Local, we should do this, as the computation also triggers actions.
+            users <- aisInPropertyDelta 
+              roleInstanceOnpath 
+              propertyBearingInstance 
+              propertyName 
+              replacementProperty 
+              (rol_pspType propertyBearingInstanceRole)
+            void $ for deltas \(Tuple _ delta) ->
+                -- TODO: For a Private property, remove users that are not another installation of the own user.
+                -- NOTICE: probably self-synchronisation (keeping installations of the same user up to date) currently doesn't work.
+                addDelta (DeltaInTransaction { users, delta: delta })
+            -- Look for requests for the original property AND the replacement property (if any).
+            (lift $ findPropertyRequests propertyBearingInstance propertyName) >>= addCorrelationIdentifiersToTransactie
+            (lift $ findPropertyRequests propertyBearingInstance replacementProperty) >>= addCorrelationIdentifiersToTransactie
 
 -- | Get the property bearing role individual in the chain.
 -- | If the property is defined on role instance's type (either directly or by Aspect), return it; otherwise
@@ -510,9 +509,6 @@ setProperty rids propertyName mdelta values = do
                 handlePerspectRolError
                 "setProperty"
                 \(pe@(PerspectRol{properties, pspType})) -> do
-                  -- Save the property values in the role instance. Do this now because it will affect computing the users.
-                  lift $ void $ cacheEntity rid (setRol_property pe replacementProperty values)
-                  users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
                   -- Create a delta for all values.
                   -- We must add the current values, otherwise a Transaction can only have a single 
                   -- DeleteProperty delta.
@@ -526,18 +522,12 @@ setProperty rids propertyName mdelta values = do
                       , values
                       , subject
                       }))
+                  -- Save the property values in the role instance. Do this now because it will affect computing the users.
+                  lift $ void $ cacheAndSave rid (setRol_property pe replacementProperty values signedDelta)
+                  users <- aisInPropertyDelta rid' rid propertyName replacementProperty pspType
                   addDelta (DeltaInTransaction { users, delta: signedDelta})
                   (lift $ findPropertyRequests rid propertyName) >>= addCorrelationIdentifiersToTransactie
                   (lift $ findPropertyRequests rid replacementProperty) >>= addCorrelationIdentifiersToTransactie
-                  -- Apply all changes to the role and then save it:
-                  --  - change the property values in one go
-                  --  - remove all propertyDeltas for this property.
-                  modifiedRole <- lift $ getPerspectRol rid
-                  lift $ cacheAndSave 
-                    rid 
-                    (over PerspectRol 
-                      (\r@{propertyDeltas} -> r {propertyDeltas = setDeltasForProperty replacementProperty (const (fromFoldable (flip Tuple signedDelta <<< unwrap <$> values))) propertyDeltas}) 
-                      modifiedRole)
 
 
 -----------------------------------------------------------

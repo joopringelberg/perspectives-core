@@ -286,9 +286,8 @@ domain model://perspectives.domains#BrokerServices
           delete context bound to Queues
           Registered = false for extern
 
-    -- TODO: On exiting a BrokerContract, we want to undo the subscription with RabbitMQ.
-    -- on exit
-
+    -- On exiting, both the queue and the account are deleted. See the exit states of AccountHolder and Queue respectively.
+    
     external
       aspect sys:Invitation$External
       -- PDRDEPENDENCY

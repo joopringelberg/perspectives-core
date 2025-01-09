@@ -3,6 +3,7 @@ module Test.ContextAndRole where
 import Prelude
 
 import Control.Monad.Free (Free)
+import Crypto.Subtle.Encrypt (encrypt)
 import Data.Array (length, union)
 import Data.Maybe (Maybe(..))
 import Data.Tuple (snd)
@@ -10,8 +11,9 @@ import Effect.Aff.Class (liftAff)
 import Perspectives.ContextAndRole (addContext_rolInContext, addRol_gevuldeRollen, addRol_property, changeRol_binding, context_rolInContext, deleteContext_rolInContext, deleteRol_property, modifyContext_rolInContext, removeContext_rolInContext, removeRol_binding, removeRol_gevuldeRollen, removeRol_property, rol_binding, rol_gevuldeRol, rol_property, setRol_property)
 import Perspectives.Parsing.Messages (PerspectivesError)
 import Perspectives.Persistent (getPerspectContext, getPerspectRol)
-import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), RoleInstance(..), Value(..))
+import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..))
+import Perspectives.Sync.SignedDelta (SignedDelta(..))
 import Perspectives.TypePersistence.LoadArc.FS (loadCompileAndCacheArcFile)
 import Test.Perspectives.Utils (runP, withSystem)
 import Test.Unit (TestF, suite, suiteOnly, suiteSkip, test, testOnly, testSkip)
@@ -108,7 +110,7 @@ theSuite = suite "ContextAndRole" do
     role3 <- pure $ deleteRol_property role2 (EnumeratedPropertyType "model:ContextAndRole$TestCase$Self$Prop1")
     liftAff $ assert "deleteRol_property fails" (length (rol_property role3 (EnumeratedPropertyType "model:ContextAndRole$TestCase$Self$Prop1")) == 0)
 
-    role4 <- pure $ setRol_property role3 (EnumeratedPropertyType "model:ContextAndRole$TestCase$Self$Prop1") [Value "1", Value "2"]
+    role4 <- pure $ setRol_property role3 (EnumeratedPropertyType "model:ContextAndRole$TestCase$Self$Prop1") [Value "1", Value "2"] (SignedDelta {author: PerspectivesUser "SomeUser", encryptedDelta: "SomeEncryptedDelta", signature: Just "SomeSignature"})
     liftAff $ assert "setRol_property fails" (length (rol_property role4 (EnumeratedPropertyType "model:ContextAndRole$TestCase$Self$Prop1")) == 2)
 
     role5 <- pure $ changeRol_binding (RoleInstance "blabla") role4
