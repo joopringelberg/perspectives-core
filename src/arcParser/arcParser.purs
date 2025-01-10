@@ -43,7 +43,7 @@ import Effect.Class (liftEffect)
 import Parsing (fail, failWithPosition)
 import Parsing.Combinators (between, lookAhead, option, optionMaybe, sepBy, sepBy1, try, (<?>))
 import Parsing.Indent (checkIndent, sameOrIndented, withPos)
-import Parsing.String (char, eof, satisfy)
+import Parsing.String (char, satisfy)
 import Partial.Unsafe (unsafePartial)
 import Perspectives.Identifiers (getFirstMatch, isModelUri)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AuthorOnly(..), AutomaticEffectE(..), ChatE(..), ColumnE(..), ContextActionE(..), ContextE(..), ContextPart(..), FilledByAttribute(..), FilledBySpecification(..), FormE(..), MarkDownE(..), NotificationE(..), PropertyE(..), PropertyFacet(..), PropertyMapping(..), PropertyPart(..), PropertyVerbE(..), PropsOrView(..), RoleE(..), RoleIdentification(..), RolePart(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), SentenceE(..), SentencePartE(..), StateE(..), StateQualifiedPart(..), StateSpecification(..), TabE(..), TableE(..), ViewE(..), WidgetCommonFields)
@@ -51,7 +51,7 @@ import Perspectives.Parsing.Arc.AST.ReplaceIdentifiers (replaceIdentifier)
 import Perspectives.Parsing.Arc.Expression (parseJSDate, propertyRange, regexExpression, step)
 import Perspectives.Parsing.Arc.Expression.AST (SimpleStep(..), Step(..))
 import Perspectives.Parsing.Arc.Identifiers (arcIdentifier, boolean, email, lowerCaseName, prefixedName, qualifiedName, reserved, stringUntilNewline)
-import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, sameOrOutdented', setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
+import Perspectives.Parsing.Arc.IndentParser (IP, arcPosition2Position, containsTab, entireBlock, entireBlock1, getArcParserState, getCurrentContext, getCurrentState, getObject, getPosition, getStateIdentifier, getSubject, inSubContext, isEof, isIndented, isNextLine, nestedBlock, protectObject, protectOnEntry, protectOnExit, protectSubject, sameOrOutdented', setObject, setOnEntry, setOnExit, setSubject, withArcParserState, withEntireBlock)
 import Perspectives.Parsing.Arc.Position (ArcPosition)
 import Perspectives.Parsing.Arc.Statement (assignment, letWithAssignment, twoReservedWords)
 import Perspectives.Parsing.Arc.Statement.AST (Statements(..))
@@ -134,9 +134,6 @@ contextE = withPos do
   pure $ CE $ ContextE { id: uname, kindOfContext: knd, contextParts, pos: pos, public: mpublicStore}
 
   where
-
-    isEof :: IP Boolean
-    isEof = eof *> pure true <|> pure false
 
     -- Remove the Calculation, a Screen (if any)
     enumeratedPublicDuplicate :: ContextPart -> ContextPart
@@ -261,9 +258,15 @@ domain :: IP ContextE
 domain = do
   void containsTab
   r <- token.whiteSpace *> contextE
+  isEndOfFile <- isEof
   case r of
-    (CE d@(ContextE {kindOfContext})) -> if kindOfContext == Domain then pure d else fail "The kind of the context must be 'Domain', "
+    (CE d@(ContextE {kindOfContext})) -> if isEndOfFile
+      then case kindOfContext of
+        Domain -> pure d
+        otherwise -> fail "The kind of the context must be 'Domain', "
+      else fail "There is text beyond the domain context that has not been parsed. Possibly you need to change its indentation: otherwise remove it. "
     otherwise -> fail "Domain must be a context, "
+
 
 --------------------------------------------------------------------------------------------------
 -- ROLE
