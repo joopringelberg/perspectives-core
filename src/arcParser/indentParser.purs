@@ -23,6 +23,7 @@
 module Perspectives.Parsing.Arc.IndentParser
   ( ArcParser
   , ArcParserState
+  , IP
   , arcPosition2Position
   , containsTab
   , entireBlock
@@ -37,7 +38,7 @@ module Perspectives.Parsing.Arc.IndentParser
   , getSubject
   , inSubContext
   , initialArcParserState
-  , IP
+  , isEof
   , isIndented
   , isNextLine
   , isSameOrIndented
@@ -385,8 +386,9 @@ sameOrOutdented' = do
   indentParserPosition <- get'
   -- The current position.
   parserPosition <- getPosition
+  isEndOfFile <- isEof
   -- fail when indented.
-  if (sourceColumn parserPosition > sourceColumn indentParserPosition) then fail "Expected the line to end at this position and then continue in the same column on the next line, or indented. Maybe could not parse the rest of the line? At " else pure unit
+  if (sourceColumn parserPosition > sourceColumn indentParserPosition && not isEndOfFile) then fail "Expected the line to end at this position and then continue in the same column on the next line, or indented, or that we have reached the end of the file. Maybe could not parse the rest of the line? At " else pure unit
 
 isNextLine :: IP Boolean
 isNextLine = do
@@ -416,3 +418,7 @@ containsTab = do
   case indexOf (Pattern "\t") input of
     Nothing -> pure true
     Just pos -> fail $ "Tab found at string position " <> (show pos) <> ". Remove all tabs as they confuse the index computation, leading to errors in parsing your model. "
+
+isEof :: IP Boolean
+isEof = eof *> pure true <|> pure false
+
