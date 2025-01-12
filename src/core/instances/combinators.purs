@@ -123,6 +123,17 @@ logicalAnd a b c = ArrayT do
     Just (Value "true"), Just (Value "true") -> pure [Value "true"]
     _, _ -> pure [Value "false"]
 
+logicalAnd_ :: forall m s. Monad m =>
+  (s -> ArrayT m Boolean) ->
+  (s -> ArrayT m Boolean) ->
+  (s -> ArrayT m Boolean)
+logicalAnd_ a b c = ArrayT do
+  (as :: Array Boolean) <- runArrayT (a c)
+  (bs :: Array Boolean) <- runArrayT (b c)
+  case head as, head bs of
+    Just true, Just true -> pure [true]
+    _, _ -> pure [false]
+
 logicalOr :: forall m s. Monad m =>
   (s -> ArrayT m Value) ->
   (s -> ArrayT m Value) ->

@@ -8,9 +8,11 @@ import Data.Newtype (unwrap)
 import Perspectives.ContextAndRole (rol_binding, rol_isMe)
 import Perspectives.CoreTypes (type (~~>), MP, liftToInstanceLevel)
 import Perspectives.Instances.Combinators (filter, some) as Combinators
+import Perspectives.Instances.Combinators (logicalAnd_)
 import Perspectives.Instances.ObjectGetters (contextType, getMe, getPreferredUserRoleType, roleType, roleType_)
 import Perspectives.Persistent (tryGetPerspectRol)
 import Perspectives.Query.UnsafeCompiler (getRoleInstances)
+import Perspectives.Representation.Class.Role (roleTypeIsFunctional)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance(..))
 import Perspectives.Representation.TypeIdentifiers (ResourceType(..), RoleType(..))
 import Perspectives.ResourceIdentifiers (isInPublicScheme, takeGuid)
@@ -54,7 +56,7 @@ notIsMe = isMe >=> pure <<< not
 
 -- | Preferrably returns the value of the type of 'me' of the context instance:
 -- | this will be the enumerated role instance that is filled (ultimately) with sys:Me.
--- | Otherwise returns all Calculated roles that are ultimately filled with sys:Me.
+-- | Otherwise returns all Calculated roles that are functional and ultimately filled with sys:Me.
 -- | The Guest and Visitor conventions tap in here.
 getMyType :: ContextInstance ~~> RoleType
 getMyType ctxt = getPreferredUserRoleType ctxt
@@ -72,7 +74,11 @@ getMyType ctxt = getPreferredUserRoleType ctxt
     findMeInEnumeratedRoles = (contextType >=> Combinators.filter (liftToInstanceLevel $ contextAspectsClosure >=> enumeratedUserRole) (computesMe ctxt))
 
     findMeInCalculatedRoles :: ContextInstance ~~> RoleType
-    findMeInCalculatedRoles = (contextType >=> Combinators.filter (liftToInstanceLevel $ contextAspectsClosure >=> calculatedUserRole) (computesMe ctxt))
+    findMeInCalculatedRoles = (contextType >=> Combinators.filter 
+      (liftToInstanceLevel $ contextAspectsClosure >=> calculatedUserRole)
+      (logicalAnd_ 
+        (lift <<< lift <<< roleTypeIsFunctional :: RoleType ~~> Boolean)
+        (computesMe ctxt)))
 
     findMeInUnlinkedRoles ::  ContextInstance ~~> RoleType
     findMeInUnlinkedRoles = Combinators.filter (Combinators.filter (contextType >=> liftToInstanceLevel (contextAspectsClosure >=> enumeratedUserRole)) isUnlinked) (computesMe ctxt)
