@@ -25,7 +25,7 @@ module Perspectives.Instances.ObjectGetters where
 import Control.Monad.Error.Class (try)
 import Control.Monad.Writer (WriterT, execWriterT, lift, tell)
 import Control.Plus (empty) as Plus
-import Data.Array (catMaybes, concat, cons, elemIndex, filter, findIndex, foldMap, foldl, head, index, length, nub, null, singleton, union)
+import Data.Array (catMaybes, concat, cons, elemIndex, filter, findIndex, foldM, foldMap, head, index, length, nub, null, singleton, union)
 import Data.Either (Either(..))
 import Data.FoldableWithIndex (foldWithIndexM)
 import Data.Map (Map, lookup) as Map
@@ -41,7 +41,7 @@ import Data.Tuple (Tuple(..), fst, snd)
 import Effect.Aff.AVar (AVar, tryRead)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
-import Foreign.Object (Object, empty, keys, lookup, values)
+import Foreign.Object (Object, empty, fromFoldable, keys, lookup, values)
 import JS.Iterable (toArray)
 import LRUCache (rvalues)
 import Partial.Unsafe (unsafePartial)
@@ -50,12 +50,13 @@ import Perspectives.ContextRolAccessors (getContextMember, getRolMember)
 import Perspectives.CoreTypes (type (~~>), ArrayWithoutDoubles(..), InformedAssumption(..), MP, MonadPerspectives, runMonadPerspectivesQuery, (##>))
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectContextError', handlePerspectRolError')
-import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, typeUri2LocalName, typeUri2ModelUri)
+import Perspectives.Identifiers (LocalName, buitenRol, deconstructBuitenRol, qualifyWith, typeUri2LocalName, typeUri2ModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext, PerspectRol(..), externalRole, states) as IP
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.InstanceRepresentation.PublicUrl (PublicUrl)
 import Perspectives.Instances.Combinators (orElse)
 import Perspectives.ModelDependencies (cardClipBoard, perspectivesUsers)
+import Perspectives.ModelTranslation (translateType)
 import Perspectives.Names (getMySystem)
 import Perspectives.Persistence.API (Keys(..), getViewOnDatabase)
 import Perspectives.Persistent (entitiesDatabaseName, getPerspectContext, getPerspectRol)
@@ -69,7 +70,7 @@ import Perspectives.Representation.Context (Context(..)) as CONTEXT
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), PerspectivesUser(..), RoleInstance(..), Value(..), roleInstance2PerspectivesUser)
 import Perspectives.Representation.Perspective (StateSpec(..)) as SP
-import Perspectives.Representation.TypeIdentifiers (ActionIdentifier(..), ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType, StateIdentifier)
+import Perspectives.Representation.TypeIdentifiers (ContextType(..), EnumeratedPropertyType(..), EnumeratedRoleType(..), RoleKind(..), RoleType, StateIdentifier)
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier, isInPublicScheme, takeGuid)
 import Perspectives.SetupCouchdb (context2RoleFilter, filler2filledFilter, filled2fillerFilter, roleFromContextFilter, role2ContextFilter)
 import Prelude (class Show, Unit, append, bind, discard, eq, flip, identity, join, map, pure, show, ($), (&&), (*>), (<#>), (<$>), (<<<), (<>), (==), (>=>), (>>=), (>>>))
@@ -153,16 +154,19 @@ contextIsInState stateId ci = getActiveStates_ ci >>= pure <<< isJust <<< elemIn
 
 -- | Get the ContextAction names for the context and user role instance, depending on the state
 -- | of both.
-getContextActions :: RoleType -> RoleInstance -> ContextInstance ~~> ActionIdentifier
+getContextActions :: RoleType -> RoleInstance -> ContextInstance ~~> Object String
 getContextActions userRoleType userRoleInstance cid = ArrayT do
   (stateActionMap :: Map.Map SP.StateSpec (Object Action)) <- lift $ actionsOfRoleType userRoleType
   (contextStates :: Array StateIdentifier) <- runArrayT $ getActiveStates cid
   (userStates :: Array StateIdentifier) <- runArrayT $ getActiveRoleStates userRoleInstance
+  cType <- lift $ contextType_ cid
   -- Try each state of the subject and each state of the context
-  pure $ ActionIdentifier <$> foldl
-    (\(cumulatedActions :: Array String) (nextState :: SP.StateSpec) -> case Map.lookup nextState stateActionMap of
-      Nothing -> cumulatedActions
-      Just (actions :: Object Action) -> cumulatedActions <> keys actions)
+  singleton <<< fromFoldable <$> foldM
+    (\(cumulatedActions :: Array (Tuple String String)) (nextState :: SP.StateSpec) -> case Map.lookup nextState stateActionMap of
+      Nothing -> pure cumulatedActions
+      Just (actions :: Object Action) -> do 
+        moreActions <- for (keys actions) \actionName -> Tuple actionName <$> (lift $ translateType (qualifyWith (unwrap cType) actionName))
+        pure (cumulatedActions <> moreActions))
     []
     ((SP.ContextState <$> contextStates) <> (SP.SubjectState <$> userStates))
 

@@ -31,19 +31,30 @@ import Data.String (Pattern(..), stripSuffix)
 import Effect.Aff.AVar (AVar, put, read)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
+import Foreign.Object (lookup, insert) as OBJ
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, delete, get, newCache, set)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, PerspectivesState, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, MonadPerspectives)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, TranslationTable)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
+import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Representation.InstanceIdentifiers (PerspectivesUser(..), RoleInstance)
 import Perspectives.ResourceIdentifiers (createDefaultIdentifier)
 import Prelude (Unit, bind, discard, pure, unit, void, ($), (+), (<<<), (>>=), (<>))
 
-newPerspectivesState :: PouchdbUser -> AVar Boolean -> AVar RepeatingTransaction -> AVar JustInTimeModelLoad -> RuntimeOptions -> AVar BrokerService -> AVar IndexedResource -> AVar IntegrityFix -> PerspectivesState
-newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate missingResource =
+newPerspectivesState :: 
+  PouchdbUser -> 
+  AVar Boolean -> 
+  AVar RepeatingTransaction -> 
+  AVar JustInTimeModelLoad -> 
+  RuntimeOptions -> 
+  AVar BrokerService -> 
+  AVar IndexedResource -> 
+  AVar IntegrityFix -> 
+  String -> PerspectivesState
+newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOptions brokerService indexedResourceToCreate missingResource currentLanguage =
   { rolInstances: newCache defaultCreateOptions
   , contextInstances: newCache defaultCreateOptions
   , domeinCache: newCache defaultCreateOptions
@@ -76,6 +87,8 @@ newPerspectivesState uinfo transFlag transactionWithTiming modelToLoad runtimeOp
   , entitiesToBeStored: []
   , indexedResourceToCreate
   , missingResource
+  , currentLanguage
+  , translations: empty
   }
 
 defaultRuntimeOptions :: RuntimeOptions
@@ -180,6 +193,22 @@ getIndexedResourceToCreate = gets _.indexedResourceToCreate
 
 getMissingResource :: MonadPerspectives (AVar IntegrityFix)
 getMissingResource = gets _.missingResource
+
+-- | The domain argument is the string version of the domain identifier.
+getTranslationTable :: String -> MonadPerspectives (Maybe TranslationTable)
+getTranslationTable domain = gets _.translations >>= pure <<< OBJ.lookup domain
+
+setTranslationTable :: String -> TranslationTable -> MonadPerspectives Unit
+setTranslationTable domain tt = modify \s -> s {translations = OBJ.insert domain tt s.translations}
+
+getCurrentLanguage :: MonadPerspectives String
+getCurrentLanguage = gets _.currentLanguage
+
+setCurrentLanguage :: String -> MonadPerspectives Unit
+setCurrentLanguage lang = modify \s -> s {currentLanguage = lang}
+
+modelsDatabaseName :: MonadPerspectives String
+modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -----------------------------------------------------------
 -- PERSPECTIVESUSER

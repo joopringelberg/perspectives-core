@@ -116,8 +116,8 @@ compileState stateId = do
       pure {updater, contextGetter}
     
     compileNotification :: Partial => Notification -> RoleType -> MP CompiledNotification
-    compileNotification (RoleNotification r@{sentence, currentContextCalculation}) subject = do
-      compiledSentence <- compileRoleSentence sentence
+    compileNotification (RoleNotification r@{sentence, currentContextCalculation, domain}) subject = do
+      compiledSentence <- compileRoleSentence domain sentence
       contextGetter <- role2context currentContextCalculation
       updater' <- pure $ notify compiledSentence contextGetter
       updater <- addTimeFacets updater' r subject stateId

@@ -51,11 +51,11 @@ import Perspectives.Data.EncodableMap (EncodableMap, empty, insert, lookup, keys
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinCache (modifyEnumeratedRoleInDomeinFile, removeDomeinFileFromCache, storeDomeinFileInCache)
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord, UpstreamAutomaticEffect(..), UpstreamStateNotification(..), addUpstreamAutomaticEffect, addUpstreamNotification, indexedContexts, indexedRoles)
-import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2typeNameSpace)
+import Perspectives.Identifiers (Namespace, areLastSegmentsOf, concatenateSegments, isTypeUri, qualifyWith, startsWithSegments, typeUri2ModelUri_, typeUri2typeNameSpace)
 import Perspectives.InvertedQuery (RelevantProperties(..))
 import Perspectives.InvertedQuery.Storable (StoredQueries)
 import Perspectives.Parsing.Arc.AST (ActionE(..), AutomaticEffectE(..), ColumnE(..), ContextActionE(..), FormE(..), MarkDownE, NotificationE(..), AuthorOnly(..), PropertyVerbE(..), PropsOrView(..), RoleVerbE(..), RowE(..), ScreenE(..), ScreenElement(..), SelfOnly(..), StateQualifiedPart(..), StateSpecification(..), StateTransitionE(..), TabE(..), TableE(..), WidgetCommonFields) as AST
-import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, SentenceE(..), SentencePartE(..), StateTransitionE(..))
+import Perspectives.Parsing.Arc.AST (ChatE(..), MarkDownE(..), RoleIdentification(..), SegmentedPath, SentenceE(..), SentencePartE(..), StateTransitionE(..), roleIdentification2context)
 import Perspectives.Parsing.Arc.AspectInference (inferFromAspectRoles)
 import Perspectives.Parsing.Arc.CheckSynchronization (checkSynchronization) as SYNC
 import Perspectives.Parsing.Arc.ContextualVariables (addContextualBindingsToExpression, addContextualBindingsToStatements, makeContextStep, makeIdentityStep, makeTypeTimeOnlyContextStep, makeTypeTimeOnlyRoleStep)
@@ -739,13 +739,15 @@ handlePostponedStateQualifiedParts = do
             , startMoment
             , endMoment
             , repeats
+            , domain: unsafePartial typeUri2ModelUri_ $ unwrap $ roleIdentification2context user
             }
           otherwise -> RoleNotification 
             { currentContextCalculation
             , sentence: compiledMessage
             , startMoment
             , endMoment
-            , repeats            
+            , repeats
+            , domain: unsafePartial typeUri2ModelUri_ $ unwrap $ roleIdentification2context user
             })
         qualifiedUsers
         states
@@ -1447,7 +1449,7 @@ handleScreens screenEs = do
               text' <- unsafePartial case text of 
                 Simple (Value _ _ t) -> pure t
               condition' <- traverse (compileStep (CDOM $ ST ctxt)) condition
-              pure $ MarkDownConstantDef {text: text', condition: condition'}
+              pure $ MarkDownConstantDef {text: text', condition: condition', domain: unsafePartial typeUri2ModelUri_ $ unwrap ctxt} 
             markdown (MarkDownPerspective {widgetFields, condition, start:s, end:e}) = do
               case condition of 
                 Nothing -> do 

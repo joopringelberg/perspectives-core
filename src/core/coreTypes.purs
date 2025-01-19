@@ -45,7 +45,7 @@ module Perspectives.CoreTypes
   , MP
   , MPQ
   , MPT
-  , MonadPerspectives
+  , MonadPerspectives 
   , MonadPerspectivesQuery
   , MonadPerspectivesTransaction
   , ObjectsGetter
@@ -61,6 +61,8 @@ module Perspectives.CoreTypes
   , RuntimeOptions
   , StorageScheme(..)
   , TrackingObjectsGetter
+  , Translations(..)
+  , TranslationTable(..)
   , TypeLevelGetter
   , TypeLevelResults
   , Updater
@@ -207,6 +209,10 @@ type PerspectivesExtraState =
   , indexedResourceToCreate :: AVar IndexedResource
 
   , missingResource :: AVar IntegrityFix
+
+  , currentLanguage :: String
+
+  , translations :: Object TranslationTable
 
   )
 
@@ -619,3 +625,20 @@ instance Show StorageScheme where show = genericShow
 
 type DbName = String
 type Url = String
+
+-------------------------------------------------------------------------------
+---- MODEL TRANSLATION REPRESENTATION
+-------------------------------------------------------------------------------
+
+-- The keys are the languages; the values are the translations of the local type name.
+-- They can be translations of any type.
+newtype Translations = Translations (Object String)
+derive newtype instance WriteForeign Translations
+derive newtype instance ReadForeign Translations
+
+instance Semigroup Translations where
+  append (Translations t1) (Translations t2) = Translations (t1 <> t2)
+
+newtype TranslationTable = TranslationTable (Object Translations)
+derive newtype instance ReadForeign TranslationTable
+derive newtype instance WriteForeign TranslationTable

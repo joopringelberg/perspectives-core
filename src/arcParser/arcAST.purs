@@ -345,6 +345,10 @@ data RoleIdentification =
   ExplicitRole ContextType RoleType ArcPosition |
   ImplicitRole ContextType Step
 
+roleIdentification2context :: RoleIdentification -> ContextType
+roleIdentification2context (ExplicitRole ct _ _) = ct
+roleIdentification2context (ImplicitRole ct _) = ct
+
 derive instance genericRoleIdentification :: Generic RoleIdentification _
 instance eqRoleIdentification :: Eq RoleIdentification where eq = genericEq
 instance showRoleIdentification :: Show RoleIdentification where 

@@ -67,7 +67,7 @@ import Perspectives.Couchdb (DatabaseName, SecurityDocument(..))
 import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.Deltas (addCreatedContextToTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
-import Perspectives.DomeinCache (addAttachments, getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinCache (addAttachments, fetchTranslations, getPatchAndBuild, getVersionToInstall, saveCachedDomeinFile, storeDomeinFileInCouchdbPreservingAttachments)
 import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, removeDownStreamAutomaticEffect, removeDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -90,7 +90,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (entitiesDatabaseName, forceSaveDomeinFile, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectContext, tryGetPerspectEntiteit)
-import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, roleCache)
+import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, modelsDatabaseName, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), cacheEntity)
@@ -107,9 +107,6 @@ import Perspectives.Sync.Transaction (Transaction(..), UninterpretedTransactionF
 import Prelude (Unit, bind, const, discard, eq, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
 import Simple.JSON (read_)
 import Unsafe.Coerce (unsafeCoerce)
-
-modelsDatabaseName :: MonadPerspectives String
-modelsDatabaseName = getSystemIdentifier >>= pure <<< (_ <> "_models")
 
 -- | Retrieves all instances of a particular role type from Couchdb. Instances that have the type as aspect are returned as well!
 -- | For example: `user: Users = callExternal cdb:RoleInstances(sysUser) returns: model://perspectives.domains#System$PerspectivesSystem$User`
@@ -213,6 +210,9 @@ updateModel arrWithModelName arrWithDependencies _ = try
       void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
       -- Install the new model, taking care of outgoing InvertedQueries.
       addModelToLocalStore (DomeinFileId modelName) isUpdate
+      -- The model is now decached, but the translations table is still in cache.
+      -- It will be loaded when a new type lookup is performed.
+      lift $ fetchTranslations dfid
     
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)
     allModelsInUse = do
@@ -242,6 +242,7 @@ isInitialLoad :: Boolean
 isInitialLoad = true
 
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
+-- | Invariant: the model is not in cache when this function returns.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   unversionedModelname <- pure $ unversionedModelUri modelname

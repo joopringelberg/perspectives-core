@@ -30,17 +30,18 @@ import Data.Traversable (for)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.ModelDependencies (sysUser)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (createDatabase, deleteDatabase, documentsInDatabase, includeDocs)
 import Perspectives.Persistent (invertedQueryDatabaseName, saveMarkedResources)
+import Perspectives.PerspectivesState (modelsDatabaseName)
 import Perspectives.Representation.TypeIdentifiers (EnumeratedRoleType(..), RoleType(..))
 import Perspectives.RunMonadPerspectivesTransaction (runMonadPerspectivesTransaction')
-import Perspectives.SetupUser (setupInvertedQueryDatabase) 
+import Perspectives.SetupUser (setupInvertedQueryDatabase)
 import Prelude (Unit, bind, discard, pure, show, ($), (*>), (<$>), (<>))
 import Simple.JSON (read) as JSON
+
 recompileLocalModels :: MonadPerspectives Boolean
 recompileLocalModels =
   do

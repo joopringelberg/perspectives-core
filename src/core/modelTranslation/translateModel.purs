@@ -29,17 +29,17 @@ module Perspectives.ModelTranslation where
 import Prelude
 
 import Control.Monad.Reader (Reader, runReader, ask)
-import Control.Monad.State (get, lift, modify, runStateT, execState)
 import Control.Monad.State (State) as ST
+import Control.Monad.State (get, lift, modify, runStateT, execState)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (filter, head, null, catMaybes, fold)
+import Data.Array (catMaybes, concat, filter, fold, head, null)
 import Data.Either (Either)
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
 import Data.Maybe (Maybe(..), fromJust, isNothing)
-import Data.Newtype (unwrap)
+import Data.Newtype (class Newtype, unwrap)
 import Data.Nullable (Nullable, notNull, null, toMaybe) as NULL
 import Data.Set (toUnfoldable) as SET
 import Data.String (Pattern(..), Replacement(..), replaceAll, stripPrefix, stripSuffix)
@@ -50,38 +50,32 @@ import Data.Traversable (for)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
+import Effect.Aff (Aff)
 import Effect.Exception (Error)
-import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, values, union)
+import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, union, values)
+import IDBKeyVal (idbGet)
 import Partial.Unsafe (unsafePartial)
+import Perspectives.CoreTypes (MonadPerspectives, TranslationTable(..), Translations(..))
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup, values) as EM
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (typeUri2LocalName_, typeUri2typeNameSpace_, startsWithSegments, buitenRol)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, startsWithSegments, typeUri2LocalName_, typeUri2ModelUri, typeUri2typeNameSpace_)
+import Perspectives.PerspectivesState (getCurrentLanguage, getTranslationTable)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
 import Perspectives.Representation.Class.Role (Role(..))
 import Perspectives.Representation.Context (Context(..))
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.Perspective (StateSpec, stateSpec2StateIdentifier)
-import Perspectives.Representation.ScreenDefinition (ScreenDefinition(..), ScreenKey(..))
+import Perspectives.Representation.ScreenDefinition (ChatDef(..), ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..))
 import Perspectives.Representation.State (Notification(..), State(..), StateFulObject(..))
 import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), EnumeratedPropertyType(..), PropertyType(..), RoleType(..), roletype2string)
-import Perspectives.TypePersistence.ContextSerialisation (collectMarkdowns)
 import Purescript.YAML (load)
-import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, write)
+import Simple.JSON (class ReadForeign, class WriteForeign, readImpl, read_, write)
 
 -------------------------------------------------------------------------------
 ---- MODEL TRANSLATION REPRESENTATION
 -------------------------------------------------------------------------------
-
--- The keys are the languages; the values are the translations of the local type name.
--- They can be translations of any type.
-newtype Translations = Translations (Object String)
-derive newtype instance WriteForeign Translations
-derive newtype instance ReadForeign Translations
-
-instance Semigroup Translations where
-  append (Translations t1) (Translations t2) = Translations (t1 <> t2)
 
 -- The keys are the original notification texts.
 newtype NotificationsTranslation = NotificationsTranslation (Object Translations)
@@ -102,6 +96,7 @@ derive newtype instance ReadForeign PropertiesTranslation
 -- The keys are the qualified Action names. Even though Action names are not qualified in the 
 -- DomeinFile, we have qualified them in the Translation.
 newtype ActionsTranslation = ActionsTranslation (Object Translations)
+derive instance Newtype ActionsTranslation _
 derive newtype instance WriteForeign ActionsTranslation
 derive newtype instance ReadForeign ActionsTranslation
 
@@ -206,6 +201,7 @@ newtype PropertiesTranslation_ = PropertiesTranslation_ (Object {translations ::
 -- Keys are state identifiers.
 newtype ActionsPerStateTranslation_ = ActionsPerStateTranslation_ (Object ActionsTranslation_)
 
+-- Keys are action identifiers as they occur in the model.
 newtype ActionsTranslation_ = ActionsTranslation_ (Object { translations :: Translations_})
 
 newtype Translations_ = Translations_ (Object (NULL.Nullable String))
@@ -569,9 +565,15 @@ instance Translation ActionsPerStateTranslation where
   qualify namespace (ActionsPerStateTranslation obj) = let
     namespace' = typeUri2typeNameSpace_ namespace
     in
-    ActionsPerStateTranslation $ fromFoldable 
-      (((toUnfoldable obj) :: Array (Tuple String ActionsTranslation)) <#> 
-        \(Tuple key val) -> Tuple namespace' (qualify namespace' val))
+    ActionsPerStateTranslation $ singleton namespace' 
+      (ActionsTranslation $ fromFoldable $ join
+        (((toUnfoldable obj) :: Array (Tuple String ActionsTranslation)) <#> 
+          \(Tuple key val) -> toUnfoldable (unwrap (qualify namespace' val))))
+
+    -- ActionsPerStateTranslation $ fromFoldable 
+    --   (((toUnfoldable obj) :: Array (Tuple String ActionsTranslation)) <#> 
+    --     \(Tuple key val) -> Tuple namespace' (qualify namespace' val))
+
   -- Keys are the string representations of StateSpecs. Combine each key with the local action names 
   -- to generate a pseudo qualified action name.
   -- Do so by qualifying the keys of the (Object ActionsTranslation) with the state.
@@ -786,9 +788,6 @@ qualifyModelTranslation m@(ModelTranslation{namespace}) = qualify namespace m
 -- Each key is the string representation of a type (ContextType, EnumeratedRoleType,
 -- CalculatedRoleType, EnumeratedPropertyType, CalculatedPropertyType) or of the combination 
 -- of a StateIdentifier and an Action name (separated by '$').
-newtype TranslationTable = TranslationTable (Object Translations)
-derive newtype instance ReadForeign TranslationTable
-derive newtype instance WriteForeign TranslationTable
 
 generateTranslationTable :: ModelTranslation -> TranslationTable
 generateTranslationTable modeltranslation = TranslationTable $ execState (writeKeys modeltranslation) empty
@@ -822,5 +821,73 @@ augmentModelTranslation :: TranslationTable -> ModelTranslation -> ModelTranslat
 augmentModelTranslation = addTranslations
 
 -------------------------------------------------------------------------------
----- RETRIEVE THE LOCAL TRANSLATION TABLE FOR A MODEL
+---- RUNTIME TRANSLATION FUNCTIONS
 -------------------------------------------------------------------------------
+translationOf :: String -> String -> MonadPerspectives String
+translationOf domain text = do
+  language <- getCurrentLanguage
+  mtable <- getTranslationTable domain
+  case mtable of 
+    Nothing -> pure text
+    Just (TranslationTable table) -> case lookup text table of 
+      Nothing -> pure text
+      Just (Translations translations) -> case lookup language translations of 
+        Nothing -> pure text
+        Just translation -> pure translation
+
+translateType :: String -> MonadPerspectives String
+translateType typeName = case typeUri2ModelUri typeName of
+  Nothing -> if isExternalRole typeName 
+    then pure "External"
+    else pure typeName
+  Just domain -> translationOf domain (deconstructBuitenRol typeName)
+
+
+-----------------------------------------------------------
+-- CLASS ADDPERSPECTIVES
+----------------------------------------------------------- 
+class CollectMarkdowns a where
+  collectMarkdowns :: a -> Array String
+
+instance addPerspectivesScreenDefinition :: CollectMarkdowns ScreenDefinition where
+  collectMarkdowns (ScreenDefinition r) = concat $ map concat $ catMaybes [map collectMarkdowns <$> r.tabs, map collectMarkdowns <$> r.rows, map collectMarkdowns <$> r.columns]
+
+instance addPerspectivesScreenElementDef  :: CollectMarkdowns ScreenElementDef where  
+  collectMarkdowns (RowElementD (RowDef re)) = concat $ collectMarkdowns <$> re
+  collectMarkdowns (ColumnElementD (ColumnDef re)) =  concat $ collectMarkdowns <$> re
+  collectMarkdowns (TableElementD (TableDef re)) = []
+  collectMarkdowns (FormElementD (FormDef re)) = []
+  collectMarkdowns (MarkDownElementD re) = collectMarkdowns re
+  collectMarkdowns (ChatElementD re) = []
+
+instance addPerspectivesTabDef  :: CollectMarkdowns TabDef where
+  collectMarkdowns (TabDef {elements}) = concat (collectMarkdowns <$> elements)
+
+instance addPerspectivesColumnDef  :: CollectMarkdowns ColumnDef where
+  collectMarkdowns (ColumnDef cols) = concat (collectMarkdowns <$> cols)
+
+instance addPerspectivesRowDef  :: CollectMarkdowns RowDef where
+  collectMarkdowns (RowDef rows) = concat (collectMarkdowns <$> rows)
+
+instance addPerspectivesTableDef  :: CollectMarkdowns TableDef where
+  collectMarkdowns (TableDef widgetCommonFields) = []
+
+instance addPerspectivesFormDef  :: CollectMarkdowns FormDef where
+  collectMarkdowns (FormDef widgetCommonFields) = []
+
+instance CollectMarkdowns MarkDownDef where
+  collectMarkdowns (MarkDownConstantDef {text}) = [text]
+  collectMarkdowns (MarkDownExpressionDef _) = []
+  collectMarkdowns (MarkDownPerspectiveDef _) = []
+  
+instance CollectMarkdowns ChatDef where
+  collectMarkdowns (ChatDef _) = []
+
+getCurrentLanguageFromIDB :: Aff String
+getCurrentLanguageFromIDB = do 
+  mforeign <- idbGet "currentLanguage" 
+  case mforeign of 
+    Nothing -> pure "en"
+    Just mlang -> case read_ mlang of 
+      Just lang -> pure lang
+      Nothing -> pure "en"

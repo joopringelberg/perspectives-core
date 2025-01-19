@@ -37,6 +37,7 @@ data PerspectivesWarning =
   | NotificationError StateIdentifier
   | AutomaticActionError StateIdentifier
   | ExternalFunctionError String String
+  | NoTranslations String
 
 instance showPerspectivesWarning :: Show PerspectivesWarning where
   show (ModelLacksModelId dfid) = "(ModelLacksModelId) The model '" <> dfid <> "' lacks a value for the property ModelIdentification on its Model instance."
@@ -47,3 +48,4 @@ instance showPerspectivesWarning :: Show PerspectivesWarning where
   show (NotificationError stateId) = "(NotificationError) Error on notifying in state " <> unwrap stateId
   show (AutomaticActionError stateId) = "(AutomaticActionError) Error on executing automatic action in state " <> unwrap stateId 
   show (ExternalFunctionError fname errorstring) = "(ExternalFunctionError) External library function '" <> fname <> "' results in an error: " <> errorstring
+  show (NoTranslations domain) = "(NoTranslations) No translations found for domain '" <> domain <> "'."

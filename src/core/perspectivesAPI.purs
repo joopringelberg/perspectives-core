@@ -423,7 +423,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
         -- The computation of actions depends on subject- and context state, but the client will always send a new request.
         Just userRoleInstance -> do
           res <- (ContextInstance object) ##= getContextActions userRoleType userRoleInstance
-          sendResponse (Result corrId (unwrap <$> res)) setter
+          sendResponse (Result corrId (writeJSON <$> res)) setter
 
     -- { request: "CreateContext"
     -- , subject: contextinstance                       the context instance to add a role instance to.

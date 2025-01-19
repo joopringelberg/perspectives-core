@@ -40,14 +40,15 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectives, (##>), (##>>))
 import Perspectives.Data.EncodableMap (lookup) as EM
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
-import Perspectives.Identifiers (isExternalRole)
+import Perspectives.Identifiers (isExternalRole, qualifyWith)
 import Perspectives.Instances.ObjectGetters (binding_, context, contextType, getActiveRoleStates, getActiveStates, roleType_)
 import Perspectives.ModelDependencies (roleWithId)
+import Perspectives.ModelTranslation (translateType)
 import Perspectives.Parsing.Arc.AST (PropertyFacet(..))
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription(..), domain, domain2roleType, functional, isContextDomain, makeComposition, mandatory, queryFunction, range, roleInContext2Context, roleInContext2Role, roleRange)
 import Perspectives.Query.UnsafeCompiler (context2context, context2role, getDynamicPropertyGetter, getPublicUrl)
 import Perspectives.Representation.ADT (ADT(..), allLeavesInADT)
-import Perspectives.Representation.Class.Identifiable (displayName, identifier)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.Class.PersistentType (getEnumeratedRole)
 import Perspectives.Representation.Class.Property (class PropertyClass)
 import Perspectives.Representation.Class.Property (getProperty, isCalculated, functional, mandatory, range, Property(..), constrainingFacets) as PROP
@@ -128,8 +129,8 @@ serialisePerspective ::
   Maybe PropertyVerbs ->
   Maybe (Array RoleVerb) ->
   Perspective ->
-  AssumptionTracking SerialisedPerspective' 
-serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs' roleVerbs' p@(Perspective {id, object, isEnumerated, displayName, roleTypes, roleVerbs, propertyVerbs, actions}) = do
+  AssumptionTracking SerialisedPerspective'
+serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs' roleVerbs' p@(Perspective {id, object, isEnumerated, roleTypes, roleVerbs, propertyVerbs, actions}) = do
   -- All properties available on the object of the perspective.
   (allProps :: Array PropertyType) <- lift $ allProperties (roleInContext2Role <$> (unsafePartial domain2roleType $ range object))
   -- All PropertyVerbs available on the object of the perspective, given context- and subject state.
@@ -166,14 +167,20 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
   cType <- lift (cid ##>> contextType)
   contextIdToAddRoleInstanceTo <- (unsafePartial computeContextFromPerspectiveObject object) >>= (lift <<< context2context) >>= \f -> lift (cid ##> f)
+  -- NOTE: there can be more than one roleType.
+  (roleType :: String) <- pure (roletype2string <$> unsafePartial fromJust $ head roleTypes)
+  (displayName :: String) <- lift $ translateType roleType
+  translatedActions <- lift (fromFoldable <$> for (nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))) 
+    \actionName -> do 
+      translatedActionName <- translateType (qualifyWith (unwrap cType) actionName)
+      pure $ Tuple actionName translatedActionName)
   pure { id
     , displayName
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
     , userRoleType: (roletype2string userRoleType)
-    -- NOTE: there can be more than one roleType.
-    , roleType: roletype2string <$> head roleTypes
+    , roleType: Just roleType
     , contextInstance: cid
     , roleKind
     , verbs: show <$> case roleVerbs' of
@@ -182,7 +189,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
         -- else combine the verbs from all active states.
         Just verbs -> (intersect verbs $ concat (roleVerbList2Verbs <$> (catMaybes $ (flip EM.lookup roleVerbs) <$> (contextStates <> subjectStates))))
     , properties: fromFoldable ((\r@({id:propId}) -> Tuple propId r) <$> serialisedProps)
-    , actions: nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> (contextStates <> subjectStates)))
+    , actions: translatedActions
     , roleInstances: fromFoldable ((\r@({roleId}) -> Tuple roleId r) <$> roleInstances)
     , contextTypesToCreate
     , contextType: cType
@@ -318,8 +325,9 @@ makeSerialisedProperty pt = do
       isMandatory <- PROP.mandatory propType
       isCalculated <- PROP.isCalculated propType
       range <- PROP.range propType
+      displayName <- translateType (propertytype2string pt)
       pure { id: unwrap $ identifier propType
-      , displayName: displayName propType
+      , displayName
       , isFunctional
       , isMandatory
       , isCalculated
@@ -436,11 +444,16 @@ roleInstancesWithProperties allProps contextSubjectStateBasedProps subjectContex
                   schemeLess <- lift $ lift $ guid (unwrap erole)
                   pure $ Just (createPublicIdentifier url schemeLess))
         _ -> pure Nothing
+      cType <- lift $ lift (cid ##>> contextType)
+      translatedActions <- lift $ lift (fromFoldable <$> for (nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates)))
+        \actionName -> do 
+          translatedActionName <- translateType (qualifyWith (unwrap cType) actionName)
+          pure $ Tuple actionName translatedActionName)
       pure $ Just
         { roleId: (unwrap roleId)
         , objectStateBasedRoleVerbs
         , propertyValues: fromFoldable valuesAndVerbs
-        , actions: nub $ concat (keys <$> (catMaybes $ (flip EM.lookup actions) <$> roleStates))
+        , actions: translatedActions
         , objectStateBasedProperties
         , publicUrl
         , filler

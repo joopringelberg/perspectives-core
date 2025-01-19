@@ -200,6 +200,16 @@ domain model://perspectives.domains#System
       property CurrentDate (Date)
       -- E.g. '13:00', 14:00', etc. This property will be automatically changed right after the hour or as soon as the PDR starts up.
       property CurrentHour (Time)
+      property CurrentLanguage (String)
+        enumeration = ("nl", "en")
+      property PreviousLanguage (String)
+        enumeration = ("nl", "en")
+      
+      state LanguageChanged = not (CurrentLanguage == PreviousLanguage)
+        on entry
+          do for User
+            PreviousLanguage = CurrentLanguage
+            callEffect util:SetCurrentLanguage( "currentLanguage", CurrentLanguage )
 
       view ShowLibraries (ShowLibraries)
 
@@ -247,7 +257,7 @@ domain model://perspectives.domains#System
         only (CreateAndFill, Remove)
         props (InviterLastName) verbs (Consult)
       perspective on External
-        props (ShowLibraries) verbs (Consult, SetPropertyValue)
+        props (ShowLibraries, CurrentLanguage, PreviousLanguage) verbs (Consult, SetPropertyValue)
         props (MyContextsVersion, PDRVersion, CurrentDate, CurrentHour) verbs (Consult)
       -- Notice that these roles are filled with the public version of VersionedModelManifest$External.
       -- We can actually only show properties that are in that perspective.
@@ -293,6 +303,9 @@ domain model://perspectives.domains#System
           row
             form External
               props (MyContextsVersion, PDRVersion, CurrentDate, CurrentHour) verbs (Consult)
+          row
+            form "System language" External
+              props (CurrentLanguage) verbs (SetPropertyValue, Consult)
         tab "SystemCaches"
           row
             form SystemCaches

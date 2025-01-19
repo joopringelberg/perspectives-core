@@ -25,10 +25,11 @@ module Perspectives.RunPerspectives where
 import Control.Monad.Reader (runReaderT)
 import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff)
-import Effect.Aff.AVar (AVar, empty, new) 
+import Effect.Aff.AVar (AVar, empty, new)
 import Perspectives.CoreTypes (MonadPerspectives, PerspectivesState)
+import Perspectives.ModelTranslation (getCurrentLanguageFromIDB)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState)
-import Prelude (bind, show, ($), (<>))
+import Prelude (bind, show, (<<<), (<>), (>>=))
 
 -- | Run an action in MonadPerspectives, given a username and password.
 runPerspectives :: forall a. String -> String -> String -> String -> String -> Int -> MonadPerspectives a
@@ -40,7 +41,7 @@ runPerspectives userName password perspectivesUser systemId host port mp = do
   modelToLoad <- empty
   indexedResourceToCreate <- empty
   missingResource <- empty
-  (rf :: AVar PerspectivesState) <- new $
+  (rf :: AVar PerspectivesState) <- getCurrentLanguageFromIDB >>= new <<< 
     ((newPerspectivesState
         { systemIdentifier: systemId
         , perspectivesUser: perspectivesUser

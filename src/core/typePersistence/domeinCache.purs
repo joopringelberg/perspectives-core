@@ -29,11 +29,13 @@ import Control.Monad.Cont.Trans (lift)
 import Control.Monad.Except (throwError)
 import Control.Monad.State (StateT, execStateT, get, put) as State
 import Data.Array (head)
+import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.MediaType (MediaType(..))
 import Data.Newtype (unwrap)
+import Data.Show (show)
 import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.AVar (AVar, put, take)
@@ -46,20 +48,26 @@ import Perspectives.CoreTypes (JustInTimeModelLoad(..), MonadPerspectives, retri
 import Perspectives.Couchdb (DeleteCouchdbDocument(..))
 import Perspectives.Couchdb.Revision (Revision_)
 import Perspectives.DomeinFile (DomeinFile(..))
+import Perspectives.ErrorLogging (logPerspectivesError, warnModeller)
 import Perspectives.Identifiers (DomeinFileName, buitenRol, deconstructBuitenRol, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.ModelDependencies (build, patch, versionToInstall)
-import Perspectives.Persistence.API (addAttachment, getAttachment, tryGetDocument)
+import Perspectives.Parsing.Messages (PerspectivesError(..))
+import Perspectives.Persistence.API (addAttachment, fromBlob, getAttachment, tryGetDocument)
 import Perspectives.Persistent (forceSaveDomeinFile, getPerspectRol, removeEntiteit, saveEntiteit, tryGetPerspectEntiteit, tryRemoveEntiteit, updateRevision)
-import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad)
+import Perspectives.PerspectivesState (domeinCacheRemove, getModelToLoad, getTranslationTable, setTranslationTable)
 import Perspectives.Representation.CalculatedProperty (CalculatedProperty(..))
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
-import Perspectives.Representation.Class.Cacheable (cacheEntity, setRevision)
+import Perspectives.Representation.Class.Cacheable (cacheEntity, setRevision, tryReadEntiteitFromCache)
+import Perspectives.Representation.Class.Identifiable (identifier)
 import Perspectives.Representation.EnumeratedRole (EnumeratedRole(..))
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value)
 import Perspectives.Representation.State (State(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..))
+import Perspectives.ResourceIdentifiers (resourceIdentifier2DocLocator)
+import Perspectives.Warning (PerspectivesWarning(..))
 import Prelude (Unit, bind, discard, identity, map, pure, unit, void, ($), (*>), (<$>), (<<<), (<>), (>>=))
+import Simple.JSON (readJSON)
 
 storeDomeinFileInCache :: DomeinFileId -> DomeinFile -> MonadPerspectives (AVar DomeinFile)
 storeDomeinFileInCache id df= cacheEntity id df
@@ -114,30 +122,63 @@ modifyStateInDomeinFile modelUri sr@(State {id}) = modifyDomeinFileInCache modif
 -- | If not found, tries to fetch the file from its repository and add it to the local models and the cache.
 -- | Tries to get the version recommended by the Author and otherwise the version with the highest version number.
 -- | If that cannot be established, settles for the document without version.
+-- | Also loads the translations table for the namespace of the DomeinFile.
 -- | The modelUri parameter may be bound to a Versioned ModelURI.
 retrieveDomeinFile :: DomeinFileId -> MonadPerspectives DomeinFile
-retrieveDomeinFile domeinFileId@(DomeinFileId modelUri) = tryGetPerspectEntiteit (DomeinFileId $ unversionedModelUri modelUri) >>= case _ of 
-  -- Now retrieve the DomeinFile from a remote repository and store it in the local "models" database of this user.
-  Nothing -> do 
-    version <- case modelUriVersion modelUri of 
-      Nothing -> map _.semver <$> getVersionToInstall domeinFileId
-      Just v -> pure $ Just v
-    modelToLoadAVar <- getModelToLoad
-    liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
-    result <- liftAff $ take modelToLoadAVar
-    -- Now the forking process waits (blocks) until retrieveFromDomeinFile fills it with another LoadModel request.
-    case result of 
-      -- We now take up communication with the forked process that actually loads the model:
-      HotLine hotline -> do 
-        loadingResult <- liftAff $ take hotline
-        case loadingResult of
-          -- The stop condition for this recursion is tryGetPerspectEntiteit!
-          ModelLoaded -> retrieveDomeinFile domeinFileId
-          LoadingFailed reason -> throwError (error $ "Cannot get " <> modelUri <> " from a repository. Reason: " <> reason)
-          _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modelUri <> ".")
-      -- This should not happen
-      _ -> throwError (error $ "Wrong communication from the forked model loading process!")
-  Just df -> pure df
+retrieveDomeinFile domeinFileId@(DomeinFileId modelUri) = do
+  mdf <- tryReadEntiteitFromCache domeinFileId
+  case mdf of
+    -- The DomeinFile is in the cache, meaning we have loaded the translations table before.
+    Just df -> pure df
+    -- The DomeinFile is not in the cache, so we have to load the translations table.
+    Nothing -> tryGetPerspectEntiteit (DomeinFileId $ unversionedModelUri modelUri) >>= case _ of 
+      -- the DomeinFile is not available in the local database. Retrieve it from a remote repository and store it in the local "models" database of this user.
+      Nothing -> do 
+        version <- case modelUriVersion modelUri of 
+          Nothing -> map _.semver <$> getVersionToInstall domeinFileId
+          Just v -> pure $ Just v
+        modelToLoadAVar <- getModelToLoad
+        liftAff $ put (LoadModel (DomeinFileId ((unversionedModelUri modelUri) <> (maybe "" ((<>) "@") version)))) modelToLoadAVar
+        result <- liftAff $ take modelToLoadAVar
+        -- Now the forking process waits (blocks) until retrieveFromDomeinFile fills it with another LoadModel request.
+        case result of 
+          -- We now take up communication with the forked process that actually loads the model:
+          HotLine hotline -> do 
+            loadingResult <- liftAff $ take hotline
+            case loadingResult of
+              -- The stop condition for this recursion is tryGetPerspectEntiteit!
+              -- It will now find the model in the local database (but not yet in cache)
+              -- the recursive call will then load the translations table.
+              ModelLoaded -> retrieveDomeinFile domeinFileId
+              LoadingFailed reason -> throwError (error $ "Cannot get " <> modelUri <> " from a repository. Reason: " <> reason)
+              _ -> throwError (error $ "Model retrieval from repository was not executed for " <> modelUri <> ".")
+          -- This should not happen
+          _ -> throwError (error $ "Wrong communication from the forked model loading process!")
+      -- The model was available in the local database, but as it was not in cache, we have to load the translations.
+      Just df -> fetchTranslations' df
+
+  where
+    fetchTranslations' :: DomeinFile -> MonadPerspectives DomeinFile
+    fetchTranslations' df = do
+      fetchTranslations (identifier df)
+      pure df
+
+fetchTranslations :: DomeinFileId -> MonadPerspectives Unit
+fetchTranslations (DomeinFileId namespace) = do
+  mtranslations <- getTranslationTable namespace
+  case mtranslations of 
+    Just translations -> pure unit
+    Nothing -> do 
+      -- Retrieve the translations and store in state.
+      {database, documentName} <- resourceIdentifier2DocLocator $ unversionedModelUri namespace
+      mtranslationsFromDb <- getAttachment database documentName "translationtable.json"
+      case mtranslationsFromDb of 
+        Nothing -> warnModeller (NoTranslations namespace)
+        Just f -> do 
+          x <- liftAff $ fromBlob f
+          case readJSON x of
+            Left e -> logPerspectivesError (Custom $ "retrieveDomeinFile. Cannot parse translations table: " <> show e)
+            Right translations -> setTranslationTable namespace translations
 
 -- | Retrieves a string that is a Semantic Version Number. Also returns the external role of the VersionedModelManifest.
 -- | The version is either the version number designated by the Author of the model to be installed,

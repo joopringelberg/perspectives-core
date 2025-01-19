@@ -56,7 +56,7 @@ import Perspectives.DataUpgrade.RecompileLocalModels as RECOMPILE
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.Error.Boundaries (handlePerspectRolError')
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, modelsDatabaseName, roleInstancesFromCouchdb)
+import Perspectives.Extern.Couchdb (addModelToLocalStore, isInitialLoad, roleInstancesFromCouchdb)
 import Perspectives.Extern.Utilities (pdrVersion)
 import Perspectives.External.CoreModules (addAllExternalFunctions)
 import Perspectives.Identifiers (buitenRol)
@@ -64,6 +64,7 @@ import Perspectives.Instances.Builders (createAndAddRoleInstance)
 import Perspectives.Instances.Indexed (indexedContexts_, indexedRoles_)
 import Perspectives.Instances.ObjectGetters (context, externalRole)
 import Perspectives.ModelDependencies (indexedContext, indexedContextName, indexedRole, indexedRoleName, sysUser, userWithCredentialsAuthorizedDomain, userWithCredentialsPassword, userWithCredentialsUsername)
+import Perspectives.ModelTranslation (getCurrentLanguageFromIDB)
 import Perspectives.Names (getMySystem)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (DatabaseName, Keys(..), PouchdbUser, UserName, createDatabase, databaseInfo, decodePouchdbUser', deleteDatabase, getViewOnDatabase)
@@ -71,7 +72,7 @@ import Perspectives.Persistence.CouchdbFunctions (setSecurityDocument)
 import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, invertedQueryDatabaseName, postDatabaseName, saveMarkedResources)
-import Perspectives.PerspectivesState (defaultRuntimeOptions, newPerspectivesState, resetCaches)
+import Perspectives.PerspectivesState (defaultRuntimeOptions, modelsDatabaseName, newPerspectivesState, resetCaches)
 import Perspectives.Proxy (internalChannelPromise) as Proxy
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.ReferentialIntegrity (fixReferences)
@@ -127,7 +128,7 @@ runPDR usr rawPouchdbUser options callback = void $ runAff handler do
       modelToLoad <- empty
       indexedResourceToCreate <- empty
       missingResource <- empty
-      state <- new $ newPerspectivesState
+      state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState
         pouchdbUser 
         transactionFlag 
         transactionWithTiming 
@@ -428,7 +429,7 @@ createAccount perspectivesUser rawPouchdbUser runtimeOptions nullableIdentityDoc
       modelToLoad <- empty
       indexedResourceToCreate <- empty
       missingResource <- empty
-      state <- new $ newPerspectivesState 
+      state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState 
         pouchdbUser 
         transactionFlag 
         transactionWithTiming 
@@ -482,7 +483,7 @@ reCreateInstances rawPouchdbUser options callback = void $ runAff handler
         modelToLoad <- empty
         indexedResourceToCreate <- empty
         missingResource <- empty
-        state <- new $ newPerspectivesState 
+        state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState 
           pouchdbUser 
           transactionFlag 
           transactionWithTiming 
@@ -532,7 +533,7 @@ resetAccount usr rawPouchdbUser options callback = void $ runAff handler
         modelToLoad <- empty
         indexedResourceToCreate <- empty
         missingResource <- empty
-        state <- new $ newPerspectivesState 
+        state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState 
           pouchdbUser 
           transactionFlag 
           transactionWithTiming 
@@ -638,7 +639,7 @@ removeAccount usr rawPouchdbUser callback = void $ runAff handler
         modelToLoad <- empty
         indexedResourceToCreate <- empty
         missingResource <- empty
-        state <- new $ newPerspectivesState 
+        state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState 
           pouchdbUser 
           transactionFlag 
           transactionWithTiming 
@@ -701,7 +702,7 @@ recompileLocalModels rawPouchdbUser callback = void $ runAff handler
         modelToLoad <- empty
         indexedResourceToCreate <- empty 
         missingResource <- empty
-        state <- new $ newPerspectivesState
+        state <- getCurrentLanguageFromIDB >>= new <<< newPerspectivesState
           pouchdbUser 
           transactionFlag 
           transactionWithTiming 

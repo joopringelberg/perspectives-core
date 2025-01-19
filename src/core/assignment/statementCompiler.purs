@@ -38,7 +38,7 @@ import Perspectives.Checking.Authorization (roleHasPerspectiveOnRoleWithVerb)
 import Perspectives.CoreTypes ((###=))
 import Perspectives.DependencyTracking.Array.Trans (runArrayT)
 import Perspectives.External.CoreModuleList (isExternalCoreModule)
-import Perspectives.External.HiddenFunctionCache (lookupHiddenFunctionCardinality, lookupHiddenFunctionIsEffect, lookupHiddenFunctionNArgs)
+import Perspectives.External.HiddenFunctionCache (lookupHiddenFunction, lookupHiddenFunctionCardinality, lookupHiddenFunctionIsEffect, lookupHiddenFunctionNArgs)
 import Perspectives.Identifiers (areLastSegmentsOf, buitenRol, typeUri2ModelUri, endsWithSegments, isExternalRole, isTypeUri)
 import Perspectives.Instances.Combinators (filter')
 import Perspectives.ModelDependencies (rootContext)
@@ -431,27 +431,29 @@ compileStatement stateIdentifiers originDomain currentcontextDomain userRoleType
         (qualifiedProperty :: EnumeratedPropertyType) <- qualifyPropertyWithRespectTo propertyIdentifier roleQfd f.start f.end
         pure $ MQD originDomain (QF.CreateFileF mimeType qualifiedProperty) [filenameQfd, contentQfd, roleQfd] originDomain True False
 
-      ExternalEffect f@{start, end, effectName, arguments} -> if lookupHiddenFunctionIsEffect effectName
-        then do
-          case (typeUri2ModelUri effectName) of
-            Nothing -> throwError (NotWellFormedName start effectName)
-            Just modelName -> if isExternalCoreModule modelName
-              then do
-                mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
-                -- TODO. Check here whether effectName refers to an Effect and not to a query function!
-                case mexpectedNrOfArgs of
-                  Nothing -> throwError (UnknownExternalFunction start end effectName)
-                  Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
-                    then do
-                      isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality effectName
-                      -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
-                      -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
-                      compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
-                      pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain isFunctional Unknown
-                    else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
-              -- TODO: behandel hier Foreign functions.
-              else throwError (UnknownExternalFunction start end effectName)
-        else throwError (NotAnEffect start end effectName)
+      ExternalEffect f@{start, end, effectName, arguments} -> case lookupHiddenFunction effectName of 
+        Nothing -> throwError (UnknownExternalFunction start end effectName)
+        Just _ ->  if lookupHiddenFunctionIsEffect effectName
+          then do
+            case (typeUri2ModelUri effectName) of
+              Nothing -> throwError (NotWellFormedName start effectName)
+              Just modelName -> if isExternalCoreModule modelName
+                then do
+                  mexpectedNrOfArgs <- pure $ lookupHiddenFunctionNArgs effectName
+                  -- TODO. Check here whether effectName refers to an Effect and not to a query function!
+                  case mexpectedNrOfArgs of
+                    Nothing -> throwError (UnknownExternalFunction start end effectName)
+                    Just expectedNrOfArgs -> if expectedNrOfArgs == length arguments || expectedNrOfArgs == length arguments - 1
+                      then do
+                        isFunctional <- pure $ unsafePartial $ fromJust $ lookupHiddenFunctionCardinality effectName
+                        -- The argument is an expression that can yield a ContextInstance, a RoleInstance or a Value.
+                        -- If it yields a Value taken from some Property, then the subject has an implicit Perspective in this State on that PropertyType.
+                        compiledArguments <- traverse (\s -> compileExpression originDomain s) arguments
+                        pure $ MQD originDomain (QF.ExternalEffectFullFunction effectName) compiledArguments originDomain isFunctional Unknown
+                      else throwError (WrongNumberOfArguments start end effectName expectedNrOfArgs (length arguments))
+                -- TODO: behandel hier Foreign functions.
+                else throwError (UnknownExternalFunction start end effectName)
+          else throwError (NotAnEffect start end effectName)
       ExternalDestructiveEffect f@{start, end, effectName, arguments} -> do
         case (typeUri2ModelUri effectName) of
           Nothing -> throwError (NotWellFormedName start effectName)

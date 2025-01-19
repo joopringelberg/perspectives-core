@@ -627,7 +627,7 @@ domain model://perspectives.domains#CouchdbManagement
       -- The design pattern for nested public contexts requires that Admin has write access
       -- to both the cw_servers_and_repositories and to the Repository database.
       perspective on Manifests
-        only (Create, Fill, Delete, RemoveContext, DeleteContext, CreateAndFill)
+        only (Create, Fill, Delete, Remove, RemoveContext, DeleteContext, CreateAndFill)
         props (Description, LocalModelName) verbs (Consult)
         props (DomeinFileName) verbs (SetPropertyValue, Consult)
         in object state NoLocalModelName

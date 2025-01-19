@@ -68,7 +68,9 @@ type SerialisedPerspective' =
   -- unified with all properties that are available given the Object states of
   -- instances. In a table, we should create a column for each.
   , properties :: Object SerialisedProperty
-  , actions :: Array String
+  -- the keys are the action names as they occur in the model.
+  -- the values are the translations in the currentLanguage.
+  , actions :: Object String
   }
 
 -- | SerialisedProperty is state-independent.
@@ -107,7 +109,8 @@ type RoleInstanceWithProperties =
   -- Note that a perspective may have more properties than that this instance
   -- has values for, due to object state.
   , propertyValues :: Object ValuesWithVerbs
-  , actions :: Array String
+  -- The keys are action names, the values their translation.
+  , actions :: Object String
   -- This member is not needed on the client side, but we need it to
   -- compile a complete list of SerialisedProperties.
   , objectStateBasedProperties :: Array PropertyType

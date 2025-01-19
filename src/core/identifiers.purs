@@ -398,7 +398,9 @@ buitenRol s = s <> "$External"
 
 -- | Returns the identifier minus the "$External" part.
 deconstructBuitenRol :: String -> String
-deconstructBuitenRol s = replaceAll (Pattern "$External") (Replacement "") s
+deconstructBuitenRol s = case stripSuffix (Pattern "$External") s of
+  Nothing -> s
+  Just n -> n
 
 isExternalRole :: String -> Boolean
 isExternalRole n = isJust $ stripSuffix (Pattern "External") n

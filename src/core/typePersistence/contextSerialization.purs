@@ -26,7 +26,7 @@ module Perspectives.TypePersistence.ContextSerialisation where
 import Prelude
 
 import Control.Monad.Trans.Class (lift)
-import Data.Array (catMaybes, concat, elemIndex, filter, filterA, head, length, null)
+import Data.Array (catMaybes, elemIndex, filter, filterA, head, length, null)
 import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (for, traverse)
@@ -38,6 +38,7 @@ import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (typeUri2ModelUri_)
 import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
+import Perspectives.ModelTranslation (translationOf)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances)
@@ -77,7 +78,7 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
             -- die het gecontextualiseerde perspectief inzet.
             -- Het resultaat invoegen in WidgetCommonDieldsDef.
             mscreen <- contextualiseScreen s 
-            case mscreen of 
+            case mscreen of  
               Nothing -> defaultScreen
               Just contextualisedScreen -> pure $ SerialisedScreen $ writeJSON contextualisedScreen
           Nothing -> defaultScreen
@@ -139,6 +140,9 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
       case mwidgetFields of 
         Just widgetFields' -> pure $ Just $ MarkDownPerspectiveDef {widgetFields: widgetFields', conditionProperty}
         Nothing -> pure Nothing
+    MarkDownConstantDef r@{text, domain} -> do 
+      translatedText <- lift $ lift $ translationOf domain text
+      pure $ Just $ MarkDownConstantDef r {text = translatedText}
     _ -> pure $ Just md
 
   contextualiseChatDef :: ChatDef -> MPQ (Maybe ChatDef)
@@ -256,10 +260,9 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
 
 -----------------------------------------------------------
 -- CLASS ADDPERSPECTIVES
------------------------------------------------------------
+----------------------------------------------------------- 
 class AddPerspectives a where
   addPerspectives :: a -> RoleInstance -> ContextInstance -> AssumptionTracking a
-  collectMarkdowns :: a -> Array String
 
 instance addPerspectivesScreenDefinition :: AddPerspectives ScreenDefinition where
   addPerspectives (ScreenDefinition r) user ctxt = do
@@ -273,7 +276,6 @@ instance addPerspectivesScreenDefinition :: AddPerspectives ScreenDefinition whe
       Nothing -> pure Nothing
       Just t -> Just <$> traverse (\a -> addPerspectives a user ctxt) t
     pure $ ScreenDefinition {title: r.title, tabs, rows, columns}
-  collectMarkdowns (ScreenDefinition r) = concat $ map concat $ catMaybes [map collectMarkdowns <$> r.tabs, map collectMarkdowns <$> r.rows, map collectMarkdowns <$> r.columns]
 
 instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef where
   addPerspectives (RowElementD re) user ctxt = RowElementD <$> addPerspectives re user ctxt
@@ -282,32 +284,22 @@ instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef wh
   addPerspectives (FormElementD re) user ctxt = FormElementD <$> addPerspectives re user ctxt
   addPerspectives (MarkDownElementD re) user ctxt = MarkDownElementD <$> addPerspectives re user ctxt
   addPerspectives (ChatElementD re) user ctxt = ChatElementD <$> addPerspectives re user ctxt
-  
-  collectMarkdowns (RowElementD (RowDef re)) = concat $ collectMarkdowns <$> re
-  collectMarkdowns (ColumnElementD (ColumnDef re)) =  concat $ collectMarkdowns <$> re
-  collectMarkdowns (TableElementD (TableDef re)) = []
-  collectMarkdowns (FormElementD (FormDef re)) = []
-  collectMarkdowns (MarkDownElementD re) = collectMarkdowns re
-  collectMarkdowns (ChatElementD re) = []
 
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
   addPerspectives (TabDef r) user ctxt = do
     elements <- traverse (\a -> addPerspectives a user ctxt) r.elements
     pure $ TabDef {title: r.title, isDefault: r.isDefault, elements}
-  collectMarkdowns (TabDef {elements}) = concat (collectMarkdowns <$> elements)
 
 instance addPerspectivesColumnDef  :: AddPerspectives ColumnDef where
   addPerspectives (ColumnDef cols) user ctxt = do
     cols' <- traverse (traverseScreenElement user ctxt) cols
     pure $ ColumnDef (catMaybes cols')
-  collectMarkdowns (ColumnDef cols) = concat (collectMarkdowns <$> cols)
 
 instance addPerspectivesRowDef  :: AddPerspectives RowDef where
   addPerspectives (RowDef rows) user ctxt = do
     rows' <- traverse (traverseScreenElement user ctxt) rows
     -- A MarkDownDef with a condition that fails should not be in the end result.
     pure $ RowDef (catMaybes rows')
-  collectMarkdowns (RowDef rows) = concat (collectMarkdowns <$> rows)
 
 instance addPerspectivesTableDef  :: AddPerspectives TableDef where
   addPerspectives (TableDef widgetCommonFields) user ctxt = do
@@ -316,7 +308,6 @@ instance addPerspectivesTableDef  :: AddPerspectives TableDef where
       widgetCommonFields
       ctxt
     pure $ TableDef widgetCommonFields {perspective = Just perspective}
-  collectMarkdowns (TableDef widgetCommonFields) = []
 
 instance addPerspectivesFormDef  :: AddPerspectives FormDef where
   addPerspectives (FormDef widgetCommonFields) user ctxt = do
@@ -325,7 +316,6 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
       widgetCommonFields
       ctxt
     pure $ FormDef widgetCommonFields {perspective = Just perspective}
-  collectMarkdowns (FormDef widgetCommonFields) = []
 
 instance AddPerspectives MarkDownDef where
   -- TODO: TRANSLATION HERE!
@@ -337,15 +327,11 @@ instance AddPerspectives MarkDownDef where
       widgetFields
       ctxt
     pure $ MarkDownPerspectiveDef {widgetFields: widgetFields {perspective = Just perspective}, conditionProperty}
-  collectMarkdowns (MarkDownConstantDef {text}) = [text]
-  collectMarkdowns (MarkDownExpressionDef _) = []
-  collectMarkdowns (MarkDownPerspectiveDef _) = []
   
 instance AddPerspectives ChatDef where
   addPerspectives (ChatDef r@ {chatRole}) user ctxt = do 
     chatRoleInstance <- runArrayT (getRoleInstances chatRole ctxt)
     pure $ ChatDef r {chatInstance = head chatRoleInstance}
-  collectMarkdowns (ChatDef _) = []
 
 traverseScreenElement :: RoleInstance -> ContextInstance -> ScreenElementDef -> AssumptionTracking (Maybe ScreenElementDef)
 traverseScreenElement user ctxt a = case a of 

@@ -30,7 +30,7 @@ import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except (ExceptT, runExceptT)
-import Control.Monad.State (execState)
+import Control.Monad.State (execState, execStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (catMaybes, difference, elemIndex, filter, head, null)
 import Data.Either (Either(..))
@@ -41,29 +41,30 @@ import Data.Maybe (Maybe(..), isJust)
 import Data.MediaType (MediaType(..))
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (for, traverse)
+import Data.TraversableWithIndex (traverseWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect.Aff (try)
-import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
-import Foreign (unsafeToForeign)
+import Foreign.Object (empty)
 import Perspectives.ContextAndRole (rol_property)
 import Perspectives.CoreTypes (MonadPerspectivesTransaction)
-import Perspectives.Couchdb (DeleteCouchdbDocument(..))
-import Perspectives.DomeinCache (storeDomeinFileInCouchdbPreservingAttachments)
-import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification, setRevision)
+import Perspectives.Couchdb (AttachmentInfo)
+import Perspectives.DomeinCache (addAttachments, storeDomeinFileInCouchdbPreservingAttachments)
+import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, addDownStreamNotification)
 import Perspectives.Error.Boundaries (handleDomeinFileError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.ExecuteInTopologicalOrder (executeInTopologicalOrder) as TOP
 import Perspectives.InvertedQuery.Storable (saveInvertedQueries)
 import Perspectives.ModelDependencies (domeinFileName, modelManifest, versionToInstall)
 import Perspectives.Parsing.Messages (PerspectivesError(..), MultiplePerspectivesErrors)
-import Perspectives.Persistence.API (Keys(..), addAttachment, addDocument, documentsInDatabase, getAttachment, getViewOnDatabase, includeDocs, toFile)
+import Perspectives.Persistence.API (Keys(..), addDocument, documentsInDatabase, getAttachment, getViewOnDatabase, includeDocs)
 import Perspectives.Persistence.Types (Url)
 import Perspectives.Persistent (getDomeinFile, getPerspectRol)
+import Perspectives.Representation.Class.Cacheable (setRevision)
 import Perspectives.Representation.InstanceIdentifiers (RoleInstance(..), Value(..))
 import Perspectives.Representation.TypeIdentifiers (DomeinFileId(..), EnumeratedPropertyType(..))
 import Perspectives.TypePersistence.LoadArc (loadAndCompileArcFile_)
-import Simple.JSON (class ReadForeign, read, read', writeJSON)
+import Simple.JSON (class ReadForeign, read, read')
 
 -- | Parse and compile the versions to install of all models found at the URL, e.g. https://perspectives.domains/models_perspectives_domains
 recompileModelsAtUrl :: Url -> Url -> MonadPerspectivesTransaction Unit
@@ -80,8 +81,10 @@ recompileModelsAtUrl modelsDb manifestsDb = do
     Left errors -> logPerspectivesError (Custom ("recompileModelsAtUrl: " <> show errors)) 
     _ -> pure unit
   where
+    -- This function is similar to recompileModel, but it does not distribute the state notifications and automatic effects over the other models.
+    -- However, it does preserve attachments found in the original model.
     recompileModelAtUrl :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-    recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _id, _rev, arc}) =
+    recompileModelAtUrl model@(UninterpretedDomeinFile{namespace, _id, _rev, arc, _attachments}) =
       do
         log ("Recompiling " <> namespace)
         r <- lift $ loadAndCompileArcFile_ (DomeinFileId namespace) arc
@@ -89,17 +92,15 @@ recompileModelsAtUrl modelsDb manifestsDb = do
           Left m -> logPerspectivesError $ Custom ("recompileModelsAtUrl: " <> show m)
           Right (Tuple df@(DomeinFile dfr@{id}) invertedQueries) -> lift $ lift do
             log $  "Recompiled '" <> namespace <> "' succesfully (" <> namespace <> ")!"
-
-            mscreensAttachment <- getAttachment modelsDb _id "screens.js"
-            _rev' <- addDocument modelsDb (setRevision _rev (DomeinFile dfr {_id = _id})) namespace
-            case mscreensAttachment of 
-              Nothing -> do 
-                theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ writeJSON invertedQueries)
-                void $ addAttachment modelsDb _id _rev' "storedQueries.json" theFile (MediaType "application/json")
-              Just screensAttachment -> do
-                DeleteCouchdbDocument {rev} <- addAttachment modelsDb _id _rev' "screens.js" screensAttachment (MediaType "text/exmascript")
-                theFile <- liftEffect $ toFile "storedQueries.json" "application/json" (unsafeToForeign $ writeJSON invertedQueries)
-                void $ addAttachment modelsDb _id rev "storedQueries.json" theFile (MediaType "application/json")
+            df' <- pure $ DomeinFile dfr { _id = _id, _rev = Just _rev, _attachments = _attachments}
+            _rev' <- addDocument modelsDb df' namespace
+            attachments <- case _attachments of
+              Nothing -> pure empty
+              Just atts ->  traverseWithIndex
+                (\attName {content_type} -> Tuple (MediaType content_type) <$> getAttachment modelsDb _id attName)
+                atts
+            newRev <- execStateT (addAttachments modelsDb _id attachments) _rev'
+            setRevision id newRev
         pure model
     getVersionedDomeinFileName :: String -> MonadPerspectivesTransaction (Maybe String)
     getVersionedDomeinFileName rid = do 
@@ -109,8 +110,11 @@ recompileModelsAtUrl modelsDb manifestsDb = do
         _, _ -> pure Nothing
 
 
+-- | As this function recompiles a model stored in the local models database, it not only actually recompiles the source, but also
+-- | distributes the state notifications and automatic effects over the other models.
+-- | It preserves attachments found in the original model.
 recompileModel :: UninterpretedDomeinFile -> ExceptT MultiplePerspectivesErrors MonadPerspectivesTransaction UninterpretedDomeinFile
-recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
+recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc, _attachments}) =
   do
     log ("Recompiling " <> namespace)
     r <- lift $ loadAndCompileArcFile_ (DomeinFileId namespace) arc
@@ -119,7 +123,7 @@ recompileModel model@(UninterpretedDomeinFile{_rev, _id, namespace, arc}) =
       Right (Tuple df@(DomeinFile drf@{invertedQueriesInOtherDomains, upstreamStateNotifications, upstreamAutomaticEffects}) invertedQueries) -> lift $ lift do
         log $  "Recompiled '" <> namespace <> "' succesfully!"
         -- We have to add the _id here manually.
-        df' <- pure $ DomeinFile drf { _id = _id}
+        df' <- pure $ DomeinFile drf { _id = _id, _attachments = _attachments}
         storeDomeinFileInCouchdbPreservingAttachments df'
         saveInvertedQueries invertedQueries
 
@@ -169,6 +173,7 @@ newtype UninterpretedDomeinFile = UninterpretedDomeinFile
   , namespace :: String
   , referredModels :: Array String
   , arc :: String
+  , _attachments :: Maybe AttachmentInfo
   }
 
 instance readForeignUninterpretedDomeinFile :: ReadForeign UninterpretedDomeinFile where

@@ -28,6 +28,7 @@ import Data.Show (show)
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (traverse)
 import Perspectives.CoreTypes (MonadPerspectives, evalMonadPerspectivesQuery, type (~~>))
+import Perspectives.ModelTranslation (translationOf)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (context2string, role2string)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance)
@@ -38,21 +39,23 @@ type CompiledSentence a = a -> MonadPerspectives String
 
 -- | Compile a Sentence to a function that creates a string out of a RoleInstance.
 compileSentence :: forall a.
+  String ->
   (QueryFunctionDescription -> MonadPerspectives (a ~~> String)) ->
   Sentence ->
   MonadPerspectives (CompiledSentence a)
-compileSentence xToString (Sentence {sentence, parts}) = do
+compileSentence domain xToString (Sentence {sentence, parts}) = do
   compiledParts <- traverse (xToString >=> pure <<< flip evalMonadPerspectivesQuery)
     parts
   pure \roleId -> do
     (replacements :: Array String) <- concat <$> traverse (\p -> p roleId) compiledParts
     -- TODO: replace sentence with its translation before applying the expression value replacements to it.
+    translatedSentence <- translationOf domain sentence
     pure (foldlWithIndex (\i s next -> replace (Pattern ("$" <> show i)) (Replacement next) s) sentence replacements)
 
 -- | From a Sentence, create a function that takes a ContextInstance and produces a String in MonadPerspectives.
-compileContextSentence :: Sentence -> MonadPerspectives (CompiledSentence ContextInstance)
-compileContextSentence = compileSentence context2string
+compileContextSentence :: String -> Sentence -> MonadPerspectives (CompiledSentence ContextInstance)
+compileContextSentence domain = compileSentence domain context2string
 
 -- | From a Sentence, create a function that takes a RoleInstance and produces a String in MonadPerspectives.
-compileRoleSentence :: Sentence -> MonadPerspectives (CompiledSentence RoleInstance)
-compileRoleSentence = compileSentence role2string
+compileRoleSentence :: String -> Sentence -> MonadPerspectives (CompiledSentence RoleInstance)
+compileRoleSentence domain = compileSentence domain role2string

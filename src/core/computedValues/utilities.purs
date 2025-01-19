@@ -24,9 +24,9 @@
 
 module Perspectives.Extern.Utilities where
 
-import Affjax.Web (Response, printError, request)
 import Affjax.RequestBody as RequestBody
 import Affjax.ResponseFormat as ResponseFormat
+import Affjax.Web (Response, printError, request)
 import Control.Monad.AvarMonadAsk (gets)
 import Control.Monad.Error.Class (throwError, try)
 import Control.Monad.Trans.Class (lift)
@@ -41,14 +41,17 @@ import Data.String (replace) as String
 import Data.String.Regex (regex, replace) as REGEX
 import Data.String.Regex.Flags (noFlags)
 import Data.Tuple (Tuple(..))
+import Data.Unit (Unit, unit)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Exception (error)
 import Effect.Random (randomRange)
 import Effect.Uncurried (EffectFn3, runEffectFn3)
+import IDBKeyVal (idbSet) as IDBKeyVal
+import Parsing (ParseError)
 import Perspectives.Authenticate (getMyPublicKey)
-import Perspectives.CoreTypes (MonadPerspectivesQuery)
+import Perspectives.CoreTypes (MonadPerspectivesQuery, MonadPerspectivesTransaction)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.Error.Boundaries (handleExternalFunctionError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
@@ -61,6 +64,7 @@ import Perspectives.Parsing.Arc.IndentParser (runIndentParser)
 import Perspectives.Parsing.Arc.PhaseTwoDefs (evalPhaseTwo')
 import Perspectives.Parsing.Messages (MultiplePerspectivesErrors)
 import Perspectives.Persistence.State (getSystemIdentifier)
+import Perspectives.PerspectivesState (setCurrentLanguage) as PState
 import Perspectives.Query.ExpandPrefix (ensureModel, expandPrefix)
 import Perspectives.Query.ExpressionCompiler (compileExpression)
 import Perspectives.Query.QueryTypes (Domain(..), QueryFunctionDescription, RoleInContext(..))
@@ -70,8 +74,7 @@ import Perspectives.Representation.InstanceIdentifiers (ContextInstance(..), Rol
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..))
 import Perspectives.ResourceIdentifiers (createCuid)
 import Prelude (class Show, bind, discard, pure, show, void, ($), (<<<), (<>), (>=>), (>>=), (*>))
-import Simple.JSON (readJSON, writeJSON)
-import Parsing (ParseError)
+import Simple.JSON (readJSON, write, writeJSON)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- TODO: verander naar echte gegenereerde identifiers.
@@ -255,6 +258,19 @@ getSharedFileServerKey keyArray _ = try
     )
   >>= handleExternalFunctionError "model://perspectives.domains#Utilities$GetSharedFileServerKey"
 
+idbSet :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+idbSet keys values _ = case head keys, head values of
+  Just key, Just value -> liftAff $ IDBKeyVal.idbSet key (write value)
+  _, _ -> pure unit
+
+setCurrentLanguage :: Array String -> Array String -> RoleInstance -> MonadPerspectivesTransaction Unit
+setCurrentLanguage keys values _ = case head keys, head values of
+  Just key, Just value -> do
+    liftAff $ IDBKeyVal.idbSet key (write value)
+    lift $ PState.setCurrentLanguage value
+  _, _ -> pure unit
+
+
 -- | An Array of External functions. Each External function is inserted into the ExternalFunctionCache and can be retrieved
 -- | with `Perspectives.External.HiddenFunctionCache.lookupHiddenFunction`.
 externalFunctions :: Array (Tuple String HiddenFunctionDescription)
@@ -273,4 +289,6 @@ externalFunctions =
   , Tuple "model://perspectives.domains#Utilities$SystemParameter" {func: unsafeCoerce systemParameter_, nArgs: 1, isFunctional: True, isEffect: false}
   , Tuple "model://perspectives.domains#Utilities$CreateInvitation" {func: unsafeCoerce createInvitation_, nArgs: 3, isFunctional: True, isEffect: false}
   , Tuple "model://perspectives.domains#Utilities$GetSharedFileServerKey" {func: unsafeCoerce getSharedFileServerKey, nArgs: 1, isFunctional: True, isEffect: false}
+  , Tuple "model://perspectives.domains#Utilities$IdbSet" {func: unsafeCoerce idbSet, nArgs: 2, isFunctional: True, isEffect: true}
+  , Tuple "model://perspectives.domains#Utilities$SetCurrentLanguage" {func: unsafeCoerce setCurrentLanguage, nArgs: 2, isFunctional: True, isEffect: true}
   ]

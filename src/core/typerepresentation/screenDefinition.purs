@@ -73,7 +73,7 @@ newtype ColumnDef = ColumnDef (Array ScreenElementDef)
 newtype TableDef = TableDef WidgetCommonFieldsDef
 newtype FormDef = FormDef WidgetCommonFieldsDef
 data MarkDownDef = 
-  MarkDownConstantDef {text :: String, condition :: Maybe QueryFunctionDescription} |
+  MarkDownConstantDef {text :: String, condition :: Maybe QueryFunctionDescription, domain :: String} |
   MarkDownPerspectiveDef { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType} |
   MarkDownExpressionDef {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String}
 newtype ChatDef = ChatDef (ChatDefFields (chatRole :: RoleType))
@@ -196,7 +196,7 @@ instance ReadForeign ScreenElementDef where
       "MarkDownElementD" -> do 
         ({tag, element:subElement} :: {tag :: String, element :: Foreign}) <- read' element
         unsafePartial $ case tag of
-          "MarkDownConstantDef" -> MarkDownElementD <<< MarkDownConstantDef <$> ((read' subElement) :: F {text :: String, condition :: Maybe QueryFunctionDescription})
+          "MarkDownConstantDef" -> MarkDownElementD <<< MarkDownConstantDef <$> ((read' subElement) :: F {text :: String, condition :: Maybe QueryFunctionDescription, domain :: String})
           "MarkDownPerspectiveDef" -> MarkDownElementD <<< MarkDownPerspectiveDef <$> ((read' subElement) :: F { widgetFields :: WidgetCommonFieldsDef, conditionProperty :: Maybe PropertyType})
           "MarkDownExpressionDef" -> MarkDownElementD <<< MarkDownExpressionDef <$> ((read' subElement) :: F {textQuery :: QueryFunctionDescription, condition :: Maybe QueryFunctionDescription,  text :: Maybe String})
       "ChatElementD" -> ChatElementD <$> ((read' element) :: F ChatDef)

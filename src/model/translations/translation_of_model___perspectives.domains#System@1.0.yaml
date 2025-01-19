@@ -54,6 +54,14 @@ model://perspectives.domains#System:
         nl: Perspectivessysteem
       external:
         properties:
+          PreviousLanguage:
+            translations:
+              en: Previous language
+              nl: Vorige taalkeuze
+          CurrentLanguage:
+            translations:
+              en: Current language
+              nl: Huidige taalkeuze
           CurrentHour:
             translations:
               en: Current hour
@@ -104,6 +112,37 @@ model://perspectives.domains#System:
               translations:
                 en: Channel
                 nl: Kanaal
+          actions:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+            model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$Filled:
+              Detach:
+                translations:
+                  en: Detach model
+                  nl: Ontkoppel van model
+            model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$UnFilled:
+              Reattach:
+                translations:
+                  en: Reattach model
+                  nl: Koppel opnieuw met model
+            model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$InstallBuild:
+              UpdateBuild:
+                translations:
+                  en: Update build
+                  nl: Actualiseer build
+            model://perspectives.domains#System$PerspectivesSystem$ModelsInUse$InstallUpdate:
+              InstallPatch:
+                translations:
+                  en: Install patch
+                  nl: Installeer patch
+            model://perspectives.domains#System$PerspectivesSystem$User:
+              ResetInvertedQueryDatabase:
+                translations:
+                  en: Reset inverted query database
+                  nl: Leeg inverted query database
       things:
         AllNotifications:
           translations:
@@ -249,6 +288,12 @@ model://perspectives.domains#System:
           translations:
             en: Notified user
             nl: Vergewittigde gebruiker
+          actions:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
       contextroles:
         Notifications:
           translations:
@@ -384,6 +429,12 @@ model://perspectives.domains#System:
           translations:
             en: Inviter
             nl: Uitnodiger
+          actions:
+            model://perspectives.domains#System$Invitation$External$Message:
+              CreateInvitation:
+                translations:
+                  en: Create invitation
+                  nl: Maak uitnodiging
     ManifestCollection:
       translations:
         en: Manifest collection

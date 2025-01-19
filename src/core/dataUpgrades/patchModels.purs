@@ -10,9 +10,9 @@ import Foreign.Object (Object, lookup)
 import Main.RecompileBasicModels (UninterpretedDomeinFile(..))
 import Perspectives.CoreTypes (MonadPerspectives)
 import Perspectives.ErrorLogging (logPerspectivesError)
-import Perspectives.Extern.Couchdb (modelsDatabaseName)
 import Perspectives.Parsing.Messages (PerspectivesError(..))
 import Perspectives.Persistence.API (addDocument_, documentsInDatabase, includeDocs)
+import Perspectives.PerspectivesState (modelsDatabaseName)
 import Perspectives.ResourceIdentifiers (resourceIdentifier2WriteDocLocator)
 import Simple.JSON (read) as JSON
 

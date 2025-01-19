@@ -171,9 +171,9 @@ instance ReadForeign StateFulObject where
       "Srole" -> pure $ Srole $ EnumeratedRoleType typ
 
 data Notification = 
-  ContextNotification (TimeFacets (sentence :: Sentence) )
+  ContextNotification (TimeFacets (sentence :: Sentence, domain :: String) )
   |
-  RoleNotification (TimeFacets (currentContextCalculation :: QueryFunctionDescription, sentence :: Sentence))
+  RoleNotification (TimeFacets (currentContextCalculation :: QueryFunctionDescription, sentence :: Sentence, domain :: String))
 
 derive instance genericNotification :: Generic Notification _
 instance showNotification :: Show Notification where show = genericShow
@@ -187,9 +187,9 @@ instance ReadForeign Notification where
   readImpl f = 
     -- Order matters here!
     do 
-      {r} :: {r :: TimeFacets ( sentence :: Sentence, currentContextCalculation :: QueryFunctionDescription )} <- read' f
+      {r} :: {r :: TimeFacets ( sentence :: Sentence, currentContextCalculation :: QueryFunctionDescription, domain :: String )} <- read' f
       pure $ RoleNotification r
     <|>
     do 
-      {r} :: {r :: TimeFacets ( sentence :: Sentence )} <- read' f
+      {r} :: {r :: TimeFacets ( sentence :: Sentence, domain :: String )} <- read' f
       pure $ ContextNotification r
