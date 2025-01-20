@@ -90,7 +90,7 @@ import Perspectives.Persistence.CouchdbFunctions as CDB
 import Perspectives.Persistence.State (getSystemIdentifier)
 import Perspectives.Persistence.Types (UserName, Password)
 import Perspectives.Persistent (entitiesDatabaseName, forceSaveDomeinFile, getDomeinFile, getPerspectRol, saveEntiteit, saveEntiteit_, saveMarkedResources, tryGetPerspectContext, tryGetPerspectEntiteit)
-import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, modelsDatabaseName, roleCache)
+import Perspectives.PerspectivesState (clearQueryCache, contextCache, getPerspectivesUser, modelsDatabaseName, removeTranslationTable, roleCache)
 import Perspectives.Query.UnsafeCompiler (getDynamicPropertyGetter)
 import Perspectives.Representation.ADT (ADT(..))
 import Perspectives.Representation.Class.Cacheable (CalculatedRoleType(..), ContextType(..), EnumeratedRoleType(..), cacheEntity)
@@ -212,6 +212,7 @@ updateModel arrWithModelName arrWithDependencies _ = try
       addModelToLocalStore (DomeinFileId modelName) isUpdate
       -- The model is now decached, but the translations table is still in cache.
       -- It will be loaded when a new type lookup is performed.
+      lift $ removeTranslationTable modelName
       lift $ fetchTranslations dfid
     
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)

@@ -143,6 +143,72 @@ model://perspectives.domains#System:
                 translations:
                   en: Reset inverted query database
                   nl: Leeg inverted query database
+          titles:
+            0:
+              translations:
+                orig: Home
+                en: Home
+                nl: Home
+            1:
+              translations:
+                orig: System
+                en: System
+                nl: Systeem
+            2:
+              translations:
+                orig: System language
+                en: System language
+                nl: Systeemtaal
+            3:
+              translations:
+                orig: SystemCaches
+                en: System caches
+                nl: Systeemcaches
+            4:
+              translations:
+                orig: Manage new models
+                en: Manage new models
+                nl: Beheer nieuwe modellen
+            5:
+              translations:
+                orig: "Default (Base) Repository"
+                en: "Default (Base) repository"
+                nl: "Basis repository"
+            6:
+              translations:
+                orig: Other repositories
+                en: Other repositories
+                nl: Andere repositories
+            7:
+              translations:
+                orig: Models that have been patched
+                en: Models that have been patched
+                nl: Modellen die zijn gepatched
+            8:
+              translations:
+                orig: Models in use
+                en: Models in use
+                nl: Modellen in gebruik
+            9:
+              translations:
+                orig: Start contexts
+                en: Start contexts
+                nl: Startcontexten
+            10:
+              translations:
+                orig: User and Contacts
+                en: User and Contacts
+                nl: Gebruiker en contacten
+            11:
+              translations:
+                orig: Invitations I have created
+                en: Invitations I have created
+                nl: Uitnodigingen door mijzelf
+            12:
+              translations:
+                orig: Invitations
+                en: Invitations
+                nl: Uitnodigingen
       things:
         AllNotifications:
           translations:
@@ -421,10 +487,47 @@ model://perspectives.domains#System:
           translations:
             en: Guest
             nl: Gast
+          titles:
+            0:
+              translations:
+                orig: Invitation
+                en: Invitation
+                nl: Uitnodiging
+            1:
+              translations:
+                orig: "You are invited by:"
+                en: "You are invited by:"
+                nl: "Je bent uitgenodigd door:"
+            2:
+              translations:
+                orig: Message from the inviter
+                en: Message from the inviter
+                nl: Boodschap van de uitnodiger
+            3:
+              translations:
+                orig: Accept by filling this role with yourself
+                en: Accept by filling this role with yourself
+                nl: Accepteer door de rol met jezelf te vullen
         Invitee:
           translations:
             en: Invitee
             nl: Uitgenodigde
+          titles:
+            0:
+              translations:
+                orig: Invitation
+                en: Invitation
+                nl: Uitnodiging
+            1:
+              translations:
+                orig: "You are invited by:"
+                en: "You are invited by:"
+                nl: "Je bent uitgenodigd door:"
+            2:
+              translations:
+                orig: Message
+                en: Message
+                nl: Boodschap
         Inviter:
           translations:
             en: Inviter
@@ -435,6 +538,17 @@ model://perspectives.domains#System:
                 translations:
                   en: Create invitation
                   nl: Maak uitnodiging
+          titles:
+            0:
+              translations:
+                orig: Invite someone
+                en: Invite someone
+                nl: Nodig iemand uit
+            1:
+              translations:
+                orig: Invitee
+                en: Invitee
+                nl: Uitgenodigde
     ManifestCollection:
       translations:
         en: Manifest collection

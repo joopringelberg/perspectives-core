@@ -37,7 +37,7 @@ import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Identifiers (typeUri2ModelUri_)
-import Perspectives.Instances.ObjectGetters (getActiveRoleStates, getActiveStates)
+import Perspectives.Instances.ObjectGetters (contextType_, getActiveRoleStates, getActiveStates)
 import Perspectives.ModelTranslation (translationOf)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
@@ -101,9 +101,10 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
   contextualiseTab :: TabDef -> MPQ (Maybe TabDef)
   contextualiseTab (TabDef {title, isDefault, elements}) = do 
     elements' <- catMaybes <$> (for elements contextualiseScreenElementDef)
+    (translatedTitle :: String) <- lift $ lift (translationOf (unsafePartial typeUri2ModelUri_ $ unwrap contextType) title) 
     if null elements'
       then pure Nothing 
-      else pure $ Just $ TabDef {title, isDefault, elements: elements'}
+      else pure $ Just $ TabDef {title: translatedTitle, isDefault, elements: elements'}
   
   contextualiseScreenElementDef :: ScreenElementDef -> MPQ (Maybe ScreenElementDef)
   contextualiseScreenElementDef (RowElementD e) = map RowElementD <$> contextualiseRowDef e
@@ -151,7 +152,7 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
     pure $ [Just $ ChatDef r {chatInstance = head chatRoleInstance}]
   
   contextualiseWidgetCommonFields :: WidgetCommonFieldsDef -> MPQ (Maybe WidgetCommonFieldsDef)
-  contextualiseWidgetCommonFields wc@{perspectiveId, propertyVerbs, roleVerbs, userRole} = do
+  contextualiseWidgetCommonFields wc@{title, perspectiveId, propertyVerbs, roleVerbs, userRole} = do
     contextStates <- lift (map ContextState <$> (runArrayT $ getActiveStates contextInstance))
     subjectStates <- lift (map SubjectState <$> (runArrayT $ getActiveRoleStates userRoleInstance))
     allPerspectives <- lift2MPQ $ perspectivesOfRoleType userRole
@@ -159,12 +160,13 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
       (\(Perspective{id}) -> id == perspectiveId)
       allPerspectives)
     mperspective <- contextualisePerspective perspective
-    for mperspective (serialise contextStates subjectStates)
+    (translatedTitle :: Maybe String) <- lift $ lift $ traverse (translationOf (unsafePartial typeUri2ModelUri_$ unwrap contextType)) title
+    for mperspective (serialise translatedTitle contextStates subjectStates)
     where 
-      serialise :: Array StateSpec -> Array StateSpec -> Perspective -> MPQ WidgetCommonFieldsDef
-      serialise contextStates subjectStates perspective = do 
+      serialise :: Maybe String -> Array StateSpec -> Array StateSpec -> Perspective -> MPQ WidgetCommonFieldsDef
+      serialise translatedTitle contextStates subjectStates perspective = do 
         serialisedPerspective <- lift $ serialisePerspective contextStates subjectStates contextInstance userRole propertyVerbs roleVerbs perspective
-        pure $ wc {perspective = Just serialisedPerspective}
+        pure $ wc {perspective = Just serialisedPerspective, title = translatedTitle}
   
   contextualisePerspective :: Perspective -> MPQ (Maybe Perspective)
   contextualisePerspective p@(Perspective pr) = if pr.isEnumerated 
@@ -288,7 +290,9 @@ instance addPerspectivesScreenElementDef  :: AddPerspectives ScreenElementDef wh
 instance addPerspectivesTabDef  :: AddPerspectives TabDef where
   addPerspectives (TabDef r) user ctxt = do
     elements <- traverse (\a -> addPerspectives a user ctxt) r.elements
-    pure $ TabDef {title: r.title, isDefault: r.isDefault, elements}
+    contextType <- lift $ contextType_ ctxt
+    (translatedTitle :: String) <- lift (translationOf (unsafePartial typeUri2ModelUri_ $ unwrap contextType) r.title) 
+    pure $ TabDef {title: translatedTitle, isDefault: r.isDefault, elements}
 
 instance addPerspectivesColumnDef  :: AddPerspectives ColumnDef where
   addPerspectives (ColumnDef cols) user ctxt = do
@@ -307,7 +311,9 @@ instance addPerspectivesTableDef  :: AddPerspectives TableDef where
       user
       widgetCommonFields
       ctxt
-    pure $ TableDef widgetCommonFields {perspective = Just perspective}
+    contextType <- lift $ contextType_ ctxt
+    (translatedTitle :: Maybe String) <- lift $ traverse (translationOf (unsafePartial typeUri2ModelUri_ $ unwrap contextType)) widgetCommonFields.title
+    pure $ TableDef widgetCommonFields {perspective = Just perspective, title = translatedTitle}
 
 instance addPerspectivesFormDef  :: AddPerspectives FormDef where
   addPerspectives (FormDef widgetCommonFields) user ctxt = do
@@ -315,7 +321,9 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
       user
       widgetCommonFields
       ctxt
-    pure $ FormDef widgetCommonFields {perspective = Just perspective}
+    contextType <- lift $ contextType_ ctxt
+    (translatedTitle :: Maybe String) <- lift $ traverse (translationOf (unsafePartial typeUri2ModelUri_ $ unwrap contextType)) widgetCommonFields.title
+    pure $ FormDef widgetCommonFields {perspective = Just perspective, title = translatedTitle}
 
 instance AddPerspectives MarkDownDef where
   -- TODO: TRANSLATION HERE!

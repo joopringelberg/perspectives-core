@@ -31,10 +31,10 @@ import Data.String (Pattern(..), stripSuffix)
 import Effect.Aff.AVar (AVar, put, read)
 import Effect.Class (liftEffect)
 import Foreign.Object (empty, singleton)
-import Foreign.Object (lookup, insert) as OBJ
+import Foreign.Object (lookup, insert, delete) as OBJ
 import LRUCache (Cache, clear, defaultCreateOptions, defaultGetOptions, delete, get, newCache, set)
 import Perspectives.AMQP.Stomp (StompClient)
-import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, MonadPerspectives, PerspectivesState, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, TranslationTable)
+import Perspectives.CoreTypes (AssumptionRegister, BrokerService, ContextInstances, DomeinCache, IndexedResource, IntegrityFix, JustInTimeModelLoad, PerspectivesState, QueryInstances, RepeatingTransaction, RolInstances, RuntimeOptions, TranslationTable, MonadPerspectives)
 import Perspectives.DomeinFile (DomeinFile)
 import Perspectives.Instances.Environment (Environment, _pushFrame, addVariable, empty, lookup) as ENV
 import Perspectives.Persistence.API (PouchdbUser)
@@ -200,6 +200,9 @@ getTranslationTable domain = gets _.translations >>= pure <<< OBJ.lookup domain
 
 setTranslationTable :: String -> TranslationTable -> MonadPerspectives Unit
 setTranslationTable domain tt = modify \s -> s {translations = OBJ.insert domain tt s.translations}
+
+removeTranslationTable :: String -> MonadPerspectives Unit
+removeTranslationTable domain = modify \s -> s {translations = OBJ.delete domain s.translations}
 
 getCurrentLanguage :: MonadPerspectives String
 getCurrentLanguage = gets _.currentLanguage

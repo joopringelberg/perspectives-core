@@ -32,13 +32,13 @@ import Control.Monad.Reader (Reader, runReader, ask)
 import Control.Monad.State (State) as ST
 import Control.Monad.State (get, lift, modify, runStateT, execState)
 import Control.Monad.Writer (Writer, execWriter, tell)
-import Data.Array (catMaybes, concat, filter, fold, head, null)
-import Data.Either (Either)
+import Data.Array (catMaybes, concat, cons, filter, fold, head, null)
+import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.FoldableWithIndex (forWithIndex_)
 import Data.FunctorWithIndex (mapWithIndex)
 import Data.Interpolate (i)
-import Data.Maybe (Maybe(..), fromJust, isNothing)
+import Data.Maybe (Maybe(..), fromJust, isNothing, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Nullable (Nullable, notNull, null, toMaybe) as NULL
 import Data.Set (toUnfoldable) as SET
@@ -50,8 +50,8 @@ import Data.Traversable (for)
 import Data.TraversableWithIndex (forWithIndex)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
-import Effect.Aff (Aff)
-import Effect.Exception (Error)
+import Effect.Aff (Aff, message)
+import Effect.Exception (Error, error)
 import Foreign.Object (Object, empty, filterKeys, fromFoldable, insert, isEmpty, keys, lookup, mapWithKey, singleton, toUnfoldable, union, values)
 import IDBKeyVal (idbGet)
 import Partial.Unsafe (unsafePartial)
@@ -59,7 +59,7 @@ import Perspectives.CoreTypes (MonadPerspectives, TranslationTable(..), Translat
 import Perspectives.Data.EncodableMap (EncodableMap)
 import Perspectives.Data.EncodableMap (keys, lookup, values) as EM
 import Perspectives.DomeinFile (DomeinFile(..), DomeinFileRecord)
-import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, startsWithSegments, typeUri2LocalName_, typeUri2ModelUri, typeUri2typeNameSpace_)
+import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole, qualifyWith, startsWithSegments, typeUri2LocalName_, typeUri2ModelUri, typeUri2typeNameSpace_)
 import Perspectives.PerspectivesState (getCurrentLanguage, getTranslationTable)
 import Perspectives.Representation.Action (Action)
 import Perspectives.Representation.CalculatedRole (CalculatedRole(..))
@@ -86,6 +86,12 @@ derive newtype instance ReadForeign NotificationsTranslation
 newtype MarkdownsTranslation = MarkdownsTranslation (Object Translations)
 derive newtype instance WriteForeign MarkdownsTranslation
 derive newtype instance ReadForeign MarkdownsTranslation
+
+-- The keys are the original titles taken from a screen description in the model.
+-- (a screen is part of the perspective on a role).
+newtype TitlesTranslation = TitlesTranslation (Object Translations)
+derive newtype instance WriteForeign TitlesTranslation
+derive newtype instance ReadForeign TitlesTranslation
 
 -- The translations of many properties.
 -- The keys are the property names; the values are their translations.
@@ -117,6 +123,7 @@ newtype RoleTranslation = RoleTranslation
   , actions :: ActionsPerStateTranslation
   , notifications :: NotificationsTranslation
   , markdowns :: MarkdownsTranslation
+  , titles :: TitlesTranslation
   }
 derive newtype instance WriteForeign RoleTranslation
 derive newtype instance ReadForeign RoleTranslation
@@ -194,6 +201,7 @@ newtype RoleTranslation_ = RoleTranslation_
   , markdowns :: NULL.Nullable Markdowns_
   -- These notifications are lexically embedded in role state transitions.
   , notifications :: NULL.Nullable Notifications_
+  , titles :: NULL.Nullable Titles_
   }
 
 newtype PropertiesTranslation_ = PropertiesTranslation_ (Object {translations :: Translations_})
@@ -214,6 +222,8 @@ newtype Translations_ = Translations_ (Object (NULL.Nullable String))
 newtype Notifications_ = Notifications_ (Object {translations :: Translations_})
 
 newtype Markdowns_ = Markdowns_ (Object {translations :: Translations_})
+
+newtype Titles_ = Titles_ (Object {translations :: Translations_})
 -------------------------------------------------------------------------------
 ---- CLASS REHYDRATE
 -------------------------------------------------------------------------------
@@ -234,6 +244,14 @@ instance Rehydrate Notifications_ NotificationsTranslation where
     in Tuple orig (Translations t')
   )
 
+instance Rehydrate Titles_ TitlesTranslation where
+  hydrate (Titles_ obj) = TitlesTranslation $ fromFoldable $ (values obj) <#> (\{translations} -> let 
+    -- keys are the index numbers we have generated. They are of no interest.
+    Translations t' = hydrate translations
+    orig = unsafePartial fromJust $ lookup "orig" t'
+    in Tuple orig (Translations t')
+  )
+
 instance Rehydrate Markdowns_ MarkdownsTranslation where
   hydrate (Markdowns_ obj) = MarkdownsTranslation $ fromFoldable $ (values obj <#> (\{translations} -> let
     Translations t' = hydrate translations
@@ -245,8 +263,8 @@ instance Rehydrate ActionsTranslation_ ActionsTranslation where
   hydrate (ActionsTranslation_ obj) = ActionsTranslation (obj <#> _.translations >>> hydrate)
 
 instance Rehydrate RoleTranslation_ RoleTranslation where
-  hydrate (RoleTranslation_ {translations, properties, actions, markdowns, notifications}) = 
-    RoleTranslation { translations: translations', properties: properties', actions: actions', notifications: notifications', markdowns: markdowns'}
+  hydrate (RoleTranslation_ {translations, properties, actions, markdowns, notifications, titles}) = 
+    RoleTranslation { translations: translations', properties: properties', actions: actions', notifications: notifications', markdowns: markdowns', titles: titles'}
     where
     properties' = case NULL.toMaybe properties of 
       Nothing -> PropertiesTranslation empty
@@ -263,6 +281,9 @@ instance Rehydrate RoleTranslation_ RoleTranslation where
     markdowns' = case NULL.toMaybe markdowns of 
       Nothing -> MarkdownsTranslation empty
       Just m@(Markdowns_ _) -> hydrate m
+    titles' = case NULL.toMaybe titles of 
+      Nothing -> TitlesTranslation empty
+      Just t@(Titles_ _) -> hydrate t
 
 instance Rehydrate ContextTranslation_ ContextTranslation where
   hydrate (ContextTranslation_ {translations, external, users, things, contextroles, contexts, notifications}) = let
@@ -273,7 +294,8 @@ instance Rehydrate ContextTranslation_ ContextTranslation where
         , properties: PropertiesTranslation empty
         , actions: ActionsPerStateTranslation empty
         , notifications: NotificationsTranslation empty
-        , markdowns: MarkdownsTranslation empty}
+        , markdowns: MarkdownsTranslation empty
+        , titles: TitlesTranslation empty}
       Just e@(RoleTranslation_ _) -> (hydrate e)
     users' = case NULL.toMaybe users of 
       Nothing -> RolesTranslation empty
@@ -395,8 +417,8 @@ translateRole (E (EnumeratedRole rec)) = do
   (properties :: PropertiesTranslation) <- do
     (ps :: Array (Tuple String Translations)) <- (for rec.properties translatePropertyType)
     pure $ PropertiesTranslation $ fromFoldable ps
-  contextActions <- translateActions rec.actions
-  (roleActions :: Array ActionsPerStateTranslation) <- for rec.perspectives (translateActions <<< _.actions <<< unwrap)
+  contextActions <- translateActions rec.context rec.actions
+  (roleActions :: Array ActionsPerStateTranslation) <- for rec.perspectives (translateActions rec.context <<< _.actions <<< unwrap)
 
   notifications <- do
     {states} <- ask
@@ -405,11 +427,27 @@ translateRole (E (EnumeratedRole rec)) = do
       Srole r | r == rec.id -> for_ (EM.values notifyOnEntry) translateNotification
       _ -> pure unit))
   markdowns <- markDownsInScreen (ScreenKey rec.context (ENR rec.id))
-  pure $ RoleTranslation {translations: Translations empty, properties, actions: contextActions <> (fold roleActions), notifications, markdowns}
+  titles <- titlesInScreen (ScreenKey rec.context (ENR rec.id))
+  pure $ RoleTranslation 
+    { translations: Translations empty
+    , properties
+    , actions: contextActions <> (fold roleActions)
+    , notifications
+    , markdowns
+    , titles
+    }
 translateRole (C (CalculatedRole rec)) = do 
-  actions <- translateActions rec.actions
+  actions <- translateActions rec.context rec.actions
   markdowns <- markDownsInScreen (ScreenKey rec.context (CR rec.id))
-  pure $ RoleTranslation {translations: Translations empty, properties: PropertiesTranslation empty, actions, notifications: NotificationsTranslation empty, markdowns}
+  titles <- titlesInScreen (ScreenKey rec.context (CR rec.id))
+  pure $ RoleTranslation 
+    { translations: Translations empty
+    , properties: PropertiesTranslation empty
+    , actions
+    , notifications: NotificationsTranslation empty
+    , markdowns
+    , titles
+    }
 
 markDownsInScreen :: ScreenKey -> Reader DomeinFileRecord MarkdownsTranslation
 markDownsInScreen screenKey = do
@@ -426,12 +464,30 @@ markDownsInScreen screenKey = do
       in 
       pure $ MarkdownsTranslation $ fromFoldable translations
 
-translateActions :: EncodableMap StateSpec (Object Action) -> Reader DomeinFileRecord ActionsPerStateTranslation
-translateActions actions = ActionsPerStateTranslation <<< fromFoldable <$> 
+titlesInScreen :: ScreenKey -> Reader DomeinFileRecord TitlesTranslation
+titlesInScreen screenKey = do
+  -- screens holds an EncodableMap where the keys are ScreenKey instances: ScreenKey ContextType RoleType.
+  -- The ContextType and RoleType are the lexical context and subject for the definition of the screen.
+  -- A screen definition is lexically embedded in a user role.
+  -- So if we take the lexical context of the role and combine it with its RoleType, we have the key to obtain all relevant screens. 
+  {screens} <- ask
+  case EM.lookup screenKey screens of 
+    Nothing -> pure $ TitlesTranslation empty
+    Just s@(ScreenDefinition _) -> let 
+      titles = (collectTitles s)
+      translations = titles <#> \title -> Tuple title (Translations $ singleton "orig" title)
+      in 
+      pure $ TitlesTranslation $ fromFoldable translations
+
+translateActions :: ContextType -> EncodableMap StateSpec (Object Action) -> Reader DomeinFileRecord ActionsPerStateTranslation
+translateActions (ContextType cType) actions = ActionsPerStateTranslation <<< fromFoldable <$> 
   (for (SET.toUnfoldable $ EM.keys actions :: Array StateSpec) \state -> pure $ Tuple 
     (unwrap $ stateSpec2StateIdentifier state) 
     (ActionsTranslation 
-      (const (Translations empty) <$> (unsafePartial fromJust $ EM.lookup state actions)))) -- Hier state met lokale action name combineren?
+      let 
+        qualifiedActionNames = qualifyWith cType <$> (keys (unsafePartial fromJust $ EM.lookup state actions))
+        in
+        fromFoldable $ flip Tuple (Translations empty) <$> qualifiedActionNames))
 
 -- The translations of a single property.
 translatePropertyType :: PropertyType -> Reader DomeinFileRecord (Tuple String Translations)
@@ -478,6 +534,27 @@ instance Translation NotificationsTranslation where
         0
   addTranslations (TranslationTable table) (NotificationsTranslation notifications) = NotificationsTranslation $
     flip mapWithKey notifications \original translations -> case lookup original table of 
+      Nothing -> translations
+      Just ts -> ts
+
+instance Translation TitlesTranslation where
+  qualify _ n = n
+  writeKeys (TitlesTranslation titles) = void $ modify \allTranslations -> allTranslations `union` titles
+  writeYaml indent (TitlesTranslation titles) = if isEmpty titles
+    then pure unit
+    else do
+      tell (i indent "titles" colonNl)
+      void $ runStateT
+        (forWithIndex titles
+          \original (Translations translations) -> do
+            nr <- get
+            lift $ tell (i indent tab nr colonNl)
+            lift $ writeYaml (indent <> tab <> tab) (Translations $ insert "orig" original translations)
+            modify ((+) 1)
+            )
+        0
+  addTranslations (TranslationTable table) (TitlesTranslation titles) = TitlesTranslation $
+    flip mapWithKey titles \original translations -> case lookup original table of 
       Nothing -> translations
       Just ts -> ts
 
@@ -554,7 +631,7 @@ instance Translation ActionsTranslation where
   writeKeys (ActionsTranslation actionTranslations) = void $ modify \allTranslations -> allTranslations `union` actionTranslations
   writeYaml indent (ActionsTranslation actions) = void $ forWithIndex actions
     \actionName translations -> do
-      tell (i indent actionName colonNl)
+      tell (i indent (typeUri2LocalName_ actionName) colonNl)
       writeYaml (indent <> tab) translations
   addTranslations (TranslationTable table) (ActionsTranslation a) = ActionsTranslation $ 
     flip mapWithKey a \actionName translations -> case lookup actionName table of
@@ -598,7 +675,7 @@ instance Translation RolesTranslation where
         in Tuple qualifiedName (qualify qualifiedName role)
       ) :: Array (Tuple String RoleTranslation))
   writeKeys (RolesTranslation roleTranslations) = forWithIndex_ roleTranslations 
-    \roleName (RoleTranslation {translations, properties, actions, notifications, markdowns}) -> do 
+    \roleName (RoleTranslation {translations, properties, actions, notifications, markdowns, titles}) -> do 
       -- tell (singleton roleName translations)
       void $ modify \allTranslations -> insert roleName translations allTranslations
       
@@ -606,6 +683,7 @@ instance Translation RolesTranslation where
       writeKeys actions
       writeKeys notifications
       writeKeys markdowns
+      writeKeys titles
   writeYaml indent (RolesTranslation userRoles) = void $ for (object2array userRoles)
     \(Tuple roleName roleTranslation) -> do
       tell (i indent (typeUri2LocalName_ roleName) colonNl)
@@ -616,24 +694,27 @@ instance Translation RolesTranslation where
       Just ts -> addTranslations tbl (RoleTranslation rec {translations = ts})
 
 instance Translation RoleTranslation where
-  qualify namespace (RoleTranslation {translations, properties, actions, notifications, markdowns}) = let 
+  qualify namespace (RoleTranslation {translations, properties, actions, notifications, markdowns, titles}) = let 
     properties' = qualify namespace properties
     actions' = qualify namespace actions
     in
-    RoleTranslation {translations, properties: properties', actions: actions', notifications, markdowns}
+    RoleTranslation {translations, properties: properties', actions: actions', notifications, markdowns, titles}
   writeKeys _ = pure unit
-  writeYaml indent (RoleTranslation {translations, properties, actions, notifications, markdowns}) = do
+  writeYaml indent (RoleTranslation {translations, properties, actions, notifications, markdowns, titles}) = do
     writeYaml indent translations
     writeYaml indent notifications
     writeYaml indent properties
     writeYaml indent actions
     writeYaml indent markdowns
-  addTranslations table (RoleTranslation {translations, properties, actions, notifications, markdowns}) = RoleTranslation $ 
+    writeYaml indent titles
+  addTranslations table (RoleTranslation {translations, properties, actions, notifications, markdowns, titles}) = RoleTranslation $ 
     { translations
     , properties: addTranslations table properties
     , actions: addTranslations table actions
     , notifications: addTranslations table notifications
-    , markdowns: addTranslations table markdowns}
+    , markdowns: addTranslations table markdowns
+    , titles: addTranslations table titles
+    }
 
 instance Translation ContextTranslation where
   qualify namespace (ContextTranslation {translations, external:ext, users, things, contextroles, contexts, notifications}) = let 
@@ -704,12 +785,13 @@ instance Translation ContextsTranslation where
       void $ modify \allTranslations -> insert contextName translations allTranslations
 
       -- We have to handle the external role here, because we must construct its name from the contextName.
-      RoleTranslation {translations:etranslations, properties:eproperties, actions:eactions, notifications:enotifications, markdowns:emarkdowns} <- pure external
+      RoleTranslation {translations:etranslations, properties:eproperties, actions:eactions, notifications:enotifications, markdowns:emarkdowns, titles:etitles} <- pure external
       void $ modify \allTranslations -> insert (contextName <> "$External" ) etranslations allTranslations
       writeKeys eproperties
       writeKeys eactions
       writeKeys enotifications
       writeKeys emarkdowns
+      writeKeys etitles
 
       writeKeys users
       writeKeys things
@@ -801,8 +883,11 @@ emptyTranslationTable = TranslationTable empty
 parseTranslation :: String -> Effect (Either Error ModelTranslation)
 parseTranslation source = do 
   parseResult :: Either Error ParsedYaml <- load source
+  -- TODO: doe iets met foutmeldingen!
   modelTranslation :: Either Error ModelTranslation <- pure (map (hydrate <<< toModelTranslation_) parseResult)
-  pure (map qualifyModelTranslation modelTranslation)
+  case modelTranslation of 
+    Left e -> pure $ Left (error $ "Could not parse the translation file: " <> message e) 
+    Right modelTranslation' -> pure $ Right $ qualifyModelTranslation modelTranslation'
   where
   toModelTranslation_ :: ParsedYaml -> ModelTranslation_
   toModelTranslation_ yaml = case head $ keys yaml of 
@@ -848,9 +933,19 @@ translateType typeName = case typeUri2ModelUri typeName of
 ----------------------------------------------------------- 
 class CollectMarkdowns a where
   collectMarkdowns :: a -> Array String
+  collectTitles :: a -> Array String
 
 instance addPerspectivesScreenDefinition :: CollectMarkdowns ScreenDefinition where
-  collectMarkdowns (ScreenDefinition r) = concat $ map concat $ catMaybes [map collectMarkdowns <$> r.tabs, map collectMarkdowns <$> r.rows, map collectMarkdowns <$> r.columns]
+  collectMarkdowns (ScreenDefinition r) = concat $ map concat $ catMaybes 
+    [map collectMarkdowns <$> r.tabs, map collectMarkdowns <$> r.rows, map collectMarkdowns <$> r.columns]
+  collectTitles (ScreenDefinition r) = let 
+    titles = (concat $ map concat $ catMaybes 
+        [map collectTitles <$> r.tabs, map collectTitles <$> r.rows, map collectTitles <$> r.columns])
+    in
+    case r.title of 
+      Nothing -> titles
+      Just title -> cons title titles
+      
 
 instance addPerspectivesScreenElementDef  :: CollectMarkdowns ScreenElementDef where  
   collectMarkdowns (RowElementD (RowDef re)) = concat $ collectMarkdowns <$> re
@@ -859,29 +954,43 @@ instance addPerspectivesScreenElementDef  :: CollectMarkdowns ScreenElementDef w
   collectMarkdowns (FormElementD (FormDef re)) = []
   collectMarkdowns (MarkDownElementD re) = collectMarkdowns re
   collectMarkdowns (ChatElementD re) = []
+  collectTitles (RowElementD (RowDef re)) = concat $ collectTitles <$> re
+  collectTitles (ColumnElementD (ColumnDef re)) =  concat $ collectTitles <$> re
+  collectTitles (TableElementD re) = collectTitles re
+  collectTitles (FormElementD re) = collectTitles re
+  collectTitles (MarkDownElementD re) = []
+  collectTitles (ChatElementD re) = []
+  
 
 instance addPerspectivesTabDef  :: CollectMarkdowns TabDef where
   collectMarkdowns (TabDef {elements}) = concat (collectMarkdowns <$> elements)
+  collectTitles (TabDef {title, elements}) = cons title (concat (collectTitles <$> elements))
 
 instance addPerspectivesColumnDef  :: CollectMarkdowns ColumnDef where
   collectMarkdowns (ColumnDef cols) = concat (collectMarkdowns <$> cols)
+  collectTitles (ColumnDef cols) = concat (collectTitles <$> cols)
 
 instance addPerspectivesRowDef  :: CollectMarkdowns RowDef where
   collectMarkdowns (RowDef rows) = concat (collectMarkdowns <$> rows)
+  collectTitles (RowDef rows) = concat (collectTitles <$> rows)
 
 instance addPerspectivesTableDef  :: CollectMarkdowns TableDef where
   collectMarkdowns (TableDef widgetCommonFields) = []
+  collectTitles (TableDef widgetCommonFields) = maybe [] (\title -> [title]) widgetCommonFields.title
 
 instance addPerspectivesFormDef  :: CollectMarkdowns FormDef where
   collectMarkdowns (FormDef widgetCommonFields) = []
+  collectTitles (FormDef widgetCommonFields) = maybe [] (\title -> [title]) widgetCommonFields.title
 
 instance CollectMarkdowns MarkDownDef where
   collectMarkdowns (MarkDownConstantDef {text}) = [text]
   collectMarkdowns (MarkDownExpressionDef _) = []
   collectMarkdowns (MarkDownPerspectiveDef _) = []
+  collectTitles _ = []
   
 instance CollectMarkdowns ChatDef where
   collectMarkdowns (ChatDef _) = []
+  collectTitles _ = []
 
 getCurrentLanguageFromIDB :: Aff String
 getCurrentLanguageFromIDB = do 
