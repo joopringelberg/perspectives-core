@@ -26,7 +26,7 @@ module Perspectives.Extern.Parsing where
 
 import Prelude
 
-import Control.Monad.Error.Class (catchError, try)
+import Control.Monad.Error.Class (catchError, throwError, try)
 import Control.Monad.State (StateT, execStateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Array (cons, head, intercalate)
@@ -47,7 +47,7 @@ import Partial.Unsafe (unsafePartial)
 import Perspectives.CoreTypes (type (~~>), MonadPerspectives, MonadPerspectivesTransaction)
 import Perspectives.Couchdb (DeleteCouchdbDocument(..), DocWithAttachmentInfo(..))
 import Perspectives.Couchdb.Revision (Revision_, changeRevision)
-import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
+import Perspectives.DependencyTracking.Array.Trans (ArrayT(..))
 import Perspectives.DomeinFile (DomeinFile(..))
 import Perspectives.Error.Boundaries (handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
@@ -229,8 +229,7 @@ parseYamlTranslation pfile_ _ = ArrayT case head pfile_ of
       Just yaml -> do
         translation' <- liftEffect $ MT.parseTranslation yaml
         case translation' of 
-          Left e -> runArrayT $ handleExternalFunctionError "model://perspectives.domains#Parsing$ParseYamlTranslation"
-            (Left e)
+          Left e -> throwError e
           Right translation -> pure $ [Value $ writeJSON translation]
 
 -- | From a PString that holds a ModelTranslation, generate the table and upload to the repository.
@@ -274,7 +273,7 @@ augmentModelTranslation translation_ domeinFileName_ _ = case head translation_,
     -- Fail silently
     Nothing -> handleExternalFunctionError "model://perspectives.domains#Parsing$AugmentModelTranslation"
       (Left (error "The model translation string could not be parsed."))
-    -- Retrieve the Existing Translation and apply it to the ModelTranslation.
+    -- Retrieve the Existing Translation from the repository and apply it to the ModelTranslation.
     Just (modelTranslation :: ModelTranslation) -> case (unsafePartial modelUri2ModelUrl domeinFileName) of
       {repositoryUrl, documentName} -> do 
         mTranslationTableBlob <- lift $ lift $ getAttachment repositoryUrl documentName "translationtable.json"
