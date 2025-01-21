@@ -49,7 +49,8 @@ type SerialisedPerspective' =
   , roleType :: Maybe String
   , roleKind :: Maybe RoleKind
   , contextType :: ContextType
-  , contextTypesToCreate :: Array ContextType
+  -- The keys are the ContextType names, the values their translations that will be shown on screen.
+  , contextTypesToCreate :: Object String
   , identifyingProperty :: String
   ----
   ---- Instance properties

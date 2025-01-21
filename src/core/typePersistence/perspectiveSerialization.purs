@@ -59,7 +59,7 @@ import Perspectives.Representation.Perspective (Perspective(..), PropertyVerbs(.
 import Perspectives.Representation.QueryFunction (FunctionName(..), QueryFunction(..))
 import Perspectives.Representation.ScreenDefinition (WidgetCommonFieldsDef)
 import Perspectives.Representation.ThreeValuedLogic (ThreeValuedLogic(..), pessimistic)
-import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (CalculatedPropertyType(..), ContextType(..), PropertyType(..), RoleKind(..), RoleType(..), propertytype2string, roletype2string)
 import Perspectives.Representation.Verbs (PropertyVerb(..), RoleVerb(..), allPropertyVerbs, roleVerbList2Verbs)
 import Perspectives.ResourceIdentifiers (createPublicIdentifier, guid)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (PropertyFacets, RoleInstanceWithProperties, SerialisedPerspective(..), SerialisedPerspective', SerialisedProperty, ValuesWithVerbs)
@@ -154,16 +154,18 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
   additionalPropertiesOnInstances <- pure $ foldl union [] (propertiesInInstance <$> roleInstances)
   -- If no properties are available, we'd like to add roleWithId as property. Otherwise, no table can be built.
   serialisedProps <- lift $ traverse makeSerialisedProperty ((maybeAddIdentifier availableProperties) <> additionalPropertiesOnInstances)
-  roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes)
+  roleKind <- lift $ traverse roleKindOfRoleType (head roleTypes) 
   -- If the binding of the ADT that is the range of the object QueryFunctionDescription, is an external role,
   -- its context type may be created.
-  contextTypesToCreate <- (lift $ maybe [] (allLeavesInADT <<< map roleInContext2Role) <$> 
+  (contextTypesToCreate :: Object String) <- (lift $ maybe [] (allLeavesInADT <<< map roleInContext2Role) <$> 
       (bindingOfADT $ unsafePartial domain2roleType (range object)))
     >>= pure <<< (filter (isExternalRole <<< unwrap))
     >>= lift <<< traverse getEnumeratedRole
     >>= pure <<< map (_.context <<< unwrap)
     >>= \as -> lift $ ( (append as) <<< concat <$> (for as (runArrayT <<< getContextAspectSpecialisations)))
-    >>= \as' -> pure $ nub as'
+    >>= (\as' -> pure $ nub as')
+    >>= (traverse \(ContextType cType) -> Tuple cType <$> translateType cType)
+    >>= pure <<< fromFoldable
   identifyingProperty <- computeIdentifyingProperty serialisedProps roleInstances
   cType <- lift (cid ##>> contextType)
   contextIdToAddRoleInstanceTo <- (unsafePartial computeContextFromPerspectiveObject object) >>= (lift <<< context2context) >>= \f -> lift (cid ##> f)
