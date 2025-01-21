@@ -185,37 +185,40 @@ updateModel arrWithModelName arrWithDependencies _ = try
     updateModel' withDependencies dfid@(DomeinFileId modelName) = do
       {repositoryUrl, documentName} <- pure $ unsafePartial modelUri2ModelUrl modelName
       unversionedModelname <- pure $ unversionedModelUri modelName
-      -- Remove the inverted queries, upstream notifications and automatic effects of the OLD version of the model!
-      DomeinFile{upstreamStateNotifications, upstreamAutomaticEffects, referredModels} <- lift $ getDomeinFile (DomeinFileId unversionedModelname)
-      if withDependencies
-        then for_ referredModels (updateModel' withDependencies)
-        else pure unit
-      -- Remove the inverted queries contributed by this model.
-      lift $ removeInvertedQueriesContributedByModel dfid
-      -- Get the inverted queries from the repository,
-      -- and add the inverted queries to the local database.
-      lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
+      (lift $ tryGetPerspectEntiteit (DomeinFileId unversionedModelname)) >>= case _ of 
+        -- If we have not installed this model, do nothing.
+        Nothing -> pure unit
+        Just (DomeinFile{upstreamStateNotifications, upstreamAutomaticEffects, referredModels}) -> do
+          -- Remove the inverted queries, upstream notifications and automatic effects of the OLD version of the model!
+          if withDependencies
+            then for_ referredModels (updateModel' withDependencies)
+            else pure unit
+          -- Remove the inverted queries contributed by this model.
+          lift $ removeInvertedQueriesContributedByModel dfid
+          -- Get the inverted queries from the repository,
+          -- and add the inverted queries to the local database.
+          lift (getInvertedQueriesOfModel repositoryUrl documentName >>= saveInvertedQueries)
 
-      forWithIndex_ upstreamStateNotifications
-        \domainName notifications -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
-            handleDomeinFileError "updateModel'"
-            \(DomeinFile dfr) -> do
-              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
-      forWithIndex_ upstreamAutomaticEffects
-        \domainName automaticEffects -> do
-          (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
-            handleDomeinFileError "updateModel'"
-            \(DomeinFile dfr) -> do
-              lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
-      -- Clear the caches of compiled states.
-      void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
-      -- Install the new model, taking care of outgoing InvertedQueries.
-      addModelToLocalStore (DomeinFileId modelName) isUpdate
-      -- The model is now decached, but the translations table is still in cache.
-      -- It will be loaded when a new type lookup is performed.
-      lift $ removeTranslationTable modelName
-      lift $ fetchTranslations dfid
+          forWithIndex_ upstreamStateNotifications
+            \domainName notifications -> do
+              (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+                handleDomeinFileError "updateModel'"
+                \(DomeinFile dfr) -> do
+                  lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ notifications removeDownStreamNotification) dfr))
+          forWithIndex_ upstreamAutomaticEffects
+            \domainName automaticEffects -> do
+              (lift $ try $ getDomeinFile (DomeinFileId domainName)) >>=
+                handleDomeinFileError "updateModel'"
+                \(DomeinFile dfr) -> do
+                  lift (storeDomeinFileInCouchdbPreservingAttachments (DomeinFile $ execState (for_ automaticEffects removeDownStreamAutomaticEffect) dfr))
+          -- Clear the caches of compiled states.
+          void $ pure $ clearModelStates (DomeinFileId unversionedModelname)
+          -- Install the new model, taking care of outgoing InvertedQueries.
+          addModelToLocalStore (DomeinFileId modelName) isUpdate
+          -- The model is now decached, but the translations table is still in cache.
+          -- It will be loaded when a new type lookup is performed.
+          lift $ removeTranslationTable modelName
+          lift $ fetchTranslations dfid
     
     allModelsInUse :: MonadPerspectives (Array DomeinFileId)
     allModelsInUse = do

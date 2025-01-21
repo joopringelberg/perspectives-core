@@ -35,6 +35,7 @@ import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), Replacement(..), replace)
 import Data.Traversable (for)
 import Effect.Aff.Class (liftAff)
+import Effect.Class.Console (log)
 import Foreign (unsafeToForeign)
 import IDBKeyVal (idbGet, idbSet)
 import Main.RecompileBasicModels (UninterpretedDomeinFile, executeInTopologicalOrder, recompileModel)
@@ -109,8 +110,11 @@ runDataUpgrades = do
     (void recompileLocalModels)
   runUpgrade installedVersion "0.26.5"
     (void recompileLocalModels)
-  runUpgrade installedVersion "0.26.6"
-    updateModels0266
+  -- As 0.26.7 upgrade performs the same actions as 0.26.6 (and more), it is no longer necessary to perform updateModels0266.
+  -- runUpgrade installedVersion "0.26.6"
+  --   updateModels0266
+  runUpgrade installedVersion "0.26.7"
+    updateModels0267
 
 
   -- Add new upgrades above this line and provide the pdr version number in which they were introduced.
@@ -128,7 +132,9 @@ runDataUpgrades = do
 runUpgrade :: PDRVersion -> PDRVersion -> MonadPerspectives Unit -> MonadPerspectives Unit
 runUpgrade installedVersion upgradeVersion upgrade = if installedVersion < upgradeVersion && upgradeVersion <= pdrVersion
   -- Run the upgrade
-  then upgrade
+  then do 
+    log ("Running upgrade to version " <> upgradeVersion)
+    upgrade
   else pure unit
 
 addFixingUpdates :: MonadPerspectives Unit
@@ -206,3 +212,18 @@ updateModels0266 = runMonadPerspectivesTransaction'
     updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#CouchdbManagement@6.0"] ["false"] (RoleInstance "")
     updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")
+
+updateModels0267 :: MonadPerspectives Unit
+updateModels0267 = runMonadPerspectivesTransaction'
+  false
+  (ENR $ EnumeratedRoleType sysUser)
+  do
+    updateModel ["model://perspectives.domains#System@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BodiesWithAccounts@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#CouchdbManagement@6.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#BrokerServices@3.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#Disconnect@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#HyperContext@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#Introduction@2.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#SharedFileServices@1.0"] ["false"] (RoleInstance "")
+    updateModel ["model://perspectives.domains#SimpleChat@1.0"] ["false"] (RoleInstance "")

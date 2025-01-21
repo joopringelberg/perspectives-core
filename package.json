@@ -1,6 +1,6 @@
 {
   "name": "perspectives-core",
-  "version": "0.26.6",
+  "version": "0.26.7",
   "description": "Core functionality of Perspectives",
   "license": "GPL-3.0-or-later",
   "author": "Joop Ringelberg <joop.ringelberg@gmail.com>",
@@ -29,7 +29,8 @@
     "symlinks": "./createPerspectivesLinks.sh",
     "docs": "./gendocs.sh",
     "stats": "webpack --json > stats.json",
-    "copyCore": "scp -r ./dist/* joop@inplace.works:/var/www/mycontexts.com/remotetest"
+    "copyCore": "scp -r ./dist/* joop@inplace.works:/var/www/mycontexts.com/remotetest",
+    "copyCoreToRoot": "scp -r ./dist/* joop@inplace.works:/var/www/mycontexts.com"
   },
   "devDependencies": {
     "webpack": "^5.95.0",
