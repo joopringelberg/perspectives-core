@@ -9,11 +9,27 @@ model://perspectives.domains#Introduction:
           translations:
             en: Manager
             nl: Beheerder
+          titles:
+            0:
+              translations:
+                orig: Introductions
+                en: Introductions
+                nl: Introducties
+            1:
+              translations:
+                orig: My Introductions
+                en: My Introductions
+                nl: Mijn introducties
+            2:
+              translations:
+                orig: Introductions started by others
+                en: Introductions sent to me
+                nl: Ontvangen introducties
       contextroles:
         IncomingIntroductions:
           translations:
             en: Introductions by others
-            nl: Introducties door anderen
+            nl: Ontvangen introducties
         Introductions:
           translations:
             en: Introductions by myself
@@ -33,10 +49,22 @@ model://perspectives.domains#Introduction:
           translations:
             en: Introducee
             nl: Introducee
+          actions:
+            model://perspectives.domains#Introduction$Introduction$Introducee:
+              StartConversation:
+                translations:
+                  en: Start conversation
+                  nl: Begin gesprek
         Introducer:
           translations:
             en: Introducer
             nl: Introducer
+          actions:
+            model://perspectives.domains#Introduction$Introduction$Introducer:
+              StartConversation:
+                translations:
+                  en: Start conversation
+                  nl: Begin gesprek
         Guest:
           translations:
             en: Guest

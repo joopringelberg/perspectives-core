@@ -19,6 +19,12 @@ model://perspectives.domains#CouchdbManagement:
                 translations:
                   en: Create server
                   nl: Maak server
+          titles:
+            0:
+              translations:
+                orig: Couchdb Server Administration
+                en: Couchdb Server Administration
+                nl: Couchdb Server Beheer
       contextroles:
         CouchdbServers:
           translations:
@@ -70,6 +76,22 @@ model://perspectives.domains#CouchdbManagement:
           translations:
             en: Visitor
             nl: Bezoeker
+          titles:
+            0:
+              translations:
+                orig: Couchdb Server
+                en: Couchdb Server
+                nl: Couchdb Server
+            1:
+              translations:
+                orig: This server
+                en: This server
+                nl: Deze server
+            2:
+              translations:
+                orig: Repositories
+                en: Repositories
+                nl: Repositories
         Accounts:
           translations:
             en: Accounts
@@ -90,7 +112,33 @@ model://perspectives.domains#CouchdbManagement:
               RequestDatabase:
                 translations:
                   en: Request your own database
-                  nl: Vraag je eigen database aan.
+                  nl: Vraag je eigen database aan
+          titles:
+            0:
+              translations:
+                orig: Couchdb Server
+                en: Couchdb Server
+                nl: Couchdb Server
+            1:
+              translations:
+                orig: The server
+                en: The server
+                nl: De server
+            2:
+              translations:
+                orig: Admins
+                en: Admins
+                nl: Beheerders
+            3:
+              translations:
+                orig: Repositories
+                en: Repositories
+                nl: Repositories
+            4:
+              translations:
+                orig: My databases
+                en: My databases
+                nl: Mijn databases
         Admin:
           translations:
             en: Administrator
@@ -106,6 +154,37 @@ model://perspectives.domains#CouchdbManagement:
                 translations:
                   en: Create a repository
                   nl: Maak een repository
+          titles:
+            0:
+              translations:
+                orig: Couchdb Server
+                en: Couchdb Server
+                nl: Couchdb Server
+            1:
+              translations:
+                orig: The server
+                en: The server
+                nl: De server
+            2:
+              translations:
+                orig: Admins
+                en: Admins
+                nl: Beheerders
+            3:
+              translations:
+                orig: Repositories
+                en: Repositories
+                nl: Repositories
+            4:
+              translations:
+                orig: Accounts
+                en: Accounts
+                nl: Inschrijvingen
+            5:
+              translations:
+                orig: Bespoke databases
+                en: Bespoke databases
+                nl: Eigen databases
         VisitorProxy:
           translations:
             en: 
@@ -181,7 +260,7 @@ model://perspectives.domains#CouchdbManagement:
             nl: 
         Owner:
           translations:
-            en: Ownder
+            en: Owner
             nl: Eigenaar
           properties:
             BespokeDatabaseUrl:
@@ -231,6 +310,22 @@ model://perspectives.domains#CouchdbManagement:
           translations:
             en: Visitor
             nl: Bezoeker
+          titles:
+            0:
+              translations:
+                orig: Repository
+                en: Repository
+                nl: Repository
+            1:
+              translations:
+                orig: Repository information
+                en: Repository information
+                nl: Repository informatie
+            2:
+              translations:
+                orig: Manifests
+                en: Manifests
+                nl: Manifesten
         Accounts:
           translations:
             en: Accounts
@@ -243,17 +338,43 @@ model://perspectives.domains#CouchdbManagement:
             0:
               translations:
                 orig: "## Add a manifest\n
-                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Add a manifest by clicking the `plus` button on the table toolbar.\n
                   Enter the *unqualified* name of the model in the column `LocalModelName`.\n
                   For the domain 'model://perspectives.domains#System' for example, this is 'System'."
                 en: "## Add a manifest\n
-                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Add a manifest by clicking the `plus` button on the table toolbar.\n
                   Enter the *unqualified* name of the model in the column `LocalModelName`.\n
                   For the domain 'model://perspectives.domains#System' for example, this is 'System'."
                 nl: "## Voeg een manifest toe\n
-                  Voeg een manifest toe door de actie `CreateManifest` uit de bovenste toolbar uit te voeren.\n
-                  Vul de *ongekwalificeerde naam van het model in in de kolom `LocalModelname`.\n
+                  Voeg een manifest toe door op de `plus` knop in de tabel toolbar te klikken.\n
+                  Vul de *ongekwalificeerde* naam van het model in in de kolom `LocalModelName`.\n
                   Voor het domein 'model://perspectives.domains#System' bijvoorbeeld, is dit 'System'."
+          titles:
+            0:
+              translations:
+                orig: Repository
+                en: Repository
+                nl: Repository
+            1:
+              translations:
+                orig: This repository
+                en: This repository
+                nl: Deze repository
+            2:
+              translations:
+                orig: Repository information
+                en: Repository information
+                nl: Repository informatie
+            3:
+              translations:
+                orig: Authors
+                en: Authors
+                nl: Auteurs
+            4:
+              translations:
+                orig: Manifests
+                en: Manifests
+                nl: Manifesten
         Admin:
           translations:
             en: Administrator
@@ -265,25 +386,56 @@ model://perspectives.domains#CouchdbManagement:
                   en: Delete notifications
                   nl: Verwijder meldingen
             model://perspectives.domains#CouchdbManagement$Repository$Admin:
-              CreateManifest:
+              CompileRepositoryModels:
                 translations:
-                  en: Create a manifest
-                  nl: Maak een manifest
+                  en: Compile models in repository
+                  nl: Compileer modellen in repository
           markdowns:
             0:
               translations:
                 orig: "## Add a manifest\n
-                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Add a manifest by clicking the `plus` button on the table toolbar.\n
                   Enter the *unqualified* name of the model in the column `LocalModelName`.\n
                   For the domain 'model://perspectives.domains#System' for example, this is 'System'."
                 en: "## Add a manifest\n
-                  Add a manifest by executing the action `CreateManifest` from the top toolbar.\n
+                  Add a manifest by clicking the `plus` button on the table toolbar.\n
                   Enter the *unqualified* name of the model in the column `LocalModelName`.\n
                   For the domain 'model://perspectives.domains#System' for example, this is 'System'."
                 nl: "## Voeg een manifest toe\n
-                  Voeg een manifest toe door de actie `CreateManifest` van de bovenste toolbar uit te voeren.\n
-                  Vul de *ongekwalificeerde* naam van het model in de kolom `LocalModelName` in.\n
-                  Voor het domein 'model://perspectives.domains#System' is dat bijvoorbeeld 'System'."
+                  Voeg een manifest toe door op de `plus` knop in de tabel toolbar te klikken.\n
+                  Vul de *ongekwalificeerde* naam van het model in in de kolom `LocalModelName`.\n
+                  Voor het domein 'model://perspectives.domains#System' bijvoorbeeld, is dit 'System'."
+          titles:
+            0:
+              translations:
+                orig: Repository
+                en: Repository
+                nl: Repository
+            1:
+              translations:
+                orig: This repository
+                en: This repository
+                nl: Deze repository
+            2:
+              translations:
+                orig: Repository information
+                en: Repository information
+                nl: Repository informatie
+            3:
+              translations:
+                orig: Administrator
+                en: Administrator
+                nl: Beheerder
+            4:
+              translations:
+                orig: Manifests
+                en: Manifests
+                nl: Manifesten
+            5:
+              translations:
+                orig: Authors
+                en: Authors
+                nl: Auteurs
         ServerAdmin:
           translations:
             en: Server administrator
@@ -336,6 +488,22 @@ model://perspectives.domains#CouchdbManagement:
           translations:
             en: Visitor
             nl: Bezoeker
+          titles:
+            0:
+              translations:
+                orig: Model Manifest
+                en: Model Manifest
+                nl: Model Manifest
+            1:
+              translations:
+                orig: This Manifest
+                en: This Manifest
+                nl: Dit Manifest
+            2:
+              translations:
+                orig: Model versions
+                en: Model versions
+                nl: Model versies
         Author:
           translations:
             en: Author
@@ -344,8 +512,8 @@ model://perspectives.domains#CouchdbManagement:
             model://perspectives.domains#CouchdbManagement$ModelManifest$Author:
               CreateVersion:
                 translations:
-                  en: Author
-                  nl: Auteur
+                  en: Create a version
+                  nl: Maak een versie
           markdowns:
             0:
               translations:
@@ -358,9 +526,35 @@ model://perspectives.domains#CouchdbManagement:
                   Add a version number in the row that appears. A version should be of the form \"Major.Minor\" where both\n
                   components should be integers. For example: \"1.0\" or \"2.11\"."
                 nl: "## Voeg een versie toe\n
-                  Om een versie toe te voegen aan je manifest, gebruik je de actie `CreateVersion` uit de bovenste toolbar.\n
-                  Voeg een versienummer in in de rij die verschijnt. Een versienummer moet de vorm \"Major.Minor\" hebben, waar beide \n
-                  gehele getallen moeten zijn. Bijvoorbeeld: \"1.0\" of \"2.11\"."
+                  Om een versie van je manifest toe te voegen, gebruik de actie `CreateVersion` van de toolbar bovenaan.\n
+                  Voeg een versienummer toe in de rij die verschijnt. Een versie moet van de vorm \"Major.Minor\" zijn waarbij beide\n
+                  componenten gehele getallen moeten zijn. Bijvoorbeeld: \"1.0\" of \"2.11\"."
+          titles:
+            0:
+              translations:
+                orig: Model Manifest
+                en: Model Manifest
+                nl: Model Manifest
+            1:
+              translations:
+                orig: Versions
+                en: Versions
+                nl: Versies
+            2:
+              translations:
+                orig: This Manifest
+                en: This Manifest
+                nl: Dit Manifest
+            3:
+              translations:
+                orig: Available Versions
+                en: Available Versions
+                nl: Beschikbare Versies
+            4:
+              translations:
+                orig: Authors
+                en: Authors
+                nl: Auteurs
         VisitorProxy:
           translations:
             en: 
@@ -475,6 +669,22 @@ model://perspectives.domains#CouchdbManagement:
           translations:
             en: Visitor
             nl: Bezoeker
+          titles:
+            0:
+              translations:
+                orig: Model version
+                en: Model version
+                nl: Model versie
+            1:
+              translations:
+                orig: This version
+                en: This version
+                nl: Deze versie
+            2:
+              translations:
+                orig: All versions
+                en: All versions
+                nl: Alle versies
         Author:
           translations:
             en: Author
@@ -520,9 +730,25 @@ model://perspectives.domains#CouchdbManagement:
                   indentation (only use 'soft tabs'. A tab should be two spaces).\n
                   To upload your augmented translation, select the `TranslationYaml` control and press enter. Then upload your file."
                 nl: "## Vertaal je model\n
-                  Begin met het bestand `TranslationYaml` te downloaden. Vul de vertalingen in in een simpele teksteditor. Zorg ervoor de \n
-                  indentering te handhaven (gebruik alleen 'soft tabs': dit zijn twee spaties).\n
-                  Om je aangevulde vertaling te uploaden, selecteer je de `TranslationYaml` control en sla je enter aan. Je kunt dan uploaden."
+                  Begin met het downloaden van het `TranslationYaml` bestand. Bewerk het in een eenvoudige tekst editor. Voeg vertalingen toe en let erop dat je \n
+                  de inspringing behoudt (gebruik alleen 'soft tabs'. Een tab moet twee spaties zijn).\n
+                  Om je aangevulde vertaling te uploaden, selecteer de `TranslationYaml` control en sla enter aan. Upload dan je bestand."
+          titles:
+            0:
+              translations:
+                orig: Model version
+                en: Model version
+                nl: Model versie
+            1:
+              translations:
+                orig: Version
+                en: Version
+                nl: Versie
+            2:
+              translations:
+                orig: Authors
+                en: Authors
+                nl: Auteurs
         VisitorProxy:
           translations:
             en: 

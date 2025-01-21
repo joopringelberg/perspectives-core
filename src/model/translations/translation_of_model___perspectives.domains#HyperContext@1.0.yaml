@@ -49,6 +49,27 @@ model://perspectives.domains#HyperContext:
           translations:
             en: Author
             nl: Auteur
+          titles:
+            0:
+              translations:
+                orig: Page Editor
+                en: Page editor
+                nl: Pagina editor
+            1:
+              translations:
+                orig: Text blocks
+                en: Text blocks
+                nl: Tekstblokken
+            2:
+              translations:
+                orig: Conditions
+                en: Conditions
+                nl: Condities
+            3:
+              translations:
+                orig: Links
+                en: Links
+                nl: Links
       things:
         TextBlocks:
           translations:
@@ -103,6 +124,22 @@ model://perspectives.domains#HyperContext:
           translations:
             en: Author
             nl: Auteur
+          titles:
+            0:
+              translations:
+                orig: Public Page Collection
+                en: Public page collection
+                nl: Collectie openbare pagina's
+            1:
+              translations:
+                orig: Entrypoint
+                en: Entrypoint
+                nl: Beginpunt
+            2:
+              translations:
+                orig: Public Pages
+                en: Public pages
+                nl: Openbare pagina's
         Creator:
           translations:
             en: Creator

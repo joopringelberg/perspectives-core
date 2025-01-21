@@ -9,6 +9,22 @@ model://perspectives.domains#SimpleChat:
           translations:
             en: Chatter
             nl: Kletser
+          titles:
+            0:
+              translations:
+                orig: Simple Chat
+                en: Simple Chat
+                nl: Eenvoudige chat
+            1:
+              translations:
+                orig: My Chats
+                en: My Chats
+                nl: Mijn gesprekken
+            2:
+              translations:
+                orig: Chats started by others
+                en: Chats started by others
+                nl: Gesprekken door anderen gestart
       contextroles:
         IncomingChats:
           translations:
@@ -37,10 +53,42 @@ model://perspectives.domains#SimpleChat:
           translations:
             en: Partner
             nl: Gesprekspartner
+          titles:
+            0:
+              translations:
+                orig: Chat
+                en: Chat
+                nl: Gesprek
+            1:
+              translations:
+                orig: This Chat's Initiator
+                en: This Chat's Initiator
+                nl: Initiatiefnemer van dit gesprek
+            2:
+              translations:
+                orig: Your message
+                en: Your message
+                nl: Jouw bericht
         Initiator:
           translations:
             en: Initiator
             nl: Initiatiefnemer
+          titles:
+            0:
+              translations:
+                orig: Chat
+                en: Chat
+                nl: Gesprek
+            1:
+              translations:
+                orig: This chat's partner
+                en: This chat's partner
+                nl: Gesprekspartner van dit gesprek
+            2:
+              translations:
+                orig: Your message
+                en: Your message
+                nl: Jouw bericht
     WithText:
       translations:
         en: With text

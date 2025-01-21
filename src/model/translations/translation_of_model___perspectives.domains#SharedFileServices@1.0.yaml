@@ -9,6 +9,46 @@ model://perspectives.domains#SharedFileServices:
           translations:
             en: Manager
             nl: Beheerder
+          markdowns:
+            0:
+              translations:
+                orig: "## Configure file sharing\n
+                  Media files are too large to be sent directly to your peers. Consequently, MyContexts puts them in a place that you have write rights to, and from which your peers can read.\n
+                  \n
+                  As MyContexts is totally distributed, we cannot provide you with a central place to put the media files that all MyContexts users want to share. \n
+                  However, you can easily set up your own storage. Currently we support the cloud service Mega. The company offers you a free account with 20Gb of storage. \n
+                  Sign up at the [Mega website](https://mega.nz/). Write down your username and password and enter them below. Write \"mega\" in the field 'StorageType' and you are all set. \n
+                  Rest assured: these credentials will never leave your computer (except to authenticate with Mega)! Such is the inherent safety of a truly distributed program such as MyContexts."
+                en: "## Configure file sharing\n
+                  Media files are too large to be sent directly to your peers. Consequently, MyContexts puts them in a place that you have write rights to, and from which your peers can read.\n
+                  \n
+                  As MyContexts is totally distributed, we cannot provide you with a central place to put the media files that all MyContexts users want to share. \n
+                  However, you can easily set up your own storage. Currently we support the cloud service Mega. The company offers you a free account with 20Gb of storage. \n
+                  Sign up at the [Mega website](https://mega.nz/). Write down your username and password and enter them below. Write \"mega\" in the field 'StorageType' and you are all set. \n
+                  Rest assured: these credentials will never leave your computer (except to authenticate with Mega)! Such is the inherent safety of a truly distributed program such as MyContexts."
+                nl: "## Configureer bestandsdeling\n
+                  Media bestanden zijn te groot om direct naar uw collega's te sturen. Daarom plaatst MyContexts ze op een plek waar u schrijfrechten heeft, en waar uw collega's ze kunnen lezen.\n
+                  \n
+                  Omdat MyContexts volledig gedistribueerd is, kunnen we u geen centrale plek bieden om de media bestanden te plaatsen die alle MyContexts gebruikers willen delen. \n
+                  U kunt echter eenvoudig uw eigen opslag instellen. Momenteel ondersteunen we de cloud service Mega. Het bedrijf biedt u een gratis account met 20Gb opslag. \n
+                  Meld u aan op de [Mega website](https://mega.nz/). Schrijf uw gebruikersnaam en wachtwoord op en voer ze hieronder in. Schrijf \"mega\" in het veld 'StorageType' en u bent klaar. \n
+                  Wees gerust: deze gegevens zullen uw computer nooit verlaten (behalve om te authenticeren met Mega)! Zo is de inherente veiligheid van een echt gedistribueerd programma zoals MyContexts."
+          titles:
+            0:
+              translations:
+                orig: Shared File Servers
+                en: Shared File Servers
+                nl: Gedeelde bestandsservers
+            1:
+              translations:
+                orig: Your own shared file service
+                en: Your own shared file service
+                nl: Uw eigen gedeelde bestandsdienst
+            2:
+              translations:
+                orig: The actual shared file service in use
+                en: The actual shared file service in use
+                nl: De daadwerkelijke gedeelde bestandsdienst in gebruik
       things:
         DefaultFileServer:
           translations:

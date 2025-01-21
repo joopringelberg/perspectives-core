@@ -9,6 +9,54 @@ model://perspectives.domains#BrokerServices:
           translations:
             en: Manager
             nl: Beheerder
+          markdowns:
+            0:
+              translations:
+                orig: "## Get connected\n
+                  MyContexts is most useful when you connect to other people. \n
+                  This installation has not yet a means to connect to others. \n
+                  Move to the [[link:pub:https://perspectives.domains/cw_j4qovsczpm/#gobbccbstw$External|Perspectives Broker Service]] \n
+                  page to get online. You will read further instructions there."
+            1:
+              translations:
+                orig: "## Sign up to a service\n
+                  You cannot yet connect to peers, but a service to do so is available below.\n
+                  Select a row with a service (there is probably just one) by clicking it.\n
+                  Then, in the toolbar below, click the bolt icon. A menu will drop down.\n
+                  Click the \"SignUp\" item. \n
+                  \n
+                  ***NOTE*** that by signing up, you will share your first- and last name \n
+                  with the manager of the service. He or she will be able to contact you \n
+                  through MyContexts.\n
+                  \n
+                  A little later, an icon will appear in the top left part of your screen, \n
+                  indicating you can now connect with peers."
+            2:
+              translations:
+                orig: "## You can connect to peers\n
+                  This installation is subscribed to a Broker Service and is able to exchange information \n
+                  automatically with peers you are in contact with (including the manager of this service)."
+          titles:
+            0:
+              translations:
+                orig: Managing Broker Services and contracts
+                en: Managing Broker Services and contracts
+                nl: Beheer Broker Services en contracten
+            1:
+              translations:
+                orig: My Contracts
+                en: My contracts
+                nl: Mijn contracten
+            2:
+              translations:
+                orig: Contract in use
+                en: Contract in use
+                nl: Contract in gebruik
+            3:
+              translations:
+                orig: Brokers
+                en: Brokers
+                nl: Brokers
       contextroles:
         ContractInUse:
           translations:
@@ -83,11 +131,68 @@ model://perspectives.domains#BrokerServices:
             en: Visitor
             nl: Bezoeker
           actions:
-            BrokerService:
+            model://perspectives.domains#BrokerServices$BrokerService:
               AddThisServer:
                 translations:
                   en: Add this server
                   nl: Voeg deze server toe
+          markdowns:
+            0:
+              translations:
+                orig: "# Broker service\n
+                  This is a 'broker service'. It is a program running on \n
+                  a webserver that programs use to exchange messages. MyContexts\n
+                  installations use it to synchronize information."
+                en: "# Broker service\n
+                  This is a 'broker service'. It is a program running on \n
+                  a webserver that programs use to exchange messages. MyContexts\n
+                  installations use it to synchronize information."
+                nl: "# Broker service\n
+                  Dit is een 'broker service'. Het is een programma dat draait op \n
+                  een webserver dat programma's gebruiken om berichten uit te wisselen. MyContexts\n
+                  installaties gebruiken het om informatie te synchroniseren."
+            1:
+              translations:
+                orig: "## Do you want to add this service?\n
+                  This service is not yet available in your installation.\n
+                  You might want to add it so you can sign up to it afterwards in order\n
+                  to connect to other people on MyContexts.\n
+                  [[action: AddThisServer|Add the service]]"
+                en: "## Do you want to add this service?\n
+                  This service is not yet available in your installation.\n
+                  You might want to add it so you can sign up to it afterwards in order\n
+                  to connect to other people on MyContexts.\n
+                  [[action: AddThisServer|Add the service]]"
+                nl: "## Wilt u deze service toevoegen?\n
+                  Deze service is nog niet beschikbaar in uw installatie.\n
+                  U wilt deze misschien toevoegen zodat u zich er later voor kunt aanmelden om\n
+                  verbinding te maken met andere mensen op MyContexts.\n
+                  [[action: AddThisServer|Voeg de service toe]]"
+            2:
+              translations:
+                orig: "## Service available, sign up!\n
+                  This service is available in your installation. However, you have not signed up to it.\n
+                  Move to the [[link:model://perspectives.domains#BrokerServices$MyBrokers|Broker Services Management]] \n
+                  page to read how to sign up."
+                en: "## Service available, sign up!\n
+                  This service is available in your installation. However, you have not signed up to it.\n
+                  Move to the [[link:model://perspectives.domains#BrokerServices$MyBrokers|Broker Services Management]] \n
+                  page to read how to sign up."
+                nl: "## Service beschikbaar, meld u aan!\n
+                  Deze service is beschikbaar in uw installatie. U heeft zich er echter nog niet voor aangemeld.\n
+                  Ga naar de [[link:model://perspectives.domains#BrokerServices$MyBrokers|Broker Services Management]] \n
+                  pagina om te lezen hoe u zich kunt aanmelden."
+          titles:
+            0:
+              translations:
+                orig: This service
+                en: This service
+                nl: Deze service
+            1:
+              translations:
+                orig: Service administrator
+                en: Service administrator
+                nl: Service beheerder
         Guest:
           translations:
             en: Guest
@@ -110,7 +215,7 @@ model://perspectives.domains#BrokerServices:
             en: Visitor proxy
             nl: Bezoeker proxy
           actions:
-            BrokerService:
+            model://perspectives.domains#BrokerServices$BrokerService:
               AddThisServer:
                 translations:
                   en: Add this server
@@ -183,17 +288,44 @@ model://perspectives.domains#BrokerServices:
           translations:
             orig: Your lease of the BrokerService has ended. Within $1 days, you will no longer be able to receive information from peers.
             en: Your lease of the BrokerService has ended. Within $1 days, you will no longer be able to receive information from peers.
-            nl: De einddatum van deelname is gepasseerd. Na $1 dagen zal je geen informatie van medegebruikers meer kunnen ontvangen.
+            nl: Uw lease van de BrokerService is beëindigd. Binnen $1 dagen zult u niet langer in staat zijn informatie van peers te ontvangen.
         1:
           translations:
             orig: You now have an account at the BrokerService $1
             en: You now have an account at the BrokerService $1
-            nl: Je bent nu deelnemer van de BrokerService $1
+            nl: U heeft nu een account bij de BrokerService $1
       users:
         Administrator:
           translations:
             en: Administrator
             nl: Beheerder
+          actions:
+            model://perspectives.domains#System$Invitation$External$Message:
+              CreateInvitation:
+                translations:
+                  en: Create invitation
+                  nl: Maak uitnodiging
+          titles:
+            0:
+              translations:
+                orig: Create Broker Contract
+                en: Create Broker Contract
+                nl: Maak Broker Contract
+            1:
+              translations:
+                orig: Invitation
+                en: Invitation
+                nl: Uitnodiging
+            2:
+              translations:
+                orig: AccountHolder
+                en: AccountHolder
+                nl: AccountHolder
+            3:
+              translations:
+                orig: Queues
+                en: Queues
+                nl: Queues
         AccountHolder:
           translations:
             en: Account holder
@@ -207,6 +339,33 @@ model://perspectives.domains#BrokerServices:
               translations:
                 en: Account name
                 nl: Lidmaatschap naam
+          actions:
+            model://perspectives.domains#System$ContextWithNotification$NotifiedUser:
+              DeleteNotifications:
+                translations:
+                  en: Delete notifications
+                  nl: Verwijder meldingen
+          titles:
+            0:
+              translations:
+                orig: Broker Contract
+                en: Broker Contract
+                nl: Broker Contract
+            1:
+              translations:
+                orig: Contract
+                en: Contract
+                nl: Contract
+            2:
+              translations:
+                orig: Administrator
+                en: Administrator
+                nl: Beheerder
+            3:
+              translations:
+                orig: Account
+                en: Account
+                nl: Account
       contextroles:
         Service:
           translations:
