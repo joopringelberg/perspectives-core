@@ -326,8 +326,9 @@ instance addPerspectivesFormDef  :: AddPerspectives FormDef where
     pure $ FormDef widgetCommonFields {perspective = Just perspective, title = translatedTitle}
 
 instance AddPerspectives MarkDownDef where
-  -- TODO: TRANSLATION HERE!
-  addPerspectives md@(MarkDownConstantDef _) user ctxt = pure md
+  addPerspectives (MarkDownConstantDef r@{text, domain}) user ctxt = do 
+    translatedText <- lift $ translationOf domain text
+    pure $ MarkDownConstantDef r {text = translatedText}
   addPerspectives md@(MarkDownExpressionDef _) user ctxt = pure md
   addPerspectives (MarkDownPerspectiveDef {widgetFields, conditionProperty}) user ctxt = do
     perspective <- perspectiveForContextAndUserFromId
@@ -345,7 +346,9 @@ traverseScreenElement :: RoleInstance -> ContextInstance -> ScreenElementDef -> 
 traverseScreenElement user ctxt a = case a of 
       MarkDownElementD mddef -> map MarkDownElementD <$> unsafePartial case mddef of 
         -- We transform the markdown string to html client side.
-        sed@(MarkDownConstantDef {condition}) -> conditionally condition (pure $ Just sed)
+        MarkDownConstantDef r@{text, domain, condition} -> do 
+          translatedText <- lift $ translationOf domain text
+          conditionally condition (pure $ Just $ MarkDownConstantDef r {text = translatedText})
         MarkDownExpressionDef {textQuery, condition} -> conditionally condition 
           do 
             (textGetter :: ContextInstance ~~> Value) <- lift $ unsafeCoerce compileFunction textQuery

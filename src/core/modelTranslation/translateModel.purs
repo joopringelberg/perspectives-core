@@ -255,8 +255,9 @@ instance Rehydrate Titles_ TitlesTranslation where
 instance Rehydrate Markdowns_ MarkdownsTranslation where
   hydrate (Markdowns_ obj) = MarkdownsTranslation $ fromFoldable $ (values obj <#> (\{translations} -> let
     Translations t' = hydrate translations
-    orig = unsafePartial fromJust $ lookup "orig" t'
-    in Tuple orig (Translations t')))
+    -- Remove the space trailing newlines here. They are not part of the original text.
+    orig = replaceAll (Pattern "\n ") (Replacement "\n") $ unsafePartial fromJust $ lookup "orig" t'
+    in Tuple orig (Translations (insert "orig" orig t'))))
 
 instance Rehydrate ActionsTranslation_ ActionsTranslation where
   -- Do away with the extra "translations" layer.
