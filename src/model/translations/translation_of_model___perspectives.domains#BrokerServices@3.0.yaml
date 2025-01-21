@@ -17,6 +17,16 @@ model://perspectives.domains#BrokerServices:
                   This installation has not yet a means to connect to others. \n
                   Move to the [[link:pub:https://perspectives.domains/cw_j4qovsczpm/#gobbccbstw$External|Perspectives Broker Service]] \n
                   page to get online. You will read further instructions there."
+                en: "## Get connected\n
+                  MyContexts is most useful when you connect to other people. \n
+                  This installation has not yet a means to connect to others. \n
+                  Move to the [[link:pub:https://perspectives.domains/cw_j4qovsczpm/#gobbccbstw$External|Perspectives Broker Service]] \n
+                  page to get online. You will read further instructions there."
+                nl: "## Maak verbinding\n
+                  MyContexts is het meest nuttig wanneer u verbinding maakt met andere mensen. \n
+                  Deze installatie heeft nog geen middel om verbinding te maken met anderen. \n
+                  Ga naar de [[link:pub:https://perspectives.domains/cw_j4qovsczpm/#gobbccbstw$External|Perspectives Broker Service]] \n
+                  pagina om online te gaan. U zult daar verdere instructies lezen."
             1:
               translations:
                 orig: "## Sign up to a service\n
@@ -31,11 +41,41 @@ model://perspectives.domains#BrokerServices:
                   \n
                   A little later, an icon will appear in the top left part of your screen, \n
                   indicating you can now connect with peers."
+                en: "## Sign up to a service\n
+                  You cannot yet connect to peers, but a service to do so is available below.\n
+                  Select a row with a service (there is probably just one) by clicking it.\n
+                  Then, in the toolbar below, click the bolt icon. A menu will drop down.\n
+                  Click the \"SignUp\" item. \n
+                  \n
+                  ***NOTE*** that by signing up, you will share your first- and last name \n
+                  with the manager of the service. He or she will be able to contact you \n
+                  through MyContexts.\n
+                  \n
+                  A little later, an icon will appear in the top left part of your screen, \n
+                  indicating you can now connect with peers."
+                nl: "## Meld u aan voor een service\n
+                  U kunt nog niet verbinden met peers, maar een service om dit te doen is hieronder beschikbaar.\n
+                  Selecteer een rij met een service (er is waarschijnlijk maar één) door erop te klikken.\n
+                  Klik vervolgens in de werkbalk hieronder op het bliksemschicht-icoon. Er verschijnt een menu.\n
+                  Klik op het item \"Aanmelden\". \n
+                  \n
+                  ***LET OP*** dat door u aan te melden, u uw voornaam en achternaam deelt \n
+                  met de beheerder van de service. Hij of zij zal contact met u kunnen opnemen \n
+                  via MyContexts.\n
+                  \n
+                  Een beetje later zal er een icoon verschijnen in het linkerbovenste deel van uw scherm, \n
+                  wat aangeeft dat u nu kunt verbinden met peers."
             2:
               translations:
                 orig: "## You can connect to peers\n
                   This installation is subscribed to a Broker Service and is able to exchange information \n
                   automatically with peers you are in contact with (including the manager of this service)."
+                en: "## You can connect to peers\n
+                  This installation is subscribed to a Broker Service and is able to exchange information \n
+                  automatically with peers you are in contact with (including the manager of this service)."
+                nl: "## U kunt verbinden met peers\n
+                  Deze installatie is geabonneerd op een Broker Service en kan informatie uitwisselen \n
+                  met peers waar u contact mee heeft (inclusief de beheerder van deze service)."
           titles:
             0:
               translations:
