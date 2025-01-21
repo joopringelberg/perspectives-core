@@ -72,7 +72,7 @@ import Perspectives.DomeinFile (DomeinFile(..), addDownStreamAutomaticEffect, ad
 import Perspectives.Error.Boundaries (handleDomeinFileError, handleExternalFunctionError, handleExternalStatementError)
 import Perspectives.ErrorLogging (logPerspectivesError)
 import Perspectives.External.HiddenFunctionCache (HiddenFunctionDescription)
-import Perspectives.Identifiers (Namespace, getFirstMatch, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
+import Perspectives.Identifiers (Namespace, getFirstMatch, isModelUri, modelUri2ManifestUrl, modelUri2ModelUrl, modelUriVersion, newModelRegex, typeUri2LocalName_, unversionedModelUri)
 import Perspectives.InstanceRepresentation (PerspectContext)
 import Perspectives.Instances.Builders (constructContext, createAndAddRoleInstance, createAndAddRoleInstance_)
 import Perspectives.Instances.CreateContext (constructEmptyContext)
@@ -175,7 +175,9 @@ updateModel arrWithModelName arrWithDependencies _ = try
     -- fail silently
     Nothing -> pure unit
     -- TODO: add a check on the form of the modelName.
-    Just modelName -> updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName))
+    Just modelName -> if isModelUri modelName 
+      then updateModel' (maybe false (eq "true") (head arrWithDependencies)) (DomeinFileId modelName)
+      else throwError (error $ "This is not a well-formed domain name: " <> modelName))
   >>= handleExternalStatementError "model://perspectives.domains#UpdateModel"
 
   where
@@ -243,6 +245,7 @@ isInitialLoad :: Boolean
 isInitialLoad = true
 
 -- | Parameter `isUpdate` should be true iff the model has been added to the local installation before.
+-- | Attachments are fetched from the repository and stored locally.
 -- | Invariant: the model is not in cache when this function returns.
 addModelToLocalStore :: DomeinFileId -> Boolean -> MonadPerspectivesTransaction Unit
 addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
@@ -251,7 +254,6 @@ addModelToLocalStore dfid@(DomeinFileId modelname) isInitialLoad' = do
   {patch, build} <- case x of 
     Nothing -> pure {patch: "0", build: "0"}
     Just {versionedModelManifest} -> lift $ getPatchAndBuild versionedModelManifest
-  -- TODO. msversion is geen Maybe waarde!
   msversion <- lift (toMaybe <$> AMA.gets (_.useSystemVersion <<< _.runtimeOptions))
   version' <- case modelUriVersion modelname of
       Just v -> pure $ Just v
