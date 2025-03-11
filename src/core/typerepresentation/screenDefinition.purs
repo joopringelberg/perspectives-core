@@ -24,6 +24,7 @@ module Perspectives.Representation.ScreenDefinition where
 
 import Prelude
 
+import Data.Either (Either(..))
 import Data.Eq.Generic (genericEq)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe)
@@ -37,7 +38,7 @@ import Perspectives.Representation.Perspective (PropertyVerbs, PerspectiveId)
 import Perspectives.Representation.TypeIdentifiers (ContextType, EnumeratedPropertyType, EnumeratedRoleType(..), PropertyType, RoleType(..), roletype2string)
 import Perspectives.Representation.Verbs (RoleVerb)
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
-import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeImpl)
+import Simple.JSON (class ReadForeign, class WriteForeign, read, read', write, writeImpl)
 
 -- | These types are part of a DomeinFile.
 -- | Runtime, we generate a simpler structure from them, that has an automatic WriteForeign instance.
@@ -49,14 +50,19 @@ import Simple.JSON (class ReadForeign, class WriteForeign, read', write, writeIm
 -- |    - excluding an entire Widget if the role type underlying it is unavailable in the given states.
 -- | The PropertyVerbs and RoleVerb Array are used to filter the full perspective the user has on a the role.
 
-newtype ScreenDefinition = ScreenDefinition
-  { title :: Maybe String
-  , tabs :: Maybe (Array TabDef)
-  -- Will be an array of ColumnElementD elements.
-  , rows :: Maybe (Array ScreenElementDef)
+type MainScreenElements = 
+  ( tabs :: Maybe (Array TabDef)
   -- Will be an array of RowElementD elements.
+  , rows :: Maybe (Array ScreenElementDef)
+  -- Will be an array of ColumnElementD elements.
   , columns :: Maybe (Array ScreenElementDef)
-  }
+  )
+
+-- When a WhoWhatWhereScreen is defined, we will not have tabs, rows or columns beside that.
+-- However, during transition to the new GUI, we will have to support both.
+type ScreenDefinitionElements f = {title :: Maybe String, whoWhatWhereScreen :: Maybe WhoWhatWhereScreenDef | f}
+
+newtype ScreenDefinition = ScreenDefinition (ScreenDefinitionElements MainScreenElements)
 
 newtype TabDef = TabDef {title :: String, isDefault :: Boolean, elements :: (Array ScreenElementDef)}
 
@@ -104,6 +110,21 @@ newtype TableDef' = TableDef' (WidgetCommonFieldsDefWithoutPerspective ())
 newtype FormDef' = FormDef' (WidgetCommonFieldsDefWithoutPerspective ())
 
 -----------------------------------------------------------
+-- WHOWHATWHERESCREEN
+-----------------------------------------------------------
+newtype WhoWhatWhereScreenDef = WhoWhatWhereScreenDef {who :: Array TableFormDef, what :: What, whereto :: Array TableFormDef}
+
+-----------------------------------------------------------
+-- TABLEFORM
+-----------------------------------------------------------
+newtype TableFormDef = TableFormDef {table :: TableDef, form :: FormDef}
+
+-----------------------------------------------------------
+-- WHAT
+-----------------------------------------------------------
+data What = TableForms (Array TableFormDef) | FreeFormScreen { | MainScreenElements}
+
+-----------------------------------------------------------
 -- GENERIC INSTANCES
 -----------------------------------------------------------
 derive instance genericScreenDefinition :: Generic ScreenDefinition _
@@ -117,6 +138,9 @@ derive instance genericFormDef :: Generic FormDef _
 derive instance genericFormDef' :: Generic FormDef' _
 derive instance Generic MarkDownDef _
 derive instance Generic ChatDef _
+derive instance Generic WhoWhatWhereScreenDef _
+derive instance Generic TableFormDef _
+derive instance Generic What _
 
 -----------------------------------------------------------
 -- SHOW INSTANCES
@@ -130,6 +154,9 @@ instance showTableDef :: Show TableDef where show = genericShow
 instance showFormDef :: Show FormDef where show = genericShow
 instance Show MarkDownDef where show = genericShow
 instance Show ChatDef where show = genericShow
+instance Show WhoWhatWhereScreenDef where show = genericShow
+instance Show TableFormDef where show = genericShow
+instance Show What where show = genericShow
 
 -----------------------------------------------------------
 -- EQ INSTANCES
@@ -143,6 +170,9 @@ instance eqTableDef :: Eq TableDef where eq = genericEq
 instance eqFormDef :: Eq FormDef where eq = genericEq
 instance Eq MarkDownDef where eq = genericEq
 instance Eq ChatDef where eq = genericEq
+instance Eq WhoWhatWhereScreenDef where eq = genericEq
+instance Eq TableFormDef where eq = genericEq
+instance Eq What where eq = genericEq
 
 -----------------------------------------------------------
 -- WRITEFOREIGN INSTANCES
@@ -180,6 +210,15 @@ instance WriteForeign ChatDef where
 instance WriteForeign ScreenKey where
   writeImpl (ScreenKey ct rt) = writeImpl {ct, rt}
 
+instance WriteForeign TableFormDef where
+  writeImpl (TableFormDef {table, form}) = write {tag: "TableFormDef", table, form}
+
+instance WriteForeign WhoWhatWhereScreenDef where
+  writeImpl (WhoWhatWhereScreenDef {who, what, whereto}) = write {tag: "WhoWhatWhereScreenDef", who, what, whereto}
+
+instance WriteForeign What where
+  writeImpl (TableForms t) = write {tag: "TableForms", elements: t}
+  writeImpl (FreeFormScreen f) = write {tag: "FreeFormScreen", elements: f}
 -----------------------------------------------------------
 -- READFOREIGN INSTANCES
 -----------------------------------------------------------
@@ -243,6 +282,31 @@ instance ReadForeign ChatDef where
   
 derive newtype instance ReadForeign TabDef
 
+instance ReadForeign TableFormDef where
+  readImpl f = do 
+    ({tag, table, form} :: {tag :: String, table :: TableDef, form :: FormDef}) <- read' f
+    case tag of 
+      "TableFormDef" -> pure $ TableFormDef {table, form}
+      _ -> fail (TypeMismatch "TableFormDef" tag)
+
+instance ReadForeign WhoWhatWhereScreenDef where
+  readImpl f = do 
+    ({tag, who, what, whereto} :: {tag :: String, who :: Array TableFormDef, what :: What, whereto :: Array TableFormDef}) <- read' f
+    case tag of 
+      "WhoWhatWhereScreenDef" -> pure $ WhoWhatWhereScreenDef {who, what, whereto}
+      _ -> fail (TypeMismatch "WhoWhatWhereScreenDef" tag)
+
+instance ReadForeign What where
+  readImpl f = do 
+    ({tag, elements} :: {tag :: String, elements :: Foreign}) <- read' f
+    case tag of 
+      "TableForms" -> case read elements of 
+        Right tableForms -> pure $ TableForms tableForms
+        Left err -> fail (ForeignError (show err))
+      "FreeFormScreen" -> case read elements of 
+        Right screenElements -> pure $ FreeFormScreen screenElements
+        Left err -> fail (ForeignError (show err))
+      _ -> fail (TypeMismatch "What" tag)
 -------------------------------------------------------------------------------
 ---- SCREENKEY
 ---- A ScreenKey is constructed in PhaseThree based on the lexical context and subject.

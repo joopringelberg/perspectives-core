@@ -8,4 +8,3 @@ export function formatDateTimeImpl( epoch, locale, options)
 
 export const pdrVersion = (typeof __PDRVersion__ == 'undefined') ? "" : __PDRVersion__;
 export const mycontextsUrl = __MYCONTEXTS__;
-

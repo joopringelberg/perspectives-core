@@ -30,7 +30,7 @@ import Data.Maybe (Maybe(..), fromJust, isJust, maybe)
 import Data.String (Pattern(..), Replacement(..), indexOf, replaceAll, split, splitAt, stripPrefix, stripSuffix)
 import Data.String.Regex (Regex, match, test)
 import Data.String.Regex.Flags (noFlags)
-import Data.String.Regex.Unsafe (unsafeRegex)
+import Data.String.Regex.Unsafe (unsafeRegex) 
 import Partial.Unsafe (unsafePartial)
 import Prelude (class Eq, class Show, append, eq, flip, identity, ($), (&&), (<<<), (<>), (==), (||), (+))
 

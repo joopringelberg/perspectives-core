@@ -1,18 +1,25 @@
 // SPDX-FileCopyrightText: 2019 Joop Ringelberg (joopringelberg@perspect.it), Cor Baars
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-const path = require("path");
-const webpack = require('webpack');
+import webpack from "webpack";
+let packageJson;
+import { promises as fs } from 'fs';
 
-module.exports = function(env) {
+export default async function(env) {
+  packageJson = JSON.parse(await fs.readFile(new URL('./package.json', import.meta.url)));
   const { target } = env;
   return {
-    entry: path.join(__dirname, "output/Main/index.js"),
+    entry: new URL('./output/Main/index.js', import.meta.url).pathname,
     output: {
-      library: "perspectives-core",
-      libraryTarget: "umd",
+      library: {
+        type: "module"
+      },
+      chunkFormat: "module",
       filename: "perspectives-core.js",
-      path: path.join(__dirname, "dist")
+      path: new URL('./dist', import.meta.url).pathname,
+    },
+    experiments: {
+      outputModule: true // Enable output as a module
     },
     resolve: {
       extensions: ['.js']
@@ -23,33 +30,27 @@ module.exports = function(env) {
     devtool: 'source-map',
     module: {
       rules: [
-        {
-          test: /\.arc/,
-          type: 'asset/source'
-        },
-        {
-          test: /\.js$/,
-          enforce: 'pre',
-          use: ['source-map-loader'],
-          include: path.resolve(__dirname, 'output'),
-          exclude: /node_modules/ // Exclude node_modules from source map processing
+      {
+        test: /\.arc/,
+        type: 'asset/source'
+      },
+      {
+        test: /\.js$/,
+        enforce: 'pre',
+        use: ['source-map-loader'],
+        include: new URL('./output', import.meta.url).pathname,
+        exclude: /node_modules/ // Exclude node_modules from source map processing
         }
       ]
     },
     plugins: [
       new webpack.DefinePlugin({
-        __PDRVersion__: JSON.stringify(require("./package.json").version),
+        __PDRVersion__: packageJson.version ? `"${packageJson.version}"` : '"no version"',
         __MYCONTEXTS__: '"https://mycontexts.com/"'
       })
     ],
     externals: {
       "eventsource": 'commonjs eventsource',
-      "perspectives-core": {
-        commonjs: "perspectives-core",
-        commonjs2: "perspectives-core",
-        amd: "perspectives-core",
-        root: "perspectives-core"
-      }
       }
   };
 };

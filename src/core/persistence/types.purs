@@ -90,7 +90,7 @@ instance Semigroup Credential where
 type PouchdbUser =
   { systemIdentifier :: String        -- the schemaless string
   , perspectivesUser :: String        -- the schemaless string
-  , userName :: String                -- this MAY be equal to perspectivesUser but it is not required.
+  , userName :: Maybe String          -- this MAY be equal to perspectivesUser but it is not required.
   , password :: Maybe String
   , couchdbUrl :: Maybe String
   }

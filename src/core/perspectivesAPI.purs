@@ -60,7 +60,7 @@ import Perspectives.Identifiers (buitenRol, deconstructBuitenRol, isExternalRole
 import Perspectives.InstanceRepresentation (PerspectRol(..))
 import Perspectives.Instances.Builders (createAndAddRoleInstance, constructContext)
 import Perspectives.Instances.Me (getAllMyRoleTypes, getMeInRoleAndContext, getMyType)
-import Perspectives.Instances.ObjectGetters (binding, context, contextType, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
+import Perspectives.Instances.ObjectGetters (binding, context, contextType, contextType_, getContextActions, getFilledRoles, getMe, getProperty, getRoleName, roleType, roleType_, siblings)
 import Perspectives.Instances.Values (parsePerspectivesFile)
 import Perspectives.ModelDependencies (actualSharedFileServer, fileShareCredentials, identifiableFirstName, identifiableLastName, mySharedFileServices, sharedFileServices, sysUser)
 import Perspectives.Names (expandDefaultNamespaces, getMySystem, getUserIdentifier, lookupIndexedContext)
@@ -86,7 +86,7 @@ import Perspectives.RunMonadPerspectivesTransaction (detectPublicStateChanges, r
 import Perspectives.SaveUserData (removeAllRoleInstances, removeBinding, removeContextIfUnbound, scheduleContextRemoval, scheduleRoleRemoval, setBinding, setFirstBinding, synchronise)
 import Perspectives.Sync.HandleTransaction (executeTransaction)
 import Perspectives.Sync.TransactionForPeer (TransactionForPeer(..))
-import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser)
+import Perspectives.TypePersistence.ContextSerialisation (screenForContextAndUser, serialisedTableFormForContextAndUser)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser, perspectivesForContextAndUser)
 import Perspectives.Types.ObjectGetters (findPerspective, getAction, getContextAction, isDatabaseQueryRole, localRoleSpecialisation, lookForRoleType, lookForUnqualifiedRoleType, lookForUnqualifiedViewType, propertiesOfRole, rolesWithPerspectiveOnRoleAndProperty, string2EnumeratedRoleType, string2RoleType)
 import Prelude (Unit, bind, discard, eq, identity, map, negate, pure, show, unit, void, ($), (<$>), (<<<), (<>), (==), (>=>), (>>=))
@@ -410,6 +410,21 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           (screenForContextAndUser userRoleInstance userRoleType (ContextType predicate))
           (ContextInstance object)
           onlyOnce
+    -- { request: "GetTableForm", subject: UserRoleType, predicate: ContextInstance, object: RoleType }
+    Api.GetTableForm -> do 
+      userRoleType <- getRoleType subject
+      objectRoleType <- getRoleType object
+      subjectGetter <- getRoleFunction subject
+      contextType <- contextType_ (ContextInstance predicate)
+      muserRoleInstance <- (ContextInstance predicate) ##> subjectGetter
+      case muserRoleInstance of
+        Nothing -> sendResponse (Error corrId ("There is no user role instance for role type '" <> subject <> "' in context instance '" <> predicate <> "'!")) setter
+        Just userRoleInstance -> registerSupportedEffect
+          corrId
+          setter
+          (serialisedTableFormForContextAndUser userRoleInstance userRoleType contextType objectRoleType)
+          (ContextInstance predicate)
+          onlyOnce
     -- { request: GetContextActions
     -- , subject: RoleType // the user role type
     -- , object: ContextInstance
@@ -567,14 +582,14 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
             void $ runMonadPerspectivesTransaction authoringRole
               do
                 void $ setBinding (RoleInstance subject) (RoleInstance object) Nothing
-            sendResponse (Result corrId ["ok"]) setter
+            sendResponse (Result corrId []) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "RemoveBinding", subject: rolID}
     Api.RemoveBinding -> catchError
       do
         -- Remove the binding from subject. We don't know whether that binding will be removed itself, hence bindingRemoved=false.
         void $ runMonadPerspectivesTransaction authoringRole $ removeBinding (RoleInstance subject)
-        sendResponse (Result corrId ["ok"]) setter
+        sendResponse (Result corrId []) setter
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- Check whether the role type in predicate allows RolID as binding.
     -- The context type given in object must be described in a locally installed model.
@@ -593,18 +608,18 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
     Api.SetProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (setProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) Nothing [(Value object)])
-        sendResponse (Result corrId ["ok"]) setter)
+        sendResponse (Result corrId []) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     Api.AddProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (addProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) [(Tuple (Value object) Nothing)])
-        sendResponse (Result corrId ["ok"]) setter)
+        sendResponse (Result corrId []) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- {request: "DeleteProperty", subject: rolID, predicate: propertyName, authoringRole: myroletype}
     Api.DeleteProperty -> catchError
       (do
         void $ runMonadPerspectivesTransaction authoringRole (deleteProperty [(RoleInstance subject)] (EnumeratedPropertyType predicate) Nothing) 
-        sendResponse (Result corrId ["Ok"]) setter)
+        sendResponse (Result corrId []) setter)
       (\e -> sendResponse (Error corrId (show e)) setter)
     -- { request: "SaveFile"
     -- , subject: PerspectivesFile serialised (may be without database)
@@ -675,7 +690,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                     updater <- lift $ compileAssignmentFromRole action
                     updater (RoleInstance predicate)
                     lift $ restoreFrame oldFrame
-                sendResponse (Result corrId ["true"]) setter
+                sendResponse (Result corrId []) setter
               _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show authoringRole <> "', perspectiveId '" <> perspectiveId <> "' and action name '" <> actionName <> "'.") setter
             )
       (\e -> sendResponse (Error corrId (show e)) setter)
@@ -701,7 +716,7 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
                 updater <- lift $ compileAssignment action
                 updater (ContextInstance object)
                 lift $ restoreFrame oldFrame
-            sendResponse (Result corrId ["true"]) setter
+            sendResponse (Result corrId []) setter
           _, _ -> sendResponse (Error corrId $ "cannot identify Action with role type '" <> show userRoleType <>
             "' and action name '" <> predicate <> "'.") setter
         )
@@ -717,13 +732,13 @@ dispatchOnRequest r@{request, subject, predicate, object, reactStateSetter, corr
           Just roleType -> do
             ctxt <- (RoleInstance subject) ##>> context
             void $ runMonadPerspectivesTransaction authoringRole (setPreferredUserRoleType ctxt [roleType])
-            sendResponse (Result corrId ["true"]) setter)
+            sendResponse (Result corrId []) setter)
       \e -> sendResponse (Error corrId (show e)) setter
     
     Api.Save -> catchError 
       (do
         saveMarkedResources
-        sendResponse (Result corrId ["true"]) setter)
+        sendResponse (Result corrId []) setter)
       \e -> sendResponse (Error corrId (show e)) setter
 
     Api.EvaluateRoleInstance -> catchError

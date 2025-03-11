@@ -1,6 +1,6 @@
-module Perspectives.Proxy  
+module Perspectives.Proxy
 (
-  internalChannelPromise,
+  handleClientRequest,
   createRequestEmitter,
   retrieveRequestEmitter
 )
@@ -15,9 +15,9 @@ import Prelude (Unit)
 
 
 -----------------------------------------------------------
--- PASSING ON InternalChannelPromise
+-- PASSING ON handleClientRequest
 -----------------------------------------------------------
-foreign import internalChannelPromise :: Promise Foreign
+foreign import handleClientRequest :: Foreign
 
 -----------------------------------------------------------
 -- REQUEST, RESPONSE AND CHANNEL

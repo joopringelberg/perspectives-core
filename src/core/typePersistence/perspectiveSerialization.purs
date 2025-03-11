@@ -69,20 +69,27 @@ import Simple.JSON (writeJSON)
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
 -- | in a given context instance.
+perspectiveForContextAndUser' ::
+  RoleInstance ->           -- The user role instance
+  RoleType ->               -- The user role type
+  RoleType ->               -- An object role type, will be matched against the Perspective's roleTypes member.
+  (ContextInstance ~~> SerialisedPerspective')
+perspectiveForContextAndUser' subject userRoleType objectRoleType cid = ArrayT do
+  contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
+  subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
+  allPerspectives <- lift$  perspectivesOfRoleType userRoleType
+  traverse
+    ((serialisePerspective contextStates subjectStates cid userRoleType Nothing Nothing))
+    (filter
+      (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap)
+      allPerspectives)
+
 perspectiveForContextAndUser ::
   RoleInstance ->           -- The user role instance
   RoleType ->               -- The user role type
   RoleType ->               -- An object role type, will be matched against the Perspective's roleTypes member.
   (ContextInstance ~~> SerialisedPerspective)
-perspectiveForContextAndUser subject userRoleType objectRoleType cid = ArrayT do
-  contextStates <- map ContextState <$> (runArrayT $ getActiveStates cid)
-  subjectStates <- map SubjectState <$> (runArrayT $ getActiveRoleStates subject)
-  allPerspectives <- lift$  perspectivesOfRoleType userRoleType
-  traverse
-    ((serialisePerspective contextStates subjectStates cid userRoleType Nothing Nothing) >=> pure <<< SerialisedPerspective <<< writeJSON)
-    (filter
-      (isJust <<< elemIndex objectRoleType <<< _.roleTypes <<< unwrap)
-      allPerspectives)
+perspectiveForContextAndUser subject userRoleType objectRoleType = perspectiveForContextAndUser' subject userRoleType objectRoleType >=> pure <<< SerialisedPerspective <<< writeJSON
 
 -- | Get the serialisation of the perspective the user role type has on the object role type,
 -- | in a given context instance.
@@ -181,7 +188,7 @@ serialisePerspective contextStates subjectStates cid userRoleType propertyVerbs'
     , isFunctional: pessimistic $ functional object
     , isMandatory: pessimistic $ mandatory object
     , isCalculated: not isEnumerated
-    , userRoleType: (roletype2string userRoleType)
+    , userRoleType: (roletype2string userRoleType) 
     , roleType: Just roleType
     , contextInstance: cid
     , roleKind

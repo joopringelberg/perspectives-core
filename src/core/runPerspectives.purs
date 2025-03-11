@@ -45,7 +45,7 @@ runPerspectives userName password perspectivesUser systemId host port mp = do
     ((newPerspectivesState
         { systemIdentifier: systemId
         , perspectivesUser: perspectivesUser
-        , userName
+        , userName: Just userName
         , password: Just password
         , couchdbUrl: Just (host <> ":" <> show port <> "/")
         }

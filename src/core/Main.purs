@@ -25,7 +25,6 @@ where
 
 import Control.Monad.AvarMonadAsk (gets, modify)
 import Control.Monad.Writer (runWriterT)
-import Control.Promise (Promise)
 import Data.Array (cons, foldM)
 import Data.DateTime.Instant (Instant, instant, unInstant)
 import Data.Either (Either(..))
@@ -73,7 +72,7 @@ import Perspectives.Persistence.State (getSystemIdentifier, withCouchdbUrl)
 import Perspectives.Persistence.Types (Credential(..))
 import Perspectives.Persistent (entitiesDatabaseName, invertedQueryDatabaseName, postDatabaseName, saveMarkedResources)
 import Perspectives.PerspectivesState (defaultRuntimeOptions, modelsDatabaseName, newPerspectivesState, resetCaches)
-import Perspectives.Proxy (internalChannelPromise) as Proxy
+import Perspectives.Proxy (handleClientRequest) as Proxy
 import Perspectives.Query.UnsafeCompiler (getPropertyFromTelescope, getPropertyFunction, getRoleFunction, getterFromPropertyType)
 import Perspectives.ReferentialIntegrity (fixReferences)
 import Perspectives.Repetition (Duration, fromDuration)
@@ -739,5 +738,5 @@ retrieveAllCredentials = do
     roleInstances
   modify \s@{couchdbCredentials} -> s {couchdbCredentials = couchdbCredentials <> fromFoldable rows}
 
-internalChannelPromise :: Promise Foreign
-internalChannelPromise = Proxy.internalChannelPromise
+handleClientRequest :: Foreign
+handleClientRequest = Proxy.handleClientRequest

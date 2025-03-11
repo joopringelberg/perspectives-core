@@ -11,7 +11,6 @@
     "idb-keyval": "^6.2.1",
     "js-yaml": "^4.1.0",
     "lru-cache": "^11.0.1",
-    "perspectives-proxy": "git+https://github.com/joopringelberg/perspectives-proxy.git#v1.21.4",
     "pouchdb-browser": "^9.0.0"
   },
   "peerDependencies": {
@@ -22,6 +21,7 @@
     "url": "git+https://github.com/joopringelberg/perspectives-core.git"
   },
   "main": "dist/perspectives-core.js",
+  "type":"module",
   "homepage": "https://github.com/joopringelberg/perspectives-core#readme",
   "scripts": {
     "buildproduction": "webpack --env target=production",

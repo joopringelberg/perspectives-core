@@ -1405,6 +1405,7 @@ handleScreens screenEs = do
             , tabs: fromFoldable <$> tabs'
             , rows: fromFoldable <$> rows'
             , columns: fromFoldable <$> columns'
+            , whoWhatWhereScreen: Nothing
             }
           pure $ EM.insert (ScreenKey context subjectRoleType) screenDef screenDefMap
 
