@@ -55,7 +55,7 @@ Execute this command to combine the sources into a bundle, as it is used by MyCo
 ```
 npm run build
 ```
-(which just calls `webpack`)
+(which just calls `rollup`)
 
 ### Develop for MyContexts
 The PDR forms the base of MyContexts. To make changes to the PDR effective in MyContexts, you will have publish the new PDR to https://mycontexts.com (or https://mycontexts.com/remotetest for testing). There is a script in the package.json to do the latter: `copyCore`. You will be prompted for a password on the server.
