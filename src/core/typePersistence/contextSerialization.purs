@@ -32,7 +32,7 @@ import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (class Newtype, unwrap)
 import Data.Traversable (traverse)
 import Partial.Unsafe (unsafePartial)
-import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, (###=))
+import Perspectives.CoreTypes (type (~~>), AssumptionTracking, MonadPerspectivesQuery, (###=), (##=))
 import Perspectives.Data.EncodableMap (lookup)
 import Perspectives.DependencyTracking.Array.Trans (ArrayT(..), runArrayT)
 import Perspectives.DomeinCache (retrieveDomeinFile)
@@ -43,10 +43,9 @@ import Perspectives.ModelTranslation (translationOf)
 import Perspectives.Query.Interpreter (lift2MPQ)
 import Perspectives.Query.QueryTypes (QueryFunctionDescription)
 import Perspectives.Query.UnsafeCompiler (compileFunction, getRoleInstances)
-import Perspectives.Representation.Class.Context (userRole)
 import Perspectives.Representation.InstanceIdentifiers (ContextInstance, RoleInstance, Value(..))
 import Perspectives.Representation.ScreenDefinition (ChatDef(..), ColumnDef(..), FormDef(..), MarkDownDef(..), RowDef(..), ScreenDefinition(..), ScreenElementDef(..), ScreenKey(..), TabDef(..), TableDef(..), TableFormDef(..), What(..), WhoWhatWhereScreenDef(..))
-import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleType, roletype2string)
+import Perspectives.Representation.TypeIdentifiers (ContextType, DomeinFileId(..), RoleKind(..), RoleType, roletype2string)
 import Perspectives.TypePersistence.PerspectiveSerialisation (perspectiveForContextAndUser', perspectiveForContextAndUserFromId, perspectivesForContextAndUser')
 import Perspectives.TypePersistence.PerspectiveSerialisation.Data (SerialisedPerspective')
 import Perspectives.TypePersistence.ScreenContextualisation (contextualiseScreen, contextualiseTableFormDef)
@@ -95,15 +94,18 @@ screenForContextAndUser userRoleInstance userRoleType contextType contextInstanc
         (screenInstance :: ScreenDefinition) <- lift $ addPerspectives s userRoleInstance contextInstance
         pure $ SerialisedScreen $ writeJSON screenInstance
       else do
+        (perspectives :: Array SerialisedPerspective') <- lift $ lift (contextInstance ##= perspectivesForContextAndUser' userRoleInstance userRoleType)
+        who <- pure $ makeTableFormDef userRoleType <$> filter isOnUserRole perspectives
+        whereto <- pure $ makeTableFormDef userRoleType <$> filter isOnContextRole perspectives
         constructedScreen <- lift $ addPerspectives (ScreenDefinition
           { title
           , tabs: Nothing
           , rows: Nothing
           , columns: Nothing
           , whoWhatWhereScreen: Just $ WhoWhatWhereScreenDef $ 
-            { who: []
+            { who
             , what: FreeFormScreen {tabs, rows, columns}
-            , whereto: []
+            , whereto
             }
           })
           userRoleInstance
@@ -123,24 +125,33 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
   if length perspectives == 1
     then do 
       row <- pure $ Just $ makeRow <$> perspectives
-      pure $ ScreenDefinition
-        { title: Nothing
-        , tabs: Nothing
-        , rows: row
-        , columns: Nothing
-        , whoWhatWhereScreen: Nothing
-        }
-    else do
-      tabs <- pure $ Just $ makeTab <$> perspectives
+      who <- pure $ makeTableFormDef userRoleType <$> filter isOnUserRole perspectives
+      whereto <- pure $ makeTableFormDef userRoleType <$> filter isOnContextRole perspectives
       pure $ ScreenDefinition
         { title: Nothing
         , tabs: Nothing
         , rows: Nothing
         , columns: Nothing
         , whoWhatWhereScreen: Just $ WhoWhatWhereScreenDef $ 
-          { who: []
+          { who
+          , what: FreeFormScreen {tabs: Nothing, rows: row, columns: Nothing}
+          , whereto
+          }
+        }
+    else do
+      -- Make tabs just for the thing roles.
+      tabs <- pure $ Just $ makeTab <$> filter isOnThingRole perspectives
+      who <- pure $ makeTableFormDef userRoleType <$> filter isOnUserRole perspectives
+      whereto <- pure $ makeTableFormDef userRoleType <$> filter isOnContextRole perspectives
+      pure $ ScreenDefinition
+        { title: Nothing
+        , tabs: Nothing
+        , rows: Nothing
+        , columns: Nothing
+        , whoWhatWhereScreen: Just $ WhoWhatWhereScreenDef $ 
+          { who
           , what: FreeFormScreen {tabs, rows: Nothing, columns: Nothing}
-          , whereto: []
+          , whereto
           }
         }
     where
@@ -178,6 +189,35 @@ constructDefaultScreen userRoleInstance userRoleType cid = do
           if isFunctional
             then FormElementD $ FormDef widgetCommonFields
             else TableElementD $ TableDef widgetCommonFields
+
+isOnThingRole :: SerialisedPerspective' -> Boolean
+isOnThingRole {roleKind} = case roleKind of
+  Just RoleInContext -> true
+  Just ExternalRole -> true
+  Just Public -> true
+  _ -> false
+isOnUserRole :: SerialisedPerspective' -> Boolean
+isOnUserRole {roleKind} = case roleKind of
+  Just UserRole -> true
+  _ -> false
+isOnContextRole :: SerialisedPerspective' -> Boolean
+isOnContextRole {roleKind} = case roleKind of
+  Just ContextRole -> true
+  _ -> false
+makeTableFormDef :: RoleType -> SerialisedPerspective' -> TableFormDef
+makeTableFormDef userRoleType p@{id, displayName} = let
+    widgetCommonFields =
+      { title: Just displayName
+      , perspective: Just p
+      , perspectiveId: id
+      , propertyVerbs: Nothing
+      , roleVerbs: Nothing
+      , userRole: userRoleType
+      }
+  in TableFormDef
+    { table: TableDef widgetCommonFields
+    , form: FormDef widgetCommonFields
+    }
 
 -----------------------------------------------------------
 -- CLASS ADDPERSPECTIVES
