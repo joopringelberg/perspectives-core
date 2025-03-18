@@ -21,7 +21,9 @@ export default async function() {
     },
     plugins: [
       del({ targets: 'dist/*' }), // Clean up the dist directory
-      resolve(), // Resolve node_modules
+      resolve(
+        {preferBuiltins: (module) => module !== 'events'} // Resolve built-in modules except 'events'
+      ), // Resolve node_modules
       commonjs(), // Convert CommonJS modules to ES6
       json(), // Handle JSON files
       sourcemaps(), // Include existing source maps

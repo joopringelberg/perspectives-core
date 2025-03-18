@@ -14,8 +14,9 @@
     "pouchdb-browser": "^9.0.0"
   },
   "peerDependencies": {
-    "eventsource": "^2.0.2"
-  },
+    "eventsource": "^2.0.2",
+    "events": "^3.3.0"
+    },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/joopringelberg/perspectives-core.git"
