@@ -93,6 +93,7 @@ workspace:
       # ref: v2.0.0
     subtlecrypto:
       # git: https://github.com/rowtype-yoga/purescript-yoga-subtlecrypto.git
+      # ref: v0.1.0
       path: ../purescript-yoga-subtlecrypto
   packageSet:
     registry: 60.6.0
