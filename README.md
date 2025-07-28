@@ -1,8 +1,10 @@
 perspectives-distributed-runtime
 ======================
+OBSOLETE!! THIS REPOSITORY IS NO LONGER IN USE. THE PERSPECTIVES PROJECT IS NOW IN [THE PERSPECTIVES MONOREPO](https://github.com/joopringelberg/perspectives-monorepo)
+======================
 
 ### About
-The Perspectives Distributed Runtime (PDR) is part of the software created in the course of the [Perspectives Project](https://academy.perspect.it).
+The Perspectives Distributed Runtime (PDR) is part of the software created in the course of the [Perspectives Project](https://joopringelberg.github.io/perspectives-documentation/).
 
 The PDR interprets models written in the Perspectives Language. **Patterns of co-operation** can easily be expressed in PL. Examples of co-operation are: buying and selling, renting stuff, a formal meeting, etc.
 
